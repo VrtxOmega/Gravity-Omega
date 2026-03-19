@@ -1,12 +1,12 @@
-﻿/**
- * GRAVITY OMEGA v3.0 â€” Preload Script
+/**
+ * GRAVITY OMEGA v2.0 — Preload Script
  * Secure bridge between Main and Renderer via contextBridge.
  * Every namespace here maps 1:1 to an IPC handler in main.js.
  */
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('omega', {
-    // â”€â”€ File Operations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── File Operations ──────────────────────────────────────
     file: {
         read:       (p) => ipcRenderer.invoke('file:read', p),
         save:       (p, c) => ipcRenderer.invoke('file:save', p, c),
@@ -20,7 +20,7 @@ contextBridge.exposeInMainWorld('omega', {
         rename:     (o, n) => ipcRenderer.invoke('file:rename', o, n),
     },
 
-    // â”€â”€ Terminal (PTY) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Terminal (PTY) ───────────────────────────────────────
     terminal: {
         create:   () => ipcRenderer.invoke('terminal:create'),
         write:    (id, data) => ipcRenderer.send('terminal:input', id, data),
@@ -30,31 +30,31 @@ contextBridge.exposeInMainWorld('omega', {
         onExit:   (cb) => ipcRenderer.on('terminal:exit', (_, id, code) => cb(id, code)),
     },
 
-    // â”€â”€ File Watcher â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── File Watcher ─────────────────────────────────────────
     watcher: {
         start:   (p) => ipcRenderer.invoke('watcher:start', p),
         onEvent: (cb) => ipcRenderer.on('watcher:event', (_, type, path) => cb(type, path)),
     },
 
-    // â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Search ───────────────────────────────────────────────
     search: {
         text: (dir, query) => ipcRenderer.invoke('search:text', dir, query),
     },
 
-    // â”€â”€ Backend Bridge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Backend Bridge ───────────────────────────────────────
     status:   () => ipcRenderer.invoke('backend:status'),
     modules:  () => ipcRenderer.invoke('backend:modules'),
     execute:  (id, args) => ipcRenderer.invoke('backend:execute', id, args),
     describe: (id) => ipcRenderer.invoke('backend:describe', id),
 
-    // â”€â”€ Chat (Agentic) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Chat (Agentic) ───────────────────────────────────────
     chat: {
         send:  (text, sessionId) => ipcRenderer.invoke('chat:send', text, sessionId),
         abort: (sessionId) => ipcRenderer.invoke('chat:abort', sessionId),
         tts:   (text) => ipcRenderer.invoke('chat:tts', text),
     },
 
-    // â”€â”€ Agent (Agentic Loop) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Agent (Agentic Loop) ─────────────────────────────────
     agent: {
         status:     () => ipcRenderer.invoke('agent:status'),
         tools:      () => ipcRenderer.invoke('agent:tools'),
@@ -63,10 +63,10 @@ contextBridge.exposeInMainWorld('omega', {
         approveAll: () => ipcRenderer.invoke('agent:approve-all'),
     },
 
-    // â”€â”€ Hardware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Hardware ─────────────────────────────────────────────
     hardware: () => ipcRenderer.invoke('hardware:info'),
 
-    // â”€â”€ Browser Automation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Browser Automation ───────────────────────────────────
     browser: {
         navigate:   (url) => ipcRenderer.invoke('browser:navigate', url),
         screenshot: (name) => ipcRenderer.invoke('browser:screenshot', name),
@@ -74,7 +74,7 @@ contextBridge.exposeInMainWorld('omega', {
         close:      () => ipcRenderer.invoke('browser:close'),
     },
 
-    // â”€â”€ Reports (EasyStreet Pipeline) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Reports (EasyStreet Pipeline) ────────────────────────
     reports: {
         drafts:    () => ipcRenderer.invoke('reports:drafts'),
         targets:   () => ipcRenderer.invoke('reports:targets'),
@@ -82,7 +82,7 @@ contextBridge.exposeInMainWorld('omega', {
         pipeline:  () => ipcRenderer.invoke('reports:pipeline'),
     },
 
-    // â”€â”€ Security Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Security Panel ───────────────────────────────────────
     security: {
         scan:          () => ipcRenderer.invoke('security:scan'),
         gravityShield: (a) => ipcRenderer.invoke('security:gravity-shield', a),
@@ -96,7 +96,7 @@ contextBridge.exposeInMainWorld('omega', {
         destroy:       () => ipcRenderer.invoke('security:destroy'),
     },
 
-    // â”€â”€ Tools (Operations) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Tools (Operations) ───────────────────────────────────
     tools: {
         credits:    () => ipcRenderer.invoke('tools:credits'),
         brain:      () => ipcRenderer.invoke('tools:brain'),
@@ -107,13 +107,13 @@ contextBridge.exposeInMainWorld('omega', {
         autoAudit:  (d) => ipcRenderer.invoke('tools:auto-audit', d),
     },
 
-    // â”€â”€ Ledger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Ledger ───────────────────────────────────────────────
     ledger: {
         stats:  () => ipcRenderer.invoke('ledger:stats'),
         search: (q) => ipcRenderer.invoke('ledger:search', q),
     },
 
-    // â”€â”€ Vault (Veritas Vault + Mnemo-Cortex) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Vault (Veritas Vault + Mnemo-Cortex) ─────────────────
     vault: {
         search:     (q) => ipcRenderer.invoke('vault:search', q),
         getContext:  () => ipcRenderer.invoke('vault:context'),
@@ -122,14 +122,14 @@ contextBridge.exposeInMainWorld('omega', {
         sweep:       () => ipcRenderer.invoke('vault:sweep'),
     },
 
-    // â”€â”€ Window Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Window Controls ──────────────────────────────────────
     window: {
         minimize: () => ipcRenderer.send('window:minimize'),
         maximize: () => ipcRenderer.send('window:maximize'),
         close:    () => ipcRenderer.send('window:close'),
     },
 
-    // â”€â”€ Event Bus (Main â†’ Renderer) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Event Bus (Main → Renderer) ──────────────────────────
     on: (channel, cb) => {
         const allowed = [
             'menu:open-file', 'menu:open-folder', 'menu:save',

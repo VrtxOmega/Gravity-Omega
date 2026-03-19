@@ -75,6 +75,7 @@ class OmegaSentinel:
             'change_log': [],
         }
         self.pending_alerts = []
+        self.paused = False
         self._ensure_dirs()
         self._load_state()
 
@@ -277,26 +278,41 @@ class OmegaSentinel:
         self.pending_alerts.clear()
         return alerts
 
+    def pause(self):
+        """Pause the sentinel — stops checking and healing."""
+        self.paused = True
+        log.info('Sentinel: PAUSED — auto-heal disabled')
+        return True
+
+    def resume(self):
+        """Resume the sentinel — re-enables checking and healing."""
+        self.paused = False
+        log.info('Sentinel: RESUMED — auto-heal re-enabled')
+        return True
+
     # ── DAEMON LOOP ─────────────────────────────────────────
     def _daemon_loop(self):
         """Background loop: check changes + auto-heal if broken."""
         log.info('Sentinel daemon started')
         while self.running:
             try:
-                changes = self.check_changes()
+                if self.paused:
+                    pass  # skip all checks while paused
+                else:
+                    changes = self.check_changes()
 
-                if changes:
-                    # Check if backend is still healthy
-                    healthy = self.health_check()
-                    if not healthy:
-                        log.warning('Sentinel: backend unhealthy after changes — auto-healing...')
-                        healed = self.heal()
-                        if healed:
-                            log.info(f'Sentinel: auto-healed {len(healed)} files, backend should recover')
-                    else:
-                        # Changes detected but system healthy — log awareness
-                        for c in changes:
-                            log.info(f'Sentinel: [{c["type"]}] {c["file"]} — system healthy, accepting')
+                    if changes:
+                        # Check if backend is still healthy
+                        healthy = self.health_check()
+                        if not healthy:
+                            log.warning('Sentinel: backend unhealthy after changes — auto-healing...')
+                            healed = self.heal()
+                            if healed:
+                                log.info(f'Sentinel: auto-healed {len(healed)} files, backend should recover')
+                        else:
+                            # Changes detected but system healthy — log awareness
+                            for c in changes:
+                                log.info(f'Sentinel: [{c["type"]}] {c["file"]} — system healthy, accepting')
 
             except Exception as e:
                 log.error(f'Sentinel daemon error: {e}')

@@ -290,6 +290,18 @@
                         </div>
                     </div>
                     <div class="reports-section">
+                        <div class="reports-section-header"><span>🛡️ SENTINEL</span></div>
+                        <div class="tools-form">
+                            <label style="font-size:11px;color:var(--text-secondary)">Auto-Heal Protection</label>
+                            <div style="display:flex;gap:6px">
+                                <button id="sentinel-pause-btn" class="reports-action-btn" onclick="window.sentinelToggle('pause')">⏸ Pause</button>
+                                <button id="sentinel-resume-btn" class="reports-action-btn" onclick="window.sentinelToggle('resume')">▶ Resume</button>
+                                <button id="sentinel-baseline-btn" class="reports-action-btn" onclick="window.sentinelToggle('accept')">🔒 Re-Baseline</button>
+                            </div>
+                            <div id="sentinel-status-text" style="font-size:10px;color:var(--text-tertiary);margin-top:4px">Active</div>
+                        </div>
+                    </div>
+                    <div class="reports-section">
                         <div class="reports-section-header"><span>ℹ️ ABOUT</span></div>
                         <div style="padding:8px 12px;font-size:11px;color:var(--text-tertiary)">
                             <div><strong style="color:var(--gold)">Gravity Omega v3.0</strong></div>

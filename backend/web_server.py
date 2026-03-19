@@ -967,6 +967,20 @@ def api_sentinel_accept():
     sentinel.accept_changes()
     return jsonify({'status': 'changes_accepted'})
 
+@app.route('/api/sentinel/pause', methods=['POST'])
+@require_auth
+def api_sentinel_pause():
+    sentinel = get_sentinel()
+    sentinel.pause()
+    return jsonify({'status': 'paused', 'paused': True})
+
+@app.route('/api/sentinel/resume', methods=['POST'])
+@require_auth
+def api_sentinel_resume():
+    sentinel = get_sentinel()
+    sentinel.resume()
+    return jsonify({'status': 'resumed', 'paused': False})
+
 
 @app.route('/api/status', methods=['GET'])
 @require_auth

@@ -1223,6 +1223,28 @@ function initEventListeners() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// SENTINEL CONTROLS
+// ══════════════════════════════════════════════════════════════
+
+window.sentinelToggle = async function(action) {
+    const statusEl = document.getElementById('sentinel-status-text');
+    try {
+        const endpoints = { pause: '/api/sentinel/pause', resume: '/api/sentinel/resume', accept: '/api/sentinel/accept' };
+        const resp = await fetch(`http://127.0.0.1:5000${endpoints[action]}`, {
+            method: 'POST', headers: { 'X-Omega-Auth': 'sentinel', 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        const labels = { pause: '⏸ Paused', resume: '▶ Active', accept: '🔒 Re-Baselined' };
+        statusEl.textContent = labels[action] || data.status;
+        statusEl.style.color = action === 'pause' ? 'var(--orange)' : 'var(--green)';
+        showToast(`Sentinel: ${labels[action]}`, 'success', 2000);
+    } catch(e) {
+        statusEl.textContent = '❌ Error';
+        showToast(`Sentinel error: ${e.message}`, 'error');
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
 // INITIALIZATION
 // ══════════════════════════════════════════════════════════════
 

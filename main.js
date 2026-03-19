@@ -1,5 +1,5 @@
 /**
- * GRAVITY OMEGA v3.0 — Electron Main Process
+ * GRAVITY OMEGA v2.0 — Electron Main Process
  * Ported from Windows → WSL Ubuntu
  *
  * Architecture:
