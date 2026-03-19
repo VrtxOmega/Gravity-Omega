@@ -4,12 +4,12 @@ def register_advanced_modules():
     """Register advanced modules with safe inline handlers.
     These do NOT use __import__ — they delegate to existing module scripts."""
     advanced = [
-        ('cerberus', 'Cerberus Engine', 'Email/Tuning Engine with high assurance execution bounds.', 'advanced', 'omega_test_harness.py'),
-        ('chain_sniper', 'Chain Sniper', 'DeFi Chain Analysis and State-Desynchronization discovery.', 'advanced', 'risk_calibrator.py'),
-        ('exploit_monitor', 'Exploit Monitor', 'Vulnerability Exploit Tracker with live mempool integration.', 'advanced', 'titan_monitor.py'),
-        ('hydra', 'Hydra Scanner v3.0', 'AST-based multi-language security scanner (Omniscient Evolution).', 'advanced', 'veritas_neural_core.py'),
-        ('omega_claw', 'Omega Claw', 'Autonomous Extraction Loop Engine for Cloud Run execution.', 'advanced', 'hybrid_coordinator.py'),
-        ('titan_engine', 'Titan Compute Engine', 'Distributed orchestration and computational bounds enforcement.', 'advanced', 'benchmark_harness.py'),
+        ('cerberus', 'Email & Outreach Engine', 'Composes, tunes, and sends automated emails with security guardrails.', 'advanced', 'omega_test_harness.py'),
+        ('chain_sniper', 'Blockchain Transaction Tracker', 'Scans blockchain transactions for suspicious patterns and price anomalies.', 'advanced', 'risk_calibrator.py'),
+        ('exploit_monitor', 'Live Vulnerability Tracker', 'Watches for new security exploits in real time across crypto mempool feeds.', 'advanced', 'titan_monitor.py'),
+        ('hydra', 'Code Security Scanner (Deep)', 'Reads source code across multiple languages and finds hidden security bugs.', 'advanced', 'veritas_neural_core.py'),
+        ('omega_claw', 'Cloud Task Runner', 'Runs automated jobs on Google Cloud — clone repos, scan code, generate reports.', 'advanced', 'hybrid_coordinator.py'),
+        ('titan_engine', 'Performance Benchmarker', 'Measures how fast your code runs and checks resource usage limits.', 'advanced', 'benchmark_harness.py'),
     ]
     for mid, name, desc, cat, script in advanced:
         register_module(mid, name, desc, category=cat, handler=_make_subprocess_handler(script))
@@ -438,34 +438,63 @@ def _make_subprocess_handler(script_name):
 def _register_all_modules():
     """Register all VERITAS modules with subprocess-based execution handlers."""
 
-    # Original 23 module entries — names/IDs/descriptions unchanged from frozen baseline
-    # Added: script mapping + VeritasModule handler for each
+    # v3.0: All 23 modules — plain-English names + clear descriptions
     modules = [
         # ID, Name, Description, Category, script_name
-        ('aegis_ald', 'AEGIS-ALD Gate Pipeline', 'FastAPI server - ingests trace logs, runs 6 ALD observation gates, generates sealed PDF audit reports.', 'security', 'edge_audit_validator.py'),
-        ('goliath_leviathan', 'Goliath Leviathan - Forensic Scanner', 'Deep forensic disclosure scanner - secret detection, metadata harvesting, temporal probing, shadow mapping, financial kill-chain detection.', 'security', None),
-        ('sentinel_omega', 'Sentinel Omega - Cybersecurity Suite', 'Admin-elevated security command center: Tor-routed API gate, XOR obfuscation forge (VeritasForge), Gravity Shield egress filtering.', 'security', None),
-        ('sentinel_shield', 'Sentinel Shield - Defensive Monitor', 'Process-level defense suite: ESM scoring, Logic Flow Divergence detection, honeytoken tripwire, port sentry, CWE-338 scanner.', 'security', 'unified_sentinel_vault.py'),
-        ('chronos', 'Chronos - DeFi Hydration Engine', '10-worker parallel DeFi hydration engine - RPC rotation, WebSocket price streams, PostgreSQL persistence.', 'defi', 'diagnostic_hydration.py'),
-        ('kinetic_siphon', 'Kinetic Siphon - Egress Monitor', 'Passive egress monitor - binds TCP port 445, detects unauthorized connections, generates HTML compliance triggers.', 'security', 'kinetic_siphon_module.py'),
-        ('sovereign_v42', 'Sovereign v4.2 - Physics Compiler', 'Constraint-locked epistemic compiler - dimensional analysis gates, Bernoulli/Hooke enforcement, equation parity.', 'compiler', 'physics_audit_engine.py'),
-        ('reality_compiler', 'Reality Compiler - VERITAS Gates', 'Schema validation, constraint compilation, gate-by-gate report generation following VERITAS Omega canonical gate order.', 'compiler', 'gate_pipeline.py'),
-        ('atc_engine', 'ATC Falsification Engine', 'Flight data ingestion, separation probe with 2D CPA calculations, NIC isolation, deterministic vertical prediction.', 'analysis', 'benchmark_harness.py'),
-        ('project_sv', 'Project SV - Compression Engine', 'Custom codec formats (.god/.sntl/.v6) with C implementations, Python benchmark harness, restoration pipeline.', 'tools', 'signal_shroud.py'),
-        ('pipeline_router', 'Detonation Pipeline', 'Isolation -> high-stress audit -> verification -> atomic promotion pipeline with RSS monitoring and SHA-256 integrity.', 'operations', None),
-        ('thermal_shield', 'Thermal Shield Forge', 'NAEF-compliant validation engine, hostile audit mode, thermal survivor testing with full reason-code registry.', 'security', 'thermal_shield_forge.py'),
-        ('ledger_bot', 'VERITAS Ledger Bot', 'Deterministic research archiver - multi-root file ingest, SHA-256 hashing, classification, policy DNA enforcement.', 'operations', 'ledger_bot_entry.py'),
-        ('easystreet', 'EasyStreet - AEGIS Audits (LIVE)', 'Fully autonomous smart contract security audit platform on Google Cloud Run. LIVE at aegisaudits.com.', 'easystreet', 'hybrid_coordinator.py'),
-        ('aegis_w1', 'AEGIS ALD W1 - Gate Pipeline', 'Full VERITAS Omega gate pipeline - veritas_api + veritas_omega packages, golden verdict suite, sealed audit packets.', 'security', 'edge_audit_validator.py'),
-        ('receipt_inspector', 'Decision Receipt Inspector', 'Frozen stasis verifier - validates decision receipt bundles for structural integrity, hash verification, seal chain.', 'analysis', 'revenue_survivor_validator.py'),
-        ('alpha_scanner', 'Alpha Predator - God Scanner', '55KB deep reconnaissance scanner - multi-threaded target analysis, SQLite persistence, risk scoring, pattern detection.', 'security', 'status_dashboard.py'),
-        ('veritas_fuzzer', 'Veritas Fuzzer', 'Input fuzzing engine - generates adversarial payloads, boundary condition tests, malformed input sequences.', 'security', 'hftsa_hostile_audit.py'),
-        ('containment_layer', 'Containment Layer - Packet Filter', 'VERITAS network containment - Kotlin PacketFilter with leaky bucket rate limiting, monotonic time decay.', 'security', 'sentinel_expanse.py'),
-        ('provenance_stack', 'Provenance Stack - Context Compiler', 'Module 20. Deterministic context compilation with proof-carrying retrieval, Archivist Node, Epistemic Engine, S.E.A.L.', 'intelligence', 'veritas_deep_indexer.py'),
-        # -- Additional VERITAS Modules (3) --
-        ('hydra_scanner', 'Hydra Scanner v3.0', 'Hydra v3.0 Omniscient Evolution - 20-module AST-based security scanner with Neural Core, Halmos Handshake, Live-State Anchor.', 'security', 'veritas_neural_core.py'),
-        ('veritas_pipeline', 'VERITAS Extraction Pipeline', 'End-to-end extraction-to-conversion pipeline - Omni-Hunter loop, clone-scan-weaponize, State-Desync Kill Chain.', 'security', 'veritas_deep_indexer.py'),
-        ('omega_strike_array', 'Omega Strike Array - Bug Bounty Engine', 'Unified bug bounty hunting engine consolidating Cerberus, Goliath, Hydra v3, Slither, and Foundry into a single scanner.', 'security', 'hftsa_validation_protocol.py'),
+        ('aegis_ald', 'Audit Report Generator', 'Reads trace logs, checks them against 6 quality gates, and produces a sealed PDF report.', 'security', 'edge_audit_validator.py'),
+        ('goliath_leviathan', 'Deep Forensic Scanner', 'Hunts for leaked secrets, hidden metadata, and suspicious financial patterns in any codebase.', 'security', None),
+        ('sentinel_omega', 'Security Command Center', 'Central security dashboard — manages encrypted connections, traffic filtering, and access control.', 'security', None),
+        ('sentinel_shield', 'Process Defense Monitor', 'Watches running processes for suspicious behavior, fake tokens, and unauthorized port access.', 'security', 'unified_sentinel_vault.py'),
+        ('chronos', 'DeFi Price Tracker', 'Pulls live crypto prices from multiple sources in parallel and stores them in a database.', 'defi', 'diagnostic_hydration.py'),
+        ('kinetic_siphon', 'Network Traffic Monitor', 'Listens for unauthorized outbound connections and flags anything suspicious.', 'security', 'kinetic_siphon_module.py'),
+        ('sovereign_v42', 'Physics & Math Verifier', 'Checks equations and scientific claims for dimensional correctness and mathematical consistency.', 'compiler', 'physics_audit_engine.py'),
+        ('reality_compiler', 'Claim Verification Engine', 'Validates data claims step-by-step through the VERITAS gate pipeline and generates a verdict.', 'compiler', 'gate_pipeline.py'),
+        ('atc_engine', 'Data Analysis Engine', 'Ingests structured data, runs calculations, and produces deterministic analysis reports.', 'analysis', 'benchmark_harness.py'),
+        ('project_sv', 'File Encryption & Compression', 'Encrypts and compresses files using custom secure formats with integrity verification.', 'tools', 'signal_shroud.py'),
+        ('pipeline_router', 'Safe Deployment Pipeline', 'Isolates code changes, stress-tests them, verifies integrity, then promotes to production.', 'operations', None),
+        ('thermal_shield', 'Stress Test Engine', 'Throws hostile edge-case inputs at your code to find where it breaks. Reports every failure.', 'security', 'thermal_shield_forge.py'),
+        ('ledger_bot', 'Research Archiver', 'Scans folders for files, hashes them for tamper-proofing, classifies them, and logs everything.', 'operations', 'ledger_bot_entry.py'),
+        ('easystreet', 'Smart Contract Auditor (Live)', 'Fully automated security audit platform for blockchain contracts. Live at aegisaudits.com.', 'easystreet', 'hybrid_coordinator.py'),
+        ('aegis_w1', 'Full Audit Pipeline', 'End-to-end security audit — scans code, runs all verification gates, and seals the final report.', 'security', 'edge_audit_validator.py'),
+        ('receipt_inspector', 'Decision Verifier', 'Checks past decisions and receipts for structural integrity, valid signatures, and unbroken seal chains.', 'analysis', 'revenue_survivor_validator.py'),
+        ('alpha_scanner', 'Deep Recon Scanner', 'Multi-threaded reconnaissance — scans targets, scores risk levels, and tracks patterns over time.', 'security', 'status_dashboard.py'),
+        ('veritas_fuzzer', 'Input Fuzzer', 'Generates thousands of weird, broken, and malicious inputs to find crashes and vulnerabilities.', 'security', 'hftsa_hostile_audit.py'),
+        ('containment_layer', 'Network Firewall', 'Rate-limits and filters network traffic to block floods, scans, and unauthorized access attempts.', 'security', 'sentinel_expanse.py'),
+        ('provenance_stack', 'Memory & Context Engine', 'Searches your Vault knowledge base, compiles relevant context, and creates tamper-proof audit trails.', 'intelligence', 'veritas_deep_indexer.py'),
+        # -- Additional Modules (3) --
+        ('hydra_scanner', 'AI Code Scanner', 'Uses AI to read source code in any language and spot security vulnerabilities humans would miss.', 'security', 'veritas_neural_core.py'),
+        ('veritas_pipeline', 'Bug Bounty Pipeline', 'Full hunting workflow — clone a repo, scan it, find bugs, and generate a submission-ready report.', 'security', 'veritas_deep_indexer.py'),
+        ('omega_strike_array', 'Unified Bug Hunter', 'Combines all scanners into one — runs every security tool at once and merges the results.', 'security', 'hftsa_validation_protocol.py'),
+        # -- Unregistered Arsenal (29 modules) --
+        ('alpha_cli', 'Scanner CLI Tool', 'Command-line interface for the deep recon scanner — run scans without a UI.', 'tools', 'alpha_cli.py'),
+        ('alpha_scanner_god', 'Alpha Trading Scanner', 'Multi-threaded market scanner that finds buy/short opportunities with risk scoring and database tracking.', 'defi', 'alpha_scanner_god.py'),
+        ('audit_ledger', 'Audit Trail Logger', 'Append-only tamper-proof log — every action gets hashed into an unbreakable chain.', 'operations', 'audit_ledger.py'),
+        ('context_compiler', 'Context Builder', 'Compiles knowledge from your Vault into a focused context bundle for AI prompts.', 'intelligence', 'context_compiler.py'),
+        ('edge_audit_parser', 'Audit Report Parser', 'Reads raw audit output and extracts structured findings with 92% detection accuracy.', 'analysis', 'edge_audit_parser_v4.py'),
+        ('goliath_drill', 'Network Signal Tracker', 'Traces external network signals — header analysis, gap detection, and cross-dataset collision checks.', 'security', 'GOLIATH_DRILL.py'),
+        ('goliath_gate', 'Security Gatekeeper', 'Multi-step security gate — checks permissions, validates signatures, and blocks unauthorized access.', 'security', 'GOLIATH_GATE.py'),
+        ('goliath_leviathan_engine', 'Deep Narrative Scanner', 'Scans documents and conversations for manipulation patterns, inconsistencies, and hidden agendas.', 'security', 'GOLIATH_LEVIATHAN.py'),
+        ('goliath_trawler', 'Forensic Data Trawler', 'Crawls through large datasets searching for evidence trails, hidden connections, and anomalies.', 'security', 'GOLIATH_TRAWLER.py'),
+        ('easystreet_training', 'AI Training Data Injector', 'Loads curated Q&A training pairs into the AI to teach it about your projects.', 'intelligence', 'inject_easystreet_training.py'),
+        ('llama_ssrf_poc', 'SSRF Exploit Tester', 'Proof-of-concept tool that tests for server-side request forgery vulnerabilities in AI stacks.', 'security', 'llama_stack_ssrf_standalone.py'),
+        ('monitor_fund', 'Wallet Fund Tracker', 'Tracks your ETH wallet balance and logs progress toward your savings target.', 'defi', 'monitor_fund.py'),
+        ('morning_brief', 'Morning Briefing Generator', 'Reads your Vault, finds where you left off, and creates a branded one-page PDF daily brief.', 'intelligence', 'morning_brief.py'),
+        ('ntfy_monitor', 'Push Notification Hub', 'Sends real-time push alerts for liquidation events, fund milestones, and system warnings.', 'operations', 'ntfy_monitor.py'),
+        ('omega_cli', 'Omega Agent (Offline)', 'The standalone autonomous agent — runs locally without internet using Ollama for reasoning.', 'intelligence', 'omega_cli.py'),
+        ('omega_mcp_server', 'MCP Tool Bridge', 'Registers Omega as a tool inside Antigravity via the Model Context Protocol.', 'intelligence', 'omega_mcp_server.py'),
+        ('omega_rag_local', 'Local Knowledge Search', 'Indexes your workspace files into SQLite and finds relevant code for any task using Ollama embeddings.', 'intelligence', 'omega_rag_local.py'),
+        ('omega_seal', 'Authorization Gate', 'The choke valve — blocks any action that does not meet minimum evidence and permission requirements.', 'security', 'omega_seal.py'),
+        ('omega_soul', 'Identity Kernel', 'Loads the system identity, injects VERITAS rules into every AI prompt, and prevents prompt drift.', 'intelligence', 'omega_soul.py'),
+        ('training_data_gen', 'AI Training Data Generator', 'Extracts knowledge from all project files and converts it into fine-tuning format for Vertex AI.', 'intelligence', 'prepare_training_data.py'),
+        ('repo_map', 'Codebase Map', 'Reads your entire codebase via AST parsing and builds a searchable index of every function and class.', 'tools', 'repo_map.py'),
+        ('test_suite', 'System Test Suite', 'Comprehensive test runner — validates module registry, AI router, dispatcher, and error handling.', 'operations', 'test_harness.py'),
+        ('db_verifier', 'Database Connection Tester', 'Verifies PostgreSQL database connectivity and checks that tables and schemas are intact.', 'operations', 'verify_v3.py'),
+        ('hardware_fuzzer', 'Hardware USB Fuzzer', 'Sends aggressive fuzz payloads to USB HID devices to test firmware robustness.', 'security', 'veritas_fuzzer_v2.py'),
+        ('pdf_generator', 'Branded PDF Creator', 'Converts any Markdown report into a polished VERITAS-branded PDF document.', 'tools', 'veritas_pdf.py'),
+        ('pdf_template', 'PDF Layout Engine', 'ReportLab-based PDF layout — handles headers, tables, styling, and multi-page branded documents.', 'tools', 'veritas_pdf_template.py'),
+        ('veritas_spec', 'Spec Validator', 'Checks files and configs against the VERITAS canonical specification for compliance.', 'compiler', 'VERITAS_SPEC.py'),
+        ('validation_suite', 'Full Validation Runner', 'End-to-end validation — hashes files, checks integrity, runs random tests, and produces a pass/fail report.', 'operations', 'VERITAS_VALIDATION_SUITE.py'),
+        ('workflow_engine', 'Workflow Pipeline Runner', 'Runs multi-step workflows with parallel execution, conditional branching, and sealed audit trails.', 'operations', 'workflow_engine.py'),
     ]
     for mid, name, desc, cat, script in modules:
         handler = _make_subprocess_handler(script) if script else None
