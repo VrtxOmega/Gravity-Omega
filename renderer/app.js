@@ -508,15 +508,29 @@ async function playVoice(text) {
         .substring(0, 800);
     console.log('[TTS] Requesting voice for:', clean.substring(0, 80));
     try {
-        const result = await window.omega.chat.tts(clean);
-        console.log('[TTS] Result:', result ? (result.error || `${(result.audio||'').length} chars base64`) : 'null');
-        if (result.error) { console.warn('[TTS] Error:', result.error); return; }
-        if (!result.audio) { console.warn('[TTS] No audio data in result'); return; }
-        const audio = new Audio('data:audio/mpeg;base64,' + result.audio);
+        // Direct fetch to Flask backend — bypasses IPC
+        const resp = await fetch('http://127.0.0.1:5000/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: clean }),
+        });
+        if (!resp.ok) {
+            console.warn('[TTS] Server error:', resp.status);
+            return;
+        }
+        const blob = await resp.blob();
+        console.log('[TTS] Got audio blob:', blob.size, 'bytes');
+        if (blob.size < 100) { console.warn('[TTS] Audio too small'); return; }
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
         state.chat.audioPlayer = audio;
         const stopBtn = document.getElementById('chat-stop-btn');
         stopBtn.classList.add('visible');
-        audio.onended = () => { state.chat.audioPlayer = null; stopBtn.classList.remove('visible'); };
+        audio.onended = () => {
+            state.chat.audioPlayer = null;
+            stopBtn.classList.remove('visible');
+            URL.revokeObjectURL(url);
+        };
         audio.onerror = (e) => console.error('[TTS] Audio playback error:', e);
         audio.play().catch(e => console.error('[TTS] Play failed:', e));
         console.log('[TTS] Playing audio...');
