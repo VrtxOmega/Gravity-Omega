@@ -406,34 +406,50 @@ function registerIPC() {
     });
 
     ipcMain.handle('chat:tts', async (_, text) => {
+        console.log('[TTS:main] Request received, text length:', text?.length);
         // Proxy TTS request to backend
         const bridgeReady = await bridge.waitForBridge();
+        console.log('[TTS:main] Bridge ready:', bridgeReady, 'port:', bridge._port);
         if (!bridgeReady) return { error: 'Backend not ready' };
         try {
             const http = require('http');
             return new Promise((resolve, reject) => {
                 const postData = JSON.stringify({ text: text.substring(0, 1000) });
                 const req = http.request({
-                    hostname: '127.0.0.1', port: bridge.port || 5000,
+                    hostname: '127.0.0.1', port: bridge._port || 5000,
                     path: '/api/tts', method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(postData) },
+                    timeout: 30000,
                 }, (res) => {
+                    console.log('[TTS:main] Response status:', res.statusCode);
                     const chunks = [];
                     res.on('data', c => chunks.push(c));
                     res.on('end', () => {
                         const buf = Buffer.concat(chunks);
+                        console.log('[TTS:main] Response body size:', buf.length, 'bytes');
                         if (res.statusCode === 200) {
                             resolve({ audio: buf.toString('base64'), mimeType: 'audio/mpeg' });
                         } else {
-                            resolve({ error: `TTS failed: ${res.statusCode}` });
+                            const errBody = buf.toString('utf-8').substring(0, 200);
+                            console.error('[TTS:main] Error response:', errBody);
+                            resolve({ error: `TTS failed: ${res.statusCode} ${errBody}` });
                         }
                     });
                 });
-                req.on('error', e => resolve({ error: e.message }));
+                req.on('error', e => {
+                    console.error('[TTS:main] Request error:', e.message);
+                    resolve({ error: e.message });
+                });
+                req.on('timeout', () => {
+                    console.error('[TTS:main] Request timeout');
+                    req.destroy();
+                    resolve({ error: 'TTS request timeout' });
+                });
                 req.write(postData);
                 req.end();
             });
         } catch (e) {
+            console.error('[TTS:main] Exception:', e.message);
             return { error: e.message };
         }
     });

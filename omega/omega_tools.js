@@ -85,6 +85,16 @@ const TOOL_REGISTRY = {
         description: 'Get the current working directory',
         args: {},
     },
+    openFile: {
+        safety: SAFETY.SAFE,
+        description: 'Open a file in the Gravity Omega editor (Monaco with tabs). Use this when the user asks to open, view, or edit a file.',
+        args: { path: { type: 'string', required: true }, line: { type: 'number' } },
+    },
+    openTerminal: {
+        safety: SAFETY.SAFE,
+        description: 'Open a new terminal in the bottom panel of Gravity Omega. Use this when the user asks to open a terminal, shell, or command line.',
+        args: { command: { type: 'string' } },
+    },
 
     // ── GATED (9) — Auto for non-destructive ─────────────────
     writeFile: {
@@ -176,6 +186,25 @@ class ToolExecutor {
     async _exec_readFile({ path: p }) {
         const content = fs.readFileSync(p, 'utf-8');
         return { path: p, content, size: content.length, lines: content.split('\n').length };
+    }
+
+    async _exec_openFile({ path: p, line }) {
+        // Sends IPC to renderer to open the file in the Monaco editor
+        const { BrowserWindow } = require('electron');
+        const windows = BrowserWindow.getAllWindows();
+        if (windows.length > 0) {
+            windows[0].webContents.send('agent:open-file', { path: p, line: line || 1 });
+        }
+        return { opened: true, path: p, line: line || 1, message: `Opened ${path.basename(p)} in the editor` };
+    }
+
+    async _exec_openTerminal({ command }) {
+        const { BrowserWindow } = require('electron');
+        const windows = BrowserWindow.getAllWindows();
+        if (windows.length > 0) {
+            windows[0].webContents.send('agent:open-terminal', { command: command || null });
+        }
+        return { opened: true, message: command ? `Opened terminal and running: ${command}` : 'Opened a new terminal' };
     }
 
     async _exec_listDir({ path: p, recursive }) {

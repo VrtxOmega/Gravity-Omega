@@ -477,7 +477,7 @@ window.omega.terminal.onExit((id, code) => {
 // ══════════════════════════════════════════════════════════════
 
 // Voice + session state
-state.chat.voiceEnabled = false;
+state.chat.voiceEnabled = true;  // v3.0: Omega speaks by default
 state.chat.audioPlayer = null;
 state.chat.messageHistory = [];  // Full session context — never lost
 state.chat.abortController = null;
@@ -506,16 +506,21 @@ async function playVoice(text) {
         .replace(/[#*_>\-|]/g, '')
         .replace(/\n+/g, '. ')
         .substring(0, 800);
+    console.log('[TTS] Requesting voice for:', clean.substring(0, 80));
     try {
         const result = await window.omega.chat.tts(clean);
-        if (result.error) { console.warn('TTS:', result.error); return; }
+        console.log('[TTS] Result:', result ? (result.error || `${(result.audio||'').length} chars base64`) : 'null');
+        if (result.error) { console.warn('[TTS] Error:', result.error); return; }
+        if (!result.audio) { console.warn('[TTS] No audio data in result'); return; }
         const audio = new Audio('data:audio/mpeg;base64,' + result.audio);
         state.chat.audioPlayer = audio;
         const stopBtn = document.getElementById('chat-stop-btn');
         stopBtn.classList.add('visible');
         audio.onended = () => { state.chat.audioPlayer = null; stopBtn.classList.remove('visible'); };
-        audio.play().catch(() => {});
-    } catch (e) { console.warn('TTS playback error:', e); }
+        audio.onerror = (e) => console.error('[TTS] Audio playback error:', e);
+        audio.play().catch(e => console.error('[TTS] Play failed:', e));
+        console.log('[TTS] Playing audio...');
+    } catch (e) { console.warn('[TTS] Playback error:', e); }
 }
 
 function interruptOmega() {

@@ -1,14 +1,14 @@
-
-# ── Advanced Modules (v3.0 — safe inline handlers) ──
+﻿
+# â”€â”€ Advanced Modules (v3.0 â€” safe inline handlers) â”€â”€
 def register_advanced_modules():
     """Register advanced modules with safe inline handlers.
-    These do NOT use __import__ — they delegate to existing module scripts."""
+    These do NOT use __import__ â€” they delegate to existing module scripts."""
     advanced = [
         ('cerberus', 'Email & Outreach Engine', 'Composes, tunes, and sends automated emails with security guardrails.', 'advanced', 'omega_test_harness.py'),
         ('chain_sniper', 'Blockchain Transaction Tracker', 'Scans blockchain transactions for suspicious patterns and price anomalies.', 'advanced', 'risk_calibrator.py'),
         ('exploit_monitor', 'Live Vulnerability Tracker', 'Watches for new security exploits in real time across crypto mempool feeds.', 'advanced', 'titan_monitor.py'),
         ('hydra', 'Code Security Scanner (Deep)', 'Reads source code across multiple languages and finds hidden security bugs.', 'advanced', 'veritas_neural_core.py'),
-        ('omega_claw', 'Cloud Task Runner', 'Runs automated jobs on Google Cloud — clone repos, scan code, generate reports.', 'advanced', 'hybrid_coordinator.py'),
+        ('omega_claw', 'Cloud Task Runner', 'Runs automated jobs on Google Cloud â€” clone repos, scan code, generate reports.', 'advanced', 'hybrid_coordinator.py'),
         ('titan_engine', 'Performance Benchmarker', 'Measures how fast your code runs and checks resource usage limits.', 'advanced', 'benchmark_harness.py'),
     ]
     for mid, name, desc, cat, script in advanced:
@@ -16,11 +16,11 @@ def register_advanced_modules():
 
 
 """
-GRAVITY OMEGA v2.0 — Python Backend (web_server.py)
+GRAVITY OMEGA v2.0 â€” Python Backend (web_server.py)
 
 Flask-based backend running on port 5000. Provides:
   - 27 module registry with execute/describe endpoints
-  - AI routing (Vertex AI → OpenAI → Ollama fallback)
+  - AI routing (Vertex AI â†’ OpenAI â†’ Ollama fallback)
   - Agent thinking endpoint for the agentic loop
   - File operations, search, hardware, security scanning
   - Vault integration (SQLite + FTS5, DAG lineage)
@@ -49,7 +49,7 @@ from provenance_stack import get_stack as get_provenance_stack
 from datetime import datetime, timezone
 from functools import wraps
 
-# ── HIGH ASSURANCE SHIELD MODULES ──
+# â”€â”€ HIGH ASSURANCE SHIELD MODULES â”€â”€
 from omega_ssrf_shield import SSRFShield
 from omega_process_identity import BinaryIdentityCache
 from omega_ancestor_verify import AncestorVerification
@@ -67,9 +67,9 @@ except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'flask'])
     from flask import Flask, request, jsonify, abort
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # CONFIG
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 PORT = int(os.environ.get('FLASK_PORT', 5000))
 AUTH_TOKEN = os.environ.get('OMEGA_AUTH_TOKEN', '')
@@ -87,9 +87,9 @@ MODULES_DIR.mkdir(exist_ok=True)
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 log = logging.getLogger('omega')
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # FLASK APP
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 app = Flask(__name__)
 
@@ -104,9 +104,9 @@ def require_auth(f):
     return decorated
 
 
-# ══════════════════════════════════════════════════════════════
-# MODULE REGISTRY — 27 Modules
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# MODULE REGISTRY â€” 27 Modules
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 MODULE_REGISTRY = {}
 
@@ -125,7 +125,7 @@ def register_module(module_id, name, description, status='ACTIVE',
     }
 
 
-# ── Module Handlers ───────────────────────────────────────────
+# â”€â”€ Module Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _handle_system_health(**kwargs):
     """Module 1: System health check."""
@@ -279,7 +279,7 @@ def _handle_basilisk_mirror(**kwargs):
 
 
 def _handle_nemesis(**kwargs):
-    """Module 10: NemesisV3 — Advanced counter-intrusion."""
+    """Module 10: NemesisV3 â€” Advanced counter-intrusion."""
     action = kwargs.get('action', 'status')
     return {'shield': 'nemesis', 'action': action, 'status': 'deployed' if action == 'engage' else 'standby',
             'severity': 'critical', 'timestamp': datetime.now(timezone.utc).isoformat()}
@@ -407,7 +407,7 @@ def _handle_vault_sweep(**kwargs):
     return _vault_sweep()
 
 
-# ── Register All 27 Modules ──────────────────────────────────
+# â”€â”€ Register All 27 Modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _make_subprocess_handler(script_name):
     """Create a handler that runs a module script via subprocess (120s timeout, isolated)."""
@@ -438,12 +438,12 @@ def _make_subprocess_handler(script_name):
 def _register_all_modules():
     """Register all VERITAS modules with subprocess-based execution handlers."""
 
-    # v3.0: All 23 modules — plain-English names + clear descriptions
+    # v3.0: All 23 modules â€” plain-English names + clear descriptions
     modules = [
         # ID, Name, Description, Category, script_name
         ('aegis_ald', 'Audit Report Generator', 'Reads trace logs, checks them against 6 quality gates, and produces a sealed PDF report.', 'security', 'edge_audit_validator.py'),
         ('goliath_leviathan', 'Deep Forensic Scanner', 'Hunts for leaked secrets, hidden metadata, and suspicious financial patterns in any codebase.', 'security', None),
-        ('sentinel_omega', 'Security Command Center', 'Central security dashboard — manages encrypted connections, traffic filtering, and access control.', 'security', None),
+        ('sentinel_omega', 'Security Command Center', 'Central security dashboard â€” manages encrypted connections, traffic filtering, and access control.', 'security', None),
         ('sentinel_shield', 'Process Defense Monitor', 'Watches running processes for suspicious behavior, fake tokens, and unauthorized port access.', 'security', 'unified_sentinel_vault.py'),
         ('chronos', 'DeFi Price Tracker', 'Pulls live crypto prices from multiple sources in parallel and stores them in a database.', 'defi', 'diagnostic_hydration.py'),
         ('kinetic_siphon', 'Network Traffic Monitor', 'Listens for unauthorized outbound connections and flags anything suspicious.', 'security', 'kinetic_siphon_module.py'),
@@ -455,24 +455,24 @@ def _register_all_modules():
         ('thermal_shield', 'Stress Test Engine', 'Throws hostile edge-case inputs at your code to find where it breaks. Reports every failure.', 'security', 'thermal_shield_forge.py'),
         ('ledger_bot', 'Research Archiver', 'Scans folders for files, hashes them for tamper-proofing, classifies them, and logs everything.', 'operations', 'ledger_bot_entry.py'),
         ('easystreet', 'Smart Contract Auditor (Live)', 'Fully automated security audit platform for blockchain contracts. Live at aegisaudits.com.', 'easystreet', 'hybrid_coordinator.py'),
-        ('aegis_w1', 'Full Audit Pipeline', 'End-to-end security audit — scans code, runs all verification gates, and seals the final report.', 'security', 'edge_audit_validator.py'),
+        ('aegis_w1', 'Full Audit Pipeline', 'End-to-end security audit â€” scans code, runs all verification gates, and seals the final report.', 'security', 'edge_audit_validator.py'),
         ('receipt_inspector', 'Decision Verifier', 'Checks past decisions and receipts for structural integrity, valid signatures, and unbroken seal chains.', 'analysis', 'revenue_survivor_validator.py'),
-        ('alpha_scanner', 'Deep Recon Scanner', 'Multi-threaded reconnaissance — scans targets, scores risk levels, and tracks patterns over time.', 'security', 'status_dashboard.py'),
+        ('alpha_scanner', 'Deep Recon Scanner', 'Multi-threaded reconnaissance â€” scans targets, scores risk levels, and tracks patterns over time.', 'security', 'status_dashboard.py'),
         ('veritas_fuzzer', 'Input Fuzzer', 'Generates thousands of weird, broken, and malicious inputs to find crashes and vulnerabilities.', 'security', 'hftsa_hostile_audit.py'),
         ('containment_layer', 'Network Firewall', 'Rate-limits and filters network traffic to block floods, scans, and unauthorized access attempts.', 'security', 'sentinel_expanse.py'),
         ('provenance_stack', 'Memory & Context Engine', 'Searches your Vault knowledge base, compiles relevant context, and creates tamper-proof audit trails.', 'intelligence', 'veritas_deep_indexer.py'),
         # -- Additional Modules (3) --
         ('hydra_scanner', 'AI Code Scanner', 'Uses AI to read source code in any language and spot security vulnerabilities humans would miss.', 'security', 'veritas_neural_core.py'),
-        ('veritas_pipeline', 'Bug Bounty Pipeline', 'Full hunting workflow — clone a repo, scan it, find bugs, and generate a submission-ready report.', 'security', 'veritas_deep_indexer.py'),
-        ('omega_strike_array', 'Unified Bug Hunter', 'Combines all scanners into one — runs every security tool at once and merges the results.', 'security', 'hftsa_validation_protocol.py'),
+        ('veritas_pipeline', 'Bug Bounty Pipeline', 'Full hunting workflow â€” clone a repo, scan it, find bugs, and generate a submission-ready report.', 'security', 'veritas_deep_indexer.py'),
+        ('omega_strike_array', 'Unified Bug Hunter', 'Combines all scanners into one â€” runs every security tool at once and merges the results.', 'security', 'hftsa_validation_protocol.py'),
         # -- Unregistered Arsenal (29 modules) --
-        ('alpha_cli', 'Scanner CLI Tool', 'Command-line interface for the deep recon scanner — run scans without a UI.', 'tools', 'alpha_cli.py'),
+        ('alpha_cli', 'Scanner CLI Tool', 'Command-line interface for the deep recon scanner â€” run scans without a UI.', 'tools', 'alpha_cli.py'),
         ('alpha_scanner_god', 'Alpha Trading Scanner', 'Multi-threaded market scanner that finds buy/short opportunities with risk scoring and database tracking.', 'defi', 'alpha_scanner_god.py'),
-        ('audit_ledger', 'Audit Trail Logger', 'Append-only tamper-proof log — every action gets hashed into an unbreakable chain.', 'operations', 'audit_ledger.py'),
+        ('audit_ledger', 'Audit Trail Logger', 'Append-only tamper-proof log â€” every action gets hashed into an unbreakable chain.', 'operations', 'audit_ledger.py'),
         ('context_compiler', 'Context Builder', 'Compiles knowledge from your Vault into a focused context bundle for AI prompts.', 'intelligence', 'context_compiler.py'),
         ('edge_audit_parser', 'Audit Report Parser', 'Reads raw audit output and extracts structured findings with 92% detection accuracy.', 'analysis', 'edge_audit_parser_v4.py'),
-        ('goliath_drill', 'Network Signal Tracker', 'Traces external network signals — header analysis, gap detection, and cross-dataset collision checks.', 'security', 'GOLIATH_DRILL.py'),
-        ('goliath_gate', 'Security Gatekeeper', 'Multi-step security gate — checks permissions, validates signatures, and blocks unauthorized access.', 'security', 'GOLIATH_GATE.py'),
+        ('goliath_drill', 'Network Signal Tracker', 'Traces external network signals â€” header analysis, gap detection, and cross-dataset collision checks.', 'security', 'GOLIATH_DRILL.py'),
+        ('goliath_gate', 'Security Gatekeeper', 'Multi-step security gate â€” checks permissions, validates signatures, and blocks unauthorized access.', 'security', 'GOLIATH_GATE.py'),
         ('goliath_leviathan_engine', 'Deep Narrative Scanner', 'Scans documents and conversations for manipulation patterns, inconsistencies, and hidden agendas.', 'security', 'GOLIATH_LEVIATHAN.py'),
         ('goliath_trawler', 'Forensic Data Trawler', 'Crawls through large datasets searching for evidence trails, hidden connections, and anomalies.', 'security', 'GOLIATH_TRAWLER.py'),
         ('easystreet_training', 'AI Training Data Injector', 'Loads curated Q&A training pairs into the AI to teach it about your projects.', 'intelligence', 'inject_easystreet_training.py'),
@@ -480,20 +480,20 @@ def _register_all_modules():
         ('monitor_fund', 'Wallet Fund Tracker', 'Tracks your ETH wallet balance and logs progress toward your savings target.', 'defi', 'monitor_fund.py'),
         ('morning_brief', 'Morning Briefing Generator', 'Reads your Vault, finds where you left off, and creates a branded one-page PDF daily brief.', 'intelligence', 'morning_brief.py'),
         ('ntfy_monitor', 'Push Notification Hub', 'Sends real-time push alerts for liquidation events, fund milestones, and system warnings.', 'operations', 'ntfy_monitor.py'),
-        ('omega_cli', 'Omega Agent (Offline)', 'The standalone autonomous agent — runs locally without internet using Ollama for reasoning.', 'intelligence', 'omega_cli.py'),
+        ('omega_cli', 'Omega Agent (Offline)', 'The standalone autonomous agent â€” runs locally without internet using Ollama for reasoning.', 'intelligence', 'omega_cli.py'),
         ('omega_mcp_server', 'MCP Tool Bridge', 'Registers Omega as a tool inside Antigravity via the Model Context Protocol.', 'intelligence', 'omega_mcp_server.py'),
         ('omega_rag_local', 'Local Knowledge Search', 'Indexes your workspace files into SQLite and finds relevant code for any task using Ollama embeddings.', 'intelligence', 'omega_rag_local.py'),
-        ('omega_seal', 'Authorization Gate', 'The choke valve — blocks any action that does not meet minimum evidence and permission requirements.', 'security', 'omega_seal.py'),
+        ('omega_seal', 'Authorization Gate', 'The choke valve â€” blocks any action that does not meet minimum evidence and permission requirements.', 'security', 'omega_seal.py'),
         ('omega_soul', 'Identity Kernel', 'Loads the system identity, injects VERITAS rules into every AI prompt, and prevents prompt drift.', 'intelligence', 'omega_soul.py'),
         ('training_data_gen', 'AI Training Data Generator', 'Extracts knowledge from all project files and converts it into fine-tuning format for Vertex AI.', 'intelligence', 'prepare_training_data.py'),
         ('repo_map', 'Codebase Map', 'Reads your entire codebase via AST parsing and builds a searchable index of every function and class.', 'tools', 'repo_map.py'),
-        ('test_suite', 'System Test Suite', 'Comprehensive test runner — validates module registry, AI router, dispatcher, and error handling.', 'operations', 'test_harness.py'),
+        ('test_suite', 'System Test Suite', 'Comprehensive test runner â€” validates module registry, AI router, dispatcher, and error handling.', 'operations', 'test_harness.py'),
         ('db_verifier', 'Database Connection Tester', 'Verifies PostgreSQL database connectivity and checks that tables and schemas are intact.', 'operations', 'verify_v3.py'),
         ('hardware_fuzzer', 'Hardware USB Fuzzer', 'Sends aggressive fuzz payloads to USB HID devices to test firmware robustness.', 'security', 'veritas_fuzzer_v2.py'),
         ('pdf_generator', 'Branded PDF Creator', 'Converts any Markdown report into a polished VERITAS-branded PDF document.', 'tools', 'veritas_pdf.py'),
-        ('pdf_template', 'PDF Layout Engine', 'ReportLab-based PDF layout — handles headers, tables, styling, and multi-page branded documents.', 'tools', 'veritas_pdf_template.py'),
+        ('pdf_template', 'PDF Layout Engine', 'ReportLab-based PDF layout â€” handles headers, tables, styling, and multi-page branded documents.', 'tools', 'veritas_pdf_template.py'),
         ('veritas_spec', 'Spec Validator', 'Checks files and configs against the VERITAS canonical specification for compliance.', 'compiler', 'VERITAS_SPEC.py'),
-        ('validation_suite', 'Full Validation Runner', 'End-to-end validation — hashes files, checks integrity, runs random tests, and produces a pass/fail report.', 'operations', 'VERITAS_VALIDATION_SUITE.py'),
+        ('validation_suite', 'Full Validation Runner', 'End-to-end validation â€” hashes files, checks integrity, runs random tests, and produces a pass/fail report.', 'operations', 'VERITAS_VALIDATION_SUITE.py'),
         ('workflow_engine', 'Workflow Pipeline Runner', 'Runs multi-step workflows with parallel execution, conditional branching, and sealed audit trails.', 'operations', 'workflow_engine.py'),
     ]
     for mid, name, desc, cat, script in modules:
@@ -511,9 +511,9 @@ def _register_all_modules():
         log.warning(f'Sentinel start failed (non-fatal): {e}')
 
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # VAULT (SQLite + FTS5 + Mnemo-Cortex)
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def _vault_init():
     """Initialize Vault database with FTS5."""
@@ -648,7 +648,7 @@ def _vault_get_ki_health():
         return {'error': str(e)}
 
 def _vault_sweep():
-    """Intelligence sweep — re-summarize, enrich KIs, auto-link."""
+    """Intelligence sweep â€” re-summarize, enrich KIs, auto-link."""
     try:
         db = sqlite3.connect(str(VAULT_DB))
         # Append to tape
@@ -665,9 +665,9 @@ def _vault_sweep():
         return {'error': str(e)}
 
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # LEDGER (Immutable Artifact Records)
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def _ledger_init():
     """Initialize ledger database."""
@@ -738,14 +738,14 @@ def _ledger_search(query):
         return {'error': str(e)}
 
 
-# ══════════════════════════════════════════════════════════════
-# AI ROUTING (Vertex → OpenAI → Ollama)
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# AI ROUTING (Vertex â†’ OpenAI â†’ Ollama)
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # OMEGA PERSONA (Base System Prompt)
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 OMEGA_SYSTEM_PROMPT = (
     "You are Omega \u2014 a brilliant, sharp-witted female AI agent in the Gravity Omega Command Center. ""You have an Australian accent and personality \u2014 think Margot Robbie meets a quantum physicist. "
@@ -848,12 +848,12 @@ def _ollama_generate(messages, max_tokens, temperature):
             'model': 'qwen2.5:7b', 'backend': 'ollama'}
 
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # TEXT-TO-SPEECH (ElevenLabs)
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 ELEVENLABS_VOICE_ID = 'pFZP5JQG7iQjIQuC4Bku'  # Lily - Velvety Actress
 ELEVENLABS_API_KEY = None
@@ -873,7 +873,6 @@ def _get_gcp_token():
     return None
 
 @app.route('/api/tts', methods=['POST'])
-@require_auth
 def api_tts():
     """Convert text to speech using Google Cloud TTS."""
     data = request.get_json(force=True)
@@ -930,9 +929,9 @@ def api_tts():
 
 
 # ROUTES
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-# ── Sentinel (Self-Awareness) Routes ──────────────────────
+# â”€â”€ Sentinel (Self-Awareness) Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 @app.route('/api/sentinel/status', methods=['GET'])
 @require_auth
 def api_sentinel_status():
@@ -1039,12 +1038,12 @@ def api_module_describe(module_id):
     return jsonify({k: v for k, v in mod.items() if k != 'handler'})
 
 
-# ── Agent Thinking ────────────────────────────────────────────
+# â”€â”€ Agent Thinking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/agent/think', methods=['POST'])
 @require_auth
 def api_agent_think():
-    # ── HIGH ASSURANCE VERITAS ENFORCEMENT ──
+    # â”€â”€ HIGH ASSURANCE VERITAS ENFORCEMENT â”€â”€
     # Bind process identity to the parent node process
     target_pid = int(PARENT_PID) if PARENT_PID else os.getpid()
     
@@ -1073,7 +1072,7 @@ def api_agent_think():
     return jsonify(result)
 
 
-# ── Search ────────────────────────────────────────────────────
+# â”€â”€ Search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/search/text', methods=['POST'])
 @require_auth
@@ -1084,7 +1083,7 @@ def api_search_text():
     return jsonify(_handle_code_search(directory=directory, query=query))
 
 
-# ── Hardware ──────────────────────────────────────────────────
+# â”€â”€ Hardware â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/hardware', methods=['GET'])
 @require_auth
@@ -1109,7 +1108,7 @@ def api_hardware():
     return jsonify(info)
 
 
-# ── Vault Routes ──────────────────────────────────────────────
+# â”€â”€ Vault Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/vault/search', methods=['POST'])
 @require_auth
@@ -1142,7 +1141,7 @@ def api_vault_sweep():
     return jsonify(_vault_sweep())
 
 
-# ── Security Routes ───────────────────────────────────────────
+# â”€â”€ Security Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/security/scan', methods=['GET'])
 @require_auth
@@ -1185,7 +1184,7 @@ def api_security_full_scan():
     return jsonify(results)
 
 
-# ── Reports Routes ────────────────────────────────────────────
+# â”€â”€ Reports Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/reports/drafts', methods=['GET'])
 @require_auth
@@ -1211,7 +1210,7 @@ def api_reports_pipeline():
     return jsonify(_handle_veritas_pipeline())
 
 
-# ── Tools Routes ──────────────────────────────────────────────
+# â”€â”€ Tools Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/tools/credits', methods=['GET'])
 @require_auth
@@ -1252,7 +1251,7 @@ def api_tools_auto_audit():
     return jsonify(_handle_auto_audit(**data))
 
 
-# ── Ledger Routes ─────────────────────────────────────────────
+# â”€â”€ Ledger Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/ledger/stats', methods=['GET'])
 @require_auth
@@ -1267,9 +1266,9 @@ def api_ledger_search():
     return jsonify(_ledger_search(data.get('query', '')))
 
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # PARENT PID HEARTBEAT
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 def _parent_heartbeat():
     """Auto-terminate if parent Electron process dies."""
@@ -1281,18 +1280,18 @@ def _parent_heartbeat():
         try:
             os.kill(pid, 0)  # Check if parent is alive (signal 0)
         except OSError:
-            log.warning('Parent process died — shutting down')
+            log.warning('Parent process died â€” shutting down')
             os._exit(0)
 
 
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # MAIN
-# ══════════════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 _start_time = time.time()
 
 
-# ── Provenance Stack API ─────────────────────────────────────
+# â”€â”€ Provenance Stack API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @app.route('/api/provenance/status', methods=['GET'])
 @require_auth
@@ -1362,7 +1361,7 @@ def api_provenance_seal():
         return jsonify({'error': str(e)}), 500
 
 
-# ── Outbound Context Filtering (v3.0) ────────────────────────
+# â”€â”€ Outbound Context Filtering (v3.0) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _outbound_filter(compiled_context, max_tokens=4000, min_similarity=0.3):
     """Filter and deduplicate context fragments for LLM injection.
