@@ -1,0 +1,30 @@
+# Secrets
+.env
+.env.*
+*.secret
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+package-lock.json
+
+# Logs & Checkpoints
+*.log
+.pipeline_checkpoint_*
+.pipeline_ctx_*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/

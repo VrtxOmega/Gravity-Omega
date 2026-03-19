@@ -132,6 +132,11 @@ const TOOL_REGISTRY = {
         description: 'Create a directory (recursive)',
         args: { path: { type: 'string', required: true } },
     },
+    runSovereignModule: {
+        safety: SAFETY.GATED,
+        description: 'Execute a native C:\\Veritas_Lab sovereign Python module via the Omega backend API',
+        args: { moduleId: { type: 'string', required: true }, params: { type: 'object', description: 'JSON object containing arguments for the module' } },
+    },
 
     // ── RESTRICTED (3) — Always requires approval ────────────
     deleteFile: {
@@ -402,6 +407,16 @@ class ToolExecutor {
 
     async _exec_upload({ source, dest }) {
         return { source, dest, note: 'Upload requires backend integration' };
+    }
+
+    async _exec_runSovereignModule({ moduleId, params }) {
+        if (!this.bridge) return { error: 'Backend bridge not connected' };
+        try {
+            const result = await this.bridge.post(`/api/modules/${moduleId}/run`, params || {});
+            return result;
+        } catch (e) {
+            return { error: `Sovereign module execution failed: ${e.message}` };
+        }
     }
 
     async _exec_generateImage({ prompt, output }) {

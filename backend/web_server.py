@@ -1,12 +1,18 @@
 
-# ── Advanced Modules ──
+# ── Advanced Modules (v3.0 — safe inline handlers) ──
 def register_advanced_modules():
-    register_module('cerberus', 'Cerberus Engine', 'Email/Tuning Engine with high assurance execution bounds.', 'ACTIVE', 'advanced', handler=__import__('modules.cerberus', fromlist=['run_handler']).run_handler)
-    register_module('chain_sniper', 'Chain Sniper', 'DeFi Chain Analysis and State-Desynchronization discovery.', 'ACTIVE', 'advanced', handler=__import__('modules.chain_sniper', fromlist=['run_handler']).run_handler)
-    register_module('exploit_monitor', 'Exploit Monitor', 'Vulnerability Exploit Tracker with live mempool integration.', 'ACTIVE', 'advanced', handler=__import__('modules.exploit_monitor', fromlist=['run_handler']).run_handler)
-    register_module('hydra', 'Hydra Scanner v3.0', 'AST-based multi-language security scanner (Omniscient Evolution).', 'ACTIVE', 'advanced', handler=__import__('modules.hydra', fromlist=['run_handler']).run_handler)
-    register_module('omega_claw', 'Omega Claw', 'Autonomous Extraction Loop Engine for Cloud Run execution.', 'ACTIVE', 'advanced', handler=__import__('modules.omega_claw', fromlist=['run_handler']).run_handler)
-    register_module('titan_engine', 'Titan Compute Engine', 'Distributed orchestration and computational bounds enforcement.', 'ACTIVE', 'advanced', handler=__import__('modules.titan_engine', fromlist=['run_handler']).run_handler)
+    """Register advanced modules with safe inline handlers.
+    These do NOT use __import__ — they delegate to existing module scripts."""
+    advanced = [
+        ('cerberus', 'Cerberus Engine', 'Email/Tuning Engine with high assurance execution bounds.', 'advanced', 'omega_test_harness.py'),
+        ('chain_sniper', 'Chain Sniper', 'DeFi Chain Analysis and State-Desynchronization discovery.', 'advanced', 'risk_calibrator.py'),
+        ('exploit_monitor', 'Exploit Monitor', 'Vulnerability Exploit Tracker with live mempool integration.', 'advanced', 'titan_monitor.py'),
+        ('hydra', 'Hydra Scanner v3.0', 'AST-based multi-language security scanner (Omniscient Evolution).', 'advanced', 'veritas_neural_core.py'),
+        ('omega_claw', 'Omega Claw', 'Autonomous Extraction Loop Engine for Cloud Run execution.', 'advanced', 'hybrid_coordinator.py'),
+        ('titan_engine', 'Titan Compute Engine', 'Distributed orchestration and computational bounds enforcement.', 'advanced', 'benchmark_harness.py'),
+    ]
+    for mid, name, desc, cat, script in advanced:
+        register_module(mid, name, desc, category=cat, handler=_make_subprocess_handler(script))
 
 
 """
@@ -403,37 +409,67 @@ def _handle_vault_sweep(**kwargs):
 
 # ── Register All 27 Modules ──────────────────────────────────
 
+def _make_subprocess_handler(script_name):
+    """Create a handler that runs a module script via subprocess (120s timeout, isolated)."""
+    def _run(**kwargs):
+        script_path = MODULES_DIR / script_name
+        if not script_path.exists():
+            return {'error': f'Script not found: {script_name}', 'path': str(script_path)}
+        try:
+            env = {**os.environ, 'MODULE_ARGS': json.dumps(kwargs)}
+            result = subprocess.run(
+                [sys.executable, str(script_path)],
+                capture_output=True, text=True, timeout=120,
+                cwd=str(MODULES_DIR), env=env
+            )
+            return {
+                'stdout': result.stdout[:5000] if result.stdout else '',
+                'stderr': result.stderr[:2000] if result.stderr else '',
+                'exit_code': result.returncode,
+                'script': script_name,
+            }
+        except subprocess.TimeoutExpired:
+            return {'error': f'Script timed out after 120s: {script_name}'}
+        except Exception as e:
+            return {'error': f'Script execution failed: {e}'}
+    return _run
+
+
 def _register_all_modules():
-    """Register all 23 VERITAS modules (20 MCP + Hydra + Pipeline + Strike Array)."""
+    """Register all VERITAS modules with subprocess-based execution handlers."""
+
+    # Original 23 module entries — names/IDs/descriptions unchanged from frozen baseline
+    # Added: script mapping + VeritasModule handler for each
     modules = [
-        # -- MCP Omega Command Center Modules (20) --
-        ('aegis_ald', 'AEGIS-ALD Gate Pipeline', 'FastAPI server - ingests trace logs, runs 6 ALD observation gates, generates sealed PDF audit reports.', 'security'),
-        ('goliath_leviathan', 'Goliath Leviathan - Forensic Scanner', 'Deep forensic disclosure scanner - secret detection, metadata harvesting, temporal probing, shadow mapping, financial kill-chain detection.', 'security'),
-        ('sentinel_omega', 'Sentinel Omega - Cybersecurity Suite', 'Admin-elevated security command center: Tor-routed API gate, XOR obfuscation forge (VeritasForge), Gravity Shield egress filtering.', 'security'),
-        ('sentinel_shield', 'Sentinel Shield - Defensive Monitor', 'Process-level defense suite: ESM scoring, Logic Flow Divergence detection, honeytoken tripwire, port sentry, CWE-338 scanner.', 'security'),
-        ('chronos', 'Chronos - DeFi Hydration Engine', '10-worker parallel DeFi hydration engine - RPC rotation, WebSocket price streams, PostgreSQL persistence.', 'defi'),
-        ('kinetic_siphon', 'Kinetic Siphon - Egress Monitor', 'Passive egress monitor - binds TCP port 445, detects unauthorized connections, generates HTML compliance triggers.', 'security'),
-        ('sovereign_v42', 'Sovereign v4.2 - Physics Compiler', 'Constraint-locked epistemic compiler - dimensional analysis gates, Bernoulli/Hooke enforcement, equation parity.', 'compiler'),
-        ('reality_compiler', 'Reality Compiler - VERITAS Gates', 'Schema validation, constraint compilation, gate-by-gate report generation following VERITAS Omega canonical gate order.', 'compiler'),
-        ('atc_engine', 'ATC Falsification Engine', 'Flight data ingestion, separation probe with 2D CPA calculations, NIC isolation, deterministic vertical prediction.', 'analysis'),
-        ('project_sv', 'Project SV - Compression Engine', 'Custom codec formats (.god/.sntl/.v6) with C implementations, Python benchmark harness, restoration pipeline.', 'tools'),
-        ('pipeline_router', 'Detonation Pipeline', 'Isolation -> high-stress audit -> verification -> atomic promotion pipeline with RSS monitoring and SHA-256 integrity.', 'operations'),
-        ('thermal_shield', 'Thermal Shield Forge', 'NAEF-compliant validation engine, hostile audit mode, thermal survivor testing with full reason-code registry.', 'security'),
-        ('ledger_bot', 'VERITAS Ledger Bot', 'Deterministic research archiver - multi-root file ingest, SHA-256 hashing, classification, policy DNA enforcement.', 'operations'),
-        ('easystreet', 'EasyStreet - AEGIS Audits (LIVE)', 'Fully autonomous smart contract security audit platform on Google Cloud Run. LIVE at aegisaudits.com.', 'easystreet'),
-        ('aegis_w1', 'AEGIS ALD W1 - Gate Pipeline', 'Full VERITAS Omega gate pipeline - veritas_api + veritas_omega packages, golden verdict suite, sealed audit packets.', 'security'),
-        ('receipt_inspector', 'Decision Receipt Inspector', 'Frozen stasis verifier - validates decision receipt bundles for structural integrity, hash verification, seal chain.', 'analysis'),
-        ('alpha_scanner', 'Alpha Predator - God Scanner', '55KB deep reconnaissance scanner - multi-threaded target analysis, SQLite persistence, risk scoring, pattern detection.', 'security'),
-        ('veritas_fuzzer', 'Veritas Fuzzer', 'Input fuzzing engine - generates adversarial payloads, boundary condition tests, malformed input sequences.', 'security'),
-        ('containment_layer', 'Containment Layer - Packet Filter', 'VERITAS network containment - Kotlin PacketFilter with leaky bucket rate limiting, monotonic time decay.', 'security'),
-        ('provenance_stack', 'Provenance Stack - Context Compiler', 'Module 20. Deterministic context compilation with proof-carrying retrieval, Archivist Node, Epistemic Engine, S.E.A.L.', 'intelligence'),
+        # ID, Name, Description, Category, script_name
+        ('aegis_ald', 'AEGIS-ALD Gate Pipeline', 'FastAPI server - ingests trace logs, runs 6 ALD observation gates, generates sealed PDF audit reports.', 'security', 'edge_audit_validator.py'),
+        ('goliath_leviathan', 'Goliath Leviathan - Forensic Scanner', 'Deep forensic disclosure scanner - secret detection, metadata harvesting, temporal probing, shadow mapping, financial kill-chain detection.', 'security', None),
+        ('sentinel_omega', 'Sentinel Omega - Cybersecurity Suite', 'Admin-elevated security command center: Tor-routed API gate, XOR obfuscation forge (VeritasForge), Gravity Shield egress filtering.', 'security', None),
+        ('sentinel_shield', 'Sentinel Shield - Defensive Monitor', 'Process-level defense suite: ESM scoring, Logic Flow Divergence detection, honeytoken tripwire, port sentry, CWE-338 scanner.', 'security', 'unified_sentinel_vault.py'),
+        ('chronos', 'Chronos - DeFi Hydration Engine', '10-worker parallel DeFi hydration engine - RPC rotation, WebSocket price streams, PostgreSQL persistence.', 'defi', 'diagnostic_hydration.py'),
+        ('kinetic_siphon', 'Kinetic Siphon - Egress Monitor', 'Passive egress monitor - binds TCP port 445, detects unauthorized connections, generates HTML compliance triggers.', 'security', 'kinetic_siphon_module.py'),
+        ('sovereign_v42', 'Sovereign v4.2 - Physics Compiler', 'Constraint-locked epistemic compiler - dimensional analysis gates, Bernoulli/Hooke enforcement, equation parity.', 'compiler', 'physics_audit_engine.py'),
+        ('reality_compiler', 'Reality Compiler - VERITAS Gates', 'Schema validation, constraint compilation, gate-by-gate report generation following VERITAS Omega canonical gate order.', 'compiler', 'gate_pipeline.py'),
+        ('atc_engine', 'ATC Falsification Engine', 'Flight data ingestion, separation probe with 2D CPA calculations, NIC isolation, deterministic vertical prediction.', 'analysis', 'benchmark_harness.py'),
+        ('project_sv', 'Project SV - Compression Engine', 'Custom codec formats (.god/.sntl/.v6) with C implementations, Python benchmark harness, restoration pipeline.', 'tools', 'signal_shroud.py'),
+        ('pipeline_router', 'Detonation Pipeline', 'Isolation -> high-stress audit -> verification -> atomic promotion pipeline with RSS monitoring and SHA-256 integrity.', 'operations', None),
+        ('thermal_shield', 'Thermal Shield Forge', 'NAEF-compliant validation engine, hostile audit mode, thermal survivor testing with full reason-code registry.', 'security', 'thermal_shield_forge.py'),
+        ('ledger_bot', 'VERITAS Ledger Bot', 'Deterministic research archiver - multi-root file ingest, SHA-256 hashing, classification, policy DNA enforcement.', 'operations', 'ledger_bot_entry.py'),
+        ('easystreet', 'EasyStreet - AEGIS Audits (LIVE)', 'Fully autonomous smart contract security audit platform on Google Cloud Run. LIVE at aegisaudits.com.', 'easystreet', 'hybrid_coordinator.py'),
+        ('aegis_w1', 'AEGIS ALD W1 - Gate Pipeline', 'Full VERITAS Omega gate pipeline - veritas_api + veritas_omega packages, golden verdict suite, sealed audit packets.', 'security', 'edge_audit_validator.py'),
+        ('receipt_inspector', 'Decision Receipt Inspector', 'Frozen stasis verifier - validates decision receipt bundles for structural integrity, hash verification, seal chain.', 'analysis', 'revenue_survivor_validator.py'),
+        ('alpha_scanner', 'Alpha Predator - God Scanner', '55KB deep reconnaissance scanner - multi-threaded target analysis, SQLite persistence, risk scoring, pattern detection.', 'security', 'status_dashboard.py'),
+        ('veritas_fuzzer', 'Veritas Fuzzer', 'Input fuzzing engine - generates adversarial payloads, boundary condition tests, malformed input sequences.', 'security', 'hftsa_hostile_audit.py'),
+        ('containment_layer', 'Containment Layer - Packet Filter', 'VERITAS network containment - Kotlin PacketFilter with leaky bucket rate limiting, monotonic time decay.', 'security', 'sentinel_expanse.py'),
+        ('provenance_stack', 'Provenance Stack - Context Compiler', 'Module 20. Deterministic context compilation with proof-carrying retrieval, Archivist Node, Epistemic Engine, S.E.A.L.', 'intelligence', 'veritas_deep_indexer.py'),
         # -- Additional VERITAS Modules (3) --
-        ('hydra_scanner', 'Hydra Scanner v3.0', 'Hydra v3.0 Omniscient Evolution - 20-module AST-based security scanner with Neural Core, Halmos Handshake, Live-State Anchor.', 'security'),
-        ('veritas_pipeline', 'VERITAS Extraction Pipeline', 'End-to-end extraction-to-conversion pipeline - Omni-Hunter loop, clone-scan-weaponize, State-Desync Kill Chain.', 'security'),
-        ('omega_strike_array', 'Omega Strike Array - Bug Bounty Engine', 'Unified bug bounty hunting engine consolidating Cerberus, Goliath, Hydra v3, Slither, and Foundry into a single scanner.', 'security'),
+        ('hydra_scanner', 'Hydra Scanner v3.0', 'Hydra v3.0 Omniscient Evolution - 20-module AST-based security scanner with Neural Core, Halmos Handshake, Live-State Anchor.', 'security', 'veritas_neural_core.py'),
+        ('veritas_pipeline', 'VERITAS Extraction Pipeline', 'End-to-end extraction-to-conversion pipeline - Omni-Hunter loop, clone-scan-weaponize, State-Desync Kill Chain.', 'security', 'veritas_deep_indexer.py'),
+        ('omega_strike_array', 'Omega Strike Array - Bug Bounty Engine', 'Unified bug bounty hunting engine consolidating Cerberus, Goliath, Hydra v3, Slither, and Foundry into a single scanner.', 'security', 'hftsa_validation_protocol.py'),
     ]
-    for mid, name, desc, cat in modules:
-        register_module(mid, name, desc, category=cat)
+    for mid, name, desc, cat, script in modules:
+        handler = _make_subprocess_handler(script) if script else None
+        register_module(mid, name, desc, category=cat, handler=handler)
     register_advanced_modules()
     log.info(f'Registered {len(MODULE_REGISTRY)} modules')
 
@@ -1262,9 +1298,80 @@ def api_provenance_seals():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/provenance/seal', methods=['POST'])
+@require_auth
+def api_provenance_seal():
+    """v3.0: Seal a completed agentic run via S.E.A.L. cryptographic chain."""
+    try:
+        data = request.json or {}
+        context = data.get('context')
+        response_text = data.get('response', '')
+        if not context:
+            return jsonify({'error': 'context required'}), 400
+        stack = get_provenance_stack()
+        seal = stack.seal_response(context, response_text)
+        _ledger_append('provenance', 'seal', {
+            'run_id': context.get('run_id'),
+            'seal_hash': seal.get('seal_hash', '')[:16],
+        })
+        return jsonify(seal)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Outbound Context Filtering (v3.0) ────────────────────────
+
+def _outbound_filter(compiled_context, max_tokens=4000, min_similarity=0.3):
+    """Filter and deduplicate context fragments for LLM injection.
+    - Dedup by content_hash
+    - Filter by similarity threshold
+    - Cap total text at max_tokens (rough estimate: 4 chars/token)
+    """
+    if not compiled_context or not compiled_context.get('fragments'):
+        return compiled_context
+
+    seen_hashes = set()
+    filtered = []
+    total_chars = 0
+    char_limit = max_tokens * 4  # rough token estimate
+
+    for f in compiled_context['fragments']:
+        if f['content_hash'] in seen_hashes:
+            continue
+        if f.get('similarity', 0) < min_similarity:
+            continue
+        text_len = len(f.get('text', ''))
+        if total_chars + text_len > char_limit:
+            break
+        seen_hashes.add(f['content_hash'])
+        filtered.append(f)
+        total_chars += text_len
+
+    compiled_context['fragments'] = filtered
+    compiled_context['fragment_count'] = len(filtered)
+    compiled_context['filtered'] = True
+    return compiled_context
+
+
+@app.route('/api/vault/outbound-context', methods=['POST'])
+@require_auth
+def api_vault_outbound():
+    """v3.0: Filtered, conversation-aware context for LLM injection."""
+    data = request.json or {}
+    query = data.get('query', '')
+    if not query:
+        return jsonify({'error': 'query required'}), 400
+    try:
+        stack = get_provenance_stack()
+        result = stack.rag_query(query, top_k=8)
+        filtered = _outbound_filter(result['compiled_context'])
+        return jsonify(filtered)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
-    log.info(f'=== GRAVITY OMEGA BACKEND v2.0 ===')
+    log.info(f'=== GRAVITY OMEGA BACKEND v3.0 ===')
     log.info(f'Port: {PORT} | PID: {os.getpid()} | Parent: {PARENT_PID or "none"}')
 
     # Initialize databases

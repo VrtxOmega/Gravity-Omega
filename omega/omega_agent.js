@@ -37,6 +37,11 @@ class OmegaAgent {
         // Agentic state
         this._stepLog = [];     // { tool, args, result, timestamp }
         this._pendingProposals = new Map();
+
+        // v3.0: Provenance + step hash chain
+        this._lastProvenanceContext = null;
+        this._stepChainHash = null;
+        this._exitReason = null;
     }
 
     // ── System Prompt ────────────────────────────────────────
@@ -109,6 +114,9 @@ ${toolDescriptions}
         this._aborted = false;
         this._stepLog = [];
         this._currentTask = text;
+        this._lastProvenanceContext = null;
+        this._stepChainHash = crypto.createHash('sha256').update(`GENESIS:${Date.now()}`).digest('hex');
+        this._exitReason = null;
 
         // Add to conversation history
         this._conversationHistory.push({ role: 'user', content: text });
@@ -119,6 +127,34 @@ ${toolDescriptions}
             { role: 'system', content: systemPrompt },
             ...this._conversationHistory,
         ];
+
+        // v3.0: Inject provenance context from Vault before entering loop
+        try {
+            const bridgeUp = await this.bridge.waitForBridge(2000);
+            if (bridgeUp) {
+                const rag = await this.bridge.post('/api/provenance/search', { query: text });
+                if (rag && rag.fragments && rag.fragments.length > 0) {
+                    // Build provenance system prompt
+                    const provLines = [
+                        `[PROVENANCE RUN ${rag.run_id}]`,
+                        `Retrieved ${rag.fragment_count} context fragments from Veritas Vault.`,
+                        '', 'RELEVANT CONTEXT:', '=' .repeat(40),
+                    ];
+                    for (const f of rag.fragments) {
+                        provLines.push(`\n[FRAGMENT ${f.index}] sim=${f.similarity} type=${f.doc_type}`);
+                        provLines.push(`SOURCE: ${f.source}`);
+                        provLines.push(f.text);
+                        provLines.push('-'.repeat(40));
+                    }
+                    provLines.push('', 'Use the above context to inform your response.');
+                    messages.splice(1, 0, { role: 'system', content: provLines.join('\n') });
+                    this._lastProvenanceContext = rag;
+                    this.context.addBreadcrumb('provenance', `Injected ${rag.fragment_count} fragments`);
+                }
+            }
+        } catch (e) {
+            this.context.addBreadcrumb('provenance', `RAG injection failed (non-fatal): ${e.message}`, {}, 'warning');
+        }
 
         try {
             let iteration = 0;
@@ -140,7 +176,8 @@ ${toolDescriptions}
 
                 if (parsed.type === 'response') {
                     // Agent is done — final message to user
-                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length };
+                    this._exitReason = 'TASK_COMPLETE';
+                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
 
@@ -166,11 +203,13 @@ ${toolDescriptions}
                     // Check for pending proposals (GATED/RESTRICTED tools that need approval)
                     const pendingCount = this._pendingProposals.size;
                     if (pendingCount > 0) {
+                        this._exitReason = 'APPROVAL_PENDING';
                         finalResponse = {
                             type: 'proposals',
                             message: `I've completed ${this._stepLog.length} steps so far. ${pendingCount} action(s) need your approval:`,
                             proposals: Array.from(this._pendingProposals.values()).map(p => p.toJSON()),
                             steps: this._stepLog.length,
+                            exitReason: 'APPROVAL_PENDING',
                         };
                         break;
                     }
@@ -184,11 +223,37 @@ ${toolDescriptions}
             }
 
             if (this._aborted) {
-                finalResponse = { type: 'aborted', message: 'Request was aborted.', steps: this._stepLog.length };
+                this._exitReason = 'ABORTED';
+                finalResponse = { type: 'aborted', message: 'Request was aborted.', steps: this._stepLog.length, exitReason: 'ABORTED' };
             }
 
             if (!finalResponse) {
-                finalResponse = { type: 'chat', message: `Completed after ${iteration} iterations.`, steps: this._stepLog.length };
+                this._exitReason = 'LOOP_EXHAUSTED';
+                finalResponse = { type: 'chat', message: `Completed after ${iteration} iterations.`, steps: this._stepLog.length, exitReason: 'LOOP_EXHAUSTED' };
+            }
+
+            // v3.0: Seal the entire run via provenance S.E.A.L.
+            if (this._lastProvenanceContext && finalResponse.message) {
+                try {
+                    const bridgeUp = await this.bridge.waitForBridge(1000);
+                    if (bridgeUp) {
+                        const seal = await this.bridge.post('/api/provenance/seal', {
+                            context: this._lastProvenanceContext,
+                            response: finalResponse.message,
+                        });
+                        if (seal && seal.seal_hash) {
+                            finalResponse.provenance = {
+                                run_id: this._lastProvenanceContext.run_id,
+                                fragments: this._lastProvenanceContext.fragment_count,
+                                seal_hash: seal.seal_hash.substring(0, 16) + '...',
+                                step_chain: this._stepChainHash.substring(0, 16) + '...',
+                            };
+                            this.context.addBreadcrumb('provenance', `Sealed run ${this._lastProvenanceContext.run_id}`);
+                        }
+                    }
+                } catch (e) {
+                    this.context.addBreadcrumb('provenance', `Seal failed (non-fatal): ${e.message}`, {}, 'warning');
+                }
             }
 
             // Save to conversation history
@@ -206,36 +271,72 @@ ${toolDescriptions}
         }
     }
 
-    // ── LLM Call ─────────────────────────────────────────────
+    // ── LLM Call (v3.0 Cooperative Handoff) ────────────────────
+    // Pattern: Ollama (backend) briefs → Gemini (frontend) generates.
+    // Ollama has local Vault/provenance access. Gemini has superior reasoning.
+    // Ollama never speaks to the user directly — it only provides the briefing.
     async _callLLM(messages) {
-        // Try backend first (it has full Vertex/Ollama routing)
+        let backendBriefing = null;
+
+        // Step 1: Backend Briefing (Ollama confers)
+        // Ask the backend for a context-enriched analysis of the user's request.
+        // This gives Gemini local knowledge it wouldn't otherwise have.
         try {
             const bridgeReady = await this.bridge.waitForBridge(2000);
             if (bridgeReady) {
+                const briefingMessages = [
+                    { role: 'system', content: 'You are an internal context analyst. Provide a BRIEF (max 300 words) intelligence briefing for the primary AI. Include: relevant vault context, provenance data, local system state, and any warnings. Do NOT address the user. Output raw analysis only.' },
+                    ...messages.filter(m => m.role === 'user').slice(-2),
+                ];
                 const response = await this.bridge.post('/api/agent/think', {
-                    messages,
-                    max_tokens: 4096,
-                    temperature: 0.2,
+                    messages: briefingMessages,
+                    max_tokens: 1024,
+                    temperature: 0.1,
                 });
-                if (response?.content || response?.response) {
-                    return response.content || response.response;
+                if (response?.content) {
+                    backendBriefing = response.content;
+                    this.context.addBreadcrumb('handoff', 'Backend briefing received', { length: backendBriefing.length });
                 }
             }
-        } catch { }
+        } catch {
+            this.context.addBreadcrumb('handoff', 'Backend briefing unavailable (non-fatal)', {}, 'warning');
+        }
 
-        // Direct Gemini (primary)
+        // Step 2: Gemini Generation (primary — informed by briefing)
         try {
-            const result = await this._geminiGenerate(messages);
+            let enrichedMessages = [...messages];
+            if (backendBriefing) {
+                // Inject the briefing as a system-level context note after the main system prompt
+                enrichedMessages.splice(1, 0, {
+                    role: 'system',
+                    content: `[BACKEND INTELLIGENCE BRIEFING]\n${backendBriefing}\n[END BRIEFING]\nUse this briefing to inform your response. Do not reference the briefing directly.`,
+                });
+            }
+            const result = await this._geminiGenerate(enrichedMessages);
             if (result) return result;
         } catch (err) {
             this.context.addBreadcrumb('agent', `Gemini failed: ${err.message}`, {}, 'warning');
         }
 
-        // Ollama fallback (local)
+        // Step 3: Emergency fallback — if Gemini is completely down,
+        // use backend response directly (Ollama speaks as last resort)
+        if (backendBriefing) {
+            // Re-ask backend for a user-facing response (not just a briefing)
+            try {
+                const response = await this.bridge.post('/api/agent/think', {
+                    messages,
+                    max_tokens: 4096,
+                    temperature: 0.2,
+                });
+                if (response?.content) return response.content;
+            } catch { }
+        }
+
+        // Step 4: Direct Ollama — absolute last resort
         try {
             return await this._ollamaGenerate(messages);
         } catch (err) {
-            this.context.addBreadcrumb('agent', `Ollama failed: ${err.message}`, {}, 'warning');
+            this.context.addBreadcrumb('agent', `All LLM backends failed: ${err.message}`, {}, 'error');
             return null;
         }
     }
@@ -484,10 +585,17 @@ ${toolDescriptions}
     }
 
     _logStep(tool, args, result) {
+        // v3.0: Extend step hash chain for tamper-evident trace
+        const stepData = JSON.stringify({ tool, ts: new Date().toISOString(), ok: !result?.error });
+        this._stepChainHash = crypto.createHash('sha256')
+            .update(`${this._stepChainHash}:${stepData}`)
+            .digest('hex');
+
         this._stepLog.push({
             tool, args,
             result: result?.error ? { error: result.error } : { ok: true },
             ts: new Date().toISOString(),
+            chainHash: this._stepChainHash.substring(0, 12),
         });
         this.context.addBreadcrumb('agent-step', `${tool}: ${result?.error ? 'FAIL' : 'OK'}`);
     }
