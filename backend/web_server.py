@@ -1,4 +1,4 @@
-﻿
+
 # â”€â”€ Advanced Modules (v3.0 â€” safe inline handlers) â”€â”€
 def register_advanced_modules():
     """Register advanced modules with safe inline handlers.
@@ -892,14 +892,18 @@ def api_tts():
             'input': {'text': text},
             'voice': {
                 'languageCode': 'en-AU',
-                'name': 'en-AU-Neural2-C'  # Female Australian
+                'name': 'en-AU-Journey-D'  # Journey = most natural, human-like
             },
             'audioConfig': {
                 'audioEncoding': 'MP3',
-                'speakingRate': 1.05,
-                'pitch': -2.00
+                'speakingRate': 0.95,
+                'pitch': 0.0,
+                'volumeGainDb': 2.0,
+                'effectsProfileId': ['headphone-class-device'],
             }
         }).encode()
+
+
 
         req = urllib.request.Request(
             'https://texttospeech.googleapis.com/v1/text:synthesize',
