@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob: data:; connect-src 'self' http://127.0.0.1:* https://generativelanguage.googleapis.com;">
+    <title>Gravity Omega</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/omega.css">
+    <link rel="stylesheet" href="../node_modules/xterm/css/xterm.css">
+</head>
+
+<body>
+    <!-- ═══ Custom Titlebar ═══ -->
+    <div id="titlebar">
+        <div class="titlebar-left">
+            <span class="titlebar-icon">Ω</span>
+            <div id="menubar">
+                <div class="menu-item" data-menu="file">
+                    <span class="menu-label">File</span>
+                    <div class="menu-dropdown">
+                        <div class="menu-entry" data-action="newFile">New File <span class="menu-shortcut">Ctrl+N</span></div>
+                        <div class="menu-entry" data-action="newWindow">New Window <span class="menu-shortcut">Ctrl+Shift+N</span></div>
+                        <div class="menu-separator"></div>
+                        <div class="menu-entry" data-action="openFile">Open File... <span class="menu-shortcut">Ctrl+O</span></div>
+                        <div class="menu-entry" data-action="openFolder">Open Folder... <span class="menu-shortcut">Ctrl+K Ctrl+O</span></div>
+                        <div class="menu-separator"></div>
+                        <div class="menu-entry" data-action="save">Save <span class="menu-shortcut">Ctrl+S</span></div>
+                        <div class="menu-entry" data-action="saveAs">Save As... <span class="menu-shortcut">Ctrl+Shift+S</span></div>
+                        <div class="menu-separator"></div>
+                        <div class="menu-entry" data-action="exit">Exit <span class="menu-shortcut">Alt+F4</span></div>
+                    </div>
+                </div>
+                <div class="menu-item" data-menu="edit">
+                    <span class="menu-label">Edit</span>
+                    <div class="menu-dropdown">
+                        <div class="menu-entry" data-action="undo">Undo <span class="menu-shortcut">Ctrl+Z</span></div>
+                        <div class="menu-entry" data-action="redo">Redo <span class="menu-shortcut">Ctrl+Y</span></div>
+                        <div class="menu-separator"></div>
+                        <div class="menu-entry" data-action="find">Find <span class="menu-shortcut">Ctrl+F</span></div>
+                        <div class="menu-entry" data-action="replace">Replace <span class="menu-shortcut">Ctrl+H</span></div>
+                    </div>
+                </div>
+                <div class="menu-item" data-menu="view">
+                    <span class="menu-label">View</span>
+                    <div class="menu-dropdown">
+                        <div class="menu-entry" data-action="commandPalette">Command Palette <span class="menu-shortcut">Ctrl+Shift+P</span></div>
+                        <div class="menu-separator"></div>
+                        <div class="menu-entry" data-action="toggleTerminal">Terminal <span class="menu-shortcut">Ctrl+`</span></div>
+                        <div class="menu-entry" data-action="toggleFullScreen">Full Screen <span class="menu-shortcut">F11</span></div>
+                    </div>
+                </div>
+                <div class="menu-item" data-menu="terminal">
+                    <span class="menu-label">Terminal</span>
+                    <div class="menu-dropdown">
+                        <div class="menu-entry" data-action="newTerminal">New Terminal <span class="menu-shortcut">Ctrl+Shift+`</span></div>
+                    </div>
+                </div>
+                <div class="menu-item" data-menu="help">
+                    <span class="menu-label">Help</span>
+                    <div class="menu-dropdown">
+                        <div class="menu-entry" data-action="showDocs">Documentation</div>
+                        <div class="menu-entry" data-action="toggleDevTools">Toggle DevTools <span class="menu-shortcut">Ctrl+Shift+I</span></div>
+                        <div class="menu-separator"></div>
+                        <div class="menu-entry" data-action="about">About Gravity Omega</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="titlebar-center" id="titlebar-filepath"></div>
+        <div class="titlebar-controls">
+            <button class="titlebar-btn" id="btn-minimize" title="Minimize">─</button>
+            <button class="titlebar-btn" id="btn-maximize" title="Maximize">□</button>
+            <button class="titlebar-btn titlebar-btn-close" id="btn-close" title="Close">✕</button>
+        </div>
+    </div>
+
+    <!-- ═══ Main Layout ═══ -->
+    <div id="app">
+        <!-- Activity Bar (leftmost icon rail) -->
+        <div id="activity-bar">
+            <button class="activity-btn" data-panel="explorer" title="Explorer (Ctrl+Shift+E)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                </svg>
+            </button>
+            <button class="activity-btn" data-panel="search" title="Search (Ctrl+Shift+F)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+            </button>
+            <button class="activity-btn" data-panel="omega" title="Omega Command Center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+            </button>
+            <button class="activity-btn" id="btn-sparky" title="Sparky — Emmy & Alex's Friend ⚡">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+            </button>
+            <button class="activity-btn" data-panel="vault" title="Veritas Vault — Memory Cortex">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a9 9 0 019 9c0 3.18-1.65 5.98-4.14 7.57L12 22l-4.86-3.43A9 9 0 0112 2z" />
+                    <circle cx="12" cy="11" r="3" />
+                </svg>
+            </button>
+
+            <button class="activity-btn" data-panel="security" title="Security — Sentinel Shield">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+            </button>
+            <button class="activity-btn" data-panel="tools" title="Tools — Operations">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+                </svg>
+            </button>
+
+            <div class="activity-spacer"></div>
+            <button class="activity-btn" data-panel="settings" title="Settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar-collapsed">
+            <div class="sidebar-header">
+                <span class="sidebar-title">EXPLORER</span>
+            </div>
+            <div id="sidebar-content">
+                <!-- Explorer panel -->
+                <div class="sidebar-panel" data-panel="explorer">
+                    <div class="panel-section">
+                        <div class="panel-section-header" id="open-folder-trigger"><span>Open Folder</span></div>
+                        <div id="file-tree" class="file-tree"></div>
+                    </div>
+                </div>
+                <!-- Search panel -->
+                <div class="sidebar-panel hidden" data-panel="search">
+                    <div class="search-box"><input type="text" id="search-input" placeholder="Search files..." /></div>
+                    <div id="search-results"></div>
+                </div>
+                <!-- Omega panel -->
+                <div class="sidebar-panel hidden" data-panel="omega">
+                    <div class="omega-status">
+                        <div class="omega-badge">Ω SENTINEL OMEGA</div>
+                        <div class="omega-health" id="omega-health-status">Connecting...</div>
+                    </div>
+                    <div class="omega-section">
+                        <div class="omega-section-header">MODULES <span id="omega-module-count" class="omega-count"></span></div>
+                        <div id="omega-module-list" class="omega-module-list"></div>
+                    </div>
+                    <div id="omega-chat-area">
+                        <div id="omega-messages"></div>
+                        <div class="omega-input-area">
+                            <input type="text" id="omega-chat-input" placeholder="Talk to Omega..." />
+                            <button id="omega-send-btn">▶</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Vault panel (NEW) -->
+                <div class="sidebar-panel hidden" data-panel="vault">
+                    <div class="omega-status">
+                        <div class="omega-badge vault-badge">🧠 VERITAS VAULT</div>
+                        <div class="omega-health" id="vault-health-status">Initializing...</div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>📊 CONTEXT FRONTIER</span></div>
+                        <div id="vault-context" class="reports-list"><div class="reports-empty">Loading...</div></div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🔍 SEARCH VAULT</span></div>
+                        <div class="tools-form">
+                            <input type="text" id="vault-search-input" placeholder="Search all sessions..." class="tool-input" />
+                            <button id="vault-search-btn" class="reports-action-btn">Search</button>
+                        </div>
+                        <div id="vault-search-results" class="reports-list"></div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>📋 KI HEALTH</span></div>
+                        <div id="vault-ki-health" class="reports-list"><div class="reports-empty">Loading...</div></div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>📜 RECENT SESSIONS</span></div>
+                        <div id="vault-sessions" class="reports-list"><div class="reports-empty">Loading...</div></div>
+                    </div>
+                    <div class="reports-actions">
+                        <button id="vault-sweep-btn" class="reports-action-btn">🧹 Intelligence Sweep</button>
+                        <button id="vault-refresh-btn" class="reports-action-btn">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Security panel -->
+                <div class="sidebar-panel hidden" data-panel="security">
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🛡️ SENTINEL SHIELD</span></div>
+                        <div id="security-posture" class="reports-list"><div class="reports-empty">Loading...</div></div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>⚔️ DEFENSE SYSTEMS</span></div>
+                        <div id="security-defenses" class="reports-list">
+                            <div class="shield-row"><div class="shield-info"><span class="shield-name">Gravity Shield</span><span class="shield-desc">Egress firewall — blocks unauthorized outbound connections</span></div><div class="shield-btns"><button class="shield-btn shield-engage" data-shield="gravity" data-action="engage">Engage</button><button class="shield-btn shield-disengage" data-shield="gravity" data-action="disengage">Disengage</button></div></div>
+                            <div class="shield-row"><div class="shield-info"><span class="shield-name">Infinite Void</span><span class="shield-desc">Deception layer — honeypot trap for intrusion detection</span></div><div class="shield-btns"><button class="shield-btn shield-engage" data-shield="void" data-action="start">Activate</button><button class="shield-btn shield-disengage" data-shield="void" data-action="stop">Deactivate</button></div></div>
+                            <div class="shield-row"><div class="shield-info"><span class="shield-name">BasiliskMirror</span><span class="shield-desc">Adversarial reflection — mirrors attack payloads for analysis</span></div><div class="shield-btns"><button class="shield-btn shield-engage" data-shield="basilisk" data-action="activate">Activate</button><button class="shield-btn shield-disengage" data-shield="basilisk" data-action="deactivate">Deactivate</button></div></div>
+                            <div class="shield-row"><div class="shield-info"><span class="shield-name">NemesisV3</span><span class="shield-desc">Offensive recon — active threat neutralization engine</span></div><div class="shield-btns"><button class="shield-btn shield-engage shield-danger" data-shield="nemesis" data-action="engage">Deploy</button><button class="shield-btn shield-disengage" data-shield="nemesis" data-action="disengage">Stand Down</button></div></div>
+                        </div>
+                    </div>
+                    <div class="reports-actions">
+                        <button id="security-full-scan-btn" class="reports-action-btn">🔍 Full Scan</button>
+                        <button id="security-refresh-btn" class="reports-action-btn">🔄 Refresh</button>
+                    </div>
+                </div>
+                <!-- Tools panel -->
+                <div class="sidebar-panel hidden" data-panel="tools">
+
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🧠 OMEGA BRAIN</span></div>
+                        <div id="tools-brain" class="reports-list"><div class="reports-empty">Loading...</div></div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>📧 EMAIL COMPOSER</span></div>
+                        <div id="tools-email" class="tools-form">
+                            <input type="text" id="email-to" placeholder="recipient@email.com" class="tool-input" />
+                            <input type="text" id="email-subject" placeholder="Subject" class="tool-input" />
+                            <textarea id="email-body" placeholder="Email body..." class="tool-textarea" rows="3"></textarea>
+                            <button id="email-send-btn" class="reports-action-btn">Send Email</button>
+                        </div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🔍 CODE REVIEW</span></div>
+                        <div id="tools-review" class="tools-form">
+                            <input type="text" id="review-repo" placeholder="owner/repo" class="tool-input" />
+                            <input type="text" id="review-pr" placeholder="PR#" class="tool-input tool-input-small" />
+                            <button id="review-btn" class="reports-action-btn">Review</button>
+                        </div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🔔 ALERT LOG</span></div>
+                        <div id="tools-alerts" class="reports-list"><div class="reports-empty">Loading...</div></div>
+                    </div>
+                </div>
+
+                <!-- Settings panel -->
+                <div class="sidebar-panel hidden" data-panel="settings">
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🤖 AI MODEL</span></div>
+                        <div class="tools-form">
+                            <select id="settings-ai-model" class="tool-input">
+                                <option value="qwen2.5:7b">Ollama — qwen2.5:7b (local)</option>
+                                <option value="llama3.1:8b">Ollama — llama3.1:8b (local)</option>
+                                <option value="gemini-2.5-flash">Vertex AI — gemini-2.5-flash</option>
+                                <option value="gpt-4o">OpenAI — gpt-4o</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🎨 THEME</span></div>
+                        <div class="tools-form">
+                            <select id="settings-theme" class="tool-input">
+                                <option value="omega-dark">Omega Dark (Gold/Black)</option>
+                                <option value="omega-light">Omega Light</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🔤 EDITOR</span></div>
+                        <div class="tools-form">
+                            <label style="font-size:11px;color:var(--text-secondary)">Font Size</label>
+                            <input type="number" id="settings-fontsize" value="13" min="10" max="24" class="tool-input tool-input-small" />
+                            <label style="font-size:11px;color:var(--text-secondary)">Word Wrap</label>
+                            <select id="settings-wordwrap" class="tool-input">
+                                <option value="on">On</option>
+                                <option value="off">Off</option>
+                            </select>
+                            <label style="font-size:11px;color:var(--text-secondary)">Minimap</label>
+                            <select id="settings-minimap" class="tool-input">
+                                <option value="true">Visible</option>
+                                <option value="false">Hidden</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>🔐 AGENT SAFETY</span></div>
+                        <div class="tools-form">
+                            <label style="font-size:11px;color:var(--text-secondary)">Auto-execute SAFE tools</label>
+                            <select id="settings-autoexec" class="tool-input">
+                                <option value="true">Enabled (default)</option>
+                                <option value="false">Disabled — always ask</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>ℹ️ ABOUT</span></div>
+                        <div style="padding:8px 12px;font-size:11px;color:var(--text-tertiary)">
+                            <div><strong style="color:var(--gold)">Gravity Omega v2.0</strong></div>
+                            <div>VERITAS Command Center</div>
+                            <div>Built by RJ Lopez</div>
+                            <div style="margin-top:4px">Electron + Flask + SQLite + Ollama</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar resize -->
+        <div class="resize-handle" id="sidebar-resize"></div>
+
+        <!-- Main Editor Area -->
+        <div id="main-area">
+            <div id="editor-tabs">
+                <div class="tab active" data-tab="welcome"><span class="tab-name">Welcome</span></div>
+            </div>
+            <div id="editor-container">
+                <div id="welcome-screen">
+                    <div class="welcome-content">
+                        <span class="welcome-icon">Ω</span>
+                        <h1 class="welcome-title">GRAVITY OMEGA</h1>
+                        <p class="welcome-subtitle">VERITAS Command Center v2.0</p>
+                        <div class="welcome-actions">
+                            <button class="welcome-btn" id="btn-welcome-open-file">Open File</button>
+                            <button class="welcome-btn" id="btn-welcome-open-folder">Open Folder</button>
+                            <button class="welcome-btn welcome-btn-accent" id="btn-welcome-omega">Command Center</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="monaco-container" class="hidden"></div>
+                <div id="json-viewer" class="viewer hidden"></div>
+                <div id="markdown-viewer" class="viewer hidden"></div>
+                <div id="image-viewer" class="viewer hidden"><img id="image-viewer-img" /></div>
+            </div>
+
+            <div class="resize-handle-h" id="panel-resize"></div>
+
+            <!-- Bottom Panel -->
+            <div id="bottom-panel">
+                <div id="panel-tabs">
+                    <button class="panel-tab active" data-panel="terminal">Terminal</button>
+                    <button class="panel-tab" data-panel="output">Output</button>
+                    <button class="panel-tab" data-panel="problems">Problems</button>
+                </div>
+                <div id="panel-content">
+                    <div id="terminal-tabs-bar">
+                        <div id="terminal-tabs-list"></div>
+                        <button id="btn-new-terminal" title="New Terminal">+</button>
+                    </div>
+                    <div id="terminal-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat resize -->
+        <div class="resize-handle" id="chat-resize"></div>
+
+        <!-- ═══ Omega Chat Panel (Right Side) ═══ -->
+        <div id="omega-chat-panel">
+            <div class="chat-header">
+                <span class="chat-header-title">Ω OMEGA</span>
+                <span class="chat-header-model" id="chat-model-badge">Ω OMEGA v2.0</span>
+                <div class="chat-header-actions">
+                    <button class="chat-action-btn" id="btn-clear-chat" title="Clear conversation">⌫</button>
+                    <button class="chat-action-btn" id="btn-toggle-chat" title="Close panel">✕</button>
+                </div>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="chat-welcome">
+                    <span class="chat-welcome-icon">Ω</span>
+                    <p class="chat-welcome-text">I'm Omega — your brilliant, slightly cheeky AI partner. I write code, run tools, crack security, and look fabulous doing it. Ask me anything, love.</p>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <textarea id="chat-input" placeholder="Ask Omega anything — I'll plan and execute autonomously" rows="1"></textarea>
+                <button id="chat-voice-btn" title="Toggle voice (Omega speaks responses)">🔇</button>
+                <button id="chat-stop-btn" title="Stop Omega (interrupt speech + generation)">■</button>
+                <button id="chat-send-btn" title="Send (Enter)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Toast Container ═══ -->
+    <div id="toast-container"></div>
+
+    <!-- ═══ Status Bar ═══ -->
+    <div id="status-bar">
+        <div class="status-left">
+            <span class="status-item status-branch">main</span>
+            <span class="status-item" id="status-errors">0 errors</span>
+            <span class="status-item" id="status-warnings">0 warnings</span>
+            <span class="status-item" id="status-vault-ctx" title="Vault context compression">🧠 --</span>
+        </div>
+        <div class="status-right">
+            <span class="status-item" id="status-position">Ln 1, Col 1</span>
+            <span class="status-item" id="status-encoding">UTF-8</span>
+            <span class="status-item" id="status-language">Plain Text</span>
+            <span class="status-item status-omega-badge" id="status-bridge">Ω OMEGA v2.0</span>
+        </div>
+    </div>
+
+    <!-- xterm.js loaded from node_modules BEFORE Monaco -->
+    <script src="../node_modules/xterm/lib/xterm.js"></script>
+    <script src="../node_modules/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+
+    <script>
+        const monacoPath = '../node_modules/monaco-editor/min/vs';
+
+        // Configure Monaco worker path BEFORE loading
+        window.MonacoEnvironment = {
+            getWorkerUrl: function (moduleId, label) {
+                if (label === 'json') return `data:text/javascript;charset=utf-8,${encodeURIComponent('self.MonacoEnvironment={baseUrl:"' + monacoPath + '/"};importScripts("' + monacoPath + '/language/json/json.worker.js");')}`;
+                if (label === 'css' || label === 'scss' || label === 'less') return `data:text/javascript;charset=utf-8,${encodeURIComponent('self.MonacoEnvironment={baseUrl:"' + monacoPath + '/"};importScripts("' + monacoPath + '/language/css/css.worker.js");')}`;
+                if (label === 'html' || label === 'handlebars' || label === 'razor') return `data:text/javascript;charset=utf-8,${encodeURIComponent('self.MonacoEnvironment={baseUrl:"' + monacoPath + '/"};importScripts("' + monacoPath + '/language/html/html.worker.js");')}`;
+                if (label === 'typescript' || label === 'javascript') return `data:text/javascript;charset=utf-8,${encodeURIComponent('self.MonacoEnvironment={baseUrl:"' + monacoPath + '/"};importScripts("' + monacoPath + '/language/typescript/ts.worker.js");')}`;
+                return `data:text/javascript;charset=utf-8,${encodeURIComponent('self.MonacoEnvironment={baseUrl:"' + monacoPath + '/"};importScripts("' + monacoPath + '/editor/editor.worker.js");')}`;
+            }
+        };
+
+        const loaderScript = document.createElement('script');
+        loaderScript.src = monacoPath + '/loader.js';
+        loaderScript.onload = function () {
+            require.config({ paths: { vs: monacoPath } });
+            require(['vs/editor/editor.main'], function () {
+                const appScript = document.createElement('script');
+                appScript.src = 'app.js';
+                document.body.appendChild(appScript);
+            });
+        };
+        document.body.appendChild(loaderScript);
+    </script>
+</body>
+
+</html>
