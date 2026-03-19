@@ -896,9 +896,7 @@ def api_tts():
             },
             'audioConfig': {
                 'audioEncoding': 'MP3',
-                'speakingRate': 0.88,
-                'pitch': 1.0,
-                'volumeGainDb': 2.0,
+                'speakingRate': 0.92,
                 'effectsProfileId': ['headphone-class-device'],
             }
         }).encode()
