@@ -1,0 +1,55 @@
+{
+  "id": "V-STASIS_006",
+  "name": "SNAP-PHLPP1 Metabolic Dormancy Protocol for Organ Preservation",
+  "mechanism": "SNAP molecule activates PHLPP1 phosphatase -> inhibits mTOR pathway -> induces cellular quiescence (dormancy)",
+  "loss_model": "Ischemic injury: ATP depletion, ROS generation, calcium overload. Reperfusion injury: mitochondrial dysfunction, apoptosis. SNAP-PHLPP1 prevents both.",
+  "regime": "Cellular metabolic transition: normoxia -> hypometabolism -> quiescence. Reversible state.",
+  "boundary": "Mammalian cells (conserved PHLPP1). Temperature: 4°C (current organ storage) or 37°C (normothermic). pH: 7.35-7.45.",
+  "performance_claim": "Extend organ viability from 4 hours to 72+ hours via SNAP-induced metabolic dormancy",
+  "value_proposition": "Organ transplant market: 100,000+ organs discarded annually due to 4-hour expiry. SNAP preservation unlocks distant donors, reduces rejection (better matching), enables scheduled surgeries. Target: Heart, liver, kidney preservation.",
+  "bom": "SNAP synthetic mimetic: $500-2k/dose (chemistry synthesis), Preservation solution: $200-500/L, Packaging: $100-300. Total BOM: $800-$3k per organ preservation kit.",
+  "profit_model": "Per-organ licensing: $15k-$30k per preserved organ (vs $1M+ cost of organ loss). Two revenue streams: (1) Preservation kits sold to transplant centers, (2) Licensing fees to organ procurement organizations.",
+  "profit_model_type": "transactional",
+  "market_timing": "Organ shortage crisis escalating (140k waitlist, 17 deaths/day in US alone). FDA breakthrough designation potential. Legislative push for organ donation expansion.",
+  "market_description": "Global organ transplant market: $18B, growing 8% CAGR. Organ preservation submarket: $300M. SNAP technology could capture 30-50% market share (if validated). TAM: $90M-$150M annually.",
+  "hardware_requirement": "SNAP synthesis facility (GMP-compliant for medical use). Ex vivo organ perfusion systems for validation. Animal models (porcine hearts/livers standard).",
+  "assumptions": [
+    "PHLPP1 is conserved in human donor organs (validated in proteomics)",
+    "SNAP crosses cell membranes (small molecule, <500 Da)",
+    "mTOR inhibition is reversible (organs 'wake up' after transplant)",
+    "No toxic accumulation after 72 hours (needs validation)",
+    "Compatible with existing UW/HTK preservation solutions",
+    "Current organ viability: 4-6 hours (heart), 12-18 hours (liver/kidney)",
+    "Market assumes 30% adoption rate in first 3 years",
+    "FDA approval pathway: 3-5 years (breakthrough device designation)"
+  ],
+  "loss_closure": "Biological: Ischemic injury (ATP <10% triggers apoptosis), Reperfusion injury (ROS >threshold triggers necrosis), Immune activation (cytokine release). SNAP mechanism: PHLPP1 dephosphorylates Akt -> blocks mTOR -> induces autophagy/quiescence.",
+  "failure_modes": [
+    "SNAP toxicity at high doses (LD50 unknown in humans)",
+    "Incomplete mTOR inhibition (PHLPP1 isoforms, tissue-specific)",
+    "Irreversible metabolic shutdown (organs don't 'wake up')",
+    "Off-target effects (PHLPP1 affects other pathways)",
+    "Regulatory rejection (safety profile insufficient)",
+    "Organ-specific variability (heart vs liver vs kidney)"
+  ],
+  "hostile_questions": [
+    {
+      "gate": "MOLECULAR_VALIDATION",
+      "question": "Is SNAP-PHLPP1 activation measured in human donor organs or only animal models?",
+      "acceptable": ["Validated in porcine organs (pig hearts >95% homology to human). Human validation ongoing.", "PHLPP1 expression confirmed in human organ proteomics. SNAP activation needs ex vivo testing."],
+      "forbidden": ["conserved pathway so it works", "literature shows it activates", "same in all mammals"]
+    },
+    {
+      "gate": "MOLECULAR_VALIDATION",
+      "question": "Can organs 'wake up' after 72 hours? What if mTOR inhibition is irreversible?",
+      "acceptable": ["Porcine hearts revived after 48 hours (ongoing 72hr study). Reversibility confirmed via ATP recovery.", "Worst case: 72hr -> 48hr claim downgrade. Still 10x improvement over 4 hours."],
+      "forbidden": ["hibernation is reversible", "designed to be reversible", "mTOR pathway reactivates"]
+    },
+    {
+      "gate": "ECONOMIC_TRUTH",
+      "question": "What if transplant centers reject $15k-$30k cost per organ?",
+      "acceptable": ["Cost offset: $1M+ lost organ value. ROI: 30x-60x.", "Insurance reimbursement model: code as 'extended preservation therapy'.", "Tiered pricing: $5k kidney, $30k heart."],
+      "forbidden": ["obvious value proposition", "centers will pay", "saves lives so cost doesn't matter"]
+    }
+  ]
+}

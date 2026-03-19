@@ -1,5 +1,5 @@
-/**
- * OMEGA BRIDGE v2.0 — Python Backend Process Manager
+﻿/**
+ * OMEGA BRIDGE v3.0 â€” Python Backend Process Manager
  *
  * Spawns web_server.py on port 5000, manages lifecycle:
  *   - Health polling (every 3s)
@@ -34,7 +34,7 @@ class OmegaBridge extends EventEmitter {
         this._startupResolve = null;
     }
 
-    // ── Start Backend ────────────────────────────────────────
+    // â”€â”€ Start Backend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async start() {
         if (this._process) return;
 
@@ -68,7 +68,7 @@ class OmegaBridge extends EventEmitter {
                 PYTHONUNBUFFERED: '1',
             };
 
-            // Spawn via WSL — Python backend lives on Linux side
+            // Spawn via WSL â€” Python backend lives on Linux side
             const wslCmd = `cd ~/gravity-omega-v2 && .venv/bin/python backend/web_server.py`;
             this._process = spawn('wsl', ['--', 'bash', '-c', wslCmd], {
                 env,
@@ -116,7 +116,7 @@ class OmegaBridge extends EventEmitter {
             // Timeout
             setTimeout(() => {
                 if (!this._ready) {
-                    console.warn('[Bridge] Startup timeout — attempting health check anyway');
+                    console.warn('[Bridge] Startup timeout â€” attempting health check anyway');
                     this._checkHealth().then(ok => {
                         if (ok) this._onReady();
                         else reject(new Error('Backend startup timeout'));
@@ -139,7 +139,7 @@ class OmegaBridge extends EventEmitter {
         }
     }
 
-    // ── Stop ─────────────────────────────────────────────────
+    // â”€â”€ Stop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async stop() {
         this._stopHealth();
         if (this._process) {
@@ -154,7 +154,7 @@ class OmegaBridge extends EventEmitter {
         this._setStatus('STOPPED');
     }
 
-    // ── HTTP Client ──────────────────────────────────────────
+    // â”€â”€ HTTP Client â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async get(path) {
         return this._request('GET', path);
     }
@@ -190,7 +190,7 @@ class OmegaBridge extends EventEmitter {
         });
     }
 
-    // ── Health ───────────────────────────────────────────────
+    // â”€â”€ Health â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async waitForBridge(timeoutMs = 5000) {
         if (this._ready) return true;
         const start = Date.now();
@@ -239,7 +239,7 @@ class OmegaBridge extends EventEmitter {
         }
     }
 
-    // ── Status ───────────────────────────────────────────────
+    // â”€â”€ Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     getStatus() {
         return {
             status: this._status, port: this._port,
@@ -253,9 +253,9 @@ class OmegaBridge extends EventEmitter {
         this.emit('status', s);
     }
 
-    // ── Helpers ──────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _findServer() {
-        // Server lives on WSL side — check it exists
+        // Server lives on WSL side â€” check it exists
         try {
             execSync('wsl -- test -f ~/gravity-omega-v2/backend/web_server.py', { timeout: 5000 });
             return '~/gravity-omega-v2/backend/web_server.py';

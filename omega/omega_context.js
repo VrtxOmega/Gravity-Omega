@@ -1,5 +1,5 @@
-/**
- * OMEGA CONTEXT v2.0 — Execution Context Manager
+﻿/**
+ * OMEGA CONTEXT v3.0 â€” Execution Context Manager
  *
  * AutoGPT + Click + Sentry hybrid:
  *   - Breadcrumb trail (50 events) for diagnostics
@@ -20,7 +20,7 @@ class OmegaContext {
         this._startTime = Date.now();
     }
 
-    // ── Breadcrumbs (Sentry pattern) ─────────────────────────
+    // â”€â”€ Breadcrumbs (Sentry pattern) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     addBreadcrumb(category, message, data = {}, level = 'info') {
         this._breadcrumbs.push({
             category, message, data, level,
@@ -36,25 +36,25 @@ class OmegaContext {
         return this._breadcrumbs.slice(-n);
     }
 
-    // ── Active Module ────────────────────────────────────────
+    // â”€â”€ Active Module â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     setActiveModule(moduleId) {
         const prev = this._activeModule;
         this._activeModule = moduleId;
-        this.addBreadcrumb('context', `Module switch: ${prev || 'none'} → ${moduleId}`);
+        this.addBreadcrumb('context', `Module switch: ${prev || 'none'} â†’ ${moduleId}`);
     }
 
     getActiveModule() { return this._activeModule; }
 
-    // ── Metadata ─────────────────────────────────────────────
+    // â”€â”€ Metadata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     setMeta(key, value) { this._meta[key] = value; }
     getMeta(key) { return this._meta[key]; }
     getAllMeta() { return { ...this._meta }; }
 
-    // ── Session ──────────────────────────────────────────────
+    // â”€â”€ Session â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     setSession(id) { this._sessionId = id; }
     getSession() { return this._sessionId; }
 
-    // ── Cleanup Stack ────────────────────────────────────────
+    // â”€â”€ Cleanup Stack â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     onCleanup(fn) { this._cleanupStack.push(fn); }
 
     async close() {
@@ -66,7 +66,7 @@ class OmegaContext {
         this._cleanupStack = [];
     }
 
-    // ── Snapshot ──────────────────────────────────────────────
+    // â”€â”€ Snapshot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     snapshot() {
         return {
             activeModule: this._activeModule,

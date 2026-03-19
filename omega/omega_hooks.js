@@ -1,5 +1,5 @@
-/**
- * OMEGA HOOKS v2.0 — Extension Hook System
+﻿/**
+ * OMEGA HOOKS v3.0 â€” Extension Hook System
  *
  * Pluggy-style hooks with capability flags:
  *   - 10 hook specs covering lifecycle, modules, chat, security
@@ -26,7 +26,7 @@ const CAP = { OFFLINE: 1, NETWORK: 2, DESTRUCTIVE: 4, GPU: 8, ADMIN: 16 };
 
 class OmegaHooks {
     constructor() {
-        this._handlers = {};  // hookName → [{ fn, tier, caps, name }]
+        this._handlers = {};  // hookName â†’ [{ fn, tier, caps, name }]
         for (const hook of Object.keys(HOOK_SPECS)) {
             this._handlers[hook] = [];
         }

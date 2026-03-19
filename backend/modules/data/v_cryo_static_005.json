@@ -1,0 +1,53 @@
+{
+  "id": "V-CRYO_STATIC_005",
+  "name": "Solid-State Thermal Capacitance for Passive Cold-Chain",
+  "mechanism": "Phase-Change Material (Salt-Hydrate PCM) + Vacuum Insulation Panels",
+  "loss_model": "Conduction through VIP (k~0.004 W/mK), Radiation (emissivity-dependent), Infiltration (seal leakage)",
+  "regime": "Steady-state heat transfer with phase-change energy storage",
+  "boundary": "Insulated container, external ambient 20-40°C, internal target -20°C",
+  "performance_claim": "Maintain -20°C for 30 days with ZERO external power",
+  "value_proposition": "Prevents $35B annual cold-chain failures (insulin, vaccines, biologics). Eliminates diesel generator dependency. Target: pharmaceutical logistics with premium cold-window insurance.",
+  "bom": "PCM material: $500-2000/container, VIP: $1000-3000/container, thermoelectric harvest: $500 (optional). Total BOM: $2k-$5.5k per container.",
+  "profit_model": "Two-tier: (1) Cold-Chain Audit License - certify routes for passive cooling ($50k-$200k per shipping company), (2) SSTC liner sales/rental - $10k-$20k per container",
+  "market_timing": "Pharmaceutical cold-chain growth 8-10% CAGR. Regulatory pressure on carbon footprint (diesel reefers). Cold-chain failure insurance market expanding.",
+  "market_description": "Global cold-chain logistics: $250B market. Pharmaceutical segment: $18B, 8% CAGR. Reefer container fleet: 3.5M units globally. Target: 1% penetration = 35,000 units.",
+  "hardware_requirement": "Custom container liner (retrofit existing reefers). PCM charging infrastructure at port facilities.",
+  "assumptions": [
+    "PCM latent heat: 200-250 kJ/kg (salt hydrates)",
+    "VIP thermal conductivity: 0.004 W/mK (industry standard)",
+    "Container volume: 60m³ (40ft reefer standard)",
+    "Payload thermal load: 100-500W (respiration, infiltration)",
+    "Ambient temp range: 20-40°C (tropical shipping routes)",
+    "30-day duration assumes perfect seals (no air leakage)",
+    "Diesel reefer fuel cost: $3000-5000 per 30-day voyage",
+    "Cold-chain failure rate: 5-15% of shipments (WHO data)"
+  ],
+  "loss_closure": "Fourier conduction (VIP), Stefan-Boltzmann radiation (emissivity 0.05-0.1), Infiltration heat load (seal quality-dependent). Phase-change energy storage: Q = m*L_f where L_f = latent heat of fusion.",
+  "failure_modes": [
+    "VIP puncture/damage (catastrophic insulation loss)",
+    "PCM degradation after 100+ cycles (reduced latent heat)",
+    "Seal failure (air infiltration dominates heat load)",
+    "Payload exceeds design thermal load (500W)",
+    "Ambient exceeds 40°C (extreme desert/tropical conditions)"
+  ],
+  "hostile_questions": [
+    {
+      "gate": "PHYSICS_VALIDATION",
+      "question": "Is '30 days at -20°C' based on actual container testing or theoretical calculation?",
+      "acceptable": ["Lab-scale prototype tested, full-scale validation needed", "Thermal model validated against industry VIP data, container test in progress", "Conservative estimate: 30 days assumes perfect seals, real-world 20-25 days"],
+      "forbidden": ["calculation shows 30 days", "PCM spec sheets say it works", "industry standard performance"]
+    },
+    {
+      "gate": "PHYSICS_VALIDATION",
+      "question": "What if VIP thermal conductivity degrades to 0.010 W/mK (puncture, aging)?",
+      "acceptable": ["Performance drops to 12-15 days. Mitigation: redundant VIP layers", "Real-time thermal monitoring detects degradation", "Over-design: 40-day capacity provides safety margin"],
+      "forbidden": ["VIPs are robust", "unlikely to degrade", "quality control prevents this"]
+    },
+    {
+      "gate": "ECONOMIC_TRUTH",
+      "question": "What if PCM + VIP liner costs $8k but only saves $3k in diesel per voyage?",
+      "acceptable": ["Payback time: 2.7 voyages (6-8 months for weekly routes)", "Value proposition shifts to failure insurance, not fuel savings", "Target high-value pharma cargo where failure cost >> fuel cost"],
+      "forbidden": ["fuel savings justify cost", "ROI is obvious", "costs will come down"]
+    }
+  ]
+}

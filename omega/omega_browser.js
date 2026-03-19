@@ -1,5 +1,5 @@
-/**
- * OMEGA BROWSER v2.0 — Puppeteer Automation
+﻿/**
+ * OMEGA BROWSER v3.0 â€” Puppeteer Automation
  *
  * GATED tool for browser automation:
  *   - Navigate, click, type, screenshot

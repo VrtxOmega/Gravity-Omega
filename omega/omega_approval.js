@@ -1,5 +1,5 @@
-/**
- * OMEGA APPROVAL v2.0 — Two-Phase Commit Gate
+﻿/**
+ * OMEGA APPROVAL v3.0 â€” Two-Phase Commit Gate
  * Immutable proposal records with audit trail.
  * Used by the agent for GATED/RESTRICTED tool approval.
  */
@@ -14,7 +14,7 @@ class Proposal {
         this.args = args;
         this.reason = reason;
         this.safety = safety;
-        this.status = 'PENDING';  // PENDING → APPROVED/DENIED → EXECUTED
+        this.status = 'PENDING';  // PENDING â†’ APPROVED/DENIED â†’ EXECUTED
         this.createdAt = new Date().toISOString();
         this.decidedAt = null;
         this.decidedBy = null;

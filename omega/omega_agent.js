@@ -1,5 +1,5 @@
 /**
- * OMEGA AGENT v2.0 — Agentic Loop Architecture
+ * OMEGA AGENT v3.0 — Agentic Loop Architecture
  *
  * This agent works like a coding AI assistant:
  *   1. Receives user request

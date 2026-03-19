@@ -1,0 +1,37 @@
+{
+  "id": "Design_627f61aa",
+  "name": "Natural Convection Passive Cooling System",
+  "category": "Thermal Management",
+  "heat_source": "Electronic Component (1-100W, max 85°C)",
+  "transfer_mechanism": "Natural Convection",
+  "geometry": "Finned Array (5-20x surface area multiplier)",
+  "material": "Copper (k = 385 W/mK)",
+  "regime": "Rayleigh-dependent (Ra > 10^7 for turbulent)",
+  "boundary": "Free surface (open air environment)",
+  "loss_model": "Nu correlation: Nu = C * Ra^n, where C and n depend on geometry",
+  "efficiency": "theoretical_range: 5-15% (heat flux to ambient)",
+  "value_proposition": "Passive cooling for consumer electronics. Zero power consumption, zero maintenance, silent operation. Target cost: $5-$20 per unit.",
+  "market": "Consumer electronics, LED lighting, low-power computing",
+  "adapted_hostile_questions": {
+    "thermal_performance": [
+      "Is 'theoretical_range: 5-15%' based on measurement or textbook?",
+      "What if actual heat transfer coefficient is 50% lower than Nu correlation?",
+      "Does fin efficiency decrease with dust buildup over time?"
+    ],
+    "geometry_constraints": [
+      "What is the maximum size/weight acceptable for your market?",
+      "Does orientation matter? (vertical vs horizontal)",
+      "What if customer installs in enclosed space (restricted airflow)?"
+    ],
+    "cost_reality": [
+      "Is $5-$20 target BOM or retail price?",
+      "What if copper cost doubles? (aluminum fallback?)",
+      "Manufacturing cost at scale (1k vs 1M units)?"
+    ],
+    "physics_validation": [
+      "Have you measured Nu for THIS fin geometry?",
+      "Radiation contribution at 85°C? (sigma*T^4)",
+      "Contact resistance between fin and base? (thermal paste?)"
+    ]
+  }
+}
