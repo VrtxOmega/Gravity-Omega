@@ -36,12 +36,13 @@ WATCHED_FILES = [
     'backend/web_server.py',
     'backend/provenance_stack.py',
     'backend/omega_sentinel.py',
-    'backend/modules/cerberus.py',
-    'backend/modules/chain_sniper.py',
-    'backend/modules/exploit_monitor.py',
-    'backend/modules/hydra.py',
-    'backend/modules/omega_claw.py',
-    'backend/modules/titan_engine.py',
+    # v3.0: Updated to surviving module files
+    'backend/modules/hybrid_coordinator.py',
+    'backend/modules/veritas_neural_core.py',
+    'backend/modules/benchmark_harness.py',
+    'backend/modules/risk_calibrator.py',
+    'backend/modules/titan_monitor.py',
+    'backend/modules/omega_test_harness.py',
 ]
 
 # These are on the Windows side -- watch via /mnt/c paths
