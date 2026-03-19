@@ -892,7 +892,7 @@ def api_tts():
             'input': {'text': text},
             'voice': {
                 'languageCode': 'en-AU',
-                'name': 'en-AU-Journey-D'  # Journey = most natural, human-like
+                'name': 'en-AU-Journey-F'  # Journey female = most natural, human-like
             },
             'audioConfig': {
                 'audioEncoding': 'MP3',
