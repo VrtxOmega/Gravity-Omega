@@ -97,6 +97,12 @@ Veritas Vault binds directly to standard `sqlite3` without ORM overhead.
 - Houses `vault_ki_health` tracking for Knowledge Items.
 - Manages the `Context Frontier`.
 
+### 5.3 The VERITAS Provenance Stack (Module 20)
+The memory layer is governed by a strict 3-Layer Provenance Stack (`provenance_stack.py`) running as a background daemon inside the execution cortex. This ensures that memory injected into the LLM is cryptographically verifiable.
+1. **Layer 1: The Archivist Node**: Implements Content-Addressed Storage (CAS). Sweeps the read-only Veritas Vault database, hashes fragments via SHA-256, and generates `nomic-embed-text` vectors via a local Ollama sidecar.
+2. **Layer 2: Context Compiler**: Transforms raw retrieval into deterministic RAG context. Emits proof-carrying fragments structured inside a cryptographic hash chain (`chain_hash`) to guarantee the trajectory of the context injection cannot be manipulated.
+3. **Layer 3: Forensic Trace Sealer (S.E.A.L.)**: Security Evidence Audit Lock. Upon conclusion of a cognitive trace, it produces a tamper-evident `.seal.json` audit trail covering the query, the compiled `chain_head`, the fragment hashes, and the final response hash.
+
 ---
 
 ## 6. The Shield & Invariants (Omega Sentinel)

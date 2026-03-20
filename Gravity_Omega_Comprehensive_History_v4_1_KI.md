@@ -61,7 +61,13 @@ The `dags/` director orchestrated sequences across 52 standalone Python executab
 - **`network_latency_auditor.json`**: A Robin-Hood style execution chaining `signal_shroud` (Mempool noise broadcast) into `hybrid_coordinator` (Liquidation snipe) to analyze and exploit RPC layer execution vacuums over Ethereum/L2 networks.
 - **`synthetic_ip_generation.json`**: Autonomous intelligence forging pipelines.
 
-### 5.1 The Recursive Learning Paradigm
+### 5.1 The VERITAS Provenance Stack (Memory Integrity)
+Before the DAG sequences could be trusted, v4.1 revolutionized its Local RAG (Retrieval-Augmented Generation) memory. Early v3 versions blindly read SQLite strings from the Veritas Vault. In v4.1, the **Provenance Stack** (`provenance_stack.py`) was formalized into three distinct layers:
+1. **Archivist Node**: Abstracting SQLite into Content-Addressed Storage (CAS) combined with local `nomic-embed-text` embeddings.
+2. **Context Compiler**: Transforming retrieval into chained, proof-carrying metadata fragments.
+3. **Trace Sealer (S.E.A.L.)**: Cryptographically locking the end-to-end trace queries and responses into tamper-evident JSON payload audits.
+
+### 5.2 The Recursive Learning Paradigm
 In tandem with DAG execution, v4.1 operationalized the **Recursive Evolution Engine** (`recursive_evolution_engine.py`). Gravity Omega effectively became a closed-loop intelligence capable of evolving its own execution harness. 
 Upon terminal execution failure (e.g., a logic loop exhaustion logged in the cryogenic `audit_ledger`), the engine automatically autopsies the trace, isolates the root cause via localized inference, and proposes a structural patch (a code change or threshold optimization). These optimizations are codified into a `manifest.json` and queued behind a RESTRICTED approval gate, ensuring the system can iteratively self-improve under secure human oversight.
 
