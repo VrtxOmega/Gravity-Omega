@@ -53,6 +53,8 @@ from .omega_array        import OmegaArray, IntelNode
 from .omega_pattern_engine import OmegaPatternEngine, PatternReport
 from .omega_province     import OmegaProvince
 from .omega_dossier      import OmegaDossier
+from .omega_lead_fetcher import LeadFetcher
+from .omega_break_layer  import OmegaBreakLayer
 
 
 # ── Hunt Run ──────────────────────────────────────────────────────────────────
@@ -72,14 +74,16 @@ class HuntRun:
                  domains: List[str] = None,
                  county: str = "", state: str = "",
                  gh_token: str = "",
+                 max_fetch: int = 50,
                  dry_run: bool = False):
-        self.seeds    = seeds
-        self.depth    = depth
-        self.domains  = domains or []
-        self.county   = county
-        self.state    = state
-        self.gh_token = gh_token
-        self.dry_run  = dry_run
+        self.seeds     = seeds
+        self.depth     = depth
+        self.domains   = domains or []
+        self.county    = county
+        self.state     = state
+        self.gh_token  = gh_token
+        self.max_fetch = max_fetch
+        self.dry_run   = dry_run
 
         ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         seed_slug = re.sub(r"[^a-zA-Z0-9]", "_", seeds[0])[:20]
@@ -123,7 +127,19 @@ class HuntRun:
             raw_path.write_text(
                 json.dumps([n.to_dict() for n in nodes], indent=2), encoding="utf-8")
 
-            # 2. PATTERN ENGINE — analyze
+            # 1b. LEAD FETCHER — deep-read discovered URLs
+            if not self.dry_run:
+                _update("RUNNING",
+                        f"Lead Fetcher: reading content of top {self.max_fetch} nodes",
+                        cycle * 25 + 12)
+                fetcher = LeadFetcher(max_fetch=self.max_fetch)
+                nodes   = fetcher.fetch_all(nodes)
+                # Save enriched nodes
+                enriched_path = self.run_dir / f"enriched_nodes_cycle{cycle}.json"
+                enriched_path.write_text(
+                    json.dumps([n.to_dict() for n in nodes], indent=2), encoding="utf-8")
+
+            # 2. PATTERN ENGINE — analyze full content
             _update("RUNNING", f"Pattern analysis on {len(nodes)} nodes", cycle * 30 + 15)
             engine = OmegaPatternEngine(known_seeds=all_seeds)
             report = engine.analyze(nodes)
@@ -150,20 +166,45 @@ class HuntRun:
 
         audit = province.audit_of_omission(sealed_proofs)
 
-        # 4. DOSSIER — generate report
-        _update("RUNNING", "Generating dossier", 85)
+        # 4a. BREAK LAYER — adversarial falsification (anti-bias gate)
+        _update("RUNNING", "Running Break Layer — adversarial falsification gate", 78)
+        break_layer  = OmegaBreakLayer(top_n_entities=20)
+        break_report = break_layer.run(report, sealed_proofs, all_nodes)
+        break_md     = break_report.to_markdown()
+        break_path   = self.run_dir / "break_layer_report.md"
+        break_path.write_text(break_md, encoding="utf-8")
+        print(f"[BREAK_LAYER] Report saved → {break_path}")
+        print(f"[BREAK_LAYER] Overall status: {break_report.overall_status}")
+
+        lead_fetcher = LeadFetcher(max_fetch=0)  # no more fetching — just summarise
+        lead_summary = lead_fetcher.get_lead_summary(all_nodes)
+        lead_path = self.run_dir / "lead_content_summary.md"
+        lead_path.write_text(lead_summary, encoding="utf-8")
+        print(f"[LEAD_FETCHER] Lead summary saved → {lead_path}")
+
+        # 4c. DOSSIER — generate report
+        _update("RUNNING", "Generating dossier", 90)
         dossier = OmegaDossier(self.run_dir, self.run_id)
-        md_path = dossier.generate(report, sealed_proofs, all_nodes, audit)
+        md_path = dossier.generate(report, sealed_proofs, all_nodes, audit,
+                                   lead_summary=lead_summary,
+                                   break_layer_md=break_md)
 
         _update("COMPLETE", f"Dossier: {md_path}", 100)
 
         result = {
-            "run_id":      self.run_id,
-            "run_dir":     str(self.run_dir),
-            "nodes_total": len(all_nodes),
-            "seeds_total": len(all_seeds),
-            "proofs":      len(sealed_proofs),
-            "dossier":     str(md_path),
+            "run_id":             self.run_id,
+            "run_dir":            str(self.run_dir),
+            "nodes_total":        len(all_nodes),
+            "enriched_nodes":     sum(1 for n in all_nodes if n.full_text),
+            "seeds_total":        len(all_seeds),
+            "proofs":             len(sealed_proofs),
+            "dossier":            str(md_path),
+            "lead_summary":       str(lead_path),
+            "break_layer_report": str(break_path),
+            "break_status":       break_report.overall_status,
+            "confirmed":          len(break_report.confirmed_claims),
+            "assumed":            len(break_report.assumed_claims),
+            "contradicted":       len(break_report.contradicted_claims),
         }
         if job_id:
             _jobs[job_id]["result"] = result
@@ -219,7 +260,8 @@ def mirror_module(module_name: str) -> Path:
 
 def run_hunt(seed: str, depth: int = 1, domains: str = "",
              county: str = "", state: str = "",
-             gh_token: str = "", dry_run: bool = False) -> str:
+             gh_token: str = "", max_fetch: int = 50,
+             dry_run: bool = False) -> str:
     """
     Launch a hunt in a background thread.
     Returns job_id — poll /api/hunter/status/<job_id> for progress.
@@ -234,6 +276,7 @@ def run_hunt(seed: str, depth: int = 1, domains: str = "",
         "job_id":     job_id,
         "seeds":      seeds,
         "depth":      depth,
+        "max_fetch":  max_fetch,
         "status":     "QUEUED",
         "message":    "Queued",
         "progress":   0,
@@ -244,7 +287,7 @@ def run_hunt(seed: str, depth: int = 1, domains: str = "",
 
     hunt = HuntRun(seeds=seeds, depth=depth, domains=domain_list,
                    county=county, state=state,
-                   gh_token=gh_token, dry_run=dry_run)
+                   gh_token=gh_token, max_fetch=max_fetch, dry_run=dry_run)
 
     thread = threading.Thread(target=hunt.execute, args=(job_id,), daemon=True)
     thread.start()
@@ -272,17 +315,18 @@ def register_routes(app):
         from flask import request, jsonify
         body = request.get_json(force=True, silent=True) or {}
         seed     = body.get("seed", "")
-        depth    = int(body.get("depth", 1))
-        domains  = body.get("domains", "")
-        county   = body.get("county", "")
-        state    = body.get("state", "")
-        gh_token = body.get("gh_token", "")
-        dry_run  = bool(body.get("dry_run", False))
+        dep    = int(body.get("depth", 1))
+        dom    = body.get("domains", "")
+        county = body.get("county", "")
+        state  = body.get("state", "")
+        tok    = body.get("gh_token", "")
+        mf     = int(body.get("max_fetch", 50))
+        dry    = bool(body.get("dry_run", False))
 
         if not seed:
             return jsonify({"error": "seed is required"}), 400
 
-        job_id = run_hunt(seed, depth, domains, county, state, gh_token, dry_run)
+        job_id = run_hunt(seed, dep, dom, county, state, tok, mf, dry)
         return jsonify({"job_id": job_id, "status": "QUEUED"})
 
     @app.route("/api/hunter/status/<job_id>", methods=["GET"])
@@ -317,13 +361,15 @@ import re  # needed by HuntRun for slug generation
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="GOLIATH HUNTER — Self-directing OSINT engine")
-    ap.add_argument("--seed",    required=True, help="Comma-separated seed terms")
-    ap.add_argument("--depth",   type=int, default=1, help="Re-search cycles")
-    ap.add_argument("--domains", default="", help="Comma-separated domains for Wayback/subdomain enum")
-    ap.add_argument("--county",  default="", help="County for EPA ECHO")
-    ap.add_argument("--state",   default="", help="State (2-letter) for EPA ECHO")
-    ap.add_argument("--dry-run", action="store_true", help="Skip real HTTP, use mock nodes")
-    ap.add_argument("--mirror",  default="", help="Mirror a module for fine-tuning")
+    ap.add_argument("--seed",      required=True,  help="Comma-separated seed terms")
+    ap.add_argument("--depth",     type=int, default=1, help="Re-search cycles")
+    ap.add_argument("--domains",   default="",  help="Comma-separated domains for Wayback/subdomain enum")
+    ap.add_argument("--county",    default="",  help="County for EPA ECHO")
+    ap.add_argument("--state",     default="",  help="State (2-letter) for EPA ECHO")
+    ap.add_argument("--max-fetch", type=int, default=50,
+                    help="Max nodes to deep-read per cycle (default 50)")
+    ap.add_argument("--dry-run",   action="store_true", help="Skip real HTTP, use mock nodes")
+    ap.add_argument("--mirror",    default="",  help="Mirror a module for fine-tuning")
     args = ap.parse_args()
 
     if args.mirror:
@@ -339,6 +385,7 @@ if __name__ == "__main__":
         domains=domain_list,
         county=args.county,
         state=args.state,
+        max_fetch=args.max_fetch,
         dry_run=args.dry_run,
     )
     result = hunt.execute()

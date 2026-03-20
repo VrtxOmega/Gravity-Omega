@@ -41,11 +41,14 @@ class OmegaDossier:
                  pattern_report: PatternReport,
                  sealed_proofs: List[SealedProof],
                  all_nodes: List[IntelNode],
-                 audit_of_omission: str) -> Path:
+                 audit_of_omission: str,
+                 lead_summary: str = "",
+                 break_layer_md: str = "") -> Path:
         """Render and save the full dossier. Returns path to the markdown file."""
 
         md = self._render_markdown(pattern_report, sealed_proofs,
-                                   all_nodes, audit_of_omission)
+                                   all_nodes, audit_of_omission,
+                                   lead_summary, break_layer_md)
 
         md_path = self.output_dir / f"DOSSIER_{self.run_id}.md"
         md_path.write_text(md, encoding="utf-8")
@@ -67,7 +70,9 @@ class OmegaDossier:
                          report: PatternReport,
                          proofs: List[SealedProof],
                          nodes: List[IntelNode],
-                         audit: str) -> str:
+                         audit: str,
+                         lead_summary: str = "",
+                         break_layer_md: str = "") -> str:
 
         ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
         dossier_hash = hashlib.sha256(
@@ -177,7 +182,51 @@ class OmegaDossier:
         lines += [
             "---",
             "",
-            "## 6. Evidence Appendix",
+            "## 5. 🔴 Break Layer — Adversarial Falsification",
+            "",
+            "> *Anti-bias gate: What would disprove this? What doesn't fit? Where are we assuming?*",
+            "",
+        ]
+        if break_layer_md:
+            # Embed the break report inline (skip the H1 title line, already in section header)
+            br_body = "\n".join(break_layer_md.split("\n")[3:])
+            lines.append(br_body[:4000])
+        else:
+            lines += [
+                "_Break Layer not run. Re-run without --dry-run to enable._",
+                "",
+            ]
+
+        lines += [
+            "---",
+            "",
+            "## 6. Lead Content — Full Text Excerpts",
+            "",
+            "> The Lead Fetcher read the full content of the highest-priority discovered URLs.",
+            "> Each excerpt below is a direct quote of the first 600 characters of the fetched document.",
+            "",
+        ]
+        if lead_summary and "Enriched nodes: 0" not in lead_summary:
+            # Extract individual lead blocks from the summary
+            blocks = lead_summary.split("## [")
+            if len(blocks) > 1:
+                for block in blocks[1:21]:  # max 20 leads in dossier
+                    lines.append(f"### [{block[:120]}")
+                    lines.append("")
+            else:
+                lines.append(lead_summary[:3000])
+                lines.append("")
+        else:
+            lines += [
+                "_No full-text content fetched in this run._",
+                "_Run without `--dry-run` and with `--max-fetch N` to enable lead fetching._",
+                "",
+            ]
+
+        lines += [
+            "---",
+            "",
+            "## 7. Evidence Appendix",
             "",
             f"All {len(nodes)} harvested intel nodes, cryptographically sealed.",
             "",

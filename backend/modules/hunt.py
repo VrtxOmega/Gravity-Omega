@@ -34,6 +34,8 @@ def main():
     ap.add_argument("--state",   default="", help="2-letter state for EPA ECHO")
     ap.add_argument("--dry-run", action="store_true",
                     help="Skip all real HTTP — use mock nodes (fast self-test)")
+    ap.add_argument("--max-fetch", type=int, default=50,
+                    help="Max URLs to deep-read per cycle (default 50)")
     ap.add_argument("--mirror",  default="",
                     help="Clone a GOLIATH module for fine-tuning, e.g. GOLIATH_TRAWLER")
     args = ap.parse_args()
@@ -57,6 +59,7 @@ def main():
         domains=domain_list,
         county=args.county,
         state=args.state,
+        max_fetch=args.max_fetch,
         dry_run=args.dry_run,
     )
     result = hunt.execute()
