@@ -1,5 +1,5 @@
 /**
- * GRAVITY OMEGA v3.0 — Renderer Application
+ * GRAVITY OMEGA v4.1 — Renderer Application
  *
  * Orchestrates the entire UI:
  *   - Monaco Editor (omega-dark theme)
@@ -477,7 +477,7 @@ window.omega.terminal.onExit((id, code) => {
 // ══════════════════════════════════════════════════════════════
 
 // Voice + session state
-state.chat.voiceEnabled = true;  // v3.0: Omega speaks by default
+state.chat.voiceEnabled = true;  // v4.1: Omega speaks by default
 state.chat.audioPlayer = null;
 state.chat.messageHistory = [];  // Full session context — never lost
 state.chat.abortController = null;
@@ -1360,7 +1360,7 @@ window.sentinelToggle = async function(action) {
         } catch { }
     }, 30000);
 
-    console.log('%c Ω GRAVITY OMEGA v3.0 %c READY ',
+    console.log('%c Ω GRAVITY OMEGA v4.1 %c READY ',
         'background: linear-gradient(90deg, #d4a843, #a0802a); color: #000; font-weight: bold; padding: 4px 12px; border-radius: 4px;',
         'background: #1a1a1a; color: #d4a843; font-weight: bold; padding: 4px 8px;'
     );

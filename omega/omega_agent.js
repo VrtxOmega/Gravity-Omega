@@ -1,5 +1,5 @@
 /**
- * OMEGA AGENT v3.0 — Agentic Loop Architecture
+ * OMEGA AGENT v4.1 — Agentic Loop Architecture
  *
  * This agent works like a coding AI assistant:
  *   1. Receives user request
@@ -38,7 +38,7 @@ class OmegaAgent {
         this._stepLog = [];     // { tool, args, result, timestamp }
         this._pendingProposals = new Map();
 
-        // v3.0: Provenance + step hash chain
+        // v4.1: Provenance + step hash chain
         this._lastProvenanceContext = null;
         this._stepChainHash = null;
         this._exitReason = null;
@@ -199,7 +199,7 @@ ${toolDescriptions}
             ...this._conversationHistory,
         ];
 
-        // v3.0: Inject provenance context from Vault before entering loop
+        // v4.1: Inject provenance context from Vault before entering loop
         try {
             const bridgeUp = await this.bridge.waitForBridge(2000);
             if (bridgeUp) {
@@ -303,7 +303,7 @@ ${toolDescriptions}
                 finalResponse = { type: 'chat', message: `Completed after ${iteration} iterations.`, steps: this._stepLog.length, exitReason: 'LOOP_EXHAUSTED' };
             }
 
-            // v3.0: Seal the entire run via provenance S.E.A.L.
+            // v4.1: Seal the entire run via provenance S.E.A.L.
             if (this._lastProvenanceContext && finalResponse.message) {
                 try {
                     const bridgeUp = await this.bridge.waitForBridge(1000);
@@ -342,7 +342,7 @@ ${toolDescriptions}
         }
     }
 
-    // ── LLM Call (v3.0 Cooperative Handoff) ────────────────────
+    // ── LLM Call (v4.1 Cooperative Handoff) ────────────────────
     // Pattern: Ollama (backend) briefs → Gemini (frontend) generates.
     // Ollama has local Vault/provenance access. Gemini has superior reasoning.
     // Ollama never speaks to the user directly — it only provides the briefing.
@@ -692,7 +692,7 @@ ${toolDescriptions}
     }
 
     _logStep(tool, args, result) {
-        // v3.0: Extend step hash chain for tamper-evident trace
+        // v4.1: Extend step hash chain for tamper-evident trace
         const stepData = JSON.stringify({ tool, ts: new Date().toISOString(), ok: !result?.error });
         this._stepChainHash = crypto.createHash('sha256')
             .update(`${this._stepChainHash}:${stepData}`)
