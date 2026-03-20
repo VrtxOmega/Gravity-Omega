@@ -42,7 +42,7 @@ The DOM is rigidly constructed using vanilla Web Standards. Zero reactive framew
      - **KI Health**: Monitor active vs dormant Knowledge Items.
      - **Recent Sessions**: Historical telemetry playback.
   5. `Sentinel Security`: Egress hardware monitoring dashboard.
-  6. `Evolution Queue`: Harness patches and mutation ingestion.
+  6. `Evolution Queue`: Exposes `data/evolution_proposals/`, where the Recursive AI DevOps Engine surfaces strict upgrade manifests (`manifest_<hash>.json`) for sovereign RESTRICTED approval. 
   7. `Tools / Operations`: Code Review pane, Brain topology mapping, Email composer.
 
 ### 2.3 User Experience Logic (`app.js`)
@@ -119,6 +119,13 @@ Gravity Omega delegates heavy computing to its `modules/` suite, orchestrated by
 - **The Standalone Binaries (52 Python Modules)**: These files represent distinct business or hacking logic capabilities that the LLM Brain can request (`veritas_neural_core.py`, `alpha_cli.py`, `physics_audit_engine.py`, `hybrid_coordinator.py`, etc.).
 - **DAG Schema (JSON Orchestration)**: The system parses files like `backend/dags/network_latency_auditor.json`. A DAG dictates an `interval_seconds` and an array of `steps`. Step syntax maps execution sequences (`module_id`, `args`, `depends_on`, `safety_tier`).
 - **Execution Orchestration**: Gravity Omega reads the DAG, schedules the sequence autonomously, computes dependency graphs via Topological Sort, and fires the requested sequence into the VTP Gateway over `subprocess`.
+
+### 7.1 The Recursive Evolution Engine (Self-Critique & Auto-DevOps)
+A cornerstone of the pipeline is `recursive_evolution_engine.py`. Gravity Omega operates as an autonomous AI DevOps engineer, capable of profiling and patching its own failure trajectories:
+1. **Ledger Autopsy**: The engine scans `~/.omega_claw/audit_ledger.jsonl` seeking terminal execution trajectories (e.g., `VIOLATION`, `LOOP_EXHAUSTED`, `DECIDABILITY_TIMEOUT`).
+2. **Optimization Loop**: Failure traces are piped into a localized Ollama instance (`qwen2.5:7b`), demanding strict root-cause analysis (detecting AST depth limits, prompt hallucination, or VTP constraint breaks).
+3. **Manifest Generation**: The engine proposes exact parameters or architectural code-patches, compiling them into a sovereignly gated `manifest_<hash>.json` payload.
+4. **The Evolution Queue**: These manifests surface in the UI's Evolution Queue, blocked by the RESTRICTED gate until human authorization applies the structural mutation to the system's own codebase.
 
 ---
 
