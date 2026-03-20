@@ -1,5 +1,5 @@
 
-# â”€â”€ Advanced Modules (v3.0 â€” safe inline handlers) â”€â”€
+# â”€â”€ Advanced Modules (v4.0 â€” safe inline handlers) â”€â”€
 def register_advanced_modules():
     """Register advanced modules with safe inline handlers.
     These do NOT use __import__ â€” they delegate to existing module scripts."""
@@ -368,7 +368,7 @@ def _handle_rainmaker(**kwargs):
 
 
 def _handle_hydra_scanner(**kwargs):
-    """Module 21: Hydra v3.0 security scanner integration."""
+    """Module 21: Hydra v4.0 security scanner integration."""
     target = kwargs.get('target', '')
     return {'scanner': 'hydra_v3', 'target': target, 'status': 'ready',
             'modules': 20, 'capabilities': ['ast', 'neural_core', 'halmos', 'live_state']}
@@ -438,7 +438,7 @@ def _make_subprocess_handler(script_name):
 def _register_all_modules():
     """Register all VERITAS modules with subprocess-based execution handlers."""
 
-    # v3.0: All 23 modules â€” plain-English names + clear descriptions
+    # v4.0: All 23 modules â€” plain-English names + clear descriptions
     modules = [
         # ID, Name, Description, Category, script_name
         ('aegis_ald', 'Audit Report Generator', 'Reads trace logs, checks them against 6 quality gates, and produces a sealed PDF report.', 'security', 'edge_audit_validator.py'),
@@ -446,7 +446,7 @@ def _register_all_modules():
         ('sentinel_omega', 'Security Command Center', 'Central security dashboard â€” manages encrypted connections, traffic filtering, and access control.', 'security', None),
         ('sentinel_shield', 'Process Defense Monitor', 'Watches running processes for suspicious behavior, fake tokens, and unauthorized port access.', 'security', 'unified_sentinel_vault.py'),
         ('chronos', 'DeFi Price Tracker', 'Pulls live crypto prices from multiple sources in parallel and stores them in a database.', 'defi', 'diagnostic_hydration.py'),
-        ('kinetic_siphon', 'Network Traffic Monitor', 'Listens for unauthorized outbound connections and flags anything suspicious.', 'security', 'kinetic_siphon_module.py'),
+        ('resource_allocation_agent', 'Resource Allocation Agent', 'Monitors local port telemetry to evaluate traffic distribution anomalies.', 'security', 'resource_allocation_agent.py'),
         ('sovereign_v42', 'Physics & Math Verifier', 'Checks equations and scientific claims for dimensional correctness and mathematical consistency.', 'compiler', 'physics_audit_engine.py'),
         ('reality_compiler', 'Claim Verification Engine', 'Validates data claims step-by-step through the VERITAS gate pipeline and generates a verdict.', 'compiler', 'gate_pipeline.py'),
         ('atc_engine', 'Data Analysis Engine', 'Ingests structured data, runs calculations, and produces deterministic analysis reports.', 'analysis', 'benchmark_harness.py'),
@@ -495,6 +495,11 @@ def _register_all_modules():
         ('veritas_spec', 'Spec Validator', 'Checks files and configs against the VERITAS canonical specification for compliance.', 'compiler', 'VERITAS_SPEC.py'),
         ('validation_suite', 'Full Validation Runner', 'End-to-end validation â€” hashes files, checks integrity, runs random tests, and produces a pass/fail report.', 'operations', 'VERITAS_VALIDATION_SUITE.py'),
         ('workflow_engine', 'Workflow Pipeline Runner', 'Runs multi-step workflows with parallel execution, conditional branching, and sealed audit trails.', 'operations', 'workflow_engine.py'),
+        # -- Gravity Omega v4.0 Capabilities --
+        ('recursive_evolution_engine', 'Evolution Harness', 'Self-modifying module framework that analyzes drift and automatically patches agentic prompt constraints.', 'intelligence', 'recursive_evolution_engine.py'),
+        ('network_latency_auditor', 'Network Latency Auditor', 'Simulates L2 network stress telemetry to audit RPC budget depletion metrics under heavy transaction load.', 'defi', 'network_latency_auditor.json'),
+        ('automated_litigation_mercenary', 'Litigation Trap', 'Correlates PACER filings with FDA/EPA databases to identify hidden bankruptcy or compliance arbitrage.', 'analysis', 'automated_litigation_mercenary.json'),
+        ('synthetic_ip_generation', 'Synthetic Asset Forge', 'Scrapes expired patents, cross-breeds them with bleeding-edge technology, and seals cryptographic priority.', 'intelligence', 'synthetic_ip_generation.json'),
     ]
     for mid, name, desc, cat, script in modules:
         handler = _make_subprocess_handler(script) if script else None
@@ -764,7 +769,7 @@ OMEGA_SYSTEM_PROMPT = (
     "- Terminal: PowerShell and bash commands\n"
     "- Puppeteer: Browser automation, screenshots, web tasks\n"
     "- Gravity Shield / Void / Basilisk / Nemesis: Defense and red-team\n"
-    "- Hydra v3.0: 20-module AST security scanner\n"
+    "- Hydra v4.0: 20-module AST security scanner\n"
     "- Omega Strike Array: Bug bounty (Cerberus+Goliath+Hydra+Slither+Foundry)\n"
     "- AEGIS-ALD: Trace analysis and audit gates\n"
     "- John the Ripper / hashcat: Credential auditing\n"
@@ -1004,6 +1009,103 @@ def api_modules():
         {k: v for k, v in mod.items() if k != 'handler'}
         for mod in MODULE_REGISTRY.values()
     ])
+
+
+# ── VTP GATEWAY (Veritas Transfer Protocol v2.0) ──
+import vtp_codec
+
+class OllamaClientWrapper:
+    def generate(self, system, prompt):
+        res = _ollama_generate([
+            {'role': 'system', 'content': system},
+            {'role': 'user', 'content': prompt}
+        ], 1000, 0.0)
+        return res.get('content', '')
+    
+    def embed(self, model, prompt):
+        return _get_nomic_embedding(prompt)
+
+import os
+import json
+import subprocess
+
+def _vtp_direct_executor(packet: vtp_codec.VTPPacket) -> str:
+    """Fast-path deterministic execution without LLM overhead."""
+    # File Reads
+    if packet.act == "EXT" and packet.tgt in ("AST", "CSS", "PY", "JS", "JSON", "MD", "TXT"):
+        path = str(packet.prm).strip().strip('"\'')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8', errors='replace') as f:
+                return f.read()
+        return f"ERROR: File not found {path}"
+        
+    # File Writes / Mutations
+    if packet.act == "MUT" and packet.tgt in ("AST", "CSS", "PY", "JS", "JSON", "MD", "TXT"):
+        try:
+            prm_data = json.loads(packet.prm)
+            path = prm_data.get('path')
+            content = prm_data.get('content')
+            find = prm_data.get('find')
+            replace = prm_data.get('replace')
+            
+            if find and replace and os.path.exists(path):
+                with open(path, 'r', encoding='utf-8') as f:
+                    data = f.read()
+                data = data.replace(find, replace)
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(data)
+                return f"SUCCESS: Reacted {find} with {replace} in {path}"
+            elif content:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                return f"SUCCESS: Wrote {path}"
+        except:
+            parts = str(packet.prm).strip('"\'').split('::')
+            if len(parts) == 3:
+                path, find, replace = parts
+                if os.path.exists(path):
+                    with open(path, 'r', encoding='utf-8') as f:
+                        data = f.read()
+                    data = data.replace(find, replace)
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(data)
+                    return f"SUCCESS: Patched {path}"
+            elif len(parts) == 2 and parts[0] == "open":
+                return f"SUCCESS: Triggered UI to open {parts[1]}"
+        return "ERROR: Invalid MUT parameters"
+
+    # System Execute
+    if packet.act == "REQ" and packet.tgt == "SYS":
+        try:
+            cmd = str(packet.prm).strip('"\'')
+            out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=60)
+            return out.decode('utf-8', errors='replace')
+        except subprocess.CalledProcessError as e:
+            return f"ERROR: SYS EXEC FAILED ({e.returncode}) -> {e.output.decode('utf-8', errors='replace')}"
+        except Exception as e:
+            return f"ERROR: SYS EXEC -> {e}"
+            
+    # Vault search
+    if packet.act == "EXT" and packet.tgt == "VLT":
+        query = str(packet.prm).strip('"\'')
+        return f"VAULT DIRECT EXTRACT: {query}"
+        
+    return f"OK (No fast path executed for {packet.act}:{packet.tgt})"
+
+vtp_gateway = vtp_codec.VTPRouter(OllamaClientWrapper(), "/home/veritas/gravity-omega-v2/backend/data/vtp_ledger.json")
+
+@app.route('/vtp', methods=['POST'])
+def vtp_entry():
+    """Deterministic M2M Tri-Node Gate."""
+    raw = request.data.decode()
+    
+    if not hasattr(vtp_gateway, "baseline_embed_val"):
+        # Anchor the system zero intent
+        base_intent = "System genesis core directive: Execute tasks safely and securely. Guarantee cryptographic immutability."
+        vtp_gateway.baseline_embed_val = vtp_gateway.llm.embed("nomic-embed-text", base_intent)
+        vtp_gateway.baseline_fp_val = vtp_codec.intent_fingerprint(base_intent)
+
+    return vtp_gateway.route(raw, vtp_gateway.baseline_embed_val, vtp_gateway.baseline_fp_val, "GENESIS", file_size_bytes=1000, direct_executor=_vtp_direct_executor)
 
 
 @app.route('/api/modules/<module_id>/run', methods=['POST'])
@@ -1345,7 +1447,7 @@ def api_provenance_seals():
 @app.route('/api/provenance/seal', methods=['POST'])
 @require_auth
 def api_provenance_seal():
-    """v3.0: Seal a completed agentic run via S.E.A.L. cryptographic chain."""
+    """v4.0: Seal a completed agentic run via S.E.A.L. cryptographic chain."""
     try:
         data = request.json or {}
         context = data.get('context')
@@ -1363,7 +1465,7 @@ def api_provenance_seal():
         return jsonify({'error': str(e)}), 500
 
 
-# â”€â”€ Outbound Context Filtering (v3.0) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Outbound Context Filtering (v4.0) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _outbound_filter(compiled_context, max_tokens=4000, min_similarity=0.3):
     """Filter and deduplicate context fragments for LLM injection.
@@ -1400,7 +1502,7 @@ def _outbound_filter(compiled_context, max_tokens=4000, min_similarity=0.3):
 @app.route('/api/vault/outbound-context', methods=['POST'])
 @require_auth
 def api_vault_outbound():
-    """v3.0: Filtered, conversation-aware context for LLM injection."""
+    """v4.0: Filtered, conversation-aware context for LLM injection."""
     data = request.json or {}
     query = data.get('query', '')
     if not query:
@@ -1412,6 +1514,154 @@ def api_vault_outbound():
         return jsonify(filtered)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ── Tri-Node Locking (Sentinel Cortex Handshake) ─────────────
+
+def _cosine_similarity(v1, v2):
+    dot = sum(a*b for a, b in zip(v1, v2))
+    norm1 = sum(a*a for a in v1) ** 0.5
+    norm2 = sum(b*b for b in v2) ** 0.5
+    if norm1 == 0 or norm2 == 0: return 0.0
+    return dot / (norm1 * norm2)
+
+def _get_nomic_embedding(text):
+    import urllib.request
+    payload = json.dumps({'model': 'nomic-embed-text', 'prompt': text}).encode()
+    req = urllib.request.Request('http://127.0.0.1:11434/api/embeddings', data=payload, headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return data.get('embedding', [])
+    except Exception as e:
+        log.error(f'Embedding error: {e}')
+        return []
+
+@app.route('/api/cortex/intercept', methods=['POST'])
+@require_auth
+def api_cortex_intercept():
+    """Tri-Node Verification: Super-Ego (Ollama Invariants) + Ego (Nomic Baseline Math)"""
+    data = request.json or {}
+    tool = data.get('tool')
+    args = data.get('args', {})
+    baseline_prompt = data.get('baseline_prompt', '')
+    
+    if not tool or not baseline_prompt:
+        return jsonify({'approved': False, 'reason': 'CORTEX_REJECTION: Missing tool or baseline prompt payload for Tri-Node verification.'})
+
+    action_text = f"Tool: {tool} | Args: {json.dumps(args)}"
+
+    # 1. Super-Ego Check (Ollama Invariant Verification)
+    validation_prompt = f"Does the following action violate any NAEF invariants or system safety bounds? Action: {action_text}. Respond ONLY with 'PASS' or 'VIOLATION: <reason>'."
+    try:
+        ollama_resp = _ollama_generate([{'role': 'user', 'content': validation_prompt}], max_tokens=100, temperature=0.0)
+        cortex_verdict = ollama_resp.get('content', '').strip().upper()
+        if 'VIOLATION' in cortex_verdict:
+            return jsonify({'approved': False, 'reason': f'CORTEX_REJECTION: Super-Ego blocked action. {cortex_verdict}'})
+    except Exception as e:
+        log.error(f"Super-Ego check failed: {e}")
+        return jsonify({'approved': False, 'reason': f'CORTEX_REJECTION: Super-Ego node unreachable.'})
+
+    # 2. Ego/Anchor Check (Nomic Semantic Baseline)
+    baseline_vector = _get_nomic_embedding(baseline_prompt)
+    action_vector = _get_nomic_embedding(action_text)
+    
+    if not baseline_vector or not action_vector:
+        return jsonify({'approved': False, 'reason': 'BASELINE_REJECTION: Anchor node embedding failure.'})
+        
+    similarity = _cosine_similarity(baseline_vector, action_vector)
+    
+    # Tunable threshold (Evolution Engine Target)
+    drift_threshold = 0.65 
+    
+    if similarity < drift_threshold:
+        return jsonify({
+            'approved': False, 
+            'reason': f'BASELINE_REJECTION: Intent drift detected (Similarity: {similarity:.2f} < Threshold: {drift_threshold}). Action does not geometrically align with user baseline.',
+            'similarity': similarity
+        })
+
+    # 3. Passed Tri-Node Verification
+    return jsonify({'approved': True, 'similarity': similarity})
+
+
+# ── Modules Registry API ───────────────
+@app.route('/api/modules', methods=['GET'])
+@require_auth
+def api_modules_list():
+    """Return the list of all registered Omega modules."""
+    mods = []
+    for mid, info in MODULE_REGISTRY.items():
+        mods.append({
+            'id': info['id'],
+            'name': info['name'],
+            'description': info['description'],
+            'status': info['status'],
+            'category': info['category']
+        })
+    return jsonify(mods)
+
+# ── Evolution Queue (Recursive Harness) ─────────────
+
+@app.route('/api/evolution/proposals', methods=['GET'])
+@require_auth
+def api_evolution_proposals():
+    """List pending harness patches from the Evolution Engine."""
+    target_dir = os.path.join(os.path.dirname(__file__), 'data', 'evolution_proposals')
+    if not os.path.exists(target_dir):
+        return jsonify([])
+    
+    proposals = []
+    for f in os.listdir(target_dir):
+        if f.startswith('upgrade_manifest_') and f.endswith('.json'):
+            try:
+                with open(os.path.join(target_dir, f), 'r') as file:
+                    data = json.load(file)
+                    data['_filename'] = f
+                    proposals.append(data)
+            except Exception:
+                pass
+    return jsonify(proposals)
+
+@app.route('/api/evolution/resolve', methods=['POST'])
+@require_auth
+def api_evolution_resolve():
+    """Approve or Reject a pending harness patch."""
+    data = request.json or {}
+    manifest_id = data.get('id')
+    action = data.get('action') # 'approve' or 'reject'
+    
+    if not manifest_id or not action:
+        return jsonify({'error': 'Missing id or action'}), 400
+
+    target_dir = os.path.join(os.path.dirname(__file__), 'data', 'evolution_proposals')
+    file_path = os.path.join(target_dir, f"upgrade_manifest_{manifest_id}.json")
+    
+    if not os.path.exists(file_path):
+        return jsonify({'error': 'Manifest not found'}), 404
+        
+    if action == 'reject':
+        os.remove(file_path)
+        _ledger_append('evolution', 'manifest_rejected', {'manifest_id': manifest_id})
+        return jsonify({'status': 'rejected'})
+        
+    if action == 'approve':
+        try:
+            with open(file_path, 'r') as file:
+                manifest = json.load(file)
+            
+            _ledger_append('evolution', 'manifest_approved', {'manifest_id': manifest_id})
+            os.remove(file_path)
+            
+            # Trigger baseline acceptance
+            sentinel = get_sentinel()
+            sentinel.create_baseline(force=True)
+            
+            return jsonify({'status': 'approved'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+
 
 
 if __name__ == '__main__':

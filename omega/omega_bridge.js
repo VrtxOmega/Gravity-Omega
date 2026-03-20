@@ -163,6 +163,34 @@ class OmegaBridge extends EventEmitter {
         return this._request('POST', path, body);
     }
 
+    async postVTP({ op, act, tgt, prm, bnd, rgm, fal, parent_seal, drift }) {
+        const { VTPCodec } = require('./vtp_codec');
+        const packetString = VTPCodec.encode(op, act, tgt, prm, bnd, rgm, fal, parent_seal || "GENESIS", drift);
+        
+        return new Promise((resolve, reject) => {
+            const req = http.request({
+                hostname: '127.0.0.1', port: this._port,
+                path: '/vtp', method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain',
+                    'X-Omega-Token': this._authToken,
+                    'Content-Length': Buffer.byteLength(packetString)
+                },
+                timeout: 60000,
+            }, (res) => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                    try { resolve(data); } catch { resolve(data); }
+                });
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
+            req.write(packetString);
+            req.end();
+        });
+    }
+
     _request(method, reqPath, body) {
         return new Promise((resolve, reject) => {
             const payload = body ? JSON.stringify(body) : null;

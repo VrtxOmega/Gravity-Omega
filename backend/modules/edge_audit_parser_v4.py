@@ -51,6 +51,16 @@ PATTERNS = {
         r'(?:pfos)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppb',
         r'(?:pfos)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppm',
     ],
+    'pfhxs': [
+        r'(?:pfhxs)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppt',
+        r'(?:pfhxs)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppb',
+        r'(?:pfhxs)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppm',
+    ],
+    'pfas': [
+        r'(?:pfas)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppt',
+        r'(?:pfas)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppb',
+        r'(?:pfas)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*ppm',
+    ],
     'dehp': [
         r'(?:dehp|\u90bb\u82ef\u4e8c\u7532\u9178\u4e8c\\(2-\u4e59\u57fa\u5df1\u57fa\\)\u916f)\\s*[:=]?\\s*<?(\\d+(?:\\.\\d+)?)\\s*(?:ppm|mg/kg)',
         r'\\|\\s*dehp\\s*\\|[^\\|]*\\|\\s*<?(\\d+(?:\\.\\d+)?)\\s*(?:ppm|%)',
@@ -91,9 +101,11 @@ def parse_declaration_v4(text: str) -> Dict[str, float]:
                     try:
                         value = float(groups[0])
                         
-                        # ppb conversion if needed
+                        # ppb/ppt conversion if needed
                         if 'ppb' in pattern:
                             value = value / 1000.0
+                        elif 'ppt' in pattern:
+                            value = value / 1_000_000.0
                         
                         substances[substance] = value
                         break  # Found value, move to next substance
@@ -228,4 +240,24 @@ DIBP:                       Not Detected
 
 
 if __name__ == "__main__":
-    test_v4_parser()
+    import sys
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description="Edge-Audit ESG Parser V4")
+    parser.add_argument("--context", type=str, help="Path to context file containing ESG text")
+    parser.add_argument("--test", action="store_true", help="Run self-tests")
+    args, unknown = parser.parse_known_args()
+
+    if args.test or len(sys.argv) == 1:
+        test_v4_parser()
+    elif args.context:
+        try:
+            with open(args.context, "r", encoding="utf-8") as f:
+                text = f.read()
+            substances = parse_declaration_v4(text)
+            print("EDGE_AUDIT_PARSED:")
+            print(json.dumps(substances, indent=2))
+        except Exception as e:
+            print(f"Error parsing context: {e}", file=sys.stderr)
+            sys.exit(1)

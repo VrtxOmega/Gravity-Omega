@@ -1,7 +1,7 @@
 {
   "name": "gravity-omega",
-  "version": "3.0.0",
-  "description": "Gravity Omega — VERITAS Command Center v3.0 (Provenance-Sealed)",
+  "version": "4.0.0",
+  "description": "Gravity Omega — VERITAS Command Center v4.0 (Provenance-Sealed)",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

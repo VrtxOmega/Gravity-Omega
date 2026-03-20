@@ -1,0 +1,52 @@
+{
+  "id": "synthetic_ip_generation_01",
+  "name": "Synthetic IP Generation (The Forge)",
+  "description": "Runs 24/7 morphological generation of novel micro-channel heat sink geometries. Physics audit engines instantly kill designs that violate the Bernoulli equation or Hooke's Law.",
+  "active": true,
+  "interval_seconds": 3600,
+  "steps": [
+    {
+      "step_id": "step_001_morphological_generation",
+      "module_id": "thermal_shield_forge",
+      "action": "execute",
+      "args": "--target-geometry micro-channel-heat-sink --mode continuous",
+      "depends_on": [],
+      "label": "Thermal Shield Forge: Ollama generation of novel passive cooling arrays",
+      "transform": true,
+      "safety_tier": "GATED"
+    },
+    {
+      "step_id": "step_002_physics_audit",
+      "module_id": "physics_audit_engine",
+      "action": "execute",
+      "args": "--enforce Bernoulli --enforce HookesLaw",
+      "depends_on": ["step_001_morphological_generation"],
+      "condition": null,
+      "label": "Physics Audit: Mathematically kill any design that violates physical invariants",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_003_economic_validator",
+      "module_id": "revenue_survivor_validator",
+      "action": "execute",
+      "args": "--gate economic-viability",
+      "depends_on": ["step_002_physics_audit"],
+      "condition": null,
+      "label": "Revenue Survivor: Validate market appetite and manufacturing feasibility",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_004_patent_generation",
+      "module_id": "veritas_pdf",
+      "action": "execute",
+      "args": "--seal --template PROVISIONAL_PATENT",
+      "depends_on": ["step_003_economic_validator"],
+      "condition": null,
+      "label": "VERITAS Sealing: Auto-write and cryptographically seal provisional patent text",
+      "transform": false,
+      "safety_tier": "SAFE"
+    }
+  ]
+}

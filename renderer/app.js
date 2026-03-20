@@ -739,6 +739,7 @@ async function loadPanelData(panel) {
         case 'security': await loadSecurityPanel(); break;
         case 'tools': await loadToolsPanel(); break;
         case 'ledger': await loadLedgerPanel(); break;
+        case 'evolution': if (window.loadEvolutionPanel) await window.loadEvolutionPanel(); break;
     }
 }
 
@@ -1163,6 +1164,12 @@ function initEventListeners() {
         showToast(result?.error ? `Scan failed: ${result.error}` : 'Scan complete!', result?.error ? 'error' : 'success');
     });
 
+    // Evolution
+    document.getElementById('evolution-scan-btn')?.addEventListener('click', () => {
+        showToast('Scanning for harness patches...', 'info');
+        if (window.loadEvolutionPanel) window.loadEvolutionPanel();
+    });
+
     // Tools
     document.getElementById('email-send-btn')?.addEventListener('click', async () => {
         const to = document.getElementById('email-to').value;
@@ -1240,6 +1247,68 @@ function initEventListeners() {
         fitAllTerminals();
     });
 }
+
+// ══════════════════════════════════════════════════════════════
+// EVOLUTION PANEL
+// ══════════════════════════════════════════════════════════════
+
+window.loadEvolutionPanel = async function() {
+    const queueEl = document.getElementById('evolution-queue');
+    const healthEl = document.getElementById('evolution-health-status');
+    if (!queueEl || !healthEl) return;
+    
+    queueEl.innerHTML = '<div class="reports-empty">Scanning for harness patches...</div>';
+    
+    try {
+        const resp = await fetch('http://127.0.0.1:5000/api/evolution/proposals', { headers: { 'X-Omega-Auth': 'sentinel' }});
+        const proposals = await resp.json();
+        
+        if (!proposals || proposals.length === 0) {
+            queueEl.innerHTML = '<div class="reports-empty">No pending manifests.</div>';
+            healthEl.textContent = 'Stable';
+            healthEl.style.color = 'var(--green)';
+            return;
+        }
+        
+        healthEl.textContent = `${proposals.length} Patches Pending`;
+        healthEl.style.color = 'var(--orange)';
+        
+        queueEl.innerHTML = proposals.map(p => `
+            <div class="search-result" style="cursor: default; padding: 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px;">
+                <div class="file-path" style="font-size: 14px; font-weight: bold; color: var(--gold)">Evolution Manifest: ${p.manifest_id.substring(0,8)}</div>
+                <div class="match-text" style="color: var(--text); margin-bottom: 6px;">Target: <span style="color: var(--blue)">${p.target_module}</span></div>
+                <div class="match-text" style="color: var(--textSubtitle); font-size: 11px;">Rationale: ${p.rationale}</div>
+                <div style="background: var(--bgDarker); padding: 8px; border-radius: 4px; margin-top: 8px; font-family: monospace; font-size: 11px; color: var(--textSubtitle); border: 1px solid var(--borderLighter);">
+                    Proposed Patch:<br/><span style="color: var(--green)">${JSON.stringify(p.proposed_patch)}</span>
+                </div>
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    <button class="reports-action-btn" onclick="resolveEvolution('${p.manifest_id}', 'approve')" style="color: var(--green); flex: 1; justify-content: center; background: var(--bgDarker)">Accept Re-Write</button>
+                    <button class="reports-action-btn" onclick="resolveEvolution('${p.manifest_id}', 'reject')" style="color: var(--red); flex: 1; justify-content: center; background: var(--bgDarker)">Reject</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        queueEl.innerHTML = `<div class="reports-empty" style="color: var(--red)">Error loading queue: ${e.message}</div>`;
+        healthEl.textContent = 'Offline';
+    }
+}
+
+window.resolveEvolution = async function(id, action) {
+    try {
+        const resp = await fetch('http://127.0.0.1:5000/api/evolution/resolve', {
+            method: 'POST',
+            headers: { 'X-Omega-Auth': 'sentinel', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, action })
+        });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        
+        showToast(`Evolution patch ${action}d successfully.`, action === 'approve' ? 'success' : 'info');
+        window.loadEvolutionPanel();
+    } catch (e) {
+        showToast(`Error: ${e.message}`, 'error');
+    }
+};
 
 // ══════════════════════════════════════════════════════════════
 // SENTINEL CONTROLS

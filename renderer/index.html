@@ -95,6 +95,7 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
+            </button>
             <button class="activity-btn" data-panel="vault" title="Veritas Vault — Memory Cortex">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2a9 9 0 019 9c0 3.18-1.65 5.98-4.14 7.57L12 22l-4.86-3.43A9 9 0 0112 2z" />
@@ -105,6 +106,11 @@
             <button class="activity-btn" data-panel="security" title="Security — Sentinel Shield">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+            </button>
+            <button class="activity-btn" data-panel="evolution" title="Evolution Queue — Harness Patches">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
                 </svg>
             </button>
             <button class="activity-btn" data-panel="tools" title="Tools — Operations">
@@ -208,6 +214,20 @@
                     <div class="reports-actions">
                         <button id="security-full-scan-btn" class="reports-action-btn">🔍 Full Scan</button>
                         <button id="security-refresh-btn" class="reports-action-btn">🔄 Refresh</button>
+                    </div>
+                </div>
+                <!-- Evolution panel (NEW) -->
+                <div class="sidebar-panel hidden" data-panel="evolution">
+                    <div class="omega-status">
+                        <div class="omega-badge vault-badge">🧬 EVOLUTION ENGINE</div>
+                        <div class="omega-health" id="evolution-health-status">Awaiting Patches...</div>
+                    </div>
+                    <div class="reports-section">
+                        <div class="reports-section-header"><span>📥 PENDING HARNESS PATCHES</span></div>
+                        <div id="evolution-queue" class="reports-list"><div class="reports-empty">No pending manifests.</div></div>
+                    </div>
+                    <div class="reports-actions">
+                        <button id="evolution-scan-btn" class="reports-action-btn">🔄 Scan Proposals</button>
                     </div>
                 </div>
                 <!-- Tools panel -->

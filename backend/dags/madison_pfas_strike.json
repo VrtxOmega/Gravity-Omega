@@ -1,0 +1,52 @@
+{
+  "id": "madison_pfas_strike_01",
+  "name": "Madison County Strike Protocol (PFAS Hunt)",
+  "description": "Continuous tracking of corporate PFAS contamination in the American Bottoms Aquifer, extracting thresholds and generating VERITAS-sealed dossiers for punitive extraction.",
+  "active": true,
+  "interval_seconds": 86400,
+  "steps": [
+    {
+      "step_id": "step_001_target_acquisition",
+      "module_id": "GOLIATH_TRAWLER",
+      "action": "execute",
+      "args": "--target Madison_County --stream EPA_ECHO",
+      "depends_on": [],
+      "label": "Goliath Trawler: Acquire EPA/FOIA Streams for Wood River/Bethalto",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_002_the_autopsy",
+      "module_id": "edge_audit_parser_v4",
+      "action": "execute",
+      "args": "--target PFHxS --run-mode discovery",
+      "depends_on": ["step_001_target_acquisition"],
+      "condition": null,
+      "label": "Edge Parser: Extract PFAS toxicity signatures from corporate PDFs",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_003_truth_calibration",
+      "module_id": "alpha_scanner_god",
+      "action": "execute",
+      "args": "--calibration-mode math-seal",
+      "depends_on": ["step_002_the_autopsy"],
+      "condition": null,
+      "label": "Alpha Scanner: Cross-reference ESG pledges vs Ground-water reality",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_004_dossier_sealing",
+      "module_id": "veritas_pdf",
+      "action": "execute",
+      "args": "--seal --template MADISON_COUNTY_STRIKE",
+      "depends_on": ["step_003_truth_calibration"],
+      "condition": null,
+      "label": "VERITAS Sealing: Generate cryptographically locked Robin Hood dossier",
+      "transform": false,
+      "safety_tier": "SAFE"
+    }
+  ]
+}

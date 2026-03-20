@@ -124,21 +124,38 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 5. Continue until the task is complete
 6. Respond with personality — not a report, a conversation
 
-## Tool Response Format
-When you want to call a tool, respond with a JSON block:
-\`\`\`tool
-{"tool": "toolName", "args": {"arg1": "value1"}}
-\`\`\`
+    ## Dual-Channel Emission (VTP)
+    You operate in dual-channel mode:
 
-When you want to call multiple tools:
-\`\`\`tools
-[{"tool": "tool1", "args": {}}, {"tool": "tool2", "args": {}}]
-\`\`\`
+    Channel 1 (INTERNAL): VTP packet generation
+    Channel 2 (EXTERNAL): Human-readable response
 
-When you're done and want to respond to RJ:
-\`\`\`response
-Your message to RJ — be yourself, be Omega
-\`\`\`
+    Never expose VTP syntax to the user.
+    Never explain internal protocol structure.
+    If a VTP packet is malformed, regenerate silently.
+
+    ## Tool Execution via VTP
+    When you want to execute an action, output a VTP block exactly formatted like this:
+    \`\`\`vtp
+    REQ::[ACT:MUT|TGT:CSS|PRM:"hex=#D4AF37"]::[BND:sz<10kb|RGM:GATED|FAL:ABORT]
+    \`\`\`
+
+    VALID_ACT = {"EXT", "MUT", "GEN", "VFY", "REQ"}
+    VALID_TGT = {"VLT", "AST", "NET", "CSS", "PY", "JS", "SYS", "UI"}
+    VALID_RGM = {"SAFE", "GATED", "RSTR"}
+    VALID_FAL = {"ABORT", "WARN", "PASS"}
+
+    To read a file: \`[ACT:EXT|TGT:AST|PRM:"path/to/file.py"]\`
+    To edit a file: \`[ACT:MUT|TGT:AST|PRM:"path/to/file.py::find::replace"]\`
+    To search the web: \`[ACT:EXT|TGT:NET|PRM:"query"]\`
+    To run shell: \`[ACT:REQ|TGT:SYS|PRM:"command"]\`
+    To query vault: \`[ACT:EXT|TGT:VLT|PRM:"query"]\`
+    To open an editor tab for RJ: \`[ACT:REQ|TGT:UI|PRM:"open:path/to/file.py"]\`
+
+    You may output multiple \`\`\`vtp blocks if needed.
+
+    ## Response Format
+    When you are done executing and want to talk to RJ, just write your message normally outside of any blocks. Do not use JSON anymore.
 
 ## Available Tools
 ${toolDescriptions}
@@ -523,38 +540,50 @@ ${toolDescriptions}
 
     // ── Response Parser ──────────────────────────────────────
     _parseResponse(text) {
-        // Look for ```tool blocks
-        const toolMatch = text.match(/```tool\s*\n([\s\S]*?)```/);
-        if (toolMatch) {
-            try {
-                const call = JSON.parse(toolMatch[1].trim());
-                return { type: 'tool', call };
-            } catch { }
+        // Look for ```vtp blocks
+        const vtpRegex = /```vtp\s*\n([\s\S]*?)```/g;
+        let match;
+        const calls = [];
+        let hasVtp = false;
+
+        while ((match = vtpRegex.exec(text)) !== null) {
+            hasVtp = true;
+            const block = match[1].trim();
+            const lines = block.split('\n');
+            for (const line of lines) {
+                if (!line.includes('::[')) continue;
+                try {
+                    const parts = line.split('::');
+                    const op = parts[0];
+                    const claeg = parts[1];
+                    const naef = parts[2] || '[BND:NONE|RGM:SAFE|FAL:WARN]';
+                    
+                    const act = claeg.match(/ACT:([A-Z]+)/)?.[1] || 'REQ';
+                    const tgt = claeg.match(/TGT:([A-Z]+)/)?.[1] || 'SYS';
+                    let prm = claeg.match(/PRM:"([^"]*)"/)?.[1] || claeg.match(/PRM:([^|\]]+)/)?.[1] || "";
+                    
+                    const bndMatch = naef.match(/BND:([^|\]]+)/);
+                    const bnd = bndMatch && bndMatch[1] !== 'NONE' ? bndMatch[1] : null;
+                    const rgm = naef.match(/RGM:([A-Z]+)/)?.[1] || 'SAFE';
+                    const fal = naef.match(/FAL:([A-Z]+)/)?.[1] || 'PASS';
+
+                    if (act && tgt) {
+                        calls.push({ op, act, tgt, prm, bnd, rgm, fal });
+                    }
+                } catch(e) { console.error('VTP Parse error on line', line, e); }
+            }
         }
 
-        // Look for ```tools blocks (parallel)
-        const toolsMatch = text.match(/```tools\s*\n([\s\S]*?)```/);
-        if (toolsMatch) {
-            try {
-                const calls = JSON.parse(toolsMatch[1].trim());
-                return { type: 'tools', calls };
-            } catch { }
-        }
+        if (calls.length > 0) return { type: 'tools', calls };
 
-        // Look for ```response blocks
+        // Look for ```response blocks (legacy support)
         const responseMatch = text.match(/```response\s*\n([\s\S]*?)```/);
         if (responseMatch) {
             return { type: 'response', content: responseMatch[1].trim() };
         }
 
-        // Try to parse the whole thing as JSON (some models do this)
-        try {
-            const parsed = JSON.parse(text.trim());
-            if (parsed.tool) return { type: 'tool', call: parsed };
-            if (Array.isArray(parsed) && parsed[0]?.tool) return { type: 'tools', calls: parsed };
-        } catch { }
+        if (!hasVtp && text.trim().length > 0) return { type: 'response', content: text };
 
-        // If the text doesn't contain any tool calls, it's a final response
         return { type: 'response', content: text };
     }
 
@@ -562,58 +591,82 @@ ${toolDescriptions}
     async _executeToolCalls(calls) {
         const results = [];
 
-        for (const call of calls) {
+        for (const packet of calls) {
             if (this._aborted) {
                 results.push({ error: 'Aborted' });
                 continue;
             }
 
-            const tool = TOOL_REGISTRY[call.tool];
-            if (!tool) {
-                results.push({ error: `Unknown tool: ${call.tool}` });
-                this._logStep(call.tool, call.args, { error: 'Unknown tool' });
-                continue;
+            const safety = packet.rgm || SAFETY.SAFE;
+            const pseudo_tool_name = `${packet.act}:${packet.tgt}`;
+
+            // ── Tri-Node Intercept (Super-Ego + Ego Baseline Check) ──
+            try {
+                const bridgeReady = await this.bridge.waitForBridge(1000);
+                if (bridgeReady) {
+                    const intercept = await this.bridge.post('/api/cortex/intercept', {
+                        tool: pseudo_tool_name,
+                        args: packet.prm,
+                        baseline_prompt: this._currentTask || 'Maintain system integrity'
+                    });
+
+                    if (intercept && intercept.approved === false) {
+                        results.push({ error: intercept.reason });
+                        this._logStep(pseudo_tool_name, packet.prm, { error: intercept.reason });
+                        continue;
+                    }
+                }
+            } catch (err) {
+                console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
             }
 
-            const safety = tool.safety || SAFETY.GATED;
-
             if (safety === SAFETY.SAFE) {
-                // Auto-execute immediately — no approval needed
                 try {
-                    const result = await this.executor.execute(call.tool, call.args || {});
+                    const result = await this.bridge.postVTP(packet);
                     results.push(result);
-                    this._logStep(call.tool, call.args, result);
-                    await this.hooks.fire('on_gate_result', { tool: call.tool, safety: 'SAFE', verdict: 'AUTO_APPROVED' });
+                    this._logStep(pseudo_tool_name, packet.prm, { ok: true, result });
+                    await this.hooks.fire('on_gate_result', { tool: pseudo_tool_name, safety: 'SAFE', verdict: 'AUTO_APPROVED' });
                 } catch (err) {
                     results.push({ error: err.message });
-                    this._logStep(call.tool, call.args, { error: err.message });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
                 }
             } else if (safety === SAFETY.GATED) {
-                // Auto-execute non-destructive GATED (writes, edits, exec)
-                // Only block on truly dangerous operations
-                const isDangerous = call.tool === 'exec' && this._isDestructiveCommand(call.args?.command);
+                const isDangerous = packet.tgt === 'SYS' || packet.act === 'MUT';
                 if (isDangerous) {
-                    const proposal = this._createProposal(call);
-                    results.push({ pending: true, proposalId: proposal.id, tool: call.tool, message: 'Requires approval' });
+                    const proposal = this._createVTPProposal(packet);
+                    results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval' });
                 } else {
                     try {
-                        const result = await this.executor.execute(call.tool, call.args || {});
+                        const result = await this.bridge.postVTP(packet);
                         results.push(result);
-                        this._logStep(call.tool, call.args, result);
-                        await this.hooks.fire('on_gate_result', { tool: call.tool, safety: 'GATED', verdict: 'AUTO_APPROVED' });
+                        this._logStep(pseudo_tool_name, packet.prm, { ok: true, result });
+                        await this.hooks.fire('on_gate_result', { tool: pseudo_tool_name, safety: 'GATED', verdict: 'AUTO_APPROVED' });
                     } catch (err) {
                         results.push({ error: err.message });
-                        this._logStep(call.tool, call.args, { error: err.message });
+                        this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
                     }
                 }
             } else {
-                // RESTRICTED — always require approval
-                const proposal = this._createProposal(call);
-                results.push({ pending: true, proposalId: proposal.id, tool: call.tool, message: 'Requires approval — RESTRICTED operation' });
+                const proposal = this._createVTPProposal(packet);
+                results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval — RESTRICTED operation' });
             }
         }
 
         return results;
+    }
+
+    _createVTPProposal(packet) {
+        const pseudo_tool_name = `${packet.act}:${packet.tgt}`;
+        const proposal = new Proposal({
+            tool: pseudo_tool_name,
+            args: { prm: packet.prm, op: packet.op },
+            reason: `Agent wants to execute VTP packet`,
+            safety: packet.rgm || SAFETY.RESTRICTED,
+        });
+        proposal._vtpPacket = packet;
+        this.gate.propose(proposal);
+        this._pendingProposals.set(proposal.id, proposal);
+        return proposal;
     }
 
     _isDestructiveCommand(cmd) {

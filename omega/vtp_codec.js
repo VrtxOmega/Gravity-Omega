@@ -1,0 +1,62 @@
+/**
+ * vtp_codec.js — Veritas Transfer Protocol v2.0
+ * Javascript twin for frontend VTP packet construction.
+ * Computes canonical HMAC-SHA256 chains before transmitting to Flask.
+ */
+'use strict';
+
+const crypto = require('crypto');
+
+// Must match Python exactly
+const NODE_SECRET = 'REPLACE_WITH_ENV_SECRET'; // In production, pull from env
+const MAX_PACKET_AGE_MS = 5000;
+
+class VTPCodec {
+    static encode(op, act, tgt, prm, bnd, rgm, fal, parent_seal, drift = null, res = null, nonce = null) {
+        const ts = Date.now();
+        nonce = nonce || crypto.randomBytes(6).toString('hex'); // 12 chars
+        const fp = this.intentFingerprint(prm);
+
+        // Normalize BND to value-only for exact Python symmetry
+        if (bnd && bnd.startsWith('BND:')) bnd = bnd.substring(4);
+        if (bnd === 'NONE') bnd = '';
+
+        // Build canonical structure
+        const packet = { op, act, tgt, prm, bnd, rgm, fal, seal: '', nonce, ts, fp, drift, res };
+        
+        const canonical = this.canonicalize(packet);
+        const seal = this.generateSeal(parent_seal, canonical);
+        
+        // claeg assembly
+        let claeg = `[ACT:${act}|TGT:${tgt}|PRM:"${prm}"|NNC:${nonce}|TS:${ts}|FP:${fp}`;
+        if (res) claeg += `|RES:${res}`;
+        if (drift !== null) claeg += `|DRFT:${drift.toFixed(4)}`;
+        claeg += `]`;
+
+        const naef = `[BND:${bnd || 'NONE'}|RGM:${rgm}|FAL:${fal}]`;
+
+        return `${op}::${claeg}::${naef}::[HASH:${seal}]`;
+    }
+
+    static intentFingerprint(prm) {
+        return crypto.createHash('sha256').update(prm).digest('hex').substring(0, 16);
+    }
+
+    static canonicalize(p) {
+        // Must exactly match python:
+        // f"ACT:{act}|TGT:{tgt}|PRM:{prm}|RES:{res}|DRFT:{drift}|NNC:{nonce}|TS:{ts}||BND:{bnd}|RGM:{rgm}|FAL:{fal}"
+        const _res = p.res || '';
+        const _drft = p.drift !== null && p.drift !== undefined ? p.drift : '';
+        const _bnd = p.bnd || '';
+        return `ACT:${p.act}|TGT:${p.tgt}|PRM:${p.prm}|RES:${_res}|DRFT:${_drft}|NNC:${p.nonce}|TS:${p.ts}||BND:${_bnd}|RGM:${p.rgm}|FAL:${p.fal}`;
+    }
+
+    static generateSeal(parent_seal, canonical_payload) {
+        const msg = `${parent_seal}|${canonical_payload}`;
+        const hmac = crypto.createHmac('sha256', NODE_SECRET);
+        hmac.update(msg);
+        return hmac.digest('hex').substring(0, 12);
+    }
+}
+
+module.exports = { VTPCodec };

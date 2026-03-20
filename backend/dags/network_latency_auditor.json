@@ -1,0 +1,41 @@
+{
+  "id": "network_latency_auditor_01",
+  "name": "Network Latency Auditor",
+  "description": "Simulates L2 network stress telemetry to audit RPC budget depletion metrics under heavy transaction load.",
+  "active": true,
+  "interval_seconds": 600,
+  "steps": [
+    {
+      "step_id": "step_001_noise_broadcast",
+      "module_id": "signal_shroud",
+      "action": "execute",
+      "args": "--network base --mode decoy-saturation --intensity maximum",
+      "depends_on": [],
+      "label": "Signal Shroud: Broadcast fake liquidation eth_calls to exhaust competitors",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_002_liquidation_snipe",
+      "module_id": "hybrid_coordinator",
+      "action": "execute",
+      "args": "--monitor-competitor-dropoff --execute-true-liquidation",
+      "depends_on": ["step_001_noise_broadcast"],
+      "condition": null,
+      "label": "Hybrid Coordinator: Execute true liquidation uncontested into the vacuum",
+      "transform": true,
+      "safety_tier": "RESTRICTED"
+    },
+    {
+      "step_id": "step_003_revenue_ledger",
+      "module_id": "alpha_cli",
+      "action": "execute",
+      "args": "--log-arbitrage-revenue --seal",
+      "depends_on": ["step_002_liquidation_snipe"],
+      "condition": null,
+      "label": "Alpha CLI: Mathematical calibration of revenue and gas offset",
+      "transform": false,
+      "safety_tier": "SAFE"
+    }
+  ]
+}

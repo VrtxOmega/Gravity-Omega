@@ -824,3 +824,95 @@ def detect_pipeline_request(text: str, module_ids: List[str]) -> bool:
 
     # Pipeline if: 2+ actions mentioned, OR chain keywords + 1 action
     return total_actions >= 2 or (chain_keywords >= 1 and total_actions >= 1)
+
+
+# ==============================================================================
+# WORKFLOW DAEMON — Continuous Background Execution (Autonomous Kill-Chain)
+# ==============================================================================
+
+class WorkflowDaemon:
+    """Daemonizes DAGs for continuous background execution."""
+
+    def __init__(self, registry, security, llm, queue, dags_dir: str = None):
+        import threading
+        self.registry = registry
+        self.security = security
+        self.llm = llm
+        self.queue = queue
+        self.dags_dir = Path(dags_dir or Path(__file__).parent.parent / "dags")
+        self.dags_dir.mkdir(parents=True, exist_ok=True)
+        self.running = False
+        self._thread = None
+        
+    def load_active_dags(self) -> List[dict]:
+        dags = []
+        if self.dags_dir.exists():
+            for f in self.dags_dir.glob("*.json"):
+                try:
+                    dag = json.loads(f.read_text(encoding="utf-8"))
+                    # Allow a dag to be marked active/inactive
+                    if dag.get("active", True):
+                        dags.append(dag)
+                except Exception as e:
+                    logger.error(f"Failed to load DAG {f.name}: {e}")
+        return dags
+
+    def start(self):
+        """Start the background daemon loop."""
+        if self.running:
+            return
+        self.running = True
+        self._thread = __import__("threading").Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        logger.info("WorkflowDaemon started (Autonomous Kill-Chain online)")
+
+    def stop(self):
+        """Stop the background daemon loop."""
+        self.running = False
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    def _run_loop(self):
+        """Continuous execution loop."""
+        while self.running:
+            try:
+                active_dags = self.load_active_dags()
+                for dag_def in active_dags:
+                    dag_id = dag_def.get("id", "unknown_dag")
+                    interval = dag_def.get("interval_seconds", 3600)
+                    
+                    # Very simple interval management (use a state file in prod)
+                    state_file = self.dags_dir / f".{dag_id}_state.json"
+                    last_run = 0
+                    if state_file.exists():
+                        try:
+                            last_run = json.loads(state_file.read_text()).get("last_run", 0)
+                        except: pass
+                        
+                    if time.time() - last_run >= interval:
+                        logger.info(f"Executing scheduled DAG: {dag_id}")
+                        self.queue.put({"type": "daemon", "event": "dag_start", "dag_id": dag_id})
+                        
+                        raw_steps = dag_def.get("steps", [])
+                        steps = [WorkflowStep(**s) for s in raw_steps]
+                        
+                        pipeline = WorkflowPipeline(
+                            steps=steps,
+                            registry=self.registry,
+                            security=self.security,
+                            llm=self.llm,
+                            queue=self.queue,
+                            request_id=f"daemon_{dag_id}_{int(time.time())}"
+                        )
+                        
+                        result = pipeline.execute()
+                        logger.info(f"DAG {dag_id} completed with verdict: {result['final_verdict']}")
+                        
+                        # Save state
+                        state_file.write_text(json.dumps({"last_run": time.time()}))
+                        
+            except Exception as e:
+                logger.error(f"WorkflowDaemon loop error: {e}")
+            
+            # Rest the daemon
+            time.sleep(30)

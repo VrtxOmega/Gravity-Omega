@@ -1,0 +1,41 @@
+{
+  "id": "automated_litigation_mercenary_01",
+  "name": "Automated Litigation Mercenary (The Bates Trap)",
+  "description": "Scrapes massive public court dockets (e.g. PACER), hunting for missing sequential Bates numbers in discovery dumps and temporal contradictions in sworn timelines.",
+  "active": true,
+  "interval_seconds": 43200,
+  "steps": [
+    {
+      "step_id": "step_001_docket_acquisition",
+      "module_id": "GOLIATH_LEVIATHAN",
+      "action": "execute",
+      "args": "--target PACER --case-class class-action-ip --download-all",
+      "depends_on": [],
+      "label": "Goliath Leviathan: Mass extraction of discovery document dumps",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_002_bates_gap_scan",
+      "module_id": "GOLIATH_GATE",
+      "action": "execute",
+      "args": "--scan-mode bates-gap-temporal-desync",
+      "depends_on": ["step_001_docket_acquisition"],
+      "condition": null,
+      "label": "Goliath Gate: Hunt for suppressed sequential numbers and temporal contradictions",
+      "transform": true,
+      "safety_tier": "SAFE"
+    },
+    {
+      "step_id": "step_003_dossier_generation",
+      "module_id": "veritas_pdf",
+      "action": "execute",
+      "args": "--seal --template LITIGATION_MERCENARY_MAP",
+      "depends_on": ["step_002_bates_gap_scan"],
+      "condition": null,
+      "label": "VERITAS Sealing: Generate highly structured map of hidden corporate evidence",
+      "transform": false,
+      "safety_tier": "SAFE"
+    }
+  ]
+}
