@@ -58,7 +58,7 @@ With the underlying protocols secured, the true offensive and analytical firepow
 
 The `dags/` director orchestrated sequences across 52 standalone Python executables (`modules/`). This enabled hyper-complex autonomous operations:
 - **`madison_pfas_strike.json`**: An orchestrated sequence chaining `GOLIATH_TRAWLER` (EPA stream extraction), `edge_audit_parser_v4` (PDF auditing), and `alpha_scanner_god` to automatically triangulate corporate chemical threshold violations.
-- **`network_latency_auditor.json`**: A Robin-Hood style execution chaining `signal_shroud` (Mempool noise broadcast) into `hybrid_coordinator` (Liquidation snipe) to analyze and exploit RPC layer execution vacuums over Ethereum/L2 networks.
+- **`network_latency_auditor.json`**: A diagnostic telemetry execution designed to analyze L2 transaction propagation latency, testing RPC endpoint resilience against sustained burst conditions to calibrate internal pipeline throughput.
 - **`synthetic_ip_generation.json`**: Autonomous intelligence forging pipelines.
 
 ### 5.1 The VERITAS Provenance Stack (Memory Integrity)
