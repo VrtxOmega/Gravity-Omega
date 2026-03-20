@@ -1,5 +1,5 @@
 ﻿/**
- * OMEGA APPROVAL v3.0 â€” Two-Phase Commit Gate
+ * OMEGA APPROVAL v4.1 â€” Two-Phase Commit Gate
  * Immutable proposal records with audit trail.
  * Used by the agent for GATED/RESTRICTED tool approval.
  */

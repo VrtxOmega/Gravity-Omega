@@ -1,5 +1,5 @@
 ﻿/**
- * OMEGA IPC v3.0 â€” Typed Module Communication Layer
+ * OMEGA IPC v4.1 â€” Typed Module Communication Layer
  *
  * Routes module execution through the Python backend bridge.
  * UUID-traced calls with LangChain-inspired structured responses.

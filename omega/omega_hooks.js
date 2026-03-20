@@ -1,5 +1,5 @@
 ﻿/**
- * OMEGA HOOKS v3.0 â€” Extension Hook System
+ * OMEGA HOOKS v4.1 â€” Extension Hook System
  *
  * Pluggy-style hooks with capability flags:
  *   - 10 hook specs covering lifecycle, modules, chat, security

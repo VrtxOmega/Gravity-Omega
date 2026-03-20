@@ -1,5 +1,5 @@
 ﻿/**
- * OMEGA CONTEXT v3.0 â€” Execution Context Manager
+ * OMEGA CONTEXT v4.1 â€” Execution Context Manager
  *
  * AutoGPT + Click + Sentry hybrid:
  *   - Breadcrumb trail (50 events) for diagnostics

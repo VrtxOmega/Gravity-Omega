@@ -1,5 +1,5 @@
 /**
- * OMEGA TOOLS v3.0 — Tool Registry + Executor
+ * OMEGA TOOLS v4.1 — Tool Registry + Executor
  *
  * 24 typed tools with three safety tiers:
  *   SAFE (12)      — Auto-execute, no approval
