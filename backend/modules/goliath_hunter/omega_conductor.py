@@ -16,6 +16,14 @@ Main orchestrator for the self-directing OSINT engine.
   Does NOT modify any existing Omega file beyond one import line.
 """
 
+import sys
+import os
+# Ensure the parent modules/ directory is on the path so
+# relative package imports work whether we're imported OR run directly.
+_pkg_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _pkg_root not in sys.path:
+    sys.path.insert(0, _pkg_root)
+
 import hashlib
 import json
 import os
