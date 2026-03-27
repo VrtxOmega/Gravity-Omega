@@ -1142,15 +1142,19 @@ vtp_gateway = vtp_codec.VTPRouter(OllamaClientWrapper(), "/home/veritas/gravity-
 @app.route('/vtp', methods=['POST'])
 def vtp_entry():
     """Deterministic M2M Tri-Node Gate."""
-    raw = request.data.decode()
-    
-    if not hasattr(vtp_gateway, "baseline_embed_val"):
-        # Anchor the system zero intent
-        base_intent = "System genesis core directive: Execute tasks safely and securely. Guarantee cryptographic immutability."
-        vtp_gateway.baseline_embed_val = vtp_gateway.llm.embed("nomic-embed-text", base_intent)
-        vtp_gateway.baseline_fp_val = vtp_codec.intent_fingerprint(base_intent)
+    try:
+        raw = request.data.decode()
+        
+        if not hasattr(vtp_gateway, "baseline_embed_val"):
+            # Anchor the system zero intent
+            base_intent = "System genesis core directive: Execute tasks safely and securely. Guarantee cryptographic immutability."
+            vtp_gateway.baseline_embed_val = vtp_gateway.ollama.embed("nomic-embed-text", base_intent)
+            vtp_gateway.baseline_fp_val = vtp_codec.intent_fingerprint(base_intent)
 
-    return vtp_gateway.route(raw, vtp_gateway.baseline_embed_val, vtp_gateway.baseline_fp_val, "GENESIS", file_size_bytes=1000, direct_executor=_vtp_direct_executor)
+        return vtp_gateway.route(raw, vtp_gateway.baseline_embed_val, vtp_gateway.baseline_fp_val, "GENESIS", file_size_bytes=1000, direct_executor=_vtp_direct_executor)
+    except Exception as e:
+        log.error(f"VTP CRASH: {e}", exc_info=True)
+        return f"REJ::[ACT:ABT|TGT:SYS|PRM:\"VTP_CRASH:{e}\"|NNC:000000000000|TS:0|FP:0000000000000000]::[BND:NONE|RGM:RSTR|FAL:ABORT]::[HASH:000000000000]", 200
 
 
 @app.route('/api/modules/<module_id>/run', methods=['POST'])
