@@ -44,9 +44,20 @@ agent.onProgress = (event) => {
         if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
             mainWindow.webContents.send('omega:agent-step', event);
             // v4.3: Auto-open files in Monaco when agent writes them
-            if (event.phase === 'tool_done' && event.ok && event.tool &&
-                (event.tool.includes('MUT') || event.tool.includes('CREATE') || event.tool.includes('writeFile'))) {
-                const filePath = typeof event.args === 'string' ? event.args : (event.args?.path || event.args?.prm || '');
+            if (event.phase === 'tool_done' && event.ok && event.tool) {
+                let filePath = '';
+                const tool = event.tool;
+                // Only auto-open for actual file writes (MUT:AST) or UI open commands (MUT:UI)
+                if (tool === 'MUT:AST' || tool === 'writeFile' || tool === 'CREATE:AST') {
+                    filePath = typeof event.args === 'string' ? event.args : (event.args?.path || event.args?.prm || '');
+                    // Extract path from VTP prm format: "path=C:\..., content=..."
+                    const pathMatch = filePath.match(/path[=:]([^,"|]+)/);
+                    if (pathMatch) filePath = pathMatch[1].trim();
+                } else if (tool === 'MUT:UI' || tool === 'REQ:UI') {
+                    filePath = typeof event.args === 'string' ? event.args : (event.args?.prm || '');
+                    // Strip "open:" prefix from UI commands
+                    filePath = filePath.replace(/^open:/, '');
+                }
                 if (filePath && /\.\w{1,10}$/.test(filePath)) {
                     mainWindow.webContents.send('omega:open-file', filePath);
                 }

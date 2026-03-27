@@ -15,6 +15,8 @@
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { ApprovalGate, Proposal } = require('./omega_approval');
 const { ToolExecutor, TOOL_REGISTRY, SAFETY } = require('./omega_tools');
 
@@ -631,6 +633,95 @@ ${toolDescriptions}
                 }
             } catch (err) {
                 console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
+            }
+
+            // ── v4.3: Local file operation handlers (bypass WSL bridge) ──
+            // Windows paths fail in WSL /bin/sh. Handle file ops via Node.js directly.
+            if (pseudo_tool_name === 'MUT:AST' || pseudo_tool_name === 'GEN:AST') {
+                try {
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    const prm = packet.prm || '';
+                    // Parse path and content from VTP PRM: "path=X, content=Y" or "path::find::replace"
+                    let filePath, content;
+                    const pathMatch = prm.match(/path[=:]"?([^",]+)"?/);
+                    const contentMatch = prm.match(/content[=:]"?([\s\S]+)$/);
+                    if (pathMatch) {
+                        filePath = pathMatch[1].trim().replace(/\\"/g, '');
+                        content = contentMatch ? contentMatch[1].trim().replace(/"$/, '') : '';
+                    } else if (prm.includes('::')) {
+                        // find::replace format
+                        const parts = prm.split('::');
+                        filePath = parts[0].replace(/^"/, '').replace(/"$/, '').trim();
+                        const findText = parts[1] || '';
+                        const replaceText = parts[2] || '';
+                        if (findText && fs.existsSync(filePath)) {
+                            const existing = fs.readFileSync(filePath, 'utf8');
+                            content = existing.replace(findText, replaceText);
+                        }
+                    } else {
+                        filePath = prm.replace(/^"/, '').replace(/"$/, '').trim();
+                    }
+                    if (filePath && content !== undefined) {
+                        const dir = path.dirname(filePath);
+                        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                        fs.writeFileSync(filePath, content, 'utf8');
+                        const result = { ok: true, message: `File written: ${filePath}` };
+                        results.push(result);
+                        this._logStep(pseudo_tool_name, packet.prm, result);
+                    } else {
+                        results.push({ error: `Cannot parse file path from: ${prm.substring(0, 100)}` });
+                        this._logStep(pseudo_tool_name, packet.prm, { error: 'Parse failed' });
+                    }
+                    continue;
+                } catch (err) {
+                    results.push({ error: err.message });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
+                    continue;
+                }
+            }
+
+            if (pseudo_tool_name === 'REQ:SYS' || pseudo_tool_name === 'MUT:SYS' || pseudo_tool_name === 'CREATE:SYS') {
+                try {
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    const prm = packet.prm || '';
+                    // Check for mkdir/createDir operations
+                    const mkdirMatch = prm.match(/(?:mkdir|createDir)\s+"?([^"]+)"?/i) || prm.match(/^"?([^"]+)"?$/);
+                    if (prm.toLowerCase().includes('mkdir') || prm.toLowerCase().includes('createdir')) {
+                        const dirPath = mkdirMatch ? mkdirMatch[1].trim() : prm.replace(/^(mkdir|createDir)\s*/i, '').trim();
+                        if (dirPath) {
+                            fs.mkdirSync(dirPath, { recursive: true });
+                            const result = { ok: true, message: `Directory created: ${dirPath}` };
+                            results.push(result);
+                            this._logStep(pseudo_tool_name, packet.prm, result);
+                            continue;
+                        }
+                    }
+                    // Non-mkdir SYS commands: fall through to bridge
+                } catch (err) {
+                    results.push({ error: err.message });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
+                    continue;
+                }
+            }
+
+            if (pseudo_tool_name === 'REQ:UI' || pseudo_tool_name === 'MUT:UI') {
+                try {
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    const prm = packet.prm || '';
+                    const openPath = prm.replace(/^open:/, '').replace(/^"/, '').replace(/"$/, '').trim();
+                    if (openPath) {
+                        // Emit a file-open event — main.js forwards to renderer
+                        this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: openPath, ok: true, totalSteps: this._stepLog.length + 1 });
+                        const result = { ok: true, message: `Opened in editor: ${openPath}` };
+                        results.push(result);
+                        this._logStep(pseudo_tool_name, packet.prm, result);
+                    }
+                    continue;
+                } catch (err) {
+                    results.push({ error: err.message });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
+                    continue;
+                }
             }
 
             if (safety === SAFETY.SAFE) {
