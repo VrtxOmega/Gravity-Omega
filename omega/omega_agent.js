@@ -585,8 +585,18 @@ ${toolDescriptions}
         while ((match = vtpRegex.exec(text)) !== null) {
             hasVtp = true;
             const block = match[1].trim();
-            const lines = block.split('\n');
-            for (const line of lines) {
+            // v4.3.9: Join continuation lines — LLM often splits VTP content across multiple lines
+            const rawLines = block.split('\n');
+            const joined = [];
+            for (const rl of rawLines) {
+                if (/^(REQ|ACK|CMD|MUT|EXT|GEN|CREATE)\s*::/.test(rl.trim())) {
+                    joined.push(rl.trim());
+                } else if (joined.length > 0) {
+                    // Continuation of previous VTP line — append with \n escape
+                    joined[joined.length - 1] += '\\n' + rl;
+                }
+            }
+            for (const line of joined) {
                 if (!line.includes('::[')) continue;
                 try {
                     const parts = line.split('::');
