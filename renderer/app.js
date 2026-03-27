@@ -813,7 +813,12 @@ async function approveProposal(id) {
     } catch (err) {
         destroyThinkingIndicator();
         thinkingEl.remove();
-        addChatMessage('assistant', `❌ Execution error: ${err.message}`);
+        // Graceful handling for already-executed proposals (double-click or continuation race)
+        if (err.message && err.message.includes('EXECUTED')) {
+            showToast('Action already executed', 'success');
+        } else {
+            addChatMessage('assistant', `❌ Execution error: ${err.message}`);
+        }
     }
 }
 

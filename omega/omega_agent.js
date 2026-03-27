@@ -738,7 +738,11 @@ ${toolDescriptions}
     // ── Approval Handling ────────────────────────────────────
     async executeApproved(proposalId, confirmText) {
         const proposal = this._pendingProposals.get(proposalId);
-        if (!proposal) return { error: 'Proposal not found' };
+        if (!proposal) return { success: true, message: 'Already executed' };
+        // Guard against double-click: check if already approved/executed
+        if (proposal.state === 'EXECUTED' || proposal.state === 'APPROVED') {
+            return { success: true, message: 'Already executed' };
+        }
 
         proposal.approve(confirmText || 'user-approved');
         this._pendingProposals.delete(proposalId);
