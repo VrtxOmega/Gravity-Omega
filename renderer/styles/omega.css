@@ -634,11 +634,17 @@ body {
 .steps-detail {
     padding: 4px 0 0; font-size: 11px; color: var(--text-secondary);
     transition: max-height 0.3s ease, opacity 0.3s ease;
-    max-height: 200px; overflow-y: auto;
+    max-height: 250px; overflow-y: auto;
+    border-radius: 6px; margin-top: 4px;
 }
+.steps-detail::-webkit-scrollbar { width: 4px; }
+.steps-detail::-webkit-scrollbar-track { background: transparent; }
+.steps-detail::-webkit-scrollbar-thumb { background: rgba(212,168,67,0.3); border-radius: 4px; }
 .steps-detail.collapsed { max-height: 0; overflow: hidden; opacity: 0; padding: 0; }
 .step-detail-row {
-    padding: 2px 0; font-family: var(--font-mono); font-size: 11px;
+    padding: 3px 8px; font-family: var(--font-mono); font-size: 11px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* ── Thinking Indicator (v4.2) ──────────────────────────────── */

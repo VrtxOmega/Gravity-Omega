@@ -345,12 +345,26 @@ ${toolDescriptions}
                 }).filter(Boolean);
                 const netOps = this._stepLog.filter(s => (s.tool || '').includes('NET')).length;
                 const sysOps = this._stepLog.filter(s => (s.tool || '').includes('SYS')).length;
+                const failedOps = this._stepLog.filter(s => s.result && !s.result.ok && s.result.error).length;
                 let summary = `Completed after ${iteration} iterations.\n\n`;
                 summary += `**${this._stepLog.length} tool steps executed:**\n`;
                 if (fileOps.length > 0) summary += `- 📁 Files: ${[...new Set(fileOps)].join(', ')}\n`;
                 if (netOps > 0) summary += `- 🌐 ${netOps} web request(s)\n`;
                 if (sysOps > 0) summary += `- ⚙️ ${sysOps} system command(s)\n`;
-                summary += `\nAll steps completed successfully. Open the files in the editor to review.`;
+                if (failedOps > 0) summary += `- ⚠️ ${failedOps} step(s) failed — check the step log for details\n`;
+                // Actionable next steps
+                const uniqueFiles = [...new Set(fileOps)];
+                const pyFiles = uniqueFiles.filter(f => f.endsWith('.py'));
+                const batFiles = uniqueFiles.filter(f => f.endsWith('.bat'));
+                const ps1Files = uniqueFiles.filter(f => f.endsWith('.ps1'));
+                summary += '\n**Next steps:**\n';
+                if (pyFiles.length > 0) summary += `- Run: \`python ${pyFiles[0]}\` to execute\n`;
+                if (batFiles.length > 0) summary += `- Run: \`${batFiles[0]}\` (double-click or terminal)\n`;
+                if (ps1Files.length > 0) summary += `- Run: \`powershell .\\${ps1Files[0]}\`\n`;
+                if (pyFiles.length === 0 && batFiles.length === 0 && ps1Files.length === 0) {
+                    summary += '- Review the files in the editor tabs above\n';
+                }
+                if (failedOps > 0) summary += '- Expand the step log below to see which steps failed\n';
                 finalResponse = { type: 'chat', message: summary, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'LOOP_EXHAUSTED' };
             }
 

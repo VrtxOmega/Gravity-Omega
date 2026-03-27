@@ -731,7 +731,19 @@ function addClickableStepsBadge(parentEl, steps, stepLog) {
             const row = document.createElement('div');
             row.className = 'step-detail-row';
             const ok = s.result?.ok ? '✅' : '❌';
-            row.textContent = `${ok} ${s.tool}`;
+            // Map tool types to readable labels
+            const toolIcons = { 'AST': '📝', 'NET': '🌐', 'SYS': '⚙️', 'UI': '🖥️', 'VAULT': '🗄️' };
+            const tgt = (s.tool || '').split(':')[1] || '';
+            const icon = toolIcons[tgt] || '🔧';
+            // Extract filename from args
+            let label = s.tool || 'unknown';
+            const args = typeof s.args === 'string' ? s.args : (s.args?.prm || s.args?.path || '');
+            if (args) {
+                const basename = args.replace(/\\/g, '/').replace(/.*\//, '').replace(/^"/, '').substring(0, 50);
+                if (basename) label = basename;
+            }
+            row.textContent = `${ok} ${icon} ${label}`;
+            row.title = args || s.tool; // full path on hover
             details.appendChild(row);
         });
     } else {
