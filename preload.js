@@ -140,7 +140,7 @@ contextBridge.exposeInMainWorld('omega', {
             'menu:new-terminal', 'omega:bridge-status-change',
             'omega:backend-ready', 'omega:agent-action',
             'omega:agent-step', 'omega:agent-complete',
-            'omega:sentinel-alert',
+            'omega:sentinel-alert', 'omega:open-file',
         ];
         if (allowed.includes(channel)) {
             const wrapper = (_, ...args) => cb(...args);

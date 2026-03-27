@@ -43,6 +43,14 @@ agent.onProgress = (event) => {
     try {
         if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
             mainWindow.webContents.send('omega:agent-step', event);
+            // v4.3: Auto-open files in Monaco when agent writes them
+            if (event.phase === 'tool_done' && event.ok && event.tool &&
+                (event.tool.includes('MUT') || event.tool.includes('CREATE') || event.tool.includes('writeFile'))) {
+                const filePath = typeof event.args === 'string' ? event.args : (event.args?.path || event.args?.prm || '');
+                if (filePath && /\.\w{1,10}$/.test(filePath)) {
+                    mainWindow.webContents.send('omega:open-file', filePath);
+                }
+            }
         }
     } catch (e) { console.error('[IPC] agent-step error:', e.message); }
 };

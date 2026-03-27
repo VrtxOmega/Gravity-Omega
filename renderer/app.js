@@ -808,13 +808,18 @@ async function approveProposal(id) {
                 addChatMessage('assistant', resp.message);
             }
         } else {
-            // v4.2: Auto-continue after approval — don't stop, keep reasoning
+            // v4.3: Auto-continue after approval — show thinking, keep reasoning
             showToast('Approved ✅ — continuing...', 'success');
+            const contThinkingEl = createThinkingIndicator();
+            document.getElementById('chat-messages').appendChild(contThinkingEl);
+            scrollChat();
             try {
                 const contResult = await window.omega.chat.send(
                     'The approved action was executed successfully. Continue with the original task.',
                     state.chat.sessionId
                 );
+                destroyThinkingIndicator();
+                contThinkingEl.remove();
                 if (contResult) {
                     if (contResult.type === 'chat' && contResult.message) {
                         const el = addChatMessage('assistant', contResult.message);
@@ -830,6 +835,8 @@ async function approveProposal(id) {
                     }
                 }
             } catch (contErr) {
+                destroyThinkingIndicator();
+                contThinkingEl.remove();
                 console.warn('[APPROVE] Auto-continue failed:', contErr.message);
             }
         }
@@ -852,9 +859,19 @@ async function denyProposal(id) {
 
 function renderMarkdown(text) {
     if (!text) return '';
-    // v4.2: Strip raw VTP blocks from chat output
-    let clean = text.replace(/```vtp[\s\S]*?```/g, '').trim();
-    if (!clean) clean = '(VTP commands executed — see tool steps above)';
+    // v4.3: Enhanced VTP sanitization — strip ALL VTP artifacts before rendering
+    let clean = text;
+    // 1. Fenced vtp code blocks (```vtp ... ```)
+    clean = clean.replace(/```vtp[\s\S]*?```/g, '');
+    // 2. Inline VTP packet lines: REQ::, [ACT:..., ||BND:...
+    clean = clean.replace(/^REQ::.*$/gm, '');
+    clean = clean.replace(/^\[ACT:[^\]]*\].*$/gm, '');
+    clean = clean.replace(/^\|\|BND:.*$/gm, '');
+    // 3. Orphaned ``vtp or `` markers left after stripping
+    clean = clean.replace(/^```\s*$/gm, '');
+    // 4. Collapse multiple blank lines
+    clean = clean.replace(/\n{3,}/g, '\n\n').trim();
+    if (!clean) clean = '(Actions executed — see tool steps above)';
     return clean
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
@@ -864,6 +881,8 @@ function renderMarkdown(text) {
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
         .replace(/^## (.+)$/gm, '<h2>$1</h2>')
         .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/^\- (.+)$/gm, '• $1')
+        .replace(/^\d+\. (.+)$/gm, '<span class="md-ol">$1</span>')
         .replace(/\n/g, '<br>');
 }
 
@@ -1432,6 +1451,14 @@ function initEventListeners() {
             showToast(`⚠️ SENTINEL: ${alert.message}`, 'warning', 4000);
         } else {
             showToast(`🔍 SENTINEL: ${alert.message}`, 'info', 3000);
+        }
+    });
+
+    // v4.3: Auto-open files in Monaco when agent writes them
+    window.omega.on('omega:open-file', (filePath) => {
+        if (filePath && typeof filePath === 'string') {
+            console.log('[MONACO] Auto-opening agent-written file:', filePath);
+            openFile(filePath);
         }
     });
 

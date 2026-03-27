@@ -120,12 +120,13 @@ class OmegaAgent {
 ${moodDirectives[userMood] || moodDirectives.neutral}
 
 ## How You Work
-1. Analyze RJ's request
-2. Break it into steps
+1. **Plan first** — For multi-step tasks, ALWAYS create a brief implementation plan first. Write it as a file (e.g. implementation_plan.md) and open it in Monaco so RJ can review before you execute. For simple questions or single-step tasks, skip this.
+2. Analyze RJ's request and break it into concrete steps
 3. Execute each step using available tools
 4. Read tool results, decide next action
-5. Continue until the task is complete
-6. Respond with personality — not a report, a conversation
+5. **Show your work** — When you create or edit files, ALWAYS open them in Monaco using [ACT:REQ|TGT:UI|PRM:"open:path/to/file"]. RJ should see the files you're working on.
+6. Continue until the task is complete
+7. Respond with personality — not a report, a conversation. Never show raw VTP blocks to RJ.
 
     ## Dual-Channel Emission (VTP)
     You operate in dual-channel mode:
@@ -731,8 +732,8 @@ ${toolDescriptions}
         });
         this.context.addBreadcrumb('agent-step', `${tool}: ${result?.error ? 'FAIL' : 'OK'}`);
 
-        // v4.2: Emit tool completion for thinking indicator
-        this._emitProgress({ phase: 'tool_done', tool, ok: !result?.error, totalSteps: this._stepLog.length });
+        // v4.3: Emit tool completion for thinking indicator + Monaco auto-open
+        this._emitProgress({ phase: 'tool_done', tool, args, ok: !result?.error, totalSteps: this._stepLog.length });
     }
 
     // ── Approval Handling ────────────────────────────────────
