@@ -643,6 +643,73 @@ ${toolDescriptions}
                 console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
             }
 
+            // ── v4.3.5: Local URL fetch handler (bypass WSL bridge) ──
+            if (pseudo_tool_name === 'EXT:NET' || pseudo_tool_name === 'REQ:NET') {
+                try {
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    let url = (packet.prm || '').replace(/^"/, '').replace(/"$/, '').trim();
+                    // Extract URL from various formats
+                    const urlMatch = url.match(/url[=:]\s*"?([^"',\s]+)"?/i);
+                    if (urlMatch) url = urlMatch[1];
+                    // Strip any remaining quotes
+                    url = url.replace(/^['"]/, '').replace(/['"]$/, '');
+
+                    if (!url.startsWith('http')) {
+                        results.push({ error: `Invalid URL: ${url}` });
+                        this._logStep(pseudo_tool_name, url, { error: 'Invalid URL' });
+                        continue;
+                    }
+
+                    // Fetch URL using Node.js https/http
+                    const protocol = url.startsWith('https') ? require('https') : require('http');
+                    const fetchResult = await new Promise((resolve) => {
+                        const req = protocol.get(url, {
+                            timeout: 15000,
+                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gravity-Omega/4.3' }
+                        }, (res) => {
+                            // Follow redirects
+                            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+                                const redirectUrl = res.headers.location;
+                                const rProto = redirectUrl.startsWith('https') ? require('https') : require('http');
+                                rProto.get(redirectUrl, { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0 Gravity-Omega/4.3' } }, (rRes) => {
+                                    let data = '';
+                                    rRes.on('data', c => { data += c; if (data.length > 50000) rRes.destroy(); });
+                                    rRes.on('end', () => resolve({ ok: true, url: redirectUrl, status: rRes.statusCode, content: data }));
+                                }).on('error', e => resolve({ error: e.message }));
+                                return;
+                            }
+                            let data = '';
+                            res.on('data', c => { data += c; if (data.length > 50000) res.destroy(); });
+                            res.on('end', () => resolve({ ok: true, url, status: res.statusCode, content: data }));
+                        });
+                        req.on('error', e => resolve({ error: e.message }));
+                        req.on('timeout', () => { req.destroy(); resolve({ error: 'Request timeout (15s)' }); });
+                    });
+
+                    if (fetchResult.error) {
+                        results.push({ error: fetchResult.error });
+                        this._logStep(pseudo_tool_name, url, { error: fetchResult.error });
+                    } else {
+                        // Strip HTML tags for cleaner text extraction
+                        let text = fetchResult.content || '';
+                        text = text.replace(/<script[\s\S]*?<\/script>/gi, '')
+                                   .replace(/<style[\s\S]*?<\/style>/gi, '')
+                                   .replace(/<[^>]+>/g, ' ')
+                                   .replace(/\s{2,}/g, ' ')
+                                   .trim()
+                                   .substring(0, 15000);
+                        const result = { ok: true, url, status: fetchResult.status, data: text, length: text.length };
+                        results.push(result);
+                        this._logStep(pseudo_tool_name, url, result);
+                    }
+                    continue;
+                } catch (err) {
+                    results.push({ error: err.message });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
+                    continue;
+                }
+            }
+
             // ── v4.3.4: Local file READ handlers (bypass WSL bridge) ──
             if (pseudo_tool_name === 'EXT:AST' || pseudo_tool_name === 'REQ:AST') {
                 try {
