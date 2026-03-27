@@ -30,11 +30,11 @@
     --radius: 6px;
     --radius-lg: 10px;
     --sidebar-width: 220px;
-    --chat-width: 300px;
+    --chat-width: 340px;
     --activity-bar-width: 48px;
     --titlebar-height: 32px;
     --statusbar-height: 24px;
-    --panel-height: 360px;
+    --panel-height: 120px;
     --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     --font-ui: 'Inter', -apple-system, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Consolas', monospace;
