@@ -927,15 +927,30 @@ ${toolDescriptions}
                     console.log('[MUT:AST] Raw PRM:', prm.substring(0, 200), '... (total:', prm.length, 'chars)');
                     let filePath = '', content = '';
 
-                    // Format 1: "path=X", "content=Y" or path=X, content=Y
-                    const pathMatch = prm.match(/path[=:]\s*"?([^",]+)"?/i);
-                    const contentMatch = prm.match(/,?\s*"?\s*content[=:]\s*"?([\s\S]+)$/i);
-                    if (pathMatch) {
-                        filePath = pathMatch[1].trim().replace(/\\"/g, '').replace(/"$/, '');
-                        content = contentMatch ? contentMatch[1].trim().replace(/^"/, '').replace(/"$/, '') : '';
+                    // v4.3.17: Multi-strategy PRM parsing with debug logging
+                    // Strategy 1: JSON format { "path": "...", "content": "..." }
+                    try {
+                        const jsonPrm = JSON.parse(prm);
+                        if (jsonPrm.path) {
+                            filePath = jsonPrm.path;
+                            content = jsonPrm.content || '';
+                            console.log('[MUT:AST] Parsed via JSON strategy. Path:', filePath.substring(0, 80));
+                        }
+                    } catch(e) { /* not JSON */ }
+
+                    // Strategy 2: "path=X, content=Y" format
+                    if (!filePath) {
+                        const pathMatch = prm.match(/path[=:]\s*"?([^",]+)"?/i);
+                        const contentMatch = prm.match(/,?\s*"?\s*content[=:]\s*"?([\s\S]+)$/i);
+                        if (pathMatch) {
+                            filePath = pathMatch[1].trim().replace(/\\"/g, '').replace(/"$/, '');
+                            content = contentMatch ? contentMatch[1].trim().replace(/^"/, '').replace(/"$/, '') : '';
+                            console.log('[MUT:AST] Parsed via path= strategy. Path:', filePath.substring(0, 80), 'Content length:', content.length);
+                        }
                     }
-                    // Format 2: path::find::replace (edit existing file)
-                    else if (prm.includes('::')) {
+
+                    // Strategy 3: path::find::replace (edit existing file)
+                    if (!filePath && prm.includes('::')) {
                         const parts = prm.split('::');
                         filePath = parts[0].replace(/^"/, '').replace(/"$/, '').trim();
                         const findText = parts[1] || '';
@@ -946,18 +961,37 @@ ${toolDescriptions}
                         } else {
                             content = replaceText;
                         }
+                        console.log('[MUT:AST] Parsed via :: strategy. Path:', filePath.substring(0, 80));
                     }
-                    // Format 3: bare filename or path (create empty / use remaining as content)
-                    else {
-                        // Split on first comma — before=path, after=content
+
+                    // Strategy 4: First newline split — path\ncontent (LLM often sends code after newline)
+                    if (!filePath && prm.includes('\n')) {
+                        const nlIdx = prm.indexOf('\n');
+                        const possiblePath = prm.substring(0, nlIdx).replace(/^"/, '').replace(/"$/, '').trim();
+                        if (possiblePath.includes('.') && possiblePath.length < 200) {
+                            filePath = possiblePath;
+                            content = prm.substring(nlIdx + 1);
+                            console.log('[MUT:AST] Parsed via newline strategy. Path:', filePath.substring(0, 80), 'Content length:', content.length);
+                        }
+                    }
+
+                    // Strategy 5: Comma split — path, content  
+                    if (!filePath) {
                         const commaIdx = prm.indexOf(',');
-                        if (commaIdx > 0) {
+                        if (commaIdx > 0 && commaIdx < 200) {
                             filePath = prm.substring(0, commaIdx).replace(/^"/, '').replace(/"$/, '').trim();
                             content = prm.substring(commaIdx + 1).replace(/^\s*"?/, '').replace(/"$/, '').trim();
+                            console.log('[MUT:AST] Parsed via comma strategy. Path:', filePath.substring(0, 80), 'Content length:', content.length);
                         } else {
                             filePath = prm.replace(/^"/, '').replace(/"$/, '').trim();
                             content = '';
+                            console.log('[MUT:AST] Bare path, no content. Path:', filePath.substring(0, 80));
                         }
+                    }
+
+                    // Warn if content is empty — likely a parse failure
+                    if (!content && filePath) {
+                        console.warn('[MUT:AST] WARNING: Content is empty for', filePath, '— PRM starts with:', prm.substring(0, 200));
                     }
 
                     // Resolve relative paths
