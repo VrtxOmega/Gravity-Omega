@@ -698,36 +698,44 @@ ${toolDescriptions}
                     url = url.replace(/^['"]/, '').replace(/['"]$/, '');
 
                     if (!url.startsWith('http')) {
-                        results.push({ error: `Invalid URL: ${url}` });
-                        this._logStep(pseudo_tool_name, url, { error: 'Invalid URL' });
-                        continue;
+                        // v4.3.11: Handle search queries — construct a search URL
+                        const queryMatch = (packet.prm || '').match(/query[=:]\s*"?([^"]+)"?/i);
+                        if (queryMatch) {
+                            url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(queryMatch[1])}`;
+                        } else {
+                            results.push({ error: `Invalid URL: ${url}` });
+                            this._logStep(pseudo_tool_name, url, { error: 'Invalid URL' });
+                            continue;
+                        }
                     }
 
-                    // Fetch URL using Node.js https/http
+                    // Fetch URL with HARD 20s timeout wrapper
                     const protocol = url.startsWith('https') ? require('https') : require('http');
-                    const fetchResult = await new Promise((resolve) => {
-                        const req = protocol.get(url, {
-                            timeout: 15000,
-                            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gravity-Omega/4.3' }
-                        }, (res) => {
-                            // Follow redirects
-                            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
-                                const redirectUrl = res.headers.location;
-                                const rProto = redirectUrl.startsWith('https') ? require('https') : require('http');
-                                rProto.get(redirectUrl, { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0 Gravity-Omega/4.3' } }, (rRes) => {
-                                    let data = '';
-                                    rRes.on('data', c => { data += c; if (data.length > 50000) rRes.destroy(); });
-                                    rRes.on('end', () => resolve({ ok: true, url: redirectUrl, status: rRes.statusCode, content: data }));
-                                }).on('error', e => resolve({ error: e.message }));
-                                return;
-                            }
-                            let data = '';
-                            res.on('data', c => { data += c; if (data.length > 50000) res.destroy(); });
-                            res.on('end', () => resolve({ ok: true, url, status: res.statusCode, content: data }));
-                        });
-                        req.on('error', e => resolve({ error: e.message }));
-                        req.on('timeout', () => { req.destroy(); resolve({ error: 'Request timeout (15s)' }); });
-                    });
+                    const fetchResult = await Promise.race([
+                        new Promise((resolve) => {
+                            const req = protocol.get(url, {
+                                timeout: 15000,
+                                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gravity-Omega/4.3' }
+                            }, (res) => {
+                                if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+                                    const redirectUrl = res.headers.location;
+                                    const rProto = redirectUrl.startsWith('https') ? require('https') : require('http');
+                                    rProto.get(redirectUrl, { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0 Gravity-Omega/4.3' } }, (rRes) => {
+                                        let data = '';
+                                        rRes.on('data', c => { data += c; if (data.length > 50000) rRes.destroy(); });
+                                        rRes.on('end', () => resolve({ ok: true, url: redirectUrl, status: rRes.statusCode, content: data }));
+                                    }).on('error', e => resolve({ error: e.message }));
+                                    return;
+                                }
+                                let data = '';
+                                res.on('data', c => { data += c; if (data.length > 50000) res.destroy(); });
+                                res.on('end', () => resolve({ ok: true, url, status: res.statusCode, content: data }));
+                            });
+                            req.on('error', e => resolve({ error: e.message }));
+                            req.on('timeout', () => { req.destroy(); resolve({ error: 'Socket timeout (15s)' }); });
+                        }),
+                        new Promise(resolve => setTimeout(() => resolve({ error: 'Hard timeout (20s) — URL may be unreachable' }), 20000))
+                    ]);
 
                     if (fetchResult.error) {
                         results.push({ error: fetchResult.error });
