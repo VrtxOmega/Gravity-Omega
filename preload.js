@@ -5,6 +5,9 @@
  */
 const { contextBridge, ipcRenderer } = require('electron');
 
+// v4.2: Module-level wrapper map for correct on/removeListener pairing
+const _ipcWrappers = new Map();
+
 contextBridge.exposeInMainWorld('omega', {
     // ── File Operations ──────────────────────────────────────
     file: {
@@ -130,6 +133,7 @@ contextBridge.exposeInMainWorld('omega', {
     },
 
     // ── Event Bus (Main → Renderer) ──────────────────────────
+    // v4.2 fix: Track wrapper→original mapping so removeListener works correctly.
     on: (channel, cb) => {
         const allowed = [
             'menu:open-file', 'menu:open-folder', 'menu:save',
@@ -139,10 +143,18 @@ contextBridge.exposeInMainWorld('omega', {
             'omega:sentinel-alert',
         ];
         if (allowed.includes(channel)) {
-            ipcRenderer.on(channel, (_, ...args) => cb(...args));
+            const wrapper = (_, ...args) => cb(...args);
+            _ipcWrappers.set(cb, wrapper);
+            ipcRenderer.on(channel, wrapper);
         }
     },
     removeListener: (channel, cb) => {
-        ipcRenderer.removeListener(channel, cb);
+        const wrapper = _ipcWrappers.get(cb);
+        if (wrapper) {
+            ipcRenderer.removeListener(channel, wrapper);
+            _ipcWrappers.delete(cb);
+        } else {
+            ipcRenderer.removeListener(channel, cb);
+        }
     },
 });

@@ -38,6 +38,15 @@ const hooks = new OmegaHooks();
 const agent = new OmegaAgent({ context, hooks, bridge });
 const browser = new OmegaBrowser({ screenshotDir: path.join(__dirname, 'screenshots') });
 
+// v4.2: Forward agent progress events to renderer for live thinking indicator
+agent.onProgress = (event) => {
+    try {
+        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+            mainWindow.webContents.send('omega:agent-step', event);
+        }
+    } catch (e) { console.error('[IPC] agent-step error:', e.message); }
+};
+
 let mainWindow = null;
 
 // ── PTY Terminals (node-pty) ─────────────────────────────────

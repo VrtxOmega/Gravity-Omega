@@ -1,5 +1,5 @@
 /**
- * GRAVITY OMEGA v4.1 — Renderer Application
+ * GRAVITY OMEGA v3.0 — Renderer Application
  *
  * Orchestrates the entire UI:
  *   - Monaco Editor (omega-dark theme)
@@ -476,8 +476,14 @@ window.omega.terminal.onExit((id, code) => {
 // CHAT SYSTEM (AGENTIC + VOICE)
 // ══════════════════════════════════════════════════════════════
 
+/** v4.2: Utility — scroll chat messages container to bottom */
+function scrollChat() {
+    const el = document.getElementById('chat-messages');
+    if (el) el.scrollTop = el.scrollHeight;
+}
+
 // Voice + session state
-state.chat.voiceEnabled = true;  // v4.1: Omega speaks by default
+state.chat.voiceEnabled = true;  // v3.0: Omega speaks by default
 state.chat.audioPlayer = null;
 state.chat.messageHistory = [];  // Full session context — never lost
 state.chat.abortController = null;
@@ -538,16 +544,116 @@ async function playVoice(text) {
 }
 
 function interruptOmega() {
-    // Stop audio
     stopAudio();
-    // Abort generation
     window.omega.chat.abort(state.chat.sessionId);
     state.chat.sending = false;
-    // Remove any thinking indicators
+    document.querySelectorAll('.thinking-indicator').forEach(el => el.remove());
     document.querySelectorAll('.chat-msg.assistant').forEach(el => {
         if (el.textContent.includes('⏳')) el.remove();
     });
+    if (window._thinkingTimer) { clearInterval(window._thinkingTimer); window._thinkingTimer = null; }
+    if (window._thinkingStepHandler) {
+        window.omega.removeListener('omega:agent-step', window._thinkingStepHandler);
+        window._thinkingStepHandler = null;
+    }
     document.getElementById('chat-stop-btn').classList.remove('visible');
+}
+
+/** v4.2: Live thinking indicator — dropdown with timer + step log */
+function createThinkingIndicator() {
+    const container = document.createElement('div');
+    container.className = 'thinking-indicator';
+
+    const header = document.createElement('div');
+    header.className = 'thinking-header';
+    header.innerHTML = `
+        <span class="thinking-icon">Ω</span>
+        <span class="thinking-label">Thinking...</span>
+        <span class="thinking-timer">0.0s</span>
+        <span class="thinking-toggle">▸</span>
+    `;
+    container.appendChild(header);
+
+    const stepLog = document.createElement('div');
+    stepLog.className = 'thinking-steps collapsed';
+    container.appendChild(stepLog);
+
+    let expanded = false;
+    header.addEventListener('click', () => {
+        expanded = !expanded;
+        stepLog.classList.toggle('collapsed', !expanded);
+        header.querySelector('.thinking-toggle').textContent = expanded ? '▾' : '▸';
+    });
+
+    const startTime = Date.now();
+    const timerEl = header.querySelector('.thinking-timer');
+    window._thinkingTimer = setInterval(() => {
+        timerEl.textContent = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
+    }, 100);
+
+    const toolLabels = {
+        'EXT:AST': 'Reading file', 'EXT:NET': 'Searching web', 'EXT:VLT': 'Querying Vault',
+        'MUT:AST': 'Editing file', 'GEN:AST': 'Writing file', 'REQ:SYS': 'Running command',
+        'REQ:UI': 'Opening in editor', 'LST:AST': 'Listing directory', 'GRP:AST': 'Searching code',
+        'MUT:CSS': 'Updating styles', 'MUT:SYS': 'System command',
+    };
+
+    const stepHandler = (event) => {
+        console.log('[THINKING] Received agent-step event:', event.phase, event);
+        const labelEl = header.querySelector('.thinking-label');
+        const step = document.createElement('div');
+        step.className = 'thinking-step';
+
+        switch (event.phase) {
+            case 'start':
+                step.innerHTML = `<span class="step-icon">🎯</span> Analyzing request...`;
+                labelEl.textContent = 'Analyzing...';
+                break;
+            case 'provenance':
+                step.innerHTML = `<span class="step-icon">📚</span> Loaded ${event.fragments} Vault fragments`;
+                labelEl.textContent = 'Consulting Vault...';
+                break;
+            case 'thinking':
+                step.innerHTML = `<span class="step-icon">🧠</span> ${event.label || `Reasoning step ${event.iteration}`}`;
+                labelEl.textContent = event.label || 'Thinking...';
+                break;
+            case 'tool': {
+                const label = toolLabels[event.tool] || event.tool;
+                const argsPreview = event.args ? ` — ${event.args}` : '';
+                step.innerHTML = `<span class="step-icon spinning">⚙️</span> ${label}${argsPreview}`;
+                step.classList.add('active');
+                labelEl.textContent = `${label}...`;
+                break;
+            }
+            case 'tool_done': {
+                const activeSteps = stepLog.querySelectorAll('.thinking-step.active');
+                if (activeSteps.length > 0) {
+                    const lastActive = activeSteps[activeSteps.length - 1];
+                    lastActive.classList.remove('active');
+                    const icon = lastActive.querySelector('.step-icon');
+                    if (icon) { icon.classList.remove('spinning'); icon.textContent = event.ok ? '✅' : '❌'; }
+                }
+                labelEl.textContent = `${event.totalSteps} steps completed...`;
+                break;
+            }
+            default: return;
+        }
+        stepLog.appendChild(step);
+        if (expanded) stepLog.scrollTop = stepLog.scrollHeight;
+        scrollChat();
+    };
+
+    window._thinkingStepHandler = stepHandler;
+    window.omega.on('omega:agent-step', stepHandler);
+    return container;
+}
+
+function destroyThinkingIndicator() {
+    if (window._thinkingTimer) { clearInterval(window._thinkingTimer); window._thinkingTimer = null; }
+    if (window._thinkingStepHandler) {
+        window.omega.removeListener('omega:agent-step', window._thinkingStepHandler);
+        window._thinkingStepHandler = null;
+    }
 }
 
 async function sendChatMessage() {
@@ -558,16 +664,18 @@ async function sendChatMessage() {
     input.value = '';
     state.chat.sending = true;
 
-    // Store in session history for context
     state.chat.messageHistory.push({ role: 'user', content: text });
     addChatMessage('user', text);
 
-    // Show thinking + stop button
-    const thinkingEl = addChatMessage('assistant', '⏳ Thinking...');
+    // Show live thinking indicator
+    const thinkingEl = createThinkingIndicator();
+    document.getElementById('chat-messages').appendChild(thinkingEl);
+    scrollChat();
     document.getElementById('chat-stop-btn').classList.add('visible');
 
     try {
         const result = await window.omega.chat.send(text, state.chat.sessionId);
+        destroyThinkingIndicator();
         thinkingEl.remove();
 
         let responseText = '';
@@ -575,10 +683,7 @@ async function sendChatMessage() {
             responseText = result.message;
             const el = addChatMessage('assistant', responseText);
             if (result.steps > 0) {
-                const stepsEl = document.createElement('div');
-                stepsEl.className = 'msg-steps';
-                stepsEl.textContent = `⚡ ${result.steps} tool steps executed`;
-                el.appendChild(stepsEl);
+                addClickableStepsBadge(el, result.steps, result.stepLog);
             }
         } else if (result.type === 'proposals') {
             responseText = result.message;
@@ -592,12 +697,10 @@ async function sendChatMessage() {
             addChatMessage('assistant', responseText);
         }
 
-        // Store assistant response in history
         state.chat.messageHistory.push({ role: 'assistant', content: responseText });
-
-        // Voice playback
         if (responseText) playVoice(responseText);
     } catch (err) {
+        destroyThinkingIndicator();
         thinkingEl.remove();
         const errMsg = `❌ Error: ${err.message}`;
         addChatMessage('assistant', errMsg);
@@ -608,6 +711,36 @@ async function sendChatMessage() {
     document.getElementById('chat-stop-btn').classList.remove('visible');
 }
 
+/** v4.2: Clickable step badge — expand to show what tools ran */
+function addClickableStepsBadge(parentEl, steps, stepLog) {
+    const badge = document.createElement('div');
+    badge.className = 'msg-steps clickable';
+    badge.innerHTML = `⚡ ${steps} tool steps executed <span class="steps-toggle">▸</span>`;
+
+    const details = document.createElement('div');
+    details.className = 'steps-detail collapsed';
+
+    if (stepLog && stepLog.length > 0) {
+        stepLog.forEach(s => {
+            const row = document.createElement('div');
+            row.className = 'step-detail-row';
+            const ok = s.result?.ok ? '✅' : '❌';
+            row.textContent = `${ok} ${s.tool}`;
+            details.appendChild(row);
+        });
+    } else {
+        details.textContent = `${steps} tool(s) executed autonomously`;
+    }
+
+    badge.addEventListener('click', () => {
+        details.classList.toggle('collapsed');
+        badge.querySelector('.steps-toggle').textContent = details.classList.contains('collapsed') ? '▸' : '▾';
+    });
+
+    parentEl.appendChild(badge);
+    parentEl.appendChild(details);
+}
+
 function addChatMessage(role, content) {
     const container = document.getElementById('chat-messages');
     const welcome = container.querySelector('.chat-welcome');
@@ -616,7 +749,6 @@ function addChatMessage(role, content) {
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg ${role}`;
 
-    // Simple markdown rendering for assistant messages
     if (role === 'assistant') {
         msgEl.innerHTML = renderMarkdown(content);
     } else {
@@ -624,7 +756,7 @@ function addChatMessage(role, content) {
     }
 
     container.appendChild(msgEl);
-    container.scrollTop = container.scrollHeight;
+    scrollChat();
     return msgEl;
 }
 
@@ -642,15 +774,45 @@ function addProposalCard(proposal) {
         </div>
     `;
     container.appendChild(card);
-    container.scrollTop = container.scrollHeight;
+    scrollChat();
 }
 
 async function approveProposal(id) {
-    const result = await window.omega.agent.approve(id, 'user-click');
-    if (result.error) {
-        showToast(`Approval failed: ${result.error}`, 'error');
-    } else {
-        showToast('Action approved and executed', 'success');
+    const btns = event?.target?.closest?.('.chat-msg')?.querySelectorAll('button');
+    if (btns) btns.forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
+
+    const thinkingEl = createThinkingIndicator();
+    document.getElementById('chat-messages').appendChild(thinkingEl);
+    scrollChat();
+
+    try {
+        const result = await window.omega.agent.approve(id, 'user-click');
+        destroyThinkingIndicator();
+        thinkingEl.remove();
+
+        if (result.error) {
+            addChatMessage('assistant', `⚠️ Approval failed: ${result.error}`);
+            return;
+        }
+
+        if (result.agentResponse) {
+            const resp = result.agentResponse;
+            if (resp.type === 'chat' && resp.message) {
+                const el = addChatMessage('assistant', resp.message);
+                if (resp.steps > 0) addClickableStepsBadge(el, resp.steps, resp.stepLog);
+            } else if (resp.type === 'proposals') {
+                addChatMessage('assistant', resp.message);
+                for (const p of resp.proposals) addProposalCard(p);
+            } else if (resp.message) {
+                addChatMessage('assistant', resp.message);
+            }
+        } else {
+            showToast('Action approved and executed', 'success');
+        }
+    } catch (err) {
+        destroyThinkingIndicator();
+        thinkingEl.remove();
+        addChatMessage('assistant', `❌ Execution error: ${err.message}`);
     }
 }
 
@@ -661,7 +823,10 @@ async function denyProposal(id) {
 
 function renderMarkdown(text) {
     if (!text) return '';
-    return text
+    // v4.2: Strip raw VTP blocks from chat output
+    let clean = text.replace(/```vtp[\s\S]*?```/g, '').trim();
+    if (!clean) clean = '(VTP commands executed — see tool steps above)';
+    return clean
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
         .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -1360,7 +1525,7 @@ window.sentinelToggle = async function(action) {
         } catch { }
     }, 30000);
 
-    console.log('%c Ω GRAVITY OMEGA v4.1 %c READY ',
+    console.log('%c Ω GRAVITY OMEGA v3.0 %c READY ',
         'background: linear-gradient(90deg, #d4a843, #a0802a); color: #000; font-weight: bold; padding: 4px 12px; border-radius: 4px;',
         'background: #1a1a1a; color: #d4a843; font-weight: bold; padding: 4px 8px;'
     );
