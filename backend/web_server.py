@@ -1104,7 +1104,7 @@ def _vtp_direct_executor(packet: vtp_codec.VTPPacket) -> str:
             with urllib.request.urlopen(req, timeout=15) as resp:
                 body = resp.read().decode('utf-8', errors='replace')
             results = []
-            blocks = _re.findall(r'class="result__body".*?(?=class="result__body"|$)', body, _re.S)[:8]
+            blocks = _re.findall(r'class="[^"]*result__body[^"]*".*?(?=class="[^"]*result__body|$)', body, _re.S)[:8]
             for block in blocks:
                 title_m = _re.search(r'class="result__a"[^>]*>(.*?)</a>', block, _re.S)
                 snip_m  = _re.search(r'class="result__snippet"[^>]*>(.*?)</span>', block, _re.S)
@@ -1256,7 +1256,7 @@ def api_search_web():
             body = resp.read().decode('utf-8', errors='replace')
         # Extract result titles + snippets + URLs
         results = []
-        blocks = _re.findall(r'class="result__body".*?(?=class="result__body"|$)', body, _re.S)[:10]
+        blocks = _re.findall(r'class="[^"]*result__body[^"]*".*?(?=class="[^"]*result__body|$)', body, _re.S)[:10]
         for block in blocks:
             title_m = _re.search(r'class="result__a"[^>]*>(.*?)</a>', block, _re.S)
             snip_m  = _re.search(r'class="result__snippet"[^>]*>(.*?)</span>', block, _re.S)
