@@ -438,19 +438,21 @@
 
     <script>
         const monacoPath = '../node_modules/monaco-editor/min/vs';
+        // Resolve to absolute URL so blob workers can importScripts correctly
+        const monacoAbsPath = new URL(monacoPath, window.location.href).href;
 
         // Configure Monaco worker path BEFORE loading
-        // v4.3.18: Use getWorker instead of getWorkerUrl to avoid blob URL path resolution issues in Electron
+        // v4.3.18c: Use getWorkerUrl with ABSOLUTE paths in blob importScripts
         window.MonacoEnvironment = {
-            getWorker: function (moduleId, label) {
+            getWorkerUrl: function (moduleId, label) {
                 let workerFile = 'editor/editor.worker.js';
                 if (label === 'json') workerFile = 'language/json/json.worker.js';
                 else if (label === 'css' || label === 'scss' || label === 'less') workerFile = 'language/css/css.worker.js';
                 else if (label === 'html' || label === 'handlebars' || label === 'razor') workerFile = 'language/html/html.worker.js';
                 else if (label === 'typescript' || label === 'javascript') workerFile = 'language/typescript/ts.worker.js';
-                // Resolve absolute file path from the renderer directory
-                const workerPath = new URL(monacoPath + '/' + workerFile, window.location.href).href;
-                return new Worker(workerPath, { name: label });
+                return `data:text/javascript;charset=utf-8,${encodeURIComponent(
+                    'self.MonacoEnvironment={baseUrl:"' + monacoAbsPath + '/"};importScripts("' + monacoAbsPath + '/' + workerFile + '");'
+                )}`;
             }
         };
 
