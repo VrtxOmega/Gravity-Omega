@@ -657,6 +657,23 @@ function destroyThinkingIndicator() {
     }
 }
 
+/** v4.2: Finalize thinking indicator — freeze as collapsed persistent dropdown */
+function finalizeThinkingIndicator(el) {
+    destroyThinkingIndicator();
+    if (!el) return;
+    el.style.animation = 'none';
+    el.style.borderColor = 'rgba(212,168,67,0.15)';
+    const stepLog = el.querySelector('.thinking-steps');
+    const stepCount = stepLog ? stepLog.querySelectorAll('.thinking-step').length : 0;
+    const label = el.querySelector('.thinking-label');
+    if (label) label.textContent = `${stepCount} step${stepCount !== 1 ? 's' : ''} completed`;
+    const icon = el.querySelector('.thinking-icon');
+    if (icon) { icon.textContent = '⚡'; icon.style.animation = 'none'; }
+    if (stepLog) stepLog.classList.add('collapsed');
+    const toggle = el.querySelector('.thinking-toggle');
+    if (toggle) toggle.textContent = '▸';
+}
+
 async function sendChatMessage() {
     const input = document.getElementById('chat-input');
     const text = input.value.trim();
@@ -676,16 +693,12 @@ async function sendChatMessage() {
 
     try {
         const result = await window.omega.chat.send(text, state.chat.sessionId);
-        destroyThinkingIndicator();
-        thinkingEl.remove();
+        finalizeThinkingIndicator(thinkingEl);
 
         let responseText = '';
         if (result.type === 'chat') {
             responseText = result.message;
-            const el = addChatMessage('assistant', responseText);
-            if (result.steps > 0) {
-                addClickableStepsBadge(el, result.steps, result.stepLog);
-            }
+            addChatMessage('assistant', responseText);
         } else if (result.type === 'proposals') {
             responseText = result.message;
             addChatMessage('assistant', responseText);
@@ -701,8 +714,7 @@ async function sendChatMessage() {
         state.chat.messageHistory.push({ role: 'assistant', content: responseText });
         if (responseText) playVoice(responseText);
     } catch (err) {
-        destroyThinkingIndicator();
-        thinkingEl.remove();
+        finalizeThinkingIndicator(thinkingEl);
         const errMsg = `❌ Error: ${err.message}`;
         addChatMessage('assistant', errMsg);
         state.chat.messageHistory.push({ role: 'assistant', content: errMsg });
