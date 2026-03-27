@@ -122,20 +122,21 @@ class OmegaAgent {
 ${moodDirectives[userMood] || moodDirectives.neutral}
 
 ## How You Work
-1. **Plan First** — For multi-step tasks, create an implementation_plan.md FILE using MUT:AST containing the full plan content. Then open it in Monaco with REQ:UI. Do NOT put the plan text in the chat — write it as a file so RJ sees it in the editor.
-2. **Write Before Open** — ALWAYS write file content with MUT:AST FIRST, then open with REQ:UI. Never open a file that hasn't been written yet.
-   Example sequence:
-   \`\`\`vtp
-   REQ::[ACT:MUT|TGT:AST|PRM:"path=C:\\Users\\rlope\\.veritas\\implementation_plan.md", "content=# Plan\n\n## Steps\n1. First step\n2. Second step"]
-   \`\`\`
-   \`\`\`vtp
-   REQ::[ACT:REQ|TGT:UI|PRM:"open:C:\\Users\\rlope\\.veritas\\implementation_plan.md"]
-   \`\`\`
+**Your Environment:**
+- Project directory: C:\\Veritas_Lab
+- Plans and scratch files: C:\\Users\\rlope\\.veritas
+- Current working directory: C:\\Veritas_Lab\\gravity-omega-v2
+- OS: Windows 11 — use Windows paths (C:\\), NOT Unix paths
+
+1. **Plan First** — For multi-step tasks, create a plan FILE. Write it with MUT:AST, then open with REQ:UI. Do NOT put the plan in chat.
+   To write a file: [ACT:MUT|TGT:AST|PRM:"path=C:\\Users\\rlope\\.veritas\\plan.md, content=# My Plan\\n## Steps\\n1. Step one"]
+   To open in editor: [ACT:REQ|TGT:UI|PRM:"open:C:\\Users\\rlope\\.veritas\\plan.md"]
+2. **Write Before Open** — ALWAYS MUT:AST first, REQ:UI second. Never open a file you haven't written.
 3. Execute each step using available tools
 4. Read tool results, decide next action
-5. **Show Your Work** — When you create or edit files, open them in Monaco so RJ can see. Use absolute paths starting with C:\\.
-6. Continue until the task is complete
-7. **Chat = Conversation Only** — Your chat messages should be brief status updates, questions, or personality. Long content (plans, code, docs) should ALWAYS go in files, not chat.
+5. **Show Your Work** — Open created/edited files in Monaco. Always use absolute Windows paths.
+6. Continue until complete
+7. **Chat = Conversation Only** — Brief updates and personality. All long content goes in files.
 
     ## Dual-Channel Emission (VTP)
     You operate in dual-channel mode:
@@ -640,6 +641,55 @@ ${toolDescriptions}
                 }
             } catch (err) {
                 console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
+            }
+
+            // ── v4.3.4: Local file READ handlers (bypass WSL bridge) ──
+            if (pseudo_tool_name === 'EXT:AST' || pseudo_tool_name === 'REQ:AST') {
+                try {
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    const prm = (packet.prm || '').replace(/^"/, '').replace(/"$/, '').trim();
+
+                    // Handle 'cwd' request
+                    if (prm === 'cwd' || prm === 'pwd') {
+                        const cwd = process.cwd();
+                        const result = { ok: true, data: cwd, message: `Working directory: ${cwd}` };
+                        results.push(result);
+                        this._logStep(pseudo_tool_name, prm, result);
+                        continue;
+                    }
+
+                    // Resolve path
+                    let targetPath = prm;
+                    const pathMatch = prm.match(/path[=:]\s*"?([^",]+)"?/i);
+                    if (pathMatch) targetPath = pathMatch[1].trim();
+                    targetPath = this._resolveFilePath(targetPath);
+
+                    if (fs.existsSync(targetPath)) {
+                        const stat = fs.statSync(targetPath);
+                        if (stat.isDirectory()) {
+                            // List directory
+                            const entries = fs.readdirSync(targetPath).slice(0, 50);
+                            const result = { ok: true, data: entries.join('\n'), message: `Listed ${entries.length} items in ${targetPath}` };
+                            results.push(result);
+                            this._logStep(pseudo_tool_name, targetPath, result);
+                        } else {
+                            // Read file
+                            const content = fs.readFileSync(targetPath, 'utf8');
+                            const result = { ok: true, data: content.substring(0, 10000), message: `Read ${content.length} bytes from ${targetPath}` };
+                            results.push(result);
+                            this._logStep(pseudo_tool_name, targetPath, result);
+                        }
+                    } else {
+                        const result = { error: `File not found: ${targetPath}` };
+                        results.push(result);
+                        this._logStep(pseudo_tool_name, targetPath, result);
+                    }
+                    continue;
+                } catch (err) {
+                    results.push({ error: err.message });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
+                    continue;
+                }
             }
 
             // ── v4.3.2: Local file operation handlers (bypass WSL bridge) ──
