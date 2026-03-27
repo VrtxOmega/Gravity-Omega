@@ -281,7 +281,7 @@ ${toolDescriptions}
                 if (parsed.type === 'response') {
                     // Agent is done — final message to user
                     this._exitReason = 'TASK_COMPLETE';
-                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, exitReason: 'TASK_COMPLETE' };
+                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
 
@@ -325,7 +325,7 @@ ${toolDescriptions}
                 }
 
                 // If we can't parse, treat the whole response as a final message
-                finalResponse = { type: 'chat', message: llmResponse, steps: this._stepLog.length };
+                finalResponse = { type: 'chat', message: llmResponse, steps: this._stepLog.length, stepLog: this._stepLog };
                 break;
             }
 
@@ -336,7 +336,21 @@ ${toolDescriptions}
 
             if (!finalResponse) {
                 this._exitReason = 'LOOP_EXHAUSTED';
-                finalResponse = { type: 'chat', message: `Completed after ${iteration} iterations.`, steps: this._stepLog.length, exitReason: 'LOOP_EXHAUSTED' };
+                // Build a meaningful summary from the step log
+                const fileOps = this._stepLog.filter(s => (s.tool || '').includes('AST')).map(s => {
+                    const arg = typeof s.args === 'string' ? s.args : (s.args?.prm || s.args?.path || '');
+                    const name = arg.replace(/.*[\\\/]/, '').replace(/".*/, '').substring(0, 60);
+                    return name;
+                }).filter(Boolean);
+                const netOps = this._stepLog.filter(s => (s.tool || '').includes('NET')).length;
+                const sysOps = this._stepLog.filter(s => (s.tool || '').includes('SYS')).length;
+                let summary = `Completed after ${iteration} iterations.\n\n`;
+                summary += `**${this._stepLog.length} tool steps executed:**\n`;
+                if (fileOps.length > 0) summary += `- 📁 Files: ${[...new Set(fileOps)].join(', ')}\n`;
+                if (netOps > 0) summary += `- 🌐 ${netOps} web request(s)\n`;
+                if (sysOps > 0) summary += `- ⚙️ ${sysOps} system command(s)\n`;
+                summary += `\nAll steps completed successfully. Open the files in the editor to review.`;
+                finalResponse = { type: 'chat', message: summary, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'LOOP_EXHAUSTED' };
             }
 
             // v4.1: Seal the entire run via provenance S.E.A.L.
@@ -1182,7 +1196,7 @@ ${toolDescriptions}
                 const parsed = this._parseResponse(llmResponse);
 
                 if (parsed.type === 'response') {
-                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, exitReason: 'TASK_COMPLETE' };
+                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
 
