@@ -143,7 +143,7 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 - Plans and scratch files: C:\\Users\\rlope\\.veritas
 - Current working directory: C:\\Veritas_Lab\\gravity-omega-v2
 - Config file: C:\\Users\\rlope\\.veritas\\config.json (contains API keys)
-- NewsAPI key: ceb2eca8f2ff49aeac2de93cd0240047b
+- NewsAPI key: ceb2eca8f2ff49aeac2de93cd0240047
 - OS: Windows 11 — use Windows paths (C:\\), NOT Unix paths
 
 ## Workflow
