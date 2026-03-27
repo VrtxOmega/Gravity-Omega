@@ -811,20 +811,22 @@ async function approveProposal(id) {
             // v4.2: Auto-continue after approval — don't stop, keep reasoning
             showToast('Approved ✅ — continuing...', 'success');
             try {
-                const contResponse = await window.omega.agent.think(
-                    'The approved action was executed successfully. Continue with the original task.'
+                const contResult = await window.omega.chat.send(
+                    'The approved action was executed successfully. Continue with the original task.',
+                    state.chat.sessionId
                 );
-                if (contResponse) {
-                    if (contResponse.type === 'chat' && contResponse.message) {
-                        const el = addChatMessage('assistant', contResponse.message);
-                        if (contResponse.steps > 0) addClickableStepsBadge(el, contResponse.steps, contResponse.stepLog);
-                    } else if (contResponse.type === 'proposals') {
-                        addChatMessage('assistant', contResponse.message || 'More actions need approval:');
-                        if (contResponse.proposals) {
-                            for (const p of contResponse.proposals) addProposalCard(p);
+                if (contResult) {
+                    if (contResult.type === 'chat' && contResult.message) {
+                        const el = addChatMessage('assistant', contResult.message);
+                        if (contResult.steps > 0) addClickableStepsBadge(el, contResult.steps, contResult.stepLog);
+                        state.chat.messageHistory.push({ role: 'assistant', content: contResult.message });
+                    } else if (contResult.type === 'proposals') {
+                        addChatMessage('assistant', contResult.message || 'More actions need approval:');
+                        if (contResult.proposals) {
+                            for (const p of contResult.proposals) addProposalCard(p);
                         }
-                    } else if (contResponse.message) {
-                        addChatMessage('assistant', contResponse.message);
+                    } else if (contResult.message) {
+                        addChatMessage('assistant', contResult.message);
                     }
                 }
             } catch (contErr) {
