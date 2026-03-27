@@ -42,6 +42,9 @@ class OmegaAgent {
         this._lastProvenanceContext = null;
         this._stepChainHash = null;
         this._exitReason = null;
+
+        // v4.2: Progress callback for live thinking indicator
+        this.onProgress = null;
     }
 
     // ── Mood Detection ───────────────────────────────────────
@@ -188,6 +191,9 @@ ${toolDescriptions}
         this._stepChainHash = crypto.createHash('sha256').update(`GENESIS:${Date.now()}`).digest('hex');
         this._exitReason = null;
 
+        // v4.2: Emit start event for thinking indicator
+        this._emitProgress({ phase: 'start', label: 'Analyzing request...', iteration: 0, totalSteps: 0 });
+
         // Add to conversation history
         this._conversationHistory.push({ role: 'user', content: text });
         this._trimHistory();
@@ -221,6 +227,7 @@ ${toolDescriptions}
                     messages.splice(1, 0, { role: 'system', content: provLines.join('\n') });
                     this._lastProvenanceContext = rag;
                     this.context.addBreadcrumb('provenance', `Injected ${rag.fragment_count} fragments`);
+                    this._emitProgress({ phase: 'provenance', fragments: rag.fragment_count });
                 }
             }
         } catch (e) {
@@ -236,6 +243,7 @@ ${toolDescriptions}
                 this.context.addBreadcrumb('agent', `Iteration ${iteration}`, { task: text.substring(0, 100) });
 
                 // Call LLM
+                this._emitProgress({ phase: 'thinking', label: `Reasoning step ${iteration}`, iteration, totalSteps: this._stepLog.length });
                 const llmResponse = await this._callLLM(messages);
                 if (!llmResponse) {
                     finalResponse = { type: 'error', message: 'LLM returned empty response' };
@@ -612,6 +620,7 @@ ${toolDescriptions}
 
                     if (intercept && intercept.approved === false) {
                         results.push({ error: intercept.reason });
+                        this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                         this._logStep(pseudo_tool_name, packet.prm, { error: intercept.reason });
                         continue;
                     }
@@ -622,6 +631,7 @@ ${toolDescriptions}
 
             if (safety === SAFETY.SAFE) {
                 try {
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                     const result = await this.bridge.postVTP(packet);
                     results.push(result);
                     this._logStep(pseudo_tool_name, packet.prm, { ok: true, result });
@@ -637,6 +647,7 @@ ${toolDescriptions}
                     results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval' });
                 } else {
                     try {
+                        this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                         const result = await this.bridge.postVTP(packet);
                         results.push(result);
                         this._logStep(pseudo_tool_name, packet.prm, { ok: true, result });
@@ -691,6 +702,17 @@ ${toolDescriptions}
         return proposal;
     }
 
+    // v4.2: Emit progress for live thinking indicator in renderer
+    _emitProgress(event) {
+        try {
+            if (typeof this.onProgress === 'function') {
+                this.onProgress(event);
+            }
+        } catch (e) {
+            console.error('[Agent] _emitProgress error:', e.message);
+        }
+    }
+
     _logStep(tool, args, result) {
         // v4.1: Extend step hash chain for tamper-evident trace
         const stepData = JSON.stringify({ tool, ts: new Date().toISOString(), ok: !result?.error });
@@ -705,6 +727,9 @@ ${toolDescriptions}
             chainHash: this._stepChainHash.substring(0, 12),
         });
         this.context.addBreadcrumb('agent-step', `${tool}: ${result?.error ? 'FAIL' : 'OK'}`);
+
+        // v4.2: Emit tool completion for thinking indicator
+        this._emitProgress({ phase: 'tool_done', tool, ok: !result?.error, totalSteps: this._stepLog.length });
     }
 
     // ── Approval Handling ────────────────────────────────────
@@ -716,7 +741,13 @@ ${toolDescriptions}
         this._pendingProposals.delete(proposalId);
 
         try {
-            const result = await this.executor.execute(proposal.tool, proposal.args);
+            let result;
+            if (proposal._vtpPacket) {
+                // VTP proposals route through the bridge, not the tool executor
+                result = await this.bridge.postVTP(proposal._vtpPacket);
+            } else {
+                result = await this.executor.execute(proposal.tool, proposal.args);
+            }
             proposal.recordExecution(result);
             this._logStep(proposal.tool, proposal.args, result);
             return { success: true, result };

@@ -595,7 +595,8 @@ function createThinkingIndicator() {
         'EXT:AST': 'Reading file', 'EXT:NET': 'Searching web', 'EXT:VLT': 'Querying Vault',
         'MUT:AST': 'Editing file', 'GEN:AST': 'Writing file', 'REQ:SYS': 'Running command',
         'REQ:UI': 'Opening in editor', 'LST:AST': 'Listing directory', 'GRP:AST': 'Searching code',
-        'MUT:CSS': 'Updating styles', 'MUT:SYS': 'System command',
+        'MUT:CSS': 'Updating styles', 'MUT:SYS': 'System command', 'MUT:VLT': 'Writing to Vault',
+        'VFY:AST': 'Verifying file', 'REQ:NET': 'Fetching URL',
     };
 
     const stepHandler = (event) => {
