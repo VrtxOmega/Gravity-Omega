@@ -467,7 +467,12 @@ function registerIPC() {
     ipcMain.handle('agent:status', async () => agent.getStatus());
     ipcMain.handle('agent:tools', async () => agent.getToolSchemas());
     ipcMain.handle('agent:approve', async (_, proposalId, confirmText) => {
-        return await agent.executeApproved(proposalId, confirmText);
+        const result = await agent.executeApproved(proposalId, confirmText);
+        // v4.2: If the agent continued reasoning after approval, surface it as agentResponse
+        if (result.continuation) {
+            result.agentResponse = result.continuation;
+        }
+        return result;
     });
     ipcMain.handle('agent:deny', async (_, proposalId, reason) => {
         return agent.denyProposal(proposalId, reason);

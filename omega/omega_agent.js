@@ -283,6 +283,9 @@ ${toolDescriptions}
                     const pendingCount = this._pendingProposals.size;
                     if (pendingCount > 0) {
                         this._exitReason = 'APPROVAL_PENDING';
+                        // Save conversation state so executeApproved can resume the loop
+                        this._pendingMessages = messages;
+                        this._pendingIteration = iteration;
                         finalResponse = {
                             type: 'proposals',
                             message: `I've completed ${this._stepLog.length} steps so far. ${pendingCount} action(s) need your approval:`,
@@ -750,11 +753,105 @@ ${toolDescriptions}
             }
             proposal.recordExecution(result);
             this._logStep(proposal.tool, proposal.args, result);
+
+            // v4.2: If no more pending proposals and we have saved conversation state, continue the loop
+            if (this._pendingProposals.size === 0 && this._pendingMessages) {
+                const continuationResult = await this._continueAfterApproval(proposal.tool, result);
+                return { success: true, result, continuation: continuationResult };
+            }
+
             return { success: true, result };
         } catch (err) {
             proposal.recordExecution({ error: err.message });
             return { error: err.message };
         }
+    }
+
+    /**
+     * v4.2: Resume the agentic reasoning loop after approval.
+     * Injects the approved tool result into the saved conversation and re-enters the think loop.
+     */
+    async _continueAfterApproval(toolName, toolResult) {
+        const messages = this._pendingMessages;
+        if (!messages) return null;
+
+        // Inject the approved tool result into the conversation
+        const resultText = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
+        const truncated = resultText.length > 2000 ? resultText.substring(0, 2000) + '\n... (truncated)' : resultText;
+        messages.push({
+            role: 'user',
+            content: `Approved tool result:\n\n### ${toolName} [✅ APPROVED]\n\`\`\`\n${truncated}\n\`\`\`\n\nContinue with the task. If done, use the response block.`
+        });
+
+        // Clear saved state
+        this._pendingMessages = null;
+        this._exitReason = null;
+
+        // Re-enter the agentic reasoning loop
+        const MAX_ITERATIONS = 15;
+        let iteration = this._pendingIteration || 0;
+        this._pendingIteration = null;
+        let finalResponse = null;
+
+        try {
+            while (iteration < MAX_ITERATIONS && !this._aborted) {
+                iteration++;
+                this._emitProgress({ phase: 'thinking', label: `Reasoning step ${iteration}`, iteration, totalSteps: this._stepLog.length });
+                const llmResponse = await this._callLLM(messages);
+                if (!llmResponse) {
+                    finalResponse = { type: 'error', message: 'LLM returned empty response' };
+                    break;
+                }
+
+                const parsed = this._parseResponse(llmResponse);
+
+                if (parsed.type === 'response') {
+                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, exitReason: 'TASK_COMPLETE' };
+                    break;
+                }
+
+                if (parsed.type === 'tool' || parsed.type === 'tools') {
+                    const toolCalls = parsed.type === 'tool' ? [parsed.call] : parsed.calls;
+                    const results = await this._executeToolCalls(toolCalls);
+
+                    const resultSummary = results.map((r, i) => {
+                        const call = toolCalls[i];
+                        const status = r.error ? '❌ ERROR' : '✅ OK';
+                        const output = r.error || JSON.stringify(r.result || r, null, 2);
+                        const t = output.length > 2000 ? output.substring(0, 2000) + '\n... (truncated)' : output;
+                        return `### ${call.tool} [${status}]\n\`\`\`\n${t}\n\`\`\``;
+                    }).join('\n\n');
+
+                    messages.push({ role: 'assistant', content: llmResponse });
+                    messages.push({ role: 'user', content: `Tool results:\n\n${resultSummary}\n\nContinue with the task. If done, use the response block.` });
+
+                    if (this._pendingProposals.size > 0) {
+                        this._pendingMessages = messages;
+                        this._pendingIteration = iteration;
+                        finalResponse = {
+                            type: 'proposals',
+                            message: `${this._pendingProposals.size} more action(s) need approval:`,
+                            proposals: Array.from(this._pendingProposals.values()).map(p => p.toJSON()),
+                            steps: this._stepLog.length,
+                            exitReason: 'APPROVAL_PENDING',
+                        };
+                        break;
+                    }
+                    continue;
+                }
+
+                finalResponse = { type: 'chat', message: llmResponse, steps: this._stepLog.length };
+                break;
+            }
+        } catch (err) {
+            finalResponse = { type: 'error', message: err.message };
+        }
+
+        // Emit the continuation response to the renderer
+        if (finalResponse) {
+            this.emit('continuation', finalResponse);
+        }
+        return finalResponse;
     }
 
     denyProposal(proposalId, reason) {
