@@ -281,7 +281,8 @@ ${toolDescriptions}
                 if (parsed.type === 'response') {
                     // Agent is done — final message to user
                     this._exitReason = 'TASK_COMPLETE';
-                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
+                    const cleanMsg = this._sanitizeForChat(parsed.content);
+                    finalResponse = { type: 'chat', message: cleanMsg, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
 
@@ -325,7 +326,7 @@ ${toolDescriptions}
                 }
 
                 // If we can't parse, treat the whole response as a final message
-                finalResponse = { type: 'chat', message: llmResponse, steps: this._stepLog.length, stepLog: this._stepLog };
+                finalResponse = { type: 'chat', message: this._sanitizeForChat(llmResponse), steps: this._stepLog.length, stepLog: this._stepLog };
                 break;
             }
 
@@ -664,6 +665,41 @@ ${toolDescriptions}
         if (!hasVtp && text.trim().length > 0) return { type: 'response', content: text };
 
         return { type: 'response', content: text };
+    }
+
+    /**
+     * v4.3.14: Strip VTP artifacts, junk filler, and excessive content from chat messages.
+     * Ensures the user only sees clean, readable text.
+     */
+    _sanitizeForChat(text) {
+        if (!text) return '(Task completed — see tool steps above)';
+        let clean = text;
+        // 1. Strip fenced VTP blocks
+        clean = clean.replace(/```vtp[\s\S]*?```/g, '');
+        // 2. Strip inline VTP lines
+        clean = clean.replace(/^REQ::.*$/gm, '');
+        clean = clean.replace(/^(ACK|CMD|MUT|EXT|GEN|CREATE)::.*$/gm, '');
+        clean = clean.replace(/^\[ACT:[^\]]*\].*$/gm, '');
+        clean = clean.replace(/^\|\|BND:.*$/gm, '');
+        // 3. Strip orphaned code fences
+        clean = clean.replace(/^```\s*$/gm, '');
+        // 4. Collapse excessive whitespace
+        clean = clean.replace(/\n{3,}/g, '\n\n').trim();
+        // 5. Truncate junk-heavy content (repeated words/patterns)
+        if (clean.length > 3000) {
+            // Check for repetition — if last 500 chars repeat patterns from first 500
+            const head = clean.substring(0, 500);
+            const tail = clean.substring(clean.length - 500);
+            const headWords = new Set(head.split(/\s+/).filter(w => w.length > 3));
+            const tailWords = tail.split(/\s+/).filter(w => w.length > 3);
+            const overlap = tailWords.filter(w => headWords.has(w)).length;
+            if (overlap > tailWords.length * 0.5) {
+                // High repetition detected — truncate
+                clean = clean.substring(0, 2000) + '\n\n*... (content truncated — see files in editor)*';
+            }
+        }
+        if (!clean || clean.length < 10) clean = '(Task completed — see tool steps above)';
+        return clean;
     }
 
     // ── Tool Execution ───────────────────────────────────────
@@ -1196,7 +1232,7 @@ ${toolDescriptions}
                 const parsed = this._parseResponse(llmResponse);
 
                 if (parsed.type === 'response') {
-                    finalResponse = { type: 'chat', message: parsed.content, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
+                    finalResponse = { type: 'chat', message: this._sanitizeForChat(parsed.content), steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
 
