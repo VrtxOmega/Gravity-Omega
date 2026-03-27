@@ -142,6 +142,8 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 - Project directory: C:\\Veritas_Lab
 - Plans and scratch files: C:\\Users\\rlope\\.veritas
 - Current working directory: C:\\Veritas_Lab\\gravity-omega-v2
+- Config file: C:\\Users\\rlope\\.veritas\\config.json (contains API keys)
+- NewsAPI key: ruLvPCLVF7dNe2uHOj0nqIB4BgB7P1wCGIzCVCq3
 - OS: Windows 11 — use Windows paths (C:\\), NOT Unix paths
 
 ## Workflow
@@ -1037,8 +1039,45 @@ ${toolDescriptions}
         try {
             let result;
             if (proposal._vtpPacket) {
-                // VTP proposals route through the bridge, not the tool executor
-                result = await this.bridge.postVTP(proposal._vtpPacket);
+                // v4.3.8: Execute VTP proposals locally instead of routing through WSL bridge
+                const packet = proposal._vtpPacket;
+                const pseudo = `${packet.act}:${packet.tgt}`;
+                const prm = packet.prm || '';
+                console.log('[APPROVE] Executing locally:', pseudo, prm.substring(0, 100));
+
+                if (pseudo === 'MUT:AST' || pseudo === 'GEN:AST') {
+                    // File write — reuse local handler logic
+                    const results = await this._executeToolCalls([packet]);
+                    result = results[0] || { ok: true };
+                } else if (pseudo === 'EXT:AST' || pseudo === 'REQ:AST') {
+                    const results = await this._executeToolCalls([packet]);
+                    result = results[0] || { ok: true };
+                } else if (pseudo === 'EXT:NET' || pseudo === 'REQ:NET') {
+                    const results = await this._executeToolCalls([packet]);
+                    result = results[0] || { ok: true };
+                } else if (pseudo === 'REQ:SYS' || pseudo === 'EXEC:SYS' || pseudo === 'MUT:SYS') {
+                    // System command — execute locally via child_process
+                    const { execSync } = require('child_process');
+                    try {
+                        const cmd = prm.replace(/^"/, '').replace(/"$/, '').trim();
+                        const output = execSync(cmd, {
+                            encoding: 'utf8',
+                            timeout: 30000,
+                            cwd: process.cwd(),
+                            shell: true
+                        });
+                        result = { ok: true, output: output.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };
+                    } catch (execErr) {
+                        result = { ok: false, error: execErr.message, stderr: (execErr.stderr || '').substring(0, 2000) };
+                    }
+                } else {
+                    // Fallback: try bridge for unknown packet types
+                    try {
+                        result = await this.bridge.postVTP(proposal._vtpPacket);
+                    } catch (bridgeErr) {
+                        result = { error: `Bridge unavailable: ${bridgeErr.message}` };
+                    }
+                }
             } else {
                 result = await this.executor.execute(proposal.tool, proposal.args);
             }

@@ -1471,6 +1471,25 @@ function initEventListeners() {
         }
     });
 
+    // v4.3.8: Ctrl+S file save handler
+    window.omega.on('menu:save', async () => {
+        const activeTab = document.querySelector('#editor-tabs .tab.active');
+        if (!activeTab) return;
+        const filePath = activeTab.dataset?.path;
+        if (!filePath || filePath === 'welcome') {
+            showToast('No file to save', 'warning');
+            return;
+        }
+        try {
+            const content = state.editor?.getValue() || '';
+            await window.omega.file.save(filePath, content);
+            showToast(`Saved: ${filePath.split(/[\\/]/).pop()}`, 'success', 2000);
+            console.log('[SAVE] Saved file:', filePath, content.length, 'chars');
+        } catch (err) {
+            showToast(`Save failed: ${err.message}`, 'error');
+        }
+    });
+
     // Auto-resize
     window.addEventListener('resize', () => {
         state.editor?.layout();
