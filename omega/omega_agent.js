@@ -635,39 +635,59 @@ ${toolDescriptions}
                 console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
             }
 
-            // ── v4.3: Local file operation handlers (bypass WSL bridge) ──
+            // ── v4.3.2: Local file operation handlers (bypass WSL bridge) ──
             // Windows paths fail in WSL /bin/sh. Handle file ops via Node.js directly.
             if (pseudo_tool_name === 'MUT:AST' || pseudo_tool_name === 'GEN:AST') {
                 try {
                     this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                     const prm = packet.prm || '';
-                    // Parse path and content from VTP PRM: "path=X, content=Y" or "path::find::replace"
-                    let filePath, content;
-                    const pathMatch = prm.match(/path[=:]"?([^",]+)"?/);
-                    const contentMatch = prm.match(/content[=:]"?([\s\S]+)$/);
+                    let filePath = '', content = '';
+
+                    // Format 1: "path=X", "content=Y" or path=X, content=Y
+                    const pathMatch = prm.match(/path[=:]\s*"?([^",]+)"?/i);
+                    const contentMatch = prm.match(/,?\s*"?\s*content[=:]\s*"?([\s\S]+)$/i);
                     if (pathMatch) {
-                        filePath = pathMatch[1].trim().replace(/\\"/g, '');
-                        content = contentMatch ? contentMatch[1].trim().replace(/"$/, '') : '';
-                    } else if (prm.includes('::')) {
-                        // find::replace format
+                        filePath = pathMatch[1].trim().replace(/\\"/g, '').replace(/"$/, '');
+                        content = contentMatch ? contentMatch[1].trim().replace(/^"/, '').replace(/"$/, '') : '';
+                    }
+                    // Format 2: path::find::replace (edit existing file)
+                    else if (prm.includes('::')) {
                         const parts = prm.split('::');
                         filePath = parts[0].replace(/^"/, '').replace(/"$/, '').trim();
                         const findText = parts[1] || '';
                         const replaceText = parts[2] || '';
+                        filePath = this._resolveFilePath(filePath);
                         if (findText && fs.existsSync(filePath)) {
-                            const existing = fs.readFileSync(filePath, 'utf8');
-                            content = existing.replace(findText, replaceText);
+                            content = fs.readFileSync(filePath, 'utf8').replace(findText, replaceText);
+                        } else {
+                            content = replaceText;
                         }
-                    } else {
-                        filePath = prm.replace(/^"/, '').replace(/"$/, '').trim();
                     }
-                    if (filePath && content !== undefined) {
+                    // Format 3: bare filename or path (create empty / use remaining as content)
+                    else {
+                        // Split on first comma — before=path, after=content
+                        const commaIdx = prm.indexOf(',');
+                        if (commaIdx > 0) {
+                            filePath = prm.substring(0, commaIdx).replace(/^"/, '').replace(/"$/, '').trim();
+                            content = prm.substring(commaIdx + 1).replace(/^\s*"?/, '').replace(/"$/, '').trim();
+                        } else {
+                            filePath = prm.replace(/^"/, '').replace(/"$/, '').trim();
+                            content = '';
+                        }
+                    }
+
+                    // Resolve relative paths
+                    filePath = this._resolveFilePath(filePath);
+
+                    if (filePath) {
                         const dir = path.dirname(filePath);
                         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                        // Unescape common LLM escape sequences
+                        content = content.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
                         fs.writeFileSync(filePath, content, 'utf8');
                         const result = { ok: true, message: `File written: ${filePath}` };
                         results.push(result);
-                        this._logStep(pseudo_tool_name, packet.prm, result);
+                        this._logStep(pseudo_tool_name, filePath, result);
                     } else {
                         results.push({ error: `Cannot parse file path from: ${prm.substring(0, 100)}` });
                         this._logStep(pseudo_tool_name, packet.prm, { error: 'Parse failed' });
@@ -685,12 +705,13 @@ ${toolDescriptions}
                     this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                     const prm = packet.prm || '';
                     // Check for mkdir/createDir operations
-                    const mkdirMatch = prm.match(/(?:mkdir|createDir)\s+"?([^"]+)"?/i) || prm.match(/^"?([^"]+)"?$/);
                     if (prm.toLowerCase().includes('mkdir') || prm.toLowerCase().includes('createdir')) {
+                        const mkdirMatch = prm.match(/(?:mkdir|createDir)\s+"?([^"]+)"?/i);
                         const dirPath = mkdirMatch ? mkdirMatch[1].trim() : prm.replace(/^(mkdir|createDir)\s*/i, '').trim();
                         if (dirPath) {
-                            fs.mkdirSync(dirPath, { recursive: true });
-                            const result = { ok: true, message: `Directory created: ${dirPath}` };
+                            const resolved = this._resolveFilePath(dirPath);
+                            fs.mkdirSync(resolved, { recursive: true });
+                            const result = { ok: true, message: `Directory created: ${resolved}` };
                             results.push(result);
                             this._logStep(pseudo_tool_name, packet.prm, result);
                             continue;
@@ -708,13 +729,14 @@ ${toolDescriptions}
                 try {
                     this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                     const prm = packet.prm || '';
-                    const openPath = prm.replace(/^open:/, '').replace(/^"/, '').replace(/"$/, '').trim();
+                    let openPath = prm.replace(/^open:/, '').replace(/^"/, '').replace(/"$/, '').trim();
+                    openPath = this._resolveFilePath(openPath);
                     if (openPath) {
                         // Emit a file-open event — main.js forwards to renderer
                         this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: openPath, ok: true, totalSteps: this._stepLog.length + 1 });
                         const result = { ok: true, message: `Opened in editor: ${openPath}` };
                         results.push(result);
-                        this._logStep(pseudo_tool_name, packet.prm, result);
+                        this._logStep(pseudo_tool_name, openPath, result);
                     }
                     continue;
                 } catch (err) {
@@ -806,6 +828,23 @@ ${toolDescriptions}
         } catch (e) {
             console.error('[Agent] _emitProgress error:', e.message);
         }
+    }
+
+    // v4.3.2: Resolve relative file paths to absolute paths
+    _resolveFilePath(filePath) {
+        if (!filePath) return '';
+        // Already absolute (Windows drive letter or UNC)
+        if (/^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith('\\\\')) return filePath;
+        // Already absolute (Unix-style — shouldn't happen but guard)
+        if (filePath.startsWith('/')) return filePath;
+        // Relative path → resolve against user home + .veritas project dir
+        const home = process.env.USERPROFILE || process.env.HOME || 'C:\\Users\\rlope';
+        const projectDir = path.join(home, '.veritas');
+        // Ensure project dir exists
+        if (!fs.existsSync(projectDir)) {
+            try { fs.mkdirSync(projectDir, { recursive: true }); } catch {}
+        }
+        return path.join(projectDir, filePath);
     }
 
     _logStep(tool, args, result) {
