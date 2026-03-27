@@ -582,7 +582,26 @@ ${toolDescriptions}
                     
                     const act = claeg.match(/ACT:([A-Z]+)/)?.[1] || 'REQ';
                     const tgt = claeg.match(/TGT:([A-Z]+)/)?.[1] || 'SYS';
-                    let prm = claeg.match(/PRM:"([^"]*)"/)?.[1] || claeg.match(/PRM:([^|\]]+)/)?.[1] || "";
+                    // v4.3.6: Robust PRM extraction (handles embedded quotes in content)
+                    let prm = '';
+                    const prmStart = claeg.indexOf('PRM:');
+                    if (prmStart !== -1) {
+                        const after = claeg.substring(prmStart + 4);
+                        if (after.startsWith('"')) {
+                            // Find closing quote: last " before | or ]
+                            let end = -1;
+                            for (let i = after.length - 1; i > 0; i--) {
+                                if (after[i] === '"') { end = i; break; }
+                            }
+                            prm = end > 0 ? after.substring(1, end) : after.substring(1);
+                        } else {
+                            // Unquoted: read to next | or ]
+                            const pipeIdx = after.indexOf('|');
+                            const bracketIdx = after.indexOf(']');
+                            const endIdx = pipeIdx === -1 ? bracketIdx : (bracketIdx === -1 ? pipeIdx : Math.min(pipeIdx, bracketIdx));
+                            prm = endIdx > 0 ? after.substring(0, endIdx).trim() : after.trim();
+                        }
+                    }
                     
                     const bndMatch = naef.match(/BND:([^|\]]+)/);
                     const bnd = bndMatch && bndMatch[1] !== 'NONE' ? bndMatch[1] : null;
@@ -765,6 +784,7 @@ ${toolDescriptions}
                 try {
                     this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                     const prm = packet.prm || '';
+                    console.log('[MUT:AST] Raw PRM:', prm.substring(0, 200), '... (total:', prm.length, 'chars)');
                     let filePath = '', content = '';
 
                     // Format 1: "path=X", "content=Y" or path=X, content=Y
