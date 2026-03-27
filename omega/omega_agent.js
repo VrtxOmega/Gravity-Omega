@@ -926,7 +926,7 @@ ${toolDescriptions}
                 }
             }
 
-            if (pseudo_tool_name === 'REQ:SYS' || pseudo_tool_name === 'MUT:SYS' || pseudo_tool_name === 'CREATE:SYS') {
+            if (pseudo_tool_name === 'REQ:SYS' || pseudo_tool_name === 'MUT:SYS' || pseudo_tool_name === 'CREATE:SYS' || pseudo_tool_name === 'RUN:SYS' || pseudo_tool_name === 'EXEC:SYS') {
                 try {
                     this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
                     const prm = packet.prm || '';
@@ -943,7 +943,24 @@ ${toolDescriptions}
                             continue;
                         }
                     }
-                    // Non-mkdir SYS commands: fall through to bridge
+                    // v4.3.15: Auto-execute non-destructive SYS commands locally
+                    const cmd = prm.replace(/^"/, '').replace(/"$/, '').trim();
+                    if (!this._isDestructiveCommand(cmd)) {
+                        console.log('[AUTO-EXEC] Non-destructive SYS:', cmd.substring(0, 100));
+                        const { exec } = require('child_process');
+                        const output = await new Promise((resolve, reject) => {
+                            exec(cmd, { encoding: 'utf8', timeout: 30000, cwd: process.cwd(), shell: true }, (err, stdout, stderr) => {
+                                if (err) reject(Object.assign(err, { stderr }));
+                                else resolve(stdout);
+                            });
+                        });
+                        const result = { ok: true, output: output.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };
+                        results.push(result);
+                        this._logStep(pseudo_tool_name, packet.prm, result);
+                        this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: cmd, ok: true, totalSteps: this._stepLog.length });
+                        continue;
+                    }
+                    // Destructive command — fall through to proposal gate
                 } catch (err) {
                     results.push({ error: err.message });
                     this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
@@ -984,10 +1001,13 @@ ${toolDescriptions}
                     this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
                 }
             } else if (safety === SAFETY.GATED) {
-                const isDangerous = packet.tgt === 'SYS' || packet.act === 'MUT';
+                // v4.3.15: Only gate actually destructive commands, not all SYS
+                const prm = packet.prm || '';
+                const cmd = prm.replace(/^"/, '').replace(/"$/, '').trim();
+                const isDangerous = (packet.act === 'MUT' && this._isDestructiveCommand(cmd)) || this._isDestructiveCommand(cmd);
                 if (isDangerous) {
                     const proposal = this._createVTPProposal(packet);
-                    results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval' });
+                    results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval — destructive command' });
                 } else {
                     try {
                         this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
