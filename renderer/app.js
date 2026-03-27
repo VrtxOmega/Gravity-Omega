@@ -152,7 +152,12 @@ async function openFile(filePath) {
 
     const result = await window.omega.file.read(filePath);
     if (result.error) {
-        showToast(`Error opening file: ${result.error}`, 'error');
+        // v4.3.2: Suppress ENOENT from agent auto-opens (file may not exist yet)
+        if (result.error.includes('ENOENT')) {
+            console.warn(`[MONACO] File not found (may be pending write): ${filePath}`);
+        } else {
+            showToast(`Error opening file: ${result.error}`, 'error');
+        }
         return;
     }
 
