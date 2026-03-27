@@ -622,16 +622,20 @@ ${toolDescriptions}
                     joined.push(rl.trim());
                 } else if (joined.length > 0) {
                     // Continuation of previous VTP line — append with \n escape
-                    joined[joined.length - 1] += '\\n' + rl;
+                    joined[joined.length - 1] += '\n' + rl;
                 }
             }
             for (const line of joined) {
                 if (!line.includes('::[')) continue;
                 try {
-                    const parts = line.split('::');
-                    const op = parts[0];
-                    const claeg = parts[1];
-                    const naef = parts[2] || '[BND:NONE|RGM:SAFE|FAL:WARN]';
+                    // v4.3.18: Only split on FIRST '::' — PRM content may contain '::'
+                    const firstSep = line.indexOf('::');
+                    const op = line.substring(0, firstSep);
+                    const remainder = line.substring(firstSep + 2);
+                    // Split remainder on '||' to separate CLAEG from NAEF
+                    const naefSep = remainder.lastIndexOf('||');
+                    const claeg = naefSep > 0 ? remainder.substring(0, naefSep) : remainder;
+                    const naef = naefSep > 0 ? remainder.substring(naefSep + 2) : '[BND:NONE|RGM:SAFE|FAL:WARN]';
                     
                     const act = claeg.match(/ACT:([A-Z]+)/)?.[1] || 'REQ';
                     const tgt = claeg.match(/TGT:([A-Z]+)/)?.[1] || 'SYS';
