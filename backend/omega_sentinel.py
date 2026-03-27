@@ -35,6 +35,9 @@ STARTUP_GRACE_S = 60      # seconds to wait after start before first check
 HEALTH_RETRIES = 2        # retry health check before declaring unhealthy
 HEALTH_RETRY_DELAY = 3    # seconds between health check retries
 
+# ── KILL SWITCH — set to False to re-enable Sentinel ──
+SENTINEL_DISABLED = True
+
 # Critical files to watch (relative to project root)
 WATCHED_FILES = [
     'backend/web_server.py',
@@ -460,6 +463,9 @@ class OmegaSentinel:
 
     def start(self):
         """Start the sentinel daemon."""
+        if SENTINEL_DISABLED:
+            log.info('Sentinel v2 DISABLED by SENTINEL_DISABLED flag — not starting')
+            return
         if self.running:
             return
         # Create baseline if first run
