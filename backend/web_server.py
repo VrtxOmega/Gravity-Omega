@@ -1089,7 +1089,52 @@ def _vtp_direct_executor(packet: vtp_codec.VTPPacket) -> str:
     if packet.act == "EXT" and packet.tgt == "VLT":
         query = str(packet.prm).strip('"\'')
         return f"VAULT DIRECT EXTRACT: {query}"
-        
+
+    # Web search (EXT:NET) — uses DuckDuckGo HTML scraping
+    if packet.act == "EXT" and packet.tgt == "NET":
+        import urllib.request, urllib.parse, html, re as _re
+        query = str(packet.prm).strip('"\'')
+        try:
+            encoded = urllib.parse.quote_plus(query)
+            url = f'https://html.duckduckgo.com/html/?q={encoded}'
+            req = urllib.request.Request(url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                'Accept': 'text/html',
+            })
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                body = resp.read().decode('utf-8', errors='replace')
+            results = []
+            blocks = _re.findall(r'class="result__body".*?(?=class="result__body"|$)', body, _re.S)[:8]
+            for block in blocks:
+                title_m = _re.search(r'class="result__a"[^>]*>(.*?)</a>', block, _re.S)
+                snip_m  = _re.search(r'class="result__snippet"[^>]*>(.*?)</span>', block, _re.S)
+                url_m   = _re.search(r'class="result__url"[^>]*>(.*?)</a>', block, _re.S)
+                if title_m:
+                    t = html.unescape(_re.sub(r'<[^>]+>', '', title_m.group(1))).strip()
+                    s = html.unescape(_re.sub(r'<[^>]+>', '', snip_m.group(1))).strip() if snip_m else ''
+                    u = html.unescape(_re.sub(r'<[^>]+>', '', url_m.group(1))).strip() if url_m else ''
+                    results.append(f"• {t}\n  {u}\n  {s}")
+            if results:
+                return f"Web search results for '{query}':\n\n" + "\n\n".join(results)
+            return f"Web search for '{query}' returned no results."
+        except Exception as e:
+            return f"ERROR: Web search failed: {e}"
+
+    # URL fetch (REQ:NET) — direct HTTPS with proper User-Agent
+    if packet.act == "REQ" and packet.tgt == "NET":
+        import urllib.request
+        url = str(packet.prm).strip('"\'')
+        try:
+            req = urllib.request.Request(url, headers={
+                'User-Agent': 'Mozilla/5.0 (compatible; OmegaBot/4.1)',
+                'Accept': 'text/html,application/json,text/plain',
+            })
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                content = resp.read().decode('utf-8', errors='replace')[:10000]
+                return f"Fetched {url} (status {resp.status}):\n{content}"
+        except Exception as e:
+            return f"ERROR: Fetch failed for {url}: {e}"
+
     return f"OK (No fast path executed for {packet.act}:{packet.tgt})"
 
 vtp_gateway = vtp_codec.VTPRouter(OllamaClientWrapper(), "/home/veritas/gravity-omega-v2/backend/data/vtp_ledger.json")
