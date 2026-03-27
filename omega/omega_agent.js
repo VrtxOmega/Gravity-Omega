@@ -716,6 +716,50 @@ ${toolDescriptions}
         return clean;
     }
 
+    /**
+     * v4.3.17: Check if a command is destructive (should require approval).
+     * Uses an ALLOWLIST approach — known-safe commands pass, everything else is gated.
+     */
+    _isDestructiveCommand(cmd) {
+        if (!cmd) return true;
+        const lower = cmd.toLowerCase().trim();
+        // Extract first token (the actual command)
+        const firstToken = lower.split(/[\s\/\\]/)[0].replace(/['"]/g, '');
+        // ALLOWLIST: Known-safe commands that don't need approval
+        const safeCommands = [
+            'python', 'python3', 'py', 'node', 'npm', 'npx', 'pip', 'pip3',
+            'cat', 'type', 'echo', 'ls', 'dir', 'where', 'which', 'whoami',
+            'pwd', 'cd', 'set', 'env', 'printenv', 'hostname',
+            'git', 'schtasks', 'sc', 'tasklist',
+            'curl', 'wget', 'ping', 'nslookup', 'ipconfig', 'ifconfig',
+            'wsl', 'bash', 'sh', 'powershell', 'pwsh', 'cmd',
+            'find', 'grep', 'head', 'tail', 'wc', 'sort', 'uniq',
+            'date', 'time', 'systeminfo', 'ver',
+            'conda', 'poetry', 'pipenv', 'uv',
+        ];
+        if (safeCommands.includes(firstToken)) return false;
+        // BLOCKLIST: Explicitly dangerous patterns
+        const dangerPatterns = [
+            /\brm\s+(-rf|--recursive|--force)/i,
+            /\bdel\s+\/[sfq]/i,
+            /\brmdir\s+\/s/i,
+            /\bformat\b/i,
+            /\bshutdown\b/i,
+            /\breboot\b/i,
+            /\bmkfs\b/i,
+            /\bdd\s+if=/i,
+            /\b(net\s+user|net\s+localgroup)/i,
+            /\breg\s+(delete|add)/i,
+            /\bcertutil\b/i,
+            /\bdiskpart\b/i,
+        ];
+        for (const pat of dangerPatterns) {
+            if (pat.test(lower)) return true;
+        }
+        // Unknown command — gate it for safety
+        return true;
+    }
+
     // ── Tool Execution ───────────────────────────────────────
     async _executeToolCalls(calls) {
         const results = [];
