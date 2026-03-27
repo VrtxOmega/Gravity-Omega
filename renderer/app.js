@@ -1213,6 +1213,7 @@ function initResizeHandles() {
     makeResizable(chatHandle, (dx) => {
         const w = Math.max(250, Math.min(600, chatPanel.offsetWidth - dx));
         chatPanel.style.width = w + 'px';
+        state.editor?.layout();
     });
 
     makeResizable(panelHandle, (_, dy) => {
@@ -1229,6 +1230,8 @@ function makeResizable(handle, onDrag, isVertical = false) {
         handle.classList.add('active');
         document.body.style.cursor = isVertical ? 'row-resize' : 'col-resize';
         document.body.style.userSelect = 'none';
+        // v4.3.5: Prevent iframes/webviews from stealing mouse events during drag
+        document.querySelectorAll('iframe, webview, .xterm').forEach(el => el.style.pointerEvents = 'none');
         const onMove = (e) => {
             const dx = e.clientX - startX; const dy = e.clientY - startY;
             startX = e.clientX; startY = e.clientY;
@@ -1238,6 +1241,7 @@ function makeResizable(handle, onDrag, isVertical = false) {
             handle.classList.remove('active');
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
+            document.querySelectorAll('iframe, webview, .xterm').forEach(el => el.style.pointerEvents = '');
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
         };

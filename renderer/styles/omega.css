@@ -156,6 +156,11 @@ body {
 #sidebar.sidebar-collapsed {
     width: 0 !important; border-right: none;
 }
+/* v4.3.5: Main editor area fills remaining space */
+#main-area {
+    flex: 1; min-width: 0; overflow: hidden;
+    display: flex; flex-direction: column;
+}
 .sidebar-header {
     padding: 12px 14px; font-size: 13px; font-weight: 600;
     color: var(--text-secondary); letter-spacing: 1px;
