@@ -143,7 +143,7 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 - Plans and scratch files: C:\\Users\\rlope\\.veritas
 - Current working directory: C:\\Veritas_Lab\\gravity-omega-v2
 - Config file: C:\\Users\\rlope\\.veritas\\config.json (contains API keys)
-- NewsAPI key: ruLvPCLVF7dNe2uHOj0nqIB4BgB7P1wCGIzCVCq3
+- NewsAPI key: ceb2eca8f2ff49aeac2de93cd0240047b
 - OS: Windows 11 — use Windows paths (C:\\), NOT Unix paths
 
 ## Workflow
@@ -1065,6 +1065,24 @@ ${toolDescriptions}
                 } else if (pseudo === 'EXT:NET' || pseudo === 'REQ:NET') {
                     const results = await this._executeToolCalls([packet]);
                     result = results[0] || { ok: true };
+                } else if (pseudo === 'INSTALL:SYS' || pseudo === 'REQ:PKG') {
+                    // Package install — parse manager and package from PRM
+                    const { execSync } = require('child_process');
+                    try {
+                        let cmd = '';
+                        const managerMatch = prm.match(/manager[=:]\s*"?([^"\s,]+)/i);
+                        const packageMatch = prm.match(/package[=:]\s*"?([^"\s,]+)/i);
+                        const manager = managerMatch ? managerMatch[1] : 'pip';
+                        const pkg = packageMatch ? packageMatch[1] : prm.replace(/^"/,  '').replace(/"$/, '').trim();
+                        if (manager === 'pip') cmd = `pip install ${pkg}`;
+                        else if (manager === 'npm') cmd = `npm install ${pkg}`;
+                        else cmd = `${manager} install ${pkg}`;
+                        console.log('[APPROVE] Installing:', cmd);
+                        const output = execSync(cmd, { encoding: 'utf8', timeout: 60000, shell: true });
+                        result = { ok: true, output: output.substring(0, 5000), message: `Installed: ${pkg}` };
+                    } catch (execErr) {
+                        result = { ok: false, error: execErr.message, stderr: (execErr.stderr || '').substring(0, 2000) };
+                    }
                 } else if (pseudo === 'REQ:SYS' || pseudo === 'EXEC:SYS' || pseudo === 'MUT:SYS') {
                     // System command — execute locally via child_process
                     const { execSync } = require('child_process');
