@@ -1046,25 +1046,23 @@ ${toolDescriptions}
     async executeApproved(proposalId, confirmText) {
         const proposal = this._pendingProposals.get(proposalId);
         if (!proposal) return { success: true, message: 'Already executed' };
-        // Guard against double-click: check if already approved/executed
         if (proposal.state === 'EXECUTED' || proposal.state === 'APPROVED') {
             return { success: true, message: 'Already executed' };
         }
 
+        console.log('[APPROVE] Starting approval for:', proposalId, 'hasPendingMessages:', !!this._pendingMessages, 'pendingProposals:', this._pendingProposals.size);
         proposal.approve(confirmText || 'user-approved');
         this._pendingProposals.delete(proposalId);
 
         try {
             let result;
             if (proposal._vtpPacket) {
-                // v4.3.8: Execute VTP proposals locally instead of routing through WSL bridge
                 const packet = proposal._vtpPacket;
                 const pseudo = `${packet.act}:${packet.tgt}`;
                 const prm = packet.prm || '';
                 console.log('[APPROVE] Executing locally:', pseudo, prm.substring(0, 100));
 
                 if (pseudo === 'MUT:AST' || pseudo === 'GEN:AST') {
-                    // File write — reuse local handler logic
                     const results = await this._executeToolCalls([packet]);
                     result = results[0] || { ok: true };
                 } else if (pseudo === 'EXT:AST' || pseudo === 'REQ:AST') {
@@ -1074,8 +1072,7 @@ ${toolDescriptions}
                     const results = await this._executeToolCalls([packet]);
                     result = results[0] || { ok: true };
                 } else if (pseudo === 'INSTALL:SYS' || pseudo === 'REQ:PKG') {
-                    // Package install — parse manager and package from PRM
-                    const { execSync } = require('child_process');
+                    const { exec } = require('child_process');
                     try {
                         let cmd = '';
                         const managerMatch = prm.match(/manager[=:]\s*"?([^"\s,]+)/i);
@@ -1085,30 +1082,37 @@ ${toolDescriptions}
                         if (manager === 'pip') cmd = `pip install ${pkg}`;
                         else if (manager === 'npm') cmd = `npm install ${pkg}`;
                         else cmd = `${manager} install ${pkg}`;
-                        console.log('[APPROVE] Installing:', cmd);
-                        const output = execSync(cmd, { encoding: 'utf8', timeout: 60000, shell: true });
+                        console.log('[APPROVE] Installing (async):', cmd);
+                        const output = await new Promise((resolve, reject) => {
+                            exec(cmd, { encoding: 'utf8', timeout: 60000, shell: true }, (err, stdout, stderr) => {
+                                if (err) reject(Object.assign(err, { stderr }));
+                                else resolve(stdout);
+                            });
+                        });
                         result = { ok: true, output: output.substring(0, 5000), message: `Installed: ${pkg}` };
                     } catch (execErr) {
                         result = { ok: false, error: execErr.message, stderr: (execErr.stderr || '').substring(0, 2000) };
                     }
                 } else if (pseudo === 'REQ:SYS' || pseudo === 'EXEC:SYS' || pseudo === 'MUT:SYS') {
-                    // System command — execute locally via child_process
-                    const { execSync } = require('child_process');
+                    const { exec } = require('child_process');
                     try {
                         const cmd = prm.replace(/^"/, '').replace(/"$/, '').trim();
-                        const output = execSync(cmd, {
-                            encoding: 'utf8',
-                            timeout: 30000,
-                            cwd: process.cwd(),
-                            shell: true
+                        console.log('[APPROVE] Running SYS (async):', cmd);
+                        const output = await new Promise((resolve, reject) => {
+                            exec(cmd, { encoding: 'utf8', timeout: 30000, cwd: process.cwd(), shell: true }, (err, stdout, stderr) => {
+                                if (err) reject(Object.assign(err, { stderr }));
+                                else resolve(stdout);
+                            });
                         });
                         result = { ok: true, output: output.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };
+                        console.log('[APPROVE] SYS completed:', result.message);
                     } catch (execErr) {
                         result = { ok: false, error: execErr.message, stderr: (execErr.stderr || '').substring(0, 2000) };
+                        console.log('[APPROVE] SYS failed:', execErr.message);
                     }
                 } else {
-                    // Fallback: try bridge for unknown packet types
                     try {
+                        console.log('[APPROVE] Fallback bridge for:', pseudo);
                         result = await this.bridge.postVTP(proposal._vtpPacket);
                     } catch (bridgeErr) {
                         result = { error: `Bridge unavailable: ${bridgeErr.message}` };
@@ -1120,14 +1124,20 @@ ${toolDescriptions}
             proposal.recordExecution(result);
             this._logStep(proposal.tool, proposal.args, result);
 
+            console.log('[APPROVE] Execution done. pendingProposals:', this._pendingProposals.size, 'hasPendingMessages:', !!this._pendingMessages);
+
             // v4.2: If no more pending proposals and we have saved conversation state, continue the loop
             if (this._pendingProposals.size === 0 && this._pendingMessages) {
+                console.log('[APPROVE] → Entering _continueAfterApproval');
                 const continuationResult = await this._continueAfterApproval(proposal.tool, result);
+                console.log('[APPROVE] → Continuation complete:', continuationResult?.type);
                 return { success: true, result, continuation: continuationResult };
             }
 
+            console.log('[APPROVE] → No continuation (pendingMessages:', !!this._pendingMessages, ')');
             return { success: true, result };
         } catch (err) {
+            console.error('[APPROVE] Exception:', err.message);
             proposal.recordExecution({ error: err.message });
             return { error: err.message };
         }
