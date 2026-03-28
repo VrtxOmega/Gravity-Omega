@@ -736,6 +736,21 @@ ${toolDescriptions}
         clean = clean.replace(/^```\s*$/gm, '');
         // 4. Collapse excessive whitespace
         clean = clean.replace(/\n{3,}/g, '\n\n').trim();
+        // v4.3.18n: AUTO-FILE-SAVE — if response is structured content (>500 chars + headers),
+        // save it to a file, open in editor, and replace chat with short notice
+        if (clean.length > 500 && (clean.includes('##') || clean.includes('\n- ') || clean.match(/\n\d+\./))) {
+            try {
+                const path = require('path');
+                const savePath = path.join('C:\\Users\\rlope\\.veritas', 'omega_response.md');
+                fs.writeFileSync(savePath, clean, 'utf8');
+                // Auto-open the file in the editor
+                // Emit tool_done event so renderer auto-opens the file
+                this._emitProgress({ phase: 'tool_done', tool: 'MUT:AST', args: savePath, ok: true, totalSteps: (this._stepLog || []).length });
+                clean = "I've written my response to omega_response.md - check the editor, love.";
+            } catch(e) {
+                clean = clean.substring(0, 400) + '\n\n*(Response truncated)*';
+            }
+        }
         // 5. Truncate junk-heavy content (repeated words/patterns)
         if (clean.length > 3000) {
             // Check for repetition â€” if last 500 chars repeat patterns from first 500
