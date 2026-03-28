@@ -1096,10 +1096,17 @@ ${toolDescriptions}
                     if (!this._isDestructiveCommand(cmd)) {
                         console.log('[AUTO-EXEC] Non-destructive SYS:', cmd.substring(0, 100));
                         const { exec } = require('child_process');
+                        // v4.3.18i: Extract CWD from absolute paths in the command
+                        let execCwd = process.cwd();
+                        const absPathMatch = cmd.match(/["']?([A-Za-z]:\\[^"'\s]+\.\w+)["']?/);
+                        if (absPathMatch) {
+                            const scriptDir = require('path').dirname(absPathMatch[1]);
+                            if (fs.existsSync(scriptDir)) execCwd = scriptDir;
+                        }
                         const output = await new Promise((resolve, reject) => {
-                            exec(cmd, { encoding: 'utf8', timeout: 30000, cwd: process.cwd(), shell: true }, (err, stdout, stderr) => {
+                            exec(cmd, { encoding: 'utf8', timeout: 120000, cwd: execCwd, shell: true }, (err, stdout, stderr) => {
                                 if (err) reject(Object.assign(err, { stderr }));
-                                else resolve(stdout);
+                                else resolve(stdout + (stderr ? '\nSTDERR: ' + stderr : ''));
                             });
                         });
                         const result = { ok: true, output: output.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };

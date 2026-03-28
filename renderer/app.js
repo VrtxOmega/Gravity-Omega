@@ -488,7 +488,7 @@ function scrollChat() {
 }
 
 // Voice + session state
-state.chat.voiceEnabled = true;  // v3.0: Omega speaks by default
+state.chat.voiceEnabled = false;  // v4.3.18i: Start muted, user enables with toggle
 state.chat.audioPlayer = null;
 state.chat.messageHistory = [];  // Full session context — never lost
 state.chat.abortController = null;
