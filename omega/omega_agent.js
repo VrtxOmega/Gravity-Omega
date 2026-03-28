@@ -358,10 +358,10 @@ ${toolDescriptions}
                 const failedOps = this._stepLog.filter(s => s.result && !s.result.ok && s.result.error).length;
                 let summary = `Completed after ${iteration} iterations.\n\n`;
                 summary += `**${this._stepLog.length} tool steps executed:**\n`;
-                if (fileOps.length > 0) summary += `- ðŸ“ Files: ${[...new Set(fileOps)].join(', ')}\n`;
-                if (netOps > 0) summary += `- ðŸŒ ${netOps} web request(s)\n`;
-                if (sysOps > 0) summary += `- âš™ï¸ ${sysOps} system command(s)\n`;
-                if (failedOps > 0) summary += `- âš ï¸ ${failedOps} step(s) failed â€” check the step log for details\n`;
+                if (fileOps.length > 0) summary += `- [FILES] Files: ${[...new Set(fileOps)].join(', ')}\n`;
+                if (netOps > 0) summary += `- [WEB] ${netOps} web request(s)\n`;
+                if (sysOps > 0) summary += `- [SYS] ${sysOps} system command(s)\n`;
+                if (failedOps > 0) summary += `- [WARN] ${failedOps} step(s) failed - check the step log for details\n`;
                 // Actionable next steps
                 const uniqueFiles = [...new Set(fileOps)];
                 const pyFiles = uniqueFiles.filter(f => f.endsWith('.py'));
