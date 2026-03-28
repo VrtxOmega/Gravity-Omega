@@ -154,6 +154,7 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 - **Python execution**: Use 'python' not 'python3' on Windows.
 - **Web fetch**: requests.get() with timeout=10 to prevent hangs. Always handle ConnectionError.
 - **File encoding**: Always specify encoding='utf-8' in open() calls.
+- **GitHub API**: RJ's profile returns 404 for unauthenticated API calls. ALWAYS read the github_token from config.json and use Authorization header: headers={'Authorization': f'token {token}', 'User-Agent': 'GravityOmega'}
 - OS: Windows 11 â€” use Windows paths (C:\\), NOT Unix paths
 
 ## Workflow
