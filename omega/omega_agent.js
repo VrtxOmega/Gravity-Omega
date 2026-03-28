@@ -679,6 +679,13 @@ ${toolDescriptions}
         if (responseMatch) {
             return { type: 'response', content: responseMatch[1].trim() };
         }
+        // v4.3.18e: If VTP was detected but no calls extracted, strip VTP blocks and return clean text
+        if (hasVtp && calls.length === 0) {
+            console.warn('[VTP] VTP block detected but no valid tool calls extracted — stripping from response');
+            const stripped = text.replace(/```vtp[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
+            const cleanText = stripped || '(I attempted to run a command but the format was invalid. Let me try again.)';
+            return { type: 'response', content: cleanText };
+        }
 
         if (!hasVtp && text.trim().length > 0) return { type: 'response', content: text };
 
