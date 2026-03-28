@@ -768,7 +768,16 @@ function addChatMessage(role, content) {
     msgEl.className = `chat-msg ${role}`;
 
     if (role === 'assistant') {
-        msgEl.innerHTML = renderMarkdown(content);
+        // v4.3.18l: Sanitize raw content leaks before rendering
+        let clean = content;
+        // Strip NET_RESPONSE boundary blocks (summarize instead of showing raw)
+        clean = clean.replace(/\[NET_RESPONSE_START\][\s\S]*?\[NET_RESPONSE_END\]/g, '*(web response received)*');
+        // Strip raw HTML that leaked through
+        clean = clean.replace(/<!doctype[^>]*>[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
+        clean = clean.replace(/<html[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
+        // Strip raw JSON blobs > 500 chars
+        clean = clean.replace(/\{[\s\S]{500,}?\}/g, '*(large JSON response — see step log)*');
+        msgEl.innerHTML = renderMarkdown(clean);
     } else {
         msgEl.textContent = content;
     }

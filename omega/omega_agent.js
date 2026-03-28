@@ -899,14 +899,25 @@ ${toolDescriptions}
                         results.push({ error: fetchResult.error });
                         this._logStep(pseudo_tool_name, url, { error: fetchResult.error });
                     } else {
-                        // Strip HTML tags for cleaner text extraction
+                        // v4.3.18l: Sanitize response - strip HTML, cap size, BLOCK VTP injection
                         let text = fetchResult.content || '';
+                        // Strip scripts, styles, HTML tags
                         text = text.replace(/<script[\s\S]*?<\/script>/gi, '')
                                    .replace(/<style[\s\S]*?<\/style>/gi, '')
                                    .replace(/<[^>]+>/g, ' ')
                                    .replace(/\s{2,}/g, ' ')
-                                   .trim()
-                                   .substring(0, 15000);
+                                   .trim();
+                        // SECURITY: Strip any VTP-like patterns from external content
+                        text = text.replace(/REQ::/g, '[BLOCKED:REQ]')
+                                   .replace(/MUT::/g, '[BLOCKED:MUT]')
+                                   .replace(/EXT::/g, '[BLOCKED:EXT]')
+                                   .replace(/CREATE::/g, '[BLOCKED:CREATE]')
+                                   .replace(/RUN::/g, '[BLOCKED:RUN]')
+                                   .replace(/EXEC::/g, '[BLOCKED:EXEC]')
+                                   .replace(/\[ACT:/g, '[BLOCKED:ACT]');
+                        // Cap response and wrap in boundary markers
+                        text = text.substring(0, 8000);
+                        text = '[NET_RESPONSE_START]\n' + text + '\n[NET_RESPONSE_END]';
                         const result = { ok: true, url, status: fetchResult.status, data: text, length: text.length };
                         results.push(result);
                         this._logStep(pseudo_tool_name, url, result);
