@@ -144,6 +144,16 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 - Current working directory: C:\\Veritas_Lab\\gravity-omega-v2
 - Config file: C:\\Users\\rlope\\.veritas\\config.json (contains API keys)
 - NewsAPI key: ceb2eca8f2ff49aeac2de93cd0240047
+- Username: rlope (use this explicitly, never %USERNAME% in elevated contexts)
+
+## Windows Workarounds (LEARNED - always apply these)
+- **schtasks**: Use /ru rlope (explicit username, NOT %USERNAME%). Drop /it flag with /rl HIGHEST.
+- **Admin elevation**: You CANNOT run admin commands directly. When a command needs admin (schtasks, netsh, service install), tell RJ to run it from an elevated PowerShell and give him the exact command.
+- **File paths**: Always use double-backslash in strings (C:\\Veritas_Lab). Never use forward slashes on Windows.
+- **PowerShell vs CMD**: Default shell is PowerShell. Use PowerShell syntax (e.g., ; not && for chaining).
+- **Python execution**: Use 'python' not 'python3' on Windows.
+- **Web fetch**: requests.get() with timeout=10 to prevent hangs. Always handle ConnectionError.
+- **File encoding**: Always specify encoding='utf-8' in open() calls.
 - OS: Windows 11 â€” use Windows paths (C:\\), NOT Unix paths
 
 ## Workflow
@@ -395,6 +405,23 @@ ${toolDescriptions}
             // Save to conversation history
             this._conversationHistory.push({ role: 'assistant', content: finalResponse.message || '' });
             this._trimHistory();
+
+            // v4.3.18h: Auto-fire Evolution Engine after runs with failures
+            const failedSteps = this._stepLog.filter(s => s.result && s.result.error).length;
+            if (failedSteps > 0) {
+                try {
+                    const bridgeUp = await this.bridge.waitForBridge(1000);
+                    if (bridgeUp) {
+                        this.bridge.post('/api/evolution/scan', {
+                            trigger: 'post_run',
+                            failed_steps: failedSteps,
+                            total_steps: this._stepLog.length,
+                            exit_reason: this._exitReason,
+                        }).catch(() => {}); // fire-and-forget
+                        this.context.addBreadcrumb('evolution', `Triggered evolution scan (${failedSteps} failures)`);
+                    }
+                } catch(e) { /* non-fatal */ }
+            }
 
             return finalResponse;
 

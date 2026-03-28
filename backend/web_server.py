@@ -1690,7 +1690,7 @@ def api_modules_list():
         })
     return jsonify(mods)
 
-# ── Evolution Queue (Recursive Harness) ─────────────
+# -- Evolution Queue (Recursive Harness) -----------------
 
 @app.route('/api/evolution/proposals', methods=['GET'])
 @require_auth
@@ -1702,15 +1702,43 @@ def api_evolution_proposals():
     
     proposals = []
     for f in os.listdir(target_dir):
-        if f.startswith('upgrade_manifest_') and f.endswith('.json'):
+        if f.startswith('manifest_') and f.endswith('.json'):
             try:
                 with open(os.path.join(target_dir, f), 'r') as file:
                     data = json.load(file)
                     data['_filename'] = f
+                    data['manifest_id'] = f.replace('manifest_', '').replace('.json', '')
                     proposals.append(data)
             except Exception:
                 pass
     return jsonify(proposals)
+
+@app.route('/api/evolution/scan', methods=['POST'])
+@require_auth
+def api_evolution_scan():
+    """Trigger an evolution engine scan asynchronously."""
+    import threading as _t
+    data = request.json or {}
+    _ledger_append('evolution', 'scan_triggered', {
+        'trigger': data.get('trigger', 'manual'),
+        'failed_steps': data.get('failed_steps', 0),
+        'total_steps': data.get('total_steps', 0),
+        'exit_reason': data.get('exit_reason', ''),
+    })
+    
+    def _run_scan():
+        try:
+            import sys as _s
+            _s.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
+            from recursive_evolution_engine import run_evolution_cycle
+            run_evolution_cycle()
+            log.info('[EVOLUTION] Scan cycle completed.')
+        except Exception as e:
+            log.error(f'[EVOLUTION] Scan failed: {e}')
+    
+    t = _t.Thread(target=_run_scan, daemon=True)
+    t.start()
+    return jsonify({'status': 'scan_initiated', 'trigger': data.get('trigger', 'manual')})
 
 @app.route('/api/evolution/resolve', methods=['POST'])
 @require_auth
@@ -1718,13 +1746,13 @@ def api_evolution_resolve():
     """Approve or Reject a pending harness patch."""
     data = request.json or {}
     manifest_id = data.get('id')
-    action = data.get('action') # 'approve' or 'reject'
+    action = data.get('action')
     
     if not manifest_id or not action:
         return jsonify({'error': 'Missing id or action'}), 400
 
     target_dir = os.path.join(os.path.dirname(__file__), 'data', 'evolution_proposals')
-    file_path = os.path.join(target_dir, f"upgrade_manifest_{manifest_id}.json")
+    file_path = os.path.join(target_dir, f"manifest_{manifest_id}.json")
     
     if not os.path.exists(file_path):
         return jsonify({'error': 'Manifest not found'}), 404
@@ -1738,17 +1766,14 @@ def api_evolution_resolve():
         try:
             with open(file_path, 'r') as file:
                 manifest = json.load(file)
-            
             _ledger_append('evolution', 'manifest_approved', {'manifest_id': manifest_id})
             os.remove(file_path)
-            
-            # Trigger baseline acceptance
             sentinel = get_sentinel()
             sentinel.create_baseline(force=True)
-            
             return jsonify({'status': 'approved'})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
 # ── Facebook Group Scraper Routes ────────────────────────────────────────────
 
 _fb_jobs = {}  # job_id -> {status, result, error}
