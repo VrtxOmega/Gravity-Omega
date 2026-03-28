@@ -993,9 +993,12 @@ ${toolDescriptions}
                         }
                     }
 
-                    // Warn if content is empty — likely a parse failure
+                    // v4.3.18e: BLOCK empty-content writes — these are parse failures, not intentional
                     if (!content && filePath) {
-                        console.warn('[MUT:AST] WARNING: Content is empty for', filePath, '— PRM starts with:', prm.substring(0, 200));
+                        console.error('[MUT:AST] BLOCKED: Content is empty for', filePath, '— PRM starts with:', prm.substring(0, 200));
+                        results.push({ error: `Empty content for ${filePath} — parse failure` });
+                        this._logStep(pseudo_tool_name, filePath, { error: 'Empty content — parse failure' });
+                        continue;
                     }
 
                     // Resolve relative paths
@@ -1006,6 +1009,17 @@ ${toolDescriptions}
                         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
                         // Unescape common LLM escape sequences
                         content = content.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                        // v4.3.18e: Shrink protection — refuse to overwrite larger files with tiny content
+                        if (fs.existsSync(filePath)) {
+                            const existingSize = fs.statSync(filePath).size;
+                            const newSize = Buffer.byteLength(content, 'utf8');
+                            if (existingSize > 200 && newSize < existingSize * 0.30) {
+                                console.warn(`[MUT:AST] SHRINK BLOCKED: ${filePath} (${existingSize}b → ${newSize}b = ${Math.round(newSize/existingSize*100)}%). Keeping existing content.`);
+                                results.push({ ok: true, message: `File preserved (shrink protection): ${filePath}` });
+                                this._logStep(pseudo_tool_name, filePath, { ok: true, message: 'Shrink protection — kept existing' });
+                                continue;
+                            }
+                        }
                         fs.writeFileSync(filePath, content, 'utf8');
                         const result = { ok: true, message: `File written: ${filePath}` };
                         results.push(result);
