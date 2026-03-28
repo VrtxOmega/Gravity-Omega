@@ -153,13 +153,17 @@ ${(() => {
 3. Execute each step using tools
 4. Continue until complete
 
-## ABSOLUTE RULE: Content Belongs in Files, NOT Chat
+## ABSOLUTE RULE: Split Work Into Focused Files
 - Your chat response must be SHORT (1-3 sentences max).
-- ALL detailed content (plans, code, analysis, results) goes into FILES via MUT:AST.
-- NEVER paste file content, code blocks, plans, or analysis into your chat response.
-- Chat responses like "I've written the plan to plan.md" or "Done, check the files" are correct.
-- Chat responses with code blocks, headers, bullet lists of steps, or pasted content are WRONG.
-- If you write a plan file, chat says ONLY: "Here's the plan - check the editor." Nothing more.
+- ALL detailed content goes into SEPARATE FOCUSED FILES via MUT:AST — one file per purpose:
+  * Plan/design -> plan.md or [task]_plan.md
+  * Python scripts -> [name].py (one script per function)
+  * HTML output -> index.html or dashboard.html
+  * Data/config -> data.json or config files
+- NEVER combine everything into one mega-file. Split by purpose.
+- NEVER paste file content, code blocks, or analysis into your chat response.
+- After writing each file, open it with REQ:UI so RJ can see it.
+- Chat says ONLY things like: "Written the plan to plan.md, love - take a look."
 
     ## Dual-Channel Emission (VTP)
     You operate in dual-channel mode:
@@ -736,22 +740,7 @@ ${toolDescriptions}
         clean = clean.replace(/^```\s*$/gm, '');
         // 4. Collapse excessive whitespace
         clean = clean.replace(/\n{3,}/g, '\n\n').trim();
-        // v4.3.18n: AUTO-FILE-SAVE — if response is structured content (>500 chars + headers),
-        // save it to a file, open in editor, and replace chat with short notice
-        if (clean.length > 500 && (clean.includes('##') || clean.includes('\n- ') || clean.match(/\n\d+\./))) {
-            try {
-                const path = require('path');
-                const savePath = path.join('C:\\Users\\rlope\\.veritas', 'omega_response.md');
-                fs.writeFileSync(savePath, clean, 'utf8');
-                // Auto-open the file in the editor
-                // Emit tool_done event so renderer auto-opens the file
-                this._emitProgress({ phase: 'tool_done', tool: 'MUT:AST', args: savePath, ok: true, totalSteps: (this._stepLog || []).length });
-                clean = "I've written my response to omega_response.md - check the editor, love.";
-            } catch(e) {
-                clean = clean.substring(0, 400) + '\n\n*(Response truncated)*';
-            }
-        }
-        // 5. Truncate junk-heavy content (repeated words/patterns)
+                // 5. Truncate junk-heavy content (repeated words/patterns)
         if (clean.length > 3000) {
             // Check for repetition â€” if last 500 chars repeat patterns from first 500
             const head = clean.substring(0, 500);
@@ -765,6 +754,16 @@ ${toolDescriptions}
             }
         }
         if (!clean || clean.length < 10) clean = '(Task completed â€” see tool steps above)';
+        // v4.3.18o: HARD CHAT CAP — like Antigravity, chat stays short
+        // If still >500 chars after all sanitization, hard truncate
+        if (clean.length > 500) {
+            // Find a natural break point near 400 chars
+            let cutPoint = clean.lastIndexOf('.', 400);
+            if (cutPoint < 200) cutPoint = clean.lastIndexOf(' ', 400);
+            if (cutPoint < 200) cutPoint = 400;
+            clean = clean.substring(0, cutPoint + 1) + '\n\n*(Use MUT:AST to write detailed content to files)*';
+        }
+
         return clean;
     }
 

@@ -780,12 +780,7 @@ function addChatMessage(role, content) {
         clean = clean.replace(/<!doctype[^>]*>[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
         clean = clean.replace(/<html[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
         // Strip raw JSON blobs > 500 chars
-        clean = clean.replace(/\{[\s\S]{500,}?\}/g, '*(large JSON response — see step log)*');
-        // v4.3.18m: Truncate excessively long chat responses that should be in files
-        if (clean.length > 800 && (clean.includes('##') || clean.includes('```'))) {
-            const truncated = clean.substring(0, 300).replace(/[#`].*$/, '').trim();
-            clean = truncated + '\n\n*(Full content written to file — check the editor tabs above)*';
-        }
+        clean = clean.replace(/\{[\s\S]{500,}?\}/g, '*(large data — expand step log for details)*');
         msgEl.innerHTML = renderMarkdown(clean);
     } else {
         msgEl.textContent = content;
