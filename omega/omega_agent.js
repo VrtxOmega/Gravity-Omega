@@ -1062,6 +1062,17 @@ ${toolDescriptions}
                         }
                     }
 
+                    // v4.3.18p: Fallback — if content is empty but PRM is long, the parse failed
+                    // Try to extract content from the raw PRM by skipping the path portion
+                    if (prm.length > filePath.length + 10) {
+                        const afterPath = prm.substring(prm.indexOf(filePath) + filePath.length);
+                        const possibleContent = afterPath.replace(/^[,=:\s"]+/, '').replace(/"$/, '');
+                        if (possibleContent.length > 20) {
+                            content = possibleContent;
+                            console.log('[MUT:AST] Recovered content via fallback extraction:', content.length, 'chars');
+                        }
+                    }
+
                     // v4.3.18e: BLOCK empty-content writes â€” these are parse failures, not intentional
                     if (!content && filePath) {
                         console.error('[MUT:AST] BLOCKED: Content is empty for', filePath, 'â€” PRM starts with:', prm.substring(0, 200));
@@ -1086,7 +1097,7 @@ ${toolDescriptions}
                         if (fs.existsSync(filePath)) {
                             const existingSize = fs.statSync(filePath).size;
                             const newSize = Buffer.byteLength(content, 'utf8');
-                            if (existingSize > 200 && newSize < existingSize * 0.30) {
+                            if (existingSize > 200 && newSize < existingSize * 0.15) {
                                 console.warn(`[MUT:AST] SHRINK BLOCKED: ${filePath} (${existingSize}b â†’ ${newSize}b = ${Math.round(newSize/existingSize*100)}%). Keeping existing content.`);
                                 results.push({ ok: true, message: `File preserved (shrink protection): ${filePath}` });
                                 this._logStep(pseudo_tool_name, filePath, { ok: true, message: 'Shrink protection â€” kept existing' });
@@ -1127,7 +1138,21 @@ ${toolDescriptions}
                         }
                     }
                     // v4.3.15: Auto-execute non-destructive SYS commands locally
-                    const cmd = prm.replace(/^"/, '').replace(/"$/, '').trim();
+                    let cmd = prm.replace(/^\"/, '').replace(/\"$/, '').trim();
+                    // v4.3.18p: Strip powershell.exe wrapper — exec() already uses shell: true (PowerShell)
+                    cmd = cmd.replace(/^powershell(?:\.exe)?\s+(?:-(?:Command|c)\s+)?/i, '')
+                             .replace(/^"/, '').replace(/"$/, '').trim();
+                    // Also detect New-Item and convert to fs.mkdirSync
+                    const newItemMatch = cmd.match(/New-Item\s+.*?-Path\s+['"](.*?)['"]/i);
+                    if (newItemMatch && cmd.includes('-ItemType Directory')) {
+                        const dirPath = this._resolveFilePath(newItemMatch[1]);
+                        fs.mkdirSync(dirPath, { recursive: true });
+                        const result = { ok: true, message: 'Directory created: ' + dirPath };
+                        results.push(result);
+                        this._logStep(pseudo_tool_name, packet.prm, result);
+                        this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: cmd, ok: true, totalSteps: this._stepLog.length });
+                        continue;
+                    }
                     if (!this._isDestructiveCommand(cmd)) {
                         console.log('[AUTO-EXEC] Non-destructive SYS:', cmd.substring(0, 100));
                         const { exec } = require('child_process');
