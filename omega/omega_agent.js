@@ -1120,6 +1120,10 @@ ${toolDescriptions}
                         content = content.split('\\t').join('\t');
                         content = content.split("\\'").join("'");
                         content = content.split('\\"').join('"');
+                        // v4.3.18p: Fix double-encoded backslashes (LLM sends \\\\path → \\path)
+                        if (content.includes('\\\\')) {
+                            content = content.split('\\\\').join('\\');
+                        }
                         // v4.3.18e: Shrink protection - refuse to overwrite larger files with tiny content â€” refuse to overwrite larger files with tiny content
                         if (fs.existsSync(filePath)) {
                             const existingSize = fs.statSync(filePath).size;
