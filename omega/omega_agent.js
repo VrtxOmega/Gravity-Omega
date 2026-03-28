@@ -302,7 +302,18 @@ ${toolDescriptions}
                 const parsed = this._parseResponse(llmResponse);
 
                 if (parsed.type === 'response') {
-                    // Agent is done â€” final message to user
+                    // v4.3.18p: ANTI-EXPLAIN GUARD
+                    const hasCode = /\`\`\`[a-z]/.test(parsed.content);
+                    const hasStructure = /^##\s/m.test(parsed.content) && parsed.content.length > 300;
+                    const hasSteps = /^\d+\.\s|^Step\s\d/m.test(parsed.content) && parsed.content.length > 300;
+                    
+                    if ((hasCode || hasStructure || hasSteps) && iteration < 19) {
+                        console.log('[ANTI-EXPLAIN] Re-prompting — response has code but no VTP');
+                        messages.push({ role: 'assistant', content: llmResponse });
+                        messages.push({ role: 'user', content: 'STOP. You explained steps and pasted code into chat. Do NOT explain — EXECUTE. Use \`\`\`vtp blocks with MUT:AST to write files. Try again.' });
+                        continue;
+                    }
+                    
                     this._exitReason = 'TASK_COMPLETE';
                     const cleanMsg = this._sanitizeForChat(parsed.content);
                     finalResponse = { type: 'chat', message: cleanMsg, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
