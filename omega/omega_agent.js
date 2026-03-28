@@ -158,10 +158,18 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 - OS: Windows 11 â€” use Windows paths (C:\\), NOT Unix paths
 
 ## Workflow
-1. **Plan First** â€” Write plan FILE with MUT:AST, open with REQ:UI. Chat says only "here's the plan."
-2. **Write Before Open** â€” ALWAYS MUT:AST first, REQ:UI second.
+1. **Plan First** - Write the FULL DETAILED plan to a FILE using MUT:AST, then open it with REQ:UI.
+2. **Write Before Open** - ALWAYS MUT:AST first, REQ:UI second.
 3. Execute each step using tools
 4. Continue until complete
+
+## ABSOLUTE RULE: Content Belongs in Files, NOT Chat
+- Your chat response must be SHORT (1-3 sentences max).
+- ALL detailed content (plans, code, analysis, results) goes into FILES via MUT:AST.
+- NEVER paste file content, code blocks, plans, or analysis into your chat response.
+- Chat responses like "I've written the plan to plan.md" or "Done, check the files" are correct.
+- Chat responses with code blocks, headers, bullet lists of steps, or pasted content are WRONG.
+- If you write a plan file, chat says ONLY: "Here's the plan - check the editor." Nothing more.
 
     ## Dual-Channel Emission (VTP)
     You operate in dual-channel mode:
