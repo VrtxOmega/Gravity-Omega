@@ -560,7 +560,7 @@ body {
 #omega-chat-panel {
     width: var(--chat-width); background: var(--bg-secondary);
     border-left: 1px solid var(--border); display: flex; flex-direction: column;
-    flex-shrink: 0;
+    flex-shrink: 0; min-height: 0; overflow: hidden;
 }
 .chat-header {
     display: flex; align-items: center; padding: 8px 12px;

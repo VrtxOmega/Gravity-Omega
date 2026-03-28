@@ -566,6 +566,10 @@ function interruptOmega() {
 
 /** v4.2: Live thinking indicator — dropdown with timer + step log */
 function createThinkingIndicator() {
+    // v4.3.18m: DEDUP GUARD — destroy existing listener before registering new one
+    // Without this, each continuation stacks another handler (events fire 2x, 3x, 4x)
+    destroyThinkingIndicator();
+
     const container = document.createElement('div');
     container.className = 'thinking-indicator';
 
