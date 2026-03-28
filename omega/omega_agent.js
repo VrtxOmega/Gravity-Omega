@@ -307,10 +307,17 @@ ${toolDescriptions}
                     const hasStructure = /^##\s/m.test(parsed.content) && parsed.content.length > 300;
                     const hasSteps = /^\d+\.\s|^Step\s\d/m.test(parsed.content) && parsed.content.length > 300;
                     
-                    if ((hasCode || hasStructure || hasSteps) && iteration < 19) {
-                        console.log('[ANTI-EXPLAIN] Re-prompting — response has code but no VTP');
+                    // v4.3.18q: ACKNOWLEDGMENT GUARD — catch "I will do X" responses
+                    // that exit the loop without executing any tools
+                    const isAcknowledgment = /\b(understood|i will|i'll|let me|i can|i am going to|going to|here'?s (my|the) plan)\b/i.test(parsed.content) 
+                        && this._stepLog.length === 0 
+                        && parsed.content.length < 500;
+                    
+                    if ((hasCode || hasStructure || hasSteps || isAcknowledgment) && iteration < 19) {
+                        const reason = isAcknowledgment ? 'acknowledgment without execution' : 'code/structure without VTP';
+                        console.log(`[ANTI-EXPLAIN] Re-prompting — ${reason}`);
                         messages.push({ role: 'assistant', content: llmResponse });
-                        messages.push({ role: 'user', content: 'STOP. You explained steps and pasted code into chat. Do NOT explain — EXECUTE. Use \`\`\`vtp blocks with MUT:AST to write files. Try again.' });
+                        messages.push({ role: 'user', content: 'DO NOT ACKNOWLEDGE. DO NOT EXPLAIN. EXECUTE NOW. Your FIRST response must contain ```vtp tool blocks. Use MUT:AST to write files and REQ:SYS to run commands. Start immediately.' });
                         continue;
                     }
                     
