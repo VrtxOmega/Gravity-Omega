@@ -1102,6 +1102,12 @@ ${toolDescriptions}
                         continue;
                     }
 
+                    // v4.3.18p: Strip "content=" prefix left by parser
+                    if (content.match(/^content[=:]s*/i)) {
+                        content = content.replace(/^content[=:]s*/i, '');
+                        console.log('[MUT:AST] Stripped content= prefix');
+                    }
+
                     // Resolve relative paths
                     filePath = this._resolveFilePath(filePath);
 
