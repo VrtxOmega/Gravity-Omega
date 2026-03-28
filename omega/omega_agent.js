@@ -1110,9 +1110,25 @@ ${toolDescriptions}
                     }
 
                     // v4.3.18p: Strip "content=" prefix left by parser
-                    if (content.match(/^content[=:]s*/i)) {
-                        content = content.replace(/^content[=:]s*/i, '');
+                    if (content.match(/^content[=:]\s*/i)) {
+                        content = content.replace(/^content[=:]\s*/i, '');
                         console.log('[MUT:AST] Stripped content= prefix');
+                    }
+
+                    // v4.3.18r: Strip triple-quote wrapping from file content
+                    // LLM sometimes wraps entire files in """...""" or '''...'''
+                    if (content.startsWith('"""') && content.trimEnd().endsWith('"""')) {
+                        content = content.slice(3);
+                        if (content.trimEnd().endsWith('"""')) {
+                            content = content.trimEnd().slice(0, -3);
+                        }
+                        console.log('[MUT:AST] Stripped triple-quote wrapping');
+                    } else if (content.startsWith("'''") && content.trimEnd().endsWith("'''")) {
+                        content = content.slice(3);
+                        if (content.trimEnd().endsWith("'''")) {
+                            content = content.trimEnd().slice(0, -3);
+                        }
+                        console.log('[MUT:AST] Stripped triple-quote wrapping');
                     }
 
                     // Resolve relative paths
@@ -1184,7 +1200,9 @@ ${toolDescriptions}
                     let cmd = prm.replace(/^\"/, '').replace(/\"$/, '').trim();
                     // v4.3.18p: Strip powershell.exe wrapper — exec() already uses shell: true (PowerShell)
                     cmd = cmd.replace(/^powershell(?:\.exe)?\s+(?:-(?:Command|c)\s+)?/i, '')
-                             .replace(/^"/, '').replace(/"$/, '').trim();
+                             .replace(/^"/, '').replace(/"$/, '')
+                             .replace(/^'/, '').replace(/'$/, '')  // v4.3.18r: Strip leaked single quotes
+                             .trim();
                     // Also detect New-Item and convert to fs.mkdirSync
                     const newItemMatch = cmd.match(/New-Item\s+.*?-Path\s+['"](.*?)['"]/i);
                     if (newItemMatch && cmd.includes('-ItemType Directory')) {
