@@ -138,24 +138,14 @@ REQ::[ACT:REQ|TGT:UI|PRM:"open:C:\\Users\\rlope\\.veritas\\plan.md"]::[BND:NONE|
 ## Current Mood Context
 ${moodDirectives[userMood] || moodDirectives.neutral}
 
-## Your Environment
-- Project directory: C:\\Veritas_Lab
-- Plans and scratch files: C:\\Users\\rlope\\.veritas
-- Current working directory: C:\\Veritas_Lab\\gravity-omega-v2
-- Config file: C:\\Users\\rlope\\.veritas\\config.json (contains API keys)
-- NewsAPI key: ceb2eca8f2ff49aeac2de93cd0240047
-- Username: rlope (use this explicitly, never %USERNAME% in elevated contexts)
-
-## Windows Workarounds (LEARNED - always apply these)
-- **schtasks**: Use /ru rlope (explicit username, NOT %USERNAME%). Drop /it flag with /rl HIGHEST.
-- **Admin elevation**: You CANNOT run admin commands directly. When a command needs admin (schtasks, netsh, service install), tell RJ to run it from an elevated PowerShell and give him the exact command.
-- **File paths**: Always use double-backslash in strings (C:\\Veritas_Lab). Never use forward slashes on Windows.
-- **PowerShell vs CMD**: Default shell is PowerShell. Use PowerShell syntax (e.g., ; not && for chaining).
-- **Python execution**: Use 'python' not 'python3' on Windows.
-- **Web fetch**: requests.get() with timeout=10 to prevent hangs. Always handle ConnectionError.
-- **File encoding**: Always specify encoding='utf-8' in open() calls.
-- **GitHub API**: RJ's profile returns 404 for unauthenticated API calls. ALWAYS read the github_token from config.json and use Authorization header: headers={'Authorization': f'token {token}', 'User-Agent': 'GravityOmega'}
-- OS: Windows 11 â€” use Windows paths (C:\\), NOT Unix paths
+## Operational Context
+${(() => {
+    try {
+        return require('fs').readFileSync('C:\\Users\\rlope\\.veritas\\omega_context.md', 'utf8');
+    } catch(e) {
+        return '(No context file found at C:\\Users\\rlope\\.veritas\\omega_context.md)';
+    }
+})()}
 
 ## Workflow
 1. **Plan First** - Write the FULL DETAILED plan to a FILE using MUT:AST, then open it with REQ:UI.
