@@ -1116,8 +1116,13 @@ ${toolDescriptions}
                         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
                         // Unescape common LLM escape sequences
                         // v4.3.18g: Use split/join to unescape LLM sequences (avoids regex escaping hell)
-                        content = content.split('\\n').join('\n');
-                        content = content.split('\\t').join('\t');
+                        // v4.3.18q: Smart unescape — only convert \\n if NO real newlines exist
+                        if (!content.includes('\n') && content.includes('\\n')) {
+                            content = content.split('\\n').join('\n');
+                        }
+                        if (!content.includes('\t') && content.includes('\\t')) {
+                            content = content.split('\\t').join('\t');
+                        }
                         content = content.split("\\'").join("'");
                         content = content.split('\\"').join('"');
                         // v4.3.18p: Fix double-encoded backslashes (LLM sends \\\\path → \\path)
