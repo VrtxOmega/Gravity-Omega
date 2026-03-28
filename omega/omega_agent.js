@@ -1152,6 +1152,38 @@ ${toolDescriptions}
                         if (content.includes('\\\\')) {
                             content = content.split('\\\\').join('\\');
                         }
+                        // v4.3.18r: TRUNCATION GUARD — detect incomplete files from LLM output truncation
+                        const ext = path.extname(filePath).toLowerCase();
+                        if (['.py', '.js', '.html', '.css', '.json'].includes(ext)) {
+                            let isTruncated = false;
+                            let truncReason = '';
+                            if (ext === '.py' || ext === '.js') {
+                                const opens = (content.match(/[({\[]/g) || []).length;
+                                const closes = (content.match(/[)}\]]/g) || []).length;
+                                if (opens - closes > 3) {
+                                    isTruncated = true;
+                                    truncReason = 'Unbalanced brackets: ' + opens + ' open vs ' + closes + ' close';
+                                }
+                            }
+                            if (ext === '.html' && !content.includes('</html>') && !content.includes('</HTML>')) {
+                                isTruncated = true;
+                                truncReason = 'Missing closing </html> tag';
+                            }
+                            if (ext === '.json') {
+                                try { JSON.parse(content); } catch(e) {
+                                    isTruncated = true;
+                                    truncReason = 'Invalid JSON: ' + e.message;
+                                }
+                            }
+                            if (isTruncated) {
+                                console.error('[MUT:AST] TRUNCATION BLOCKED: ' + filePath + ' — ' + truncReason);
+                                const truncResult = { error: 'File truncated (' + truncReason + '). Split into files under 150 lines.' };
+                                results.push(truncResult);
+                                this._logStep(pseudo_tool_name, filePath, truncResult);
+                                this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: filePath, ok: false, totalSteps: this._stepLog.length });
+                                continue;
+                            }
+                        }
                         // v4.3.18e: Shrink protection - refuse to overwrite larger files with tiny content â€” refuse to overwrite larger files with tiny content
                         if (fs.existsSync(filePath)) {
                             const existingSize = fs.statSync(filePath).size;
