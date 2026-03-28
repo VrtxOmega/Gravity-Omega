@@ -776,9 +776,14 @@ function addChatMessage(role, content) {
         let clean = content;
         // Strip NET_RESPONSE boundary blocks (summarize instead of showing raw)
         clean = clean.replace(/\[NET_RESPONSE_START\][\s\S]*?\[NET_RESPONSE_END\]/g, '*(web response received)*');
-        // Strip raw HTML that leaked through
+        // Strip raw HTML that leaked through (Flask 404s, error pages, etc.)
         clean = clean.replace(/<!doctype[^>]*>[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
         clean = clean.replace(/<html[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
+        // v4.3.18o: Catch Flask 404 (no </html> tag) and escaped HTML in quotes
+        clean = clean.replace(/\*?"?<!doctype[^"]*(?:<\/p>|<\/h1>|<\/title>)[^"]*"?\*?/gi, '*(error page response)*');
+        clean = clean.replace(/"?<html\s*lang=[^"]*(?:<\/p>|<\/h1>)[^"]*"?/gi, '*(error page response)*');
+        // Catch literal escaped HTML: \n<html\n<title>404...
+        clean = clean.replace(/\\n<[!a-z][^]*?(?:<\/p>|<\/h1>|<\/html>)\\n/gi, '*(error page response)*');
         // Strip raw JSON blobs > 500 chars
         clean = clean.replace(/\{[\s\S]{500,}?\}/g, '*(large data — expand step log for details)*');
         msgEl.innerHTML = renderMarkdown(clean);

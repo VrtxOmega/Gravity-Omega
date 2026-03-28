@@ -1144,7 +1144,16 @@ ${toolDescriptions}
                                 else resolve(stdout + (stderr ? '\nSTDERR: ' + stderr : ''));
                             });
                         });
-                        const result = { ok: true, output: output.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };
+                        // v4.3.18o: Strip HTML from SYS output (catches curl returning error pages)
+                        let cleanOutput = output;
+                        if (cleanOutput.includes('<html') || cleanOutput.includes('<!doctype') || cleanOutput.includes('<!DOCTYPE')) {
+                            cleanOutput = cleanOutput.replace(/<script[\s\S]*?<\/script>/gi, '')
+                                .replace(/<style[\s\S]*?<\/style>/gi, '')
+                                .replace(/<[^>]+>/g, ' ')
+                                .replace(/\s{2,}/g, ' ')
+                                .trim();
+                        }
+                        const result = { ok: true, output: cleanOutput.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };
                         results.push(result);
                         this._logStep(pseudo_tool_name, packet.prm, result);
                         this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: cmd, ok: true, totalSteps: this._stepLog.length });
