@@ -862,7 +862,18 @@ ${toolDescriptions}
                         new Promise((resolve) => {
                             const req = protocol.get(url, {
                                 timeout: 15000,
-                                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gravity-Omega/4.3' }
+                                headers: (() => {
+                                    const h = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gravity-Omega/4.3' };
+                                    // v4.3.18k: Auto-inject auth for known APIs
+                                    if (url.includes('api.github.com')) {
+                                        try {
+                                            const cfg = JSON.parse(fs.readFileSync('C:\\Users\\rlope\\.veritas\\config.json', 'utf8'));
+                                            if (cfg.github_token) h['Authorization'] = 'token ' + cfg.github_token;
+                                            h['Accept'] = 'application/vnd.github+json';
+                                        } catch(e) { /* no config */ }
+                                    }
+                                    return h;
+                                })()
                             }, (res) => {
                                 if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
                                     const redirectUrl = res.headers.location;
