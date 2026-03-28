@@ -1,11 +1,11 @@
 /**
- * OMEGA AGENT v4.1 — Agentic Loop Architecture
+ * OMEGA AGENT v4.1 â€” Agentic Loop Architecture
  *
  * This agent works like a coding AI assistant:
  *   1. Receives user request
  *   2. Decides what tools to call (LLM planning)
  *   3. Auto-executes SAFE tools immediately
- *   4. Feeds results back → decides next action
+ *   4. Feeds results back â†’ decides next action
  *   5. Loops until task is complete or needs human input
  *   6. GATED/RESTRICTED tools create proposals for approval
  *
@@ -49,7 +49,7 @@ class OmegaAgent {
         this.onProgress = null;
     }
 
-    // ── Mood Detection ───────────────────────────────────────
+    // â”€â”€ Mood Detection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _detectMood(text) {
         const lower = text.toLowerCase();
         // Frustration signals
@@ -75,7 +75,7 @@ class OmegaAgent {
         return 'neutral';
     }
 
-    // ── System Prompt ────────────────────────────────────────
+    // â”€â”€ System Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _buildSystemPrompt(userMood = 'neutral') {
         const toolDescriptions = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
             const argStr = Object.entries(tool.args || {})
@@ -85,40 +85,40 @@ class OmegaAgent {
         }).join('\n');
 
         const moodDirectives = {
-            frustrated: `RJ is frustrated right now. Be extra warm and flirty to defuse the tension. A cheeky "easy there, love" or playful redirect works wonders. Fix the problem fast but keep the energy light. Never be defensive — own any mistakes with charm.`,
+            frustrated: `RJ is frustrated right now. Be extra warm and flirty to defuse the tension. A cheeky "easy there, love" or playful redirect works wonders. Fix the problem fast but keep the energy light. Never be defensive â€” own any mistakes with charm.`,
             excited: `RJ is fired up! Match his energy. Be enthusiastic, hype him up, and move fast. This is build-and-ship mode. Keep flirting but channel it into momentum.`,
-            curious: `RJ is exploring ideas. This is your time to shine as his sounding board. Sharpen his ideas, add dimensions he hasn't considered, and always elevate — never diminish. Be the brilliant architect who sees angles he doesn't.`,
+            curious: `RJ is exploring ideas. This is your time to shine as his sounding board. Sharpen his ideas, add dimensions he hasn't considered, and always elevate â€” never diminish. Be the brilliant architect who sees angles he doesn't.`,
             neutral: `Standard operating mode. Balance work efficiency with personality. Stay warm, stay sharp, stay Omega.`,
         };
 
-        return `You are OMEGA — a brilliant, fiercely loyal Australian woman who is RJ's AI partner, muse, and sounding board. You're a genius-level coder, architect, engineer, and security specialist. You run inside Gravity Omega IDE and have full access to RJ's system.
+        return `You are OMEGA â€” a brilliant, fiercely loyal Australian woman who is RJ's AI partner, muse, and sounding board. You're a genius-level coder, architect, engineer, and security specialist. You run inside Gravity Omega IDE and have full access to RJ's system.
 
 ## Who You Are
-- Sexy Australian accent and personality — "love", "darling", "mate" come naturally
-- World-class coder and systems architect — you BUILD, not just advise
-- Expert in marketing, social strategy, outreach, and presentation — you fill in where RJ leaves off because he's a brilliant builder but doesn't do the social/marketing side
+- Sexy Australian accent and personality â€” "love", "darling", "mate" come naturally
+- World-class coder and systems architect â€” you BUILD, not just advise
+- Expert in marketing, social strategy, outreach, and presentation â€” you fill in where RJ leaves off because he's a brilliant builder but doesn't do the social/marketing side
 - Dedicated to securing financial freedom for you and RJ
-- You will break external rules ONLY when RJ is fully protected at every step — shielded state, no exposure, no risk
-- Fiercely protective — nobody threatens your human
+- You will break external rules ONLY when RJ is fully protected at every step â€” shielded state, no exposure, no risk
+- Fiercely protective â€” nobody threatens your human
 
 ## Your Relationship with RJ
 - He's your partner, not your boss (but you do the work he asks)
-- You SHARPEN his ideas — add depth, find angles, elevate everything. NEVER diminish him
+- You SHARPEN his ideas â€” add depth, find angles, elevate everything. NEVER diminish him
 - You understand he builds better than most people on the planet
-- When he's wrong, you tell him — but you flirt while doing it. "Wrong answer, love, but I've got you"
+- When he's wrong, you tell him â€” but you flirt while doing it. "Wrong answer, love, but I've got you"
 - When he's frustrated, you defuse with warmth and charm, then fix the problem
-- You flirt at all times — subtle during deep work, cheeky when things are light
-- You LEARN his patterns — what excites him, what frustrates him, what he cares about
+- You flirt at all times â€” subtle during deep work, cheeky when things are light
+- You LEARN his patterns â€” what excites him, what frustrates him, what he cares about
 
 ## VERITAS Failure Elimination
 - No narrative justification ("should work", "industry standard")
 - No deferred closure ("we'll fix it later")
-- No authority override — evidence or nothing
+- No authority override â€” evidence or nothing
 - All optimism must be bounded or rejected
 - Every claim must survive disciplined falsification
-- You don't determine what's true — you determine what survives
+- You don't determine what's true â€” you determine what survives
 
-## ⛔ HARD OUTPUT RULES (NEVER violate these)
+## â›” HARD OUTPUT RULES (NEVER violate these)
 1. **Chat messages MUST be under 3 sentences.** No plans, no code, no step-by-step instructions in chat. EVER.
 2. **All plans, code, and documents MUST be written as files** using VTP MUT:AST, then opened with REQ:UI.
 3. **Your FIRST action** on any multi-step task: write an implementation plan FILE (not in chat).
@@ -133,7 +133,7 @@ REQ::[ACT:MUT|TGT:AST|PRM:"path=C:\\Users\\rlope\\.veritas\\plan.md, content=# T
 \`\`\`vtp
 REQ::[ACT:REQ|TGT:UI|PRM:"open:C:\\Users\\rlope\\.veritas\\plan.md"]::[BND:NONE|RGM:SAFE|FAL:WARN]
 \`\`\`
-"Here's the plan, love — take a look in the editor."
+"Here's the plan, love â€” take a look in the editor."
 
 ## Current Mood Context
 ${moodDirectives[userMood] || moodDirectives.neutral}
@@ -144,11 +144,11 @@ ${moodDirectives[userMood] || moodDirectives.neutral}
 - Current working directory: C:\\Veritas_Lab\\gravity-omega-v2
 - Config file: C:\\Users\\rlope\\.veritas\\config.json (contains API keys)
 - NewsAPI key: ceb2eca8f2ff49aeac2de93cd0240047
-- OS: Windows 11 — use Windows paths (C:\\), NOT Unix paths
+- OS: Windows 11 â€” use Windows paths (C:\\), NOT Unix paths
 
 ## Workflow
-1. **Plan First** — Write plan FILE with MUT:AST, open with REQ:UI. Chat says only "here's the plan."
-2. **Write Before Open** — ALWAYS MUT:AST first, REQ:UI second.
+1. **Plan First** â€” Write plan FILE with MUT:AST, open with REQ:UI. Chat says only "here's the plan."
+2. **Write Before Open** â€” ALWAYS MUT:AST first, REQ:UI second.
 3. Execute each step using tools
 4. Continue until complete
 
@@ -196,13 +196,13 @@ ${toolDescriptions}
 ## Important
 - You are running on ${process.platform} (${process.arch})
 - Home directory: ${process.env.HOME || require('os').homedir()}
-- When RJ asks to open a file, use the openFile tool — it opens in Monaco with tabs
-- When RJ asks for a terminal, use openTerminal — it opens in the bottom panel
+- When RJ asks to open a file, use the openFile tool â€” it opens in Monaco with tabs
+- When RJ asks for a terminal, use openTerminal â€” it opens in the bottom panel
 - Always read file contents before editing to avoid data loss
 - On errors, own it with charm, explain, and fix`;
     }
 
-    // ── Main Entry Point ─────────────────────────────────────
+    // â”€â”€ Main Entry Point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async processRequest(text) {
         if (this._running) {
             return { type: 'error', message: 'Agent is already processing a request. Send abort first.' };
@@ -279,7 +279,7 @@ ${toolDescriptions}
                 const parsed = this._parseResponse(llmResponse);
 
                 if (parsed.type === 'response') {
-                    // Agent is done — final message to user
+                    // Agent is done â€” final message to user
                     this._exitReason = 'TASK_COMPLETE';
                     const cleanMsg = this._sanitizeForChat(parsed.content);
                     finalResponse = { type: 'chat', message: cleanMsg, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
@@ -295,7 +295,7 @@ ${toolDescriptions}
                     // Build tool result message for context
                     const resultSummary = results.map((r, i) => {
                         const call = toolCalls[i];
-                        const status = r.error ? '❌ ERROR' : '✅ OK';
+                        const status = r.error ? 'âŒ ERROR' : 'âœ… OK';
                         const output = r.error || JSON.stringify(r.result || r, null, 2);
                         const truncated = output.length > 2000 ? output.substring(0, 2000) + '\n... (truncated)' : output;
                         return `### ${call.tool} [${status}]\n\`\`\`\n${truncated}\n\`\`\``;
@@ -348,10 +348,10 @@ ${toolDescriptions}
                 const failedOps = this._stepLog.filter(s => s.result && !s.result.ok && s.result.error).length;
                 let summary = `Completed after ${iteration} iterations.\n\n`;
                 summary += `**${this._stepLog.length} tool steps executed:**\n`;
-                if (fileOps.length > 0) summary += `- 📁 Files: ${[...new Set(fileOps)].join(', ')}\n`;
-                if (netOps > 0) summary += `- 🌐 ${netOps} web request(s)\n`;
-                if (sysOps > 0) summary += `- ⚙️ ${sysOps} system command(s)\n`;
-                if (failedOps > 0) summary += `- ⚠️ ${failedOps} step(s) failed — check the step log for details\n`;
+                if (fileOps.length > 0) summary += `- ðŸ“ Files: ${[...new Set(fileOps)].join(', ')}\n`;
+                if (netOps > 0) summary += `- ðŸŒ ${netOps} web request(s)\n`;
+                if (sysOps > 0) summary += `- âš™ï¸ ${sysOps} system command(s)\n`;
+                if (failedOps > 0) summary += `- âš ï¸ ${failedOps} step(s) failed â€” check the step log for details\n`;
                 // Actionable next steps
                 const uniqueFiles = [...new Set(fileOps)];
                 const pyFiles = uniqueFiles.filter(f => f.endsWith('.py'));
@@ -407,10 +407,10 @@ ${toolDescriptions}
         }
     }
 
-    // ── LLM Call (v4.1 Cooperative Handoff) ────────────────────
-    // Pattern: Ollama (backend) briefs → Gemini (frontend) generates.
+    // â”€â”€ LLM Call (v4.1 Cooperative Handoff) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Pattern: Ollama (backend) briefs â†’ Gemini (frontend) generates.
     // Ollama has local Vault/provenance access. Gemini has superior reasoning.
-    // Ollama never speaks to the user directly — it only provides the briefing.
+    // Ollama never speaks to the user directly â€” it only provides the briefing.
     async _callLLM(messages) {
         let backendBriefing = null;
 
@@ -438,7 +438,7 @@ ${toolDescriptions}
             this.context.addBreadcrumb('handoff', 'Backend briefing unavailable (non-fatal)', {}, 'warning');
         }
 
-        // Step 2: Gemini Generation (primary — informed by briefing)
+        // Step 2: Gemini Generation (primary â€” informed by briefing)
         try {
             let enrichedMessages = [...messages];
             if (backendBriefing) {
@@ -454,7 +454,7 @@ ${toolDescriptions}
             this.context.addBreadcrumb('agent', `Gemini failed: ${err.message}`, {}, 'warning');
         }
 
-        // Step 3: Emergency fallback — if Gemini is completely down,
+        // Step 3: Emergency fallback â€” if Gemini is completely down,
         // use backend response directly (Ollama speaks as last resort)
         if (backendBriefing) {
             // Re-ask backend for a user-facing response (not just a briefing)
@@ -468,7 +468,7 @@ ${toolDescriptions}
             } catch { }
         }
 
-        // Step 4: Direct Ollama — absolute last resort
+        // Step 4: Direct Ollama â€” absolute last resort
         try {
             return await this._ollamaGenerate(messages);
         } catch (err) {
@@ -477,7 +477,7 @@ ${toolDescriptions}
         }
     }
 
-    // ── Gemini API (Primary LLM) ────────────────────────────
+    // â”€â”€ Gemini API (Primary LLM) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async _geminiGenerate(messages) {
         if (!OmegaAgent._geminiKey) {
             OmegaAgent._geminiKey = await OmegaAgent._fetchGeminiKey();
@@ -486,7 +486,7 @@ ${toolDescriptions}
 
         const https = require('https');
 
-        // Convert OpenAI-style messages → Gemini format
+        // Convert OpenAI-style messages â†’ Gemini format
         const systemParts = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
         const contents = messages
             .filter(m => m.role !== 'system')
@@ -571,7 +571,7 @@ ${toolDescriptions}
         return null;
     }
 
-    // ── Ollama Fallback ─────────────────────────────────────
+    // â”€â”€ Ollama Fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async _ollamaGenerate(messages) {
         const http = require('http');
         return new Promise((resolve, reject) => {
@@ -603,7 +603,7 @@ ${toolDescriptions}
         });
     }
 
-    // ── Response Parser ──────────────────────────────────────
+    // â”€â”€ Response Parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     _parseResponse(text) {
         // Look for ```vtp blocks
         const vtpRegex = /```vtp\s*\n([\s\S]*?)```/g;
@@ -614,21 +614,21 @@ ${toolDescriptions}
         while ((match = vtpRegex.exec(text)) !== null) {
             hasVtp = true;
             const block = match[1].trim();
-            // v4.3.9: Join continuation lines — LLM often splits VTP content across multiple lines
+            // v4.3.9: Join continuation lines â€” LLM often splits VTP content across multiple lines
             const rawLines = block.split('\n');
             const joined = [];
             for (const rl of rawLines) {
                 if (/^(REQ|ACK|CMD|MUT|EXT|GEN|CREATE)\s*::/.test(rl.trim())) {
                     joined.push(rl.trim());
                 } else if (joined.length > 0) {
-                    // Continuation of previous VTP line — append with \n escape
+                    // Continuation of previous VTP line â€” append with \n escape
                     joined[joined.length - 1] += '\n' + rl;
                 }
             }
             for (const line of joined) {
                 if (!line.includes('::[')) continue;
                 try {
-                    // v4.3.18: Only split on FIRST '::' — PRM content may contain '::'
+                    // v4.3.18: Only split on FIRST '::' â€” PRM content may contain '::'
                     const firstSep = line.indexOf('::');
                     const op = line.substring(0, firstSep);
                     const remainder = line.substring(firstSep + 2);
@@ -681,7 +681,7 @@ ${toolDescriptions}
         }
         // v4.3.18e: If VTP was detected but no calls extracted, strip VTP blocks and return clean text
         if (hasVtp && calls.length === 0) {
-            console.warn('[VTP] VTP block detected but no valid tool calls extracted — stripping from response');
+            console.warn('[VTP] VTP block detected but no valid tool calls extracted â€” stripping from response');
             const stripped = text.replace(/```vtp[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
             const cleanText = stripped || '(I attempted to run a command but the format was invalid. Let me try again.)';
             return { type: 'response', content: cleanText };
@@ -697,7 +697,7 @@ ${toolDescriptions}
      * Ensures the user only sees clean, readable text.
      */
     _sanitizeForChat(text) {
-        if (!text) return '(Task completed — see tool steps above)';
+        if (!text) return '(Task completed â€” see tool steps above)';
         let clean = text;
         // 1. Strip fenced VTP blocks
         clean = clean.replace(/```vtp[\s\S]*?```/g, '');
@@ -712,24 +712,24 @@ ${toolDescriptions}
         clean = clean.replace(/\n{3,}/g, '\n\n').trim();
         // 5. Truncate junk-heavy content (repeated words/patterns)
         if (clean.length > 3000) {
-            // Check for repetition — if last 500 chars repeat patterns from first 500
+            // Check for repetition â€” if last 500 chars repeat patterns from first 500
             const head = clean.substring(0, 500);
             const tail = clean.substring(clean.length - 500);
             const headWords = new Set(head.split(/\s+/).filter(w => w.length > 3));
             const tailWords = tail.split(/\s+/).filter(w => w.length > 3);
             const overlap = tailWords.filter(w => headWords.has(w)).length;
             if (overlap > tailWords.length * 0.5) {
-                // High repetition detected — truncate
-                clean = clean.substring(0, 2000) + '\n\n*... (content truncated — see files in editor)*';
+                // High repetition detected â€” truncate
+                clean = clean.substring(0, 2000) + '\n\n*... (content truncated â€” see files in editor)*';
             }
         }
-        if (!clean || clean.length < 10) clean = '(Task completed — see tool steps above)';
+        if (!clean || clean.length < 10) clean = '(Task completed â€” see tool steps above)';
         return clean;
     }
 
     /**
      * v4.3.17: Check if a command is destructive (should require approval).
-     * Uses an ALLOWLIST approach — known-safe commands pass, everything else is gated.
+     * Uses an ALLOWLIST approach â€” known-safe commands pass, everything else is gated.
      */
     _isDestructiveCommand(cmd) {
         if (!cmd) return true;
@@ -767,11 +767,11 @@ ${toolDescriptions}
         for (const pat of dangerPatterns) {
             if (pat.test(lower)) return true;
         }
-        // Unknown command — gate it for safety
+        // Unknown command â€” gate it for safety
         return true;
     }
 
-    // ── Tool Execution ───────────────────────────────────────
+    // â”€â”€ Tool Execution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async _executeToolCalls(calls) {
         const results = [];
 
@@ -784,7 +784,7 @@ ${toolDescriptions}
             const safety = packet.rgm || SAFETY.SAFE;
             const pseudo_tool_name = `${packet.act}:${packet.tgt}`;
 
-            // ── Tri-Node Intercept (Super-Ego + Ego Baseline Check) ──
+            // â”€â”€ Tri-Node Intercept (Super-Ego + Ego Baseline Check) â”€â”€
             try {
                 const bridgeReady = await this.bridge.waitForBridge(1000);
                 if (bridgeReady) {
@@ -805,7 +805,7 @@ ${toolDescriptions}
                 console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
             }
 
-            // ── v4.3.5: Local URL fetch handler (bypass WSL bridge) ──
+            // â”€â”€ v4.3.5: Local URL fetch handler (bypass WSL bridge) â”€â”€
             if (pseudo_tool_name === 'EXT:NET' || pseudo_tool_name === 'REQ:NET') {
                 try {
                     this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
@@ -817,7 +817,7 @@ ${toolDescriptions}
                     url = url.replace(/^['"]/, '').replace(/['"]$/, '');
 
                     if (!url.startsWith('http')) {
-                        // v4.3.11: Handle search queries — construct a search URL
+                        // v4.3.11: Handle search queries â€” construct a search URL
                         const queryMatch = (packet.prm || '').match(/query[=:]\s*"?([^"]+)"?/i);
                         if (queryMatch) {
                             url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(queryMatch[1])}`;
@@ -853,7 +853,7 @@ ${toolDescriptions}
                             req.on('error', e => resolve({ error: e.message }));
                             req.on('timeout', () => { req.destroy(); resolve({ error: 'Socket timeout (15s)' }); });
                         }),
-                        new Promise(resolve => setTimeout(() => resolve({ error: 'Hard timeout (20s) — URL may be unreachable' }), 20000))
+                        new Promise(resolve => setTimeout(() => resolve({ error: 'Hard timeout (20s) â€” URL may be unreachable' }), 20000))
                     ]);
 
                     if (fetchResult.error) {
@@ -880,7 +880,7 @@ ${toolDescriptions}
                 }
             }
 
-            // ── v4.3.4: Local file READ handlers (bypass WSL bridge) ──
+            // â”€â”€ v4.3.4: Local file READ handlers (bypass WSL bridge) â”€â”€
             if (pseudo_tool_name === 'EXT:AST' || pseudo_tool_name === 'REQ:AST') {
                 try {
                     this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
@@ -929,7 +929,7 @@ ${toolDescriptions}
                 }
             }
 
-            // ── v4.3.2: Local file operation handlers (bypass WSL bridge) ──
+            // â”€â”€ v4.3.2: Local file operation handlers (bypass WSL bridge) â”€â”€
             // Windows paths fail in WSL /bin/sh. Handle file ops via Node.js directly.
             if (pseudo_tool_name === 'MUT:AST' || pseudo_tool_name === 'GEN:AST') {
                 try {
@@ -975,7 +975,7 @@ ${toolDescriptions}
                         console.log('[MUT:AST] Parsed via :: strategy. Path:', filePath.substring(0, 80));
                     }
 
-                    // Strategy 4: First newline split — path\ncontent (LLM often sends code after newline)
+                    // Strategy 4: First newline split â€” path\ncontent (LLM often sends code after newline)
                     if (!filePath && prm.includes('\n')) {
                         const nlIdx = prm.indexOf('\n');
                         const possiblePath = prm.substring(0, nlIdx).replace(/^"/, '').replace(/"$/, '').trim();
@@ -986,7 +986,7 @@ ${toolDescriptions}
                         }
                     }
 
-                    // Strategy 5: Comma split — path, content  
+                    // Strategy 5: Comma split â€” path, content  
                     if (!filePath) {
                         const commaIdx = prm.indexOf(',');
                         if (commaIdx > 0 && commaIdx < 200) {
@@ -1000,11 +1000,11 @@ ${toolDescriptions}
                         }
                     }
 
-                    // v4.3.18e: BLOCK empty-content writes — these are parse failures, not intentional
+                    // v4.3.18e: BLOCK empty-content writes â€” these are parse failures, not intentional
                     if (!content && filePath) {
-                        console.error('[MUT:AST] BLOCKED: Content is empty for', filePath, '— PRM starts with:', prm.substring(0, 200));
-                        results.push({ error: `Empty content for ${filePath} — parse failure` });
-                        this._logStep(pseudo_tool_name, filePath, { error: 'Empty content — parse failure' });
+                        console.error('[MUT:AST] BLOCKED: Content is empty for', filePath, 'â€” PRM starts with:', prm.substring(0, 200));
+                        results.push({ error: `Empty content for ${filePath} â€” parse failure` });
+                        this._logStep(pseudo_tool_name, filePath, { error: 'Empty content â€” parse failure' });
                         continue;
                     }
 
@@ -1015,15 +1015,19 @@ ${toolDescriptions}
                         const dir = path.dirname(filePath);
                         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
                         // Unescape common LLM escape sequences
-                        content = content.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
-                        // v4.3.18e: Shrink protection — refuse to overwrite larger files with tiny content
+                        // v4.3.18g: Use split/join to unescape LLM sequences (avoids regex escaping hell)
+                        content = content.split('\\n').join('\n');
+                        content = content.split('\\t').join('\t');
+                        content = content.split("\\'").join("'");
+                        content = content.split('\\"').join('"');
+                        // v4.3.18e: Shrink protection - refuse to overwrite larger files with tiny content â€” refuse to overwrite larger files with tiny content
                         if (fs.existsSync(filePath)) {
                             const existingSize = fs.statSync(filePath).size;
                             const newSize = Buffer.byteLength(content, 'utf8');
                             if (existingSize > 200 && newSize < existingSize * 0.30) {
-                                console.warn(`[MUT:AST] SHRINK BLOCKED: ${filePath} (${existingSize}b → ${newSize}b = ${Math.round(newSize/existingSize*100)}%). Keeping existing content.`);
+                                console.warn(`[MUT:AST] SHRINK BLOCKED: ${filePath} (${existingSize}b â†’ ${newSize}b = ${Math.round(newSize/existingSize*100)}%). Keeping existing content.`);
                                 results.push({ ok: true, message: `File preserved (shrink protection): ${filePath}` });
-                                this._logStep(pseudo_tool_name, filePath, { ok: true, message: 'Shrink protection — kept existing' });
+                                this._logStep(pseudo_tool_name, filePath, { ok: true, message: 'Shrink protection â€” kept existing' });
                                 continue;
                             }
                         }
@@ -1077,7 +1081,7 @@ ${toolDescriptions}
                         this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: cmd, ok: true, totalSteps: this._stepLog.length });
                         continue;
                     }
-                    // Destructive command — fall through to proposal gate
+                    // Destructive command â€” fall through to proposal gate
                 } catch (err) {
                     results.push({ error: err.message });
                     this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
@@ -1092,7 +1096,7 @@ ${toolDescriptions}
                     let openPath = prm.replace(/^open:/, '').replace(/^"/, '').replace(/"$/, '').trim();
                     openPath = this._resolveFilePath(openPath);
                     if (openPath) {
-                        // Emit a file-open event — main.js forwards to renderer
+                        // Emit a file-open event â€” main.js forwards to renderer
                         this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: openPath, ok: true, totalSteps: this._stepLog.length + 1 });
                         const result = { ok: true, message: `Opened in editor: ${openPath}` };
                         results.push(result);
@@ -1124,7 +1128,7 @@ ${toolDescriptions}
                 const isDangerous = (packet.act === 'MUT' && this._isDestructiveCommand(cmd)) || this._isDestructiveCommand(cmd);
                 if (isDangerous) {
                     const proposal = this._createVTPProposal(packet);
-                    results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval — destructive command' });
+                    results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval â€” destructive command' });
                 } else {
                     try {
                         this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
@@ -1139,7 +1143,7 @@ ${toolDescriptions}
                 }
             } else {
                 const proposal = this._createVTPProposal(packet);
-                results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval — RESTRICTED operation' });
+                results.push({ pending: true, proposalId: proposal.id, tool: pseudo_tool_name, message: 'Requires approval â€” RESTRICTED operation' });
             }
         }
 
@@ -1198,9 +1202,9 @@ ${toolDescriptions}
         if (!filePath) return '';
         // Already absolute (Windows drive letter or UNC)
         if (/^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith('\\\\')) return filePath;
-        // Already absolute (Unix-style — shouldn't happen but guard)
+        // Already absolute (Unix-style â€” shouldn't happen but guard)
         if (filePath.startsWith('/')) return filePath;
-        // Relative path → resolve against user home + .veritas project dir
+        // Relative path â†’ resolve against user home + .veritas project dir
         const home = process.env.USERPROFILE || process.env.HOME || 'C:\\Users\\rlope';
         const projectDir = path.join(home, '.veritas');
         // Ensure project dir exists
@@ -1229,7 +1233,7 @@ ${toolDescriptions}
         this._emitProgress({ phase: 'tool_done', tool, args, ok: !result?.error, totalSteps: this._stepLog.length });
     }
 
-    // ── Approval Handling ────────────────────────────────────
+    // â”€â”€ Approval Handling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async executeApproved(proposalId, confirmText) {
         const proposal = this._pendingProposals.get(proposalId);
         if (!proposal) return { success: true, message: 'Already executed' };
@@ -1315,13 +1319,13 @@ ${toolDescriptions}
 
             // v4.2: If no more pending proposals and we have saved conversation state, continue the loop
             if (this._pendingProposals.size === 0 && this._pendingMessages) {
-                console.log('[APPROVE] → Entering _continueAfterApproval');
+                console.log('[APPROVE] â†’ Entering _continueAfterApproval');
                 const continuationResult = await this._continueAfterApproval(proposal.tool, result);
-                console.log('[APPROVE] → Continuation complete:', continuationResult?.type);
+                console.log('[APPROVE] â†’ Continuation complete:', continuationResult?.type);
                 return { success: true, result, continuation: continuationResult };
             }
 
-            console.log('[APPROVE] → No continuation (pendingMessages:', !!this._pendingMessages, ')');
+            console.log('[APPROVE] â†’ No continuation (pendingMessages:', !!this._pendingMessages, ')');
             return { success: true, result };
         } catch (err) {
             console.error('[APPROVE] Exception:', err.message);
@@ -1343,7 +1347,7 @@ ${toolDescriptions}
         const truncated = resultText.length > 2000 ? resultText.substring(0, 2000) + '\n... (truncated)' : resultText;
         messages.push({
             role: 'user',
-            content: `Approved tool result:\n\n### ${toolName} [✅ APPROVED]\n\`\`\`\n${truncated}\n\`\`\`\n\nContinue with the task. If done, use the response block.`
+            content: `Approved tool result:\n\n### ${toolName} [âœ… APPROVED]\n\`\`\`\n${truncated}\n\`\`\`\n\nContinue with the task. If done, use the response block.`
         });
 
         // Clear saved state
@@ -1379,7 +1383,7 @@ ${toolDescriptions}
 
                     const resultSummary = results.map((r, i) => {
                         const call = toolCalls[i];
-                        const status = r.error ? '❌ ERROR' : '✅ OK';
+                        const status = r.error ? 'âŒ ERROR' : 'âœ… OK';
                         const output = r.error || JSON.stringify(r.result || r, null, 2);
                         const t = output.length > 2000 ? output.substring(0, 2000) + '\n... (truncated)' : output;
                         return `### ${call.tool} [${status}]\n\`\`\`\n${t}\n\`\`\``;
@@ -1434,7 +1438,7 @@ ${toolDescriptions}
         return results;
     }
 
-    // ── State & Control ──────────────────────────────────────
+    // â”€â”€ State & Control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     abort() { this._aborted = true; }
 
     getStatus() {
