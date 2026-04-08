@@ -11,27 +11,27 @@
 
 ---
 
-Gravity Omega is a sovereign AI development environment built on the **VERITAS $([char]937) framework**. It integrates a full-stack Electron frontend with a hardened Python backend running 60+ autonomous modules across 4 execution DAGs.
+Gravity Omega is a sovereign AI development environment built on the **VERITAS** framework. It integrates a full-stack Electron frontend with a hardened Python backend running 60+ autonomous modules across 4 execution DAGs.
 
 > **Zero cloud dependency. Everything runs on your hardware.**
 
 ## Architecture
 
-`
-$([char]9484)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9488)
-$([char]9474)         GRAVITY OMEGA v2         $([char]9474)
-$([char]9500)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9508)
-$([char]9474) ELECTRON MAIN (main.js)         $([char]9474)
-$([char]9474)   IPC Bridge + Window Mgmt      $([char]9474)
-$([char]9500)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9508)
-$([char]9474) RENDERER (HTML/CSS/JS)           $([char]9474)
-$([char]9474)   Monaco Editor + Terminal HUD   $([char]9474)
-$([char]9500)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9508)
-$([char]9474) PYTHON BACKEND (60+ modules)     $([char]9474)
-$([char]9474)   Tri-Node VTP Architecture      $([char]9474)
-$([char]9474)   Brain / Bridge / Cortex / Shield$([char]9474)
-$([char]9492)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9496)
-`
+```
++------------------------------------+
+|         GRAVITY OMEGA v2           |
++------------------------------------+
+| ELECTRON MAIN (main.js)           |
+|   IPC Bridge + Window Management  |
++------------------------------------+
+| RENDERER (HTML/CSS/JS)            |
+|   Monaco Editor + Terminal HUD    |
++------------------------------------+
+| PYTHON BACKEND (60+ modules)      |
+|   Tri-Node VTP Architecture       |
+|   Brain / Bridge / Cortex / Shield|
++------------------------------------+
+```
 
 ### Tri-Node VTP Engine
 
@@ -72,7 +72,7 @@ $([char]9492)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$([char]9472)$(
 
 ### Install
 
-`ash
+```bash
 # Install Electron dependencies
 npm install
 
@@ -82,7 +82,7 @@ pip install -r requirements.txt
 
 # Start the application
 npm start
-`
+```
 
 ## Security
 
@@ -98,5 +98,5 @@ MIT
 ---
 
 <div align="center">
-  <sub>Built by <a href="https://github.com/VrtxOmega">RJ Lopez</a> | VERITAS <code>$([char]937)</code> Framework</sub>
+  <sub>Built by <a href="https://github.com/VrtxOmega">RJ Lopez</a> | VERITAS Framework</sub>
 </div>
