@@ -20,10 +20,10 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional
+from typing import List, Optional
 
 from .omega_array import IntelNode
-from .omega_pattern_engine import PatternReport, ContradictionVector
+from .omega_pattern_engine import PatternReport
 from .omega_province import SealedProof
 
 

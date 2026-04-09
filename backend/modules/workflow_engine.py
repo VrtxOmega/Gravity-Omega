@@ -18,14 +18,13 @@ VERITAS Compliance:
 import hashlib
 import json
 import logging
-import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger("workflow_engine")
 
@@ -834,7 +833,6 @@ class WorkflowDaemon:
     """Daemonizes DAGs for continuous background execution."""
 
     def __init__(self, registry, security, llm, queue, dags_dir: str = None):
-        import threading
         self.registry = registry
         self.security = security
         self.llm = llm
@@ -887,7 +885,7 @@ class WorkflowDaemon:
                     if state_file.exists():
                         try:
                             last_run = json.loads(state_file.read_text()).get("last_run", 0)
-                        except: pass
+                        except Exception as e: pass
                         
                     if time.time() - last_run >= interval:
                         logger.info(f"Executing scheduled DAG: {dag_id}")

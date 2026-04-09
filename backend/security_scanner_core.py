@@ -1,5 +1,5 @@
 import os
-from security_scanner_modules._secrets import scan_hardcoded_secrets, redact_secret
+from security_scanner_modules._secrets import scan_hardcoded_secrets
 from security_scanner_modules._bindings import scan_exposed_bindings
 from security_scanner_modules._eval_exec import scan_eval_exec_usage
 from security_scanner_modules._validation import scan_missing_validation

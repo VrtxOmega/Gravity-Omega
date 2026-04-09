@@ -9,7 +9,7 @@ V4 improvements:
 """
 
 import re
-from typing import Dict, List
+from typing import Dict
 
 # Simplified patterns - each substance gets tried in order
 PATTERNS = {

@@ -17,7 +17,6 @@ import time
 import sys
 import subprocess
 import os
-import signal
 import random
 import io
 from datetime import datetime, timedelta

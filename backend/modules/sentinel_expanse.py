@@ -15,11 +15,9 @@ import struct
 import zlib
 import argparse
 import time
-import hashlib
 import statistics
-import random
 from collections import Counter
-from typing import BinaryIO, List, Dict, Optional
+from typing import BinaryIO, List
 
 # ==============================================================================
 # CONSTANTS & CONFIG

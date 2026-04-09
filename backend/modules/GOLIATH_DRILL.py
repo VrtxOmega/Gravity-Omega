@@ -5,7 +5,6 @@ Vectors: X-Header Extraction, Bates-Gap Analysis, Cross-Dataset Collision
 """
 import os
 import re
-import sys
 import zipfile
 import datetime
 import collections
@@ -45,7 +44,7 @@ def extract_x_headers(filepath):
         guids = [x.decode('utf-8') for x in re.findall(guid_pattern, header.upper())]
 
         return {"ips": set(ips), "macs": set(macs), "guids": set(guids)}
-    except:
+    except Exception as e:
         return None
 
 # ==============================================================================
@@ -88,7 +87,7 @@ def scan_fraud_data_multi(target_ids):
                         for tid in target_ids:
                             if tid in content:
                                 hits[tid].append(f"[HIT] Found in RAW Data: {file}")
-                except: pass
+                except Exception as e: pass
                 
             # B. Zip Archives (Deep Dive)
             elif file.endswith('.zip'):
@@ -100,7 +99,7 @@ def scan_fraud_data_multi(target_ids):
                                 for tid in target_ids:
                                     if tid in content:
                                         hits[tid].append(f"[HIT] Found in ZIP Archive: {file} -> {member}")
-                except: pass
+                except Exception as e: pass
                 
     return hits
 

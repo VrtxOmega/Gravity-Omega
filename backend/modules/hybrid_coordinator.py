@@ -13,7 +13,7 @@ import time
 import logging
 from pathlib import Path
 from decimal import Decimal
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 from web3 import Web3
@@ -22,7 +22,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] [%(name)s] %(message)s',
     handlers=[
-        logging.FileHandler('c:\\Veritas_Lab\\coordinator.log'),
+        logging.FileHandler('coordinator.log'),
         logging.StreamHandler()
     ]
 )
@@ -32,7 +32,7 @@ logging.basicConfig(
 # ============================================================================
 
 BASE_RPC = "https://mainnet.base.org"
-QUEUE_DIR = Path("c:/Veritas_Lab/candidate_queue")
+QUEUE_DIR = Path("candidate_queue")
 MIN_P_WIN = 0.35
 EVALUATION_WINDOW_MS = 1200  # Collect reports for 1.2s
 

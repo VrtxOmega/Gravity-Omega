@@ -10,7 +10,7 @@ This auditor attacks the survivor's weak points:
 
 import json
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List, Dict
 
 
 @dataclass

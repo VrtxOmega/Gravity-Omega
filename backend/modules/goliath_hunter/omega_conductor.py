@@ -33,13 +33,13 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
 MODULE_DIR   = Path(__file__).parent
 MODULES_DIR  = MODULE_DIR.parent   # backend/modules
-WORKSPACE    = Path("C:/GOLIATH_WORKSPACE")
+WORKSPACE    = Path("GOLIATH_WORKSPACE")
 INTEL_DIR    = WORKSPACE / "INTEL"
 INTEL_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -50,7 +50,7 @@ _jobs: Dict[str, dict] = {}
 # ── Local imports ─────────────────────────────────────────────────────────────
 
 from .omega_array        import OmegaArray, IntelNode
-from .omega_pattern_engine import OmegaPatternEngine, PatternReport
+from .omega_pattern_engine import OmegaPatternEngine
 from .omega_province     import OmegaProvince
 from .omega_dossier      import OmegaDossier
 from .omega_lead_fetcher import LeadFetcher

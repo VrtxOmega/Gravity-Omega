@@ -6,7 +6,6 @@ Monitors sovereign wallet and logs strikes until 4.0 ETH target achieved
 """
 
 import time
-import os
 from datetime import datetime
 from web3 import Web3
 

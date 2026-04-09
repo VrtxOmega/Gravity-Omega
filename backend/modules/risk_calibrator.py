@@ -13,7 +13,7 @@ NAEF compliant: no optimism, no deferred closure.
 """
 
 from dataclasses import dataclass, asdict
-from typing import List, Dict, Any
+from typing import List, Dict
 from gate_pipeline import GateResult, PASS, WARN, FAIL
 
 

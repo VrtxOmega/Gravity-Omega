@@ -12,7 +12,7 @@ def generate_dashboard():
         print("Error: Could not decode security_findings.json. Check file integrity.")
         return
 
-    template_path = 'C:\\Veritas_Lab\\gravity-omega-v2\\backend\\security_dashboard_template.html'
+    template_path = 'backend/security_dashboard_template.html'
     with open(template_path, 'r', encoding='utf-8') as f:
         template = f.read()
 
@@ -61,7 +61,7 @@ def generate_dashboard():
     final_html = final_html.replace('{{ missing_validation_findings }}', missing_validation_html)
     final_html = final_html.replace('{{ scan_errors }}', scan_errors_html)
 
-    output_path = 'C:\\Veritas_Lab\\gravity-omega-v2\\backend\\security_dashboard.html'
+    output_path = 'backend/security_dashboard.html'
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(final_html)
     

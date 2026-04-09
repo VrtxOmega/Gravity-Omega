@@ -1158,7 +1158,7 @@ def _vtp_direct_executor_inner(packet: vtp_codec.VTPPacket) -> str:
                 with open(path, 'w', encoding='utf-8') as f:
                     f.write(content)
                 return f"SUCCESS: Wrote {path}"
-        except:
+        except Exception as e:
             parts = str(packet.prm).strip('"\'').split('::')
             if len(parts) == 3:
                 path, find, replace = parts
@@ -2136,7 +2136,7 @@ def extract_text(file_bytes, filename):
     if ext == ".json":
         text = file_bytes.decode("utf-8", errors="replace")
         try: return json.dumps(json.loads(text), indent=2)
-        except: return text
+        except Exception as e: return text
     if ext == ".docx":
         if not DOCX_AVAILABLE: raise RuntimeError("python-docx not installed.")
         doc = DocxDocument(io.BytesIO(file_bytes))

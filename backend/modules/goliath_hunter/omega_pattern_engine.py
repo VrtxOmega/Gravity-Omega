@@ -12,12 +12,11 @@ This is what makes Gravity Omega self-directing:
 """
 
 import re
-import json
 import hashlib
-from collections import defaultdict, Counter
+from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from typing import List, Dict, Tuple, Set, Optional
+from typing import List, Dict, Tuple, Set
 
 from .omega_array import IntelNode
 

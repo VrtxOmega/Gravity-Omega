@@ -4,7 +4,6 @@ Identity: Kinetic Layer Sentinel Omega
 Protocol: OMNI_VALIDATION
 """
 import json
-import hashlib
 
 class Boundary:
     def __init__(self, name, constraint):
