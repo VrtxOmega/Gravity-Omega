@@ -9,7 +9,6 @@ This prevents the OpenClaw bug where system instructions drift
 out of context during long conversations.
 """
 
-import os
 from pathlib import Path
 from typing import Optional
 

@@ -342,7 +342,7 @@ class MorphologicalChart:
                 dim_names[i]: combo[i]
                 for i in range(len(dim_names))
             }
-            candidate['id'] = hashlib.md5(
+            candidate['id'] = hashlib.sha256(
                 json.dumps({k: v.name for k, v in candidate.items()}, sort_keys=True).encode()
             ).hexdigest()[:12]
             

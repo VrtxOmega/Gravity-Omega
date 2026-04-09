@@ -13,16 +13,14 @@ Sections:
   5. Evidence Appendix (all sealed nodes)
 """
 
-import json
-import os
 import sys
 import hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from .omega_pattern_engine import PatternReport, ContradictionVector
-from .omega_province import SealedProof, OmegaProvince
+from .omega_pattern_engine import PatternReport
+from .omega_province import SealedProof
 from .omega_array import IntelNode
 
 

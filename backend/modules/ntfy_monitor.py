@@ -6,7 +6,6 @@ Sends push notifications for liquidation events and fund progress
 
 import time
 import requests
-from datetime import datetime
 from web3 import Web3
 
 # CONSTANTS

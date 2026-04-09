@@ -4,7 +4,6 @@ Protocol: NAEF (Narrative-Based Agentic Failure)
 Identity: Architect RJ / Kinetic Layer Sentinel Omega
 """
 import os
-import sys
 import datetime
 import json
 import hashlib
@@ -15,7 +14,6 @@ from enum import Enum
 from contextlib import contextmanager
 
 # VERITAS Spec Alignment
-import VERITAS_SPEC
 from VERITAS_SPEC import Claim, LossModel, get_canonical_boundaries
 
 # ==============================================================================
@@ -111,7 +109,7 @@ class LeviathanTrace:
             with open(cls._log_path, "a") as f:
                 f.write(entry)
             cls._last_hash = this_h
-        except: pass
+        except Exception as e: pass
 
 # ==============================================================================
 # LEVIATHAN ANALYTICS
@@ -143,7 +141,7 @@ class MetadataHarvester:
                             meta[tag] = child.text
                         meta['institutional_origin'] = company
                         return meta
-        except: pass
+        except Exception as e: pass
         return None
 
 class TemporalProber:
@@ -164,7 +162,7 @@ class TemporalProber:
                     dt = datetime.datetime.strptime(ts_str.strip(), p)
                     if dt.tzinfo: dt = dt.replace(tzinfo=None) # Strip TZ for baseline compare
                     break
-                except: continue
+                except Exception as e: continue
                 
             if not dt: return "PARSE_ERROR", "Unrecognized timestamp format"
             
@@ -174,7 +172,7 @@ class TemporalProber:
                 return "PRE_BASELINE_OP", f"Activity at {dt} before Act Passage (Nov 19)"
                 
             return "ALIGNED", ""
-        except: return "UNKNOWN", ""
+        except Exception as e: return "UNKNOWN", ""
 
 class ShadowMapper:
     """Maps the Generic Signal Networks."""
@@ -275,7 +273,7 @@ class DeltaMapper:
         data = bytearray()
         for i in range(total_units):
             # Simulate sparse hits in the bitstream
-            v = 1 if (hashlib.md5(str(i).encode()).digest()[0] % 100) < 5 else 0
+            v = 1 if (hashlib.sha256(str(i).encode()).digest()[0] % 100) < 5 else 0
             data.append(v)
         
         with open(map_path, "wb") as f:
@@ -385,7 +383,7 @@ def execute_disclosure_scan(claim_id="CLAIM_90GB_DRIFT"):
                                     "fin_hits": s_fin_hits
                                 })
 
-                except: pass
+                except Exception as e: pass
 
     # LossModel Logic: abs(unredacted - public)
     # Mocking public count for the baseline reconciliation

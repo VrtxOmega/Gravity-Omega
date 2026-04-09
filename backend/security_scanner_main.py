@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'security_scanner_module
 from security_scanner_core import scan_file_content # Import core functions
 
 def main():
-    base_dir = "C:\\Veritas_Lab\\gravity-omega-v2\\" # Corrected path
+    base_dir = "." # Corrected path
     findings = {
         'hardcoded_secrets': [], 'sensitive_files': [], 'exposed_bindings': [],
         'eval_exec_usage': [], 'missing_validation': [], 'errors': []

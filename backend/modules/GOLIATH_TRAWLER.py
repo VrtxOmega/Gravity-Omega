@@ -4,12 +4,8 @@ Protocol: VERITAS Ω INTEGRATION
 Identity: Architect RJ / Kinetic Layer Sentinel Omega
 """
 import os
-import sys
 import datetime
-import traceback
 import time
-import random
-import shutil
 import math
 import lzma
 import zlib
@@ -48,7 +44,6 @@ SAMPLE_SIZE = 64 * 1024
 # ==============================================================================
 # EPA & ESG WEB TRAWLER (PHASE 2 UPGRADE)
 # ==============================================================================
-import requests
 
 class WebTrawler:
     """Ingests public EPA enforcement databases and corporate ESG filings."""
@@ -168,7 +163,7 @@ class TraceManager:
             with open(cls._log_path, "a") as f:
                 f.write(log_entry)
             cls._last_hash = this_h
-        except: pass
+        except Exception as e: pass
 
 # Legacy Shim for backward compatibility during migration
 class AuditManager:
@@ -186,7 +181,7 @@ class VaultManager:
             try:
                 with open(BOLO_REGISTRY_PATH, "r") as f:
                     return json.load(f)
-            except: return {}
+            except Exception as e: return {}
         return {}
 
     @staticmethod
@@ -194,7 +189,7 @@ class VaultManager:
         try:
             with open(BOLO_REGISTRY_PATH, "w") as f:
                 json.dump(registry, f, indent=2)
-        except: pass
+        except Exception as e: pass
 
     @staticmethod
     @Capabilities.require(Capability.FILE_WRITE)
@@ -241,7 +236,7 @@ def calculate_sha256(filepath):
             while chunk := f.read(8192):
                 h.update(chunk)
         return h.hexdigest()
-    except: return "HASH_ERR"
+    except Exception as e: return "HASH_ERR"
 
 def boot_log(msg):
     ts = datetime.datetime.now().strftime("%H:%M:%S")
@@ -250,7 +245,7 @@ def boot_log(msg):
         log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BREADCRUMB_AG.log")
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{ts}] [VAULT-ASCENSION] {msg}\n")
-    except: pass
+    except Exception as e: pass
 
 def calculate_entropy_sample(filepath):
     try:
@@ -261,7 +256,7 @@ def calculate_entropy_sample(filepath):
         length = len(data)
         if length == 0: return 0
         return -sum((count / length) * math.log2(count / length) for count in counter.values())
-    except: return 0
+    except Exception as e: return 0
 
 # ==============================================================================
 # BATES-GAP RECOVERY (ZIP SCANNER)
@@ -289,8 +284,8 @@ class BatesGapScanner:
                                     print(f"[BATES-GAP] Recovery Triggered in {os.path.basename(zippath)}: {name}")
                                     # Extract specific member for analysis
                                     return name
-                    except: pass
-        except: pass
+                    except Exception as e: pass
+        except Exception as e: pass
         return None
 
 # ==============================================================================
@@ -367,7 +362,7 @@ class WholeDocumentRestore:
             AuditManager.log_event("CONTAINER_RESTORE", fname, os.path.basename(dest), s_hash, "DIR_RESTORE")
             
             return True
-        except: return False
+        except Exception as e: return False
 
     @staticmethod
     def restore_unmasked_file(filepath):
@@ -404,7 +399,7 @@ class WholeDocumentRestore:
             AuditManager.log_event("WHOLE_RESTORE", fname, os.path.basename(out_path), s_hash, d_hash)
             
             return out_path
-        except: pass
+        except Exception as e: pass
         return None
 
 # ==============================================================================
@@ -435,7 +430,7 @@ class RedactionXray:
                         entropy = calculate_entropy_data(sample)
                         if entropy > 7.75:
                             return True, marker.decode("utf-8", errors="ignore")
-        except: pass
+        except Exception as e: pass
         return False, None
 
     @staticmethod
@@ -460,7 +455,7 @@ class RedactionXray:
                 with open(out_path, "wb") as f_out:
                     f_out.write(data)
                 return out_path
-        except: pass
+        except Exception as e: pass
         return None
 
 def calculate_entropy_data(data):
@@ -605,7 +600,6 @@ def safe_run():
             except Exception as e:
                 if "VIOLATION" in str(e):
                     boot_log(f"[SECURITY] {e}")
-                pass
             return False
 
         def process(self):

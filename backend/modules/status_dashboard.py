@@ -38,13 +38,13 @@ def show_status():
             print(f"  {p}")
     
     # Check queue
-    queue_dir = Path("c:/Veritas_Lab/candidate_queue")
+    queue_dir = Path("candidate_queue")
     if queue_dir.exists():
         queue_count = len(list(queue_dir.glob("*.json")))
         print(f"\nCandidate Queue: {queue_count} reports")
     
     # Show recent coordinator log
-    log_file = Path("c:/Veritas_Lab/coordinator.log")
+    log_file = Path("coordinator.log")
     if log_file.exists():
         print("\nRecent Coordinator Activity:")
         lines = log_file.read_text().split('\n')[-5:]

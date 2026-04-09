@@ -22,7 +22,7 @@ import uuid
 import ipaddress
 import random
 import numpy as np
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Set
 from enum import Enum, auto
 

@@ -100,3 +100,6 @@ MIT
 <div align="center">
   <sub>Built by <a href="https://github.com/VrtxOmega">RJ Lopez</a> | VERITAS Framework</sub>
 </div>
+
+## Continuous Improvement
+Updated MD5 to SHA256 and fixed exceptions.

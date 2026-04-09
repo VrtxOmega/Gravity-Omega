@@ -1,7 +1,6 @@
 import ast
 import re
 import json
-import os
 
 def analyze_routes(file_content):
     tree = ast.parse(file_content)

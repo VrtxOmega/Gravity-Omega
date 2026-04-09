@@ -38,7 +38,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] [DEEP_INDEXER] %(message)s',
     handlers=[
-        logging.FileHandler('c:\\Veritas_Lab\\deep_indexer.log'),
+        logging.FileHandler('deep_indexer.log'),
         logging.StreamHandler()
     ]
 )

@@ -6,8 +6,6 @@ Output: training_data.jsonl ready for upload to Google Cloud Storage.
 Format per Vertex AI docs:
 {"contents": [{"role": "user", "parts": [{"text": "..."}]}, {"role": "model", "parts": [{"text": "..."}]}]}
 """
-import os
-import sys
 import json
 from pathlib import Path
 

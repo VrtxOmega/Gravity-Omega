@@ -46,7 +46,7 @@ class SignalShroud:
                     'data': "0x35a14a7d" + dummy_address[2:].lower().zfill(64) # getUserAccountData
                 })
                 time.sleep(0.5)
-            except:
+            except Exception as e:
                 pass
 
     def shadow_strike(self):

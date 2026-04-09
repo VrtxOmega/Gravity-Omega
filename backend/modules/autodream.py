@@ -1,5 +1,4 @@
 import sqlite3
-import json
 import struct
 import numpy as np
 import os

@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect('c:/Veritas_Lab/gravity-omega-v2/backend/data/vault.db')
+conn = sqlite3.connect('backend/data/vault.db')
 c = conn.cursor()
 tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
 print("Tables:", tables)
