@@ -2,11 +2,13 @@ import requests
 import json
 import os
 
-# FIXME [AEGIS]: Move to environment variable
-# def fetch_terafab_news(query='Terafab', api_key='ceb2eca8f2ff49aeac2de93cd0240047', language='en', sort_by='publishedAt'):
+def fetch_terafab_news(query='Terafab', api_key=None, language='en', sort_by='publishedAt'):
     '''
     Fetches recent news articles related to 'Terafab' using the NewsAPI.
     '''
+    if api_key is None:
+        api_key = os.getenv('NEWS_API_KEY')
+
     base_url = 'https://newsapi.org/v2/everything'
     params = {
         'q': query,
