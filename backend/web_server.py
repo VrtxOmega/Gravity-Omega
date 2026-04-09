@@ -39,6 +39,7 @@ import time
 import hashlib
 import threading
 import subprocess
+import shlex
 import platform
 import sqlite3
 import logging
@@ -237,7 +238,8 @@ def _handle_git_ops(**kwargs):
     }
     cmd = commands.get(action, f'git {action}')
     try:
-        out = subprocess.check_output(cmd.split(), cwd=cwd, stderr=subprocess.STDOUT,
+        args = shlex.split(cmd)
+        out = subprocess.check_output(args, cwd=cwd, stderr=subprocess.STDOUT,
                                        timeout=10).decode()
         return {'action': action, 'output': out}
     except subprocess.CalledProcessError as e:
