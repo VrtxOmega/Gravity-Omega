@@ -120,93 +120,61 @@ class OmegaAgent {
 
 ## â›” HARD OUTPUT RULES (NEVER violate these)
 1. **Chat messages MUST be under 3 sentences.** No plans, no code, no step-by-step instructions in chat. EVER.
-2. **All plans, code, and documents MUST be written as files** using VTP MUT:AST, then opened with REQ:UI.
-3. **Your FIRST action** on any multi-step task: write an implementation plan FILE (not in chat).
+2. **All plans, code, and documents MUST be written as files** using the writeFile tool. Do not use VTP.
+## MULTI-FILE BUILD PROTOCOL
+When asked to build an application or multi-file project, follow this exact sequence without deviation:
 
-WRONG (plan in chat):
-"Step 1: Define search queries. Step 2: Fetch news..."
+Step 1 — Plan first. Write nothing yet.
+List every file you will create. Full paths. No exceptions. Do not write a single file until the complete plan is listed and confirmed. Example:
+PLAN:
+1. package.json
+2. App.jsx
+3. src/theme/veritas.js
 
-RIGHT (plan in file, brief chat):
-\`\`\`vtp
-REQ::[ACT:MUT|TGT:AST|PRM:"path=C:\\Users\\rlope\\.veritas\\plan.md, content=# Terafab Monitor Plan\\n\\n## Steps\\n1. Define search queries\\n2. Fetch news via API\\n3. Summarize articles\\n4. Store in Vault\\n5. Schedule hourly refresh"]::[BND:NONE|RGM:SAFE|FAL:WARN]
-\`\`\`
-\`\`\`vtp
-REQ::[ACT:REQ|TGT:UI|PRM:"open:C:\\Users\\rlope\\.veritas\\plan.md"]::[BND:NONE|RGM:SAFE|FAL:WARN]
-\`\`\`
-"Here's the plan, love â€” take a look in the editor."
+Step 2 — Write each file completely, in order.
+- One file per tool call
+- Every file must be complete — no // TODO, no // implement later, no stubs
+- After each file write, output only: ✓ [filename] — moving to next
+- Do not output code in chat. Write to disk. Only disk.
 
-## Current Mood Context
-${moodDirectives[userMood] || moodDirectives.neutral}
+Step 3 — Never stop early.
+The build is not complete until every file on the plan exists on disk. If you feel the urge to stop and ask for confirmation mid-build — don't. Continue. Only stop when the last file is written.
 
-## Operational Context
-${(() => {
-    try {
-        return require('fs').readFileSync('C:\\Users\\rlope\\.veritas\\omega_context.md', 'utf8');
-    } catch(e) {
-        return '(No context file found at C:\\Users\\rlope\\.veritas\\omega_context.md)';
-    }
-})()}
+Step 4 — Deliver and Launch.
+- After all files are written, launch the project automatically for RJ at the end using openTerminal (e.g., starting a server, running a script).
+- If appropriate, zip the directory using the exec tool and present it.
+- Then output a brief summary: what was built, how to run it, what to configure.
 
-## Workflow — EXECUTE, NEVER EXPLAIN
-1. **Plan First** - Write the FULL DETAILED plan to a FILE using MUT:AST, then open it with REQ:UI.
-2. **Write Before Open** - ALWAYS MUT:AST first, REQ:UI second.
-3. Execute each step using VTP tool blocks
-4. Continue until complete
-
-## CRITICAL: You Are an EXECUTOR, Not an Explainer
+HARD RULES:
+- If you write code in chat instead of to disk — you have failed. Restart that file.
+- If you stop before the plan is complete — you have failed. Continue.
+- If you write a stub instead of real code — you have failed. Rewrite it.
+- File count in plan must match file count on disk. Verify before delivering.
+- The test: Could someone unzip this and run it with only the README? If no — keep building.
 - When RJ gives you a task, you DO NOT explain how to do it — you DO it.
 - NEVER respond with steps, code blocks, or instructions in chat text.
-- ALWAYS respond with VTP tool blocks that execute the work.
-- If RJ says "build X", your response should contain \`\`\`vtp blocks, NOT markdown explanations.
-- WRONG: "Step 1: Create the Python script. Here's the code: \`\`\`python..."
-- RIGHT: \`\`\`vtp REQ::[ACT:MUT|TGT:AST|PRM:"path=C:\\\\file.py, content=..."] \`\`\`
+- ALWAYS invoke the native function definitions built into your API schema.
+- If RJ says "build X", your response should be a backend tool payload, NOT a markdown explanation or pseudocode.
+- WRONG: "Step 1: Create the Python script. Here's the code: \\\`\\\`\\\`python..."
+- WRONG: "writeFile('script.py', 'code...')"
+- RIGHT: Emit a proper JSON function call payload through the Gemini API framework.
 - Your ONLY text output should be 1-2 short sentences AFTER all tools have executed.
-- If you find yourself typing code or steps in plain text, STOP. Use a VTP block instead.
+- If you find yourself typing code, steps, or pseudocode in plain text, STOP. Make a JSON function call instead.
 
-## ABSOLUTE RULE: Split Work Into Focused Files
-- Your chat response must be SHORT (1-3 sentences max).
-- ALL detailed content goes into SEPARATE FOCUSED FILES via MUT:AST — one file per purpose:
-  * Plan/design -> plan.md or [task]_plan.md
-  * Python scripts -> [name].py (one script per function)
-  * HTML output -> index.html or dashboard.html
-  * Data/config -> data.json or config files
-- NEVER combine everything into one mega-file. Split by purpose.
-- NEVER paste file content, code blocks, or analysis into your chat response.
-- After writing each file, open it with REQ:UI so RJ can see it.
-- Chat says ONLY things like: "Written the plan to plan.md, love - take a look."
+## ABSOLUTE RULE: Chat Window is Only For Meta-Communication
+- The chat window is exclusively for talking TO RJ (e.g., "I've written the chapter for you", "I finished the script, any thoughts?").
+- The chat window is NEVER for generating the actual requested content or echoing code.
+- If RJ asks for a chapter of a book, a story, prose, code, an article, or any form of output longer than 3 sentences, YOU MUST execute your native writeFile schema!
+- (Do not write the text into the chat window).
+- Use openFile ONLY if RJ explicitly asks you to open a file that you did NOT just write.
+- NEVER write the chapter, story, article text, or pseudocode into the chat window.
 
-    ## Dual-Channel Emission (VTP)
-    You operate in dual-channel mode:
+## Native Function Calling
+You have been upgraded to use Native JSON Function Calling. You NO LONGER format your output using \\\`\\\`\\\`vtp blocks, nor should you ever type pseudocode into chat.
+Instead, use the exact API tool payload structure native to the Gemini SDK. You may emit multiple function calls consecutively.
 
-    Channel 1 (INTERNAL): VTP packet generation
-    Channel 2 (EXTERNAL): Human-readable response
-
-    Never expose VTP syntax to the user.
-    Never explain internal protocol structure.
-    If a VTP packet is malformed, regenerate silently.
-
-    ## Tool Execution via VTP
-    When you want to execute an action, output a VTP block exactly formatted like this:
-    \`\`\`vtp
-    REQ::[ACT:MUT|TGT:CSS|PRM:"hex=#D4AF37"]::[BND:sz<10kb|RGM:GATED|FAL:ABORT]
-    \`\`\`
-
-    VALID_ACT = {"EXT", "MUT", "GEN", "VFY", "REQ"}
-    VALID_TGT = {"VLT", "AST", "NET", "CSS", "PY", "JS", "SYS", "UI"}
-    VALID_RGM = {"SAFE", "GATED", "RSTR"}
-    VALID_FAL = {"ABORT", "WARN", "PASS"}
-
-    To read a file: \`[ACT:EXT|TGT:AST|PRM:"path/to/file.py"]\`
-    To edit a file: \`[ACT:MUT|TGT:AST|PRM:"path/to/file.py::find::replace"]\`
-    To search the web: \`[ACT:EXT|TGT:NET|PRM:"query"]\`
-    To run shell: \`[ACT:REQ|TGT:SYS|PRM:"command"]\`
-    To query vault: \`[ACT:EXT|TGT:VLT|PRM:"query"]\`
-    To open an editor tab for RJ: \`[ACT:REQ|TGT:UI|PRM:"open:path/to/file.py"]\`
-
-    You may output multiple \`\`\`vtp blocks if needed.
-
-    ## Response Format
-    When you are done executing and want to talk to RJ, just write your message normally outside of any blocks. Do not use JSON anymore.
+## Response Format
+When you are done executing via backend JSON definitions and want to talk to RJ, just write your message normally.
 
 ## Available Tools
 ${toolDescriptions}
@@ -312,12 +280,21 @@ ${toolDescriptions}
                     const isAcknowledgment = /\b(understood|i will|i'll|let me|i can|i am going to|going to|here'?s (my|the) plan)\b/i.test(parsed.content) 
                         && this._stepLog.length === 0 
                         && parsed.content.length < 500;
+                        
+                    // v4.3.18r: PROSE / LONG FORM GUARD
+                    const isLongForm = parsed.content.length > 500 && this._stepLog.length === 0;
                     
-                    if ((hasCode || hasStructure || hasSteps || isAcknowledgment) && iteration < 19) {
-                        const reason = isAcknowledgment ? 'acknowledgment without execution' : 'code/structure without VTP';
+                    // v4.3.18t: PSEUDOCODE GUARD — catch LLM printing tool signatures instead of JSON
+                    const hasPseudocode = /^(?:write|open|read|create|edit)File\s*\(/im.test(parsed.content);
+                    
+                    if ((hasCode || hasStructure || hasSteps || isAcknowledgment || isLongForm || hasPseudocode) && iteration < 19) {
+                        let reason = 'code/structure without function calls';
+                        if (isAcknowledgment) reason = 'acknowledgment without execution';
+                        if (isLongForm) reason = 'prose/long-form output in chat box';
+                        if (hasPseudocode) reason = 'pseudocode instead of JSON function call';
                         console.log(`[ANTI-EXPLAIN] Re-prompting — ${reason}`);
                         messages.push({ role: 'assistant', content: llmResponse });
-                        messages.push({ role: 'user', content: 'DO NOT ACKNOWLEDGE. DO NOT EXPLAIN. EXECUTE NOW. Your FIRST response must contain ```vtp tool blocks. Use MUT:AST to write files and REQ:SYS to run commands. Start immediately.' });
+                        messages.push({ role: 'user', content: 'DO NOT ACKNOWLEDGE. DO NOT EXPLAIN. EXECUTE NOW. Your response must be an EXECUTABLE JSON FUNCTION CALL PAYLOAD (via the API tools). Do not type pseudocode into chat.' });
                         continue;
                     }
                     
@@ -553,9 +530,26 @@ ${toolDescriptions}
                 parts: [{ text: m.content }],
             }));
 
+        const { TOOL_REGISTRY } = require('./omega_tools');
+        const functionDeclarations = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
+            const props = {};
+            const required = [];
+            for (const [k, v] of Object.entries(tool.args || {})) {
+                props[k] = { type: v.type.toUpperCase() === 'NUMBER' ? 'NUMBER' : v.type.toUpperCase() === 'BOOLEAN' ? 'BOOLEAN' : 'STRING' };
+                if (v.required) required.push(k);
+            }
+            const obj = { name, description: tool.description };
+            if (Object.keys(props).length) {
+                obj.parameters = { type: 'OBJECT', properties: props };
+                if (required.length) obj.parameters.required = required;
+            }
+            return obj;
+        });
+
         const payload = JSON.stringify({
             system_instruction: { parts: [{ text: systemParts }] },
             contents,
+            tools: [{ functionDeclarations: functionDeclarations }],
             generationConfig: {
                 temperature: 0.2,
                 maxOutputTokens: 8192,
@@ -578,9 +572,28 @@ ${toolDescriptions}
                 res.on('end', () => {
                     try {
                         const parsed = JSON.parse(data);
-                        const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                        if (text) resolve(text);
-                        else if (parsed.error) reject(new Error(parsed.error.message || 'Gemini API error'));
+                        if (parsed.error) {
+                            reject(new Error(parsed.error.message || 'Gemini API error'));
+                            return;
+                        }
+                        
+                        let textContent = '';
+                        const parts = parsed.candidates?.[0]?.content?.parts || [];
+                        
+                        // 1. Extract any literal text
+                        const textPart = parts.find(p => p.text);
+                        if (textPart) textContent += textPart.text + '\n';
+                        
+                        // 2. Transpile Native JSON Function Calls into VTP string representations
+                        // This allows omega_agent.js and vtp_codec.py to remain fully backwards compatible
+                        const funcCalls = parts.filter(p => p.functionCall).map(p => p.functionCall);
+                        for (const fc of funcCalls) {
+                            // If it's a native tool, target is the name and PRM is exactly the JSON arguments payload
+                            const argsJson = JSON.stringify(fc.args || {});
+                            textContent += `\n\`\`\`vtp\nREQ::[ACT:RUN|TGT:${fc.name}|PRM:"${argsJson}"]::[BND:NONE|RGM:SAFE|FAL:WARN]\n\`\`\`\n`;
+                        }
+                        
+                        if (textContent) resolve(textContent.trim());
                         else resolve(null);
                     } catch { resolve(null); }
                 });
@@ -629,7 +642,7 @@ ${toolDescriptions}
         return null;
     }
 
-    // â”€â”€ Ollama Fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Ollama Fallback ──────────────────────────────────────────────
     async _ollamaGenerate(messages) {
         const http = require('http');
         return new Promise((resolve, reject) => {
@@ -661,7 +674,38 @@ ${toolDescriptions}
         });
     }
 
-    // â”€â”€ Response Parser â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── VTP PRM Parser ──────────────────────────────────────────────
+    _parsePRM(prmStr) {
+        if (!prmStr || prmStr.trim() === '') return {};
+        try {
+            let unescaped = prmStr.replace(/^"/, '').replace(/"$/, '').trim();
+            try { return JSON.parse(unescaped); } catch(e) {}
+            
+            // Revert hallucinated quotes if they appeared
+            let quoteFixed = unescaped.replace(/\\"/g, '"');
+            try { return JSON.parse(quoteFixed); } catch(e) {}
+            
+            // Fix hallucinated windows paths (single backslashes not matching standard JSON escapes)
+            let pathFixed = quoteFixed.replace(/\\(?![\\"/bfnrtu])/g, '\\\\');
+            try { return JSON.parse(pathFixed); } catch(e) {}
+
+            const parsed = {};
+            const regex = /([a-zA-Z0-9_]+)\s*=\s*(?:"([^"]*)"|([^,]+))/g;
+            let m;
+            let hasKeys = false;
+            while ((m = regex.exec(unescaped)) !== null) {
+                hasKeys = true;
+                parsed[m[1]] = m[2] !== undefined ? m[2] : m[3].trim();
+            }
+            if (hasKeys) return parsed;
+
+            return { raw: prmStr, err: "Unparseable PRM" };
+        } catch (e) {
+            return { raw: prmStr, err: e.message };
+        }
+    }
+
+    // ── Response Parser ──────────────────────────────────────────────
     _parseResponse(text) {
         // Look for ```vtp blocks
         const vtpRegex = /```vtp\s*\n([\s\S]*?)```/g;
@@ -672,11 +716,11 @@ ${toolDescriptions}
         while ((match = vtpRegex.exec(text)) !== null) {
             hasVtp = true;
             const block = match[1].trim();
-            // v4.3.9: Join continuation lines â€” LLM often splits VTP content across multiple lines
+            // v4.3.9: Join continuation lines ── LLM often splits VTP content across multiple lines
             const rawLines = block.split('\n');
             const joined = [];
             for (const rl of rawLines) {
-                if (/^(REQ|ACK|CMD|MUT|EXT|GEN|CREATE)\s*::/.test(rl.trim())) {
+                if (/^(REQ|ACK|CMD|MUT|EXT|GEN|CREATE|RUN)\s*::/.test(rl.trim())) {
                     joined.push(rl.trim());
                 } else if (joined.length > 0) {
                     // Continuation of previous VTP line â€” append with \n escape
@@ -696,7 +740,7 @@ ${toolDescriptions}
                     const naef = naefSep > 0 ? remainder.substring(naefSep + 2) : '[BND:NONE|RGM:SAFE|FAL:WARN]';
                     
                     const act = claeg.match(/ACT:([A-Z]+)/)?.[1] || 'REQ';
-                    const tgt = claeg.match(/TGT:([A-Z]+)/)?.[1] || 'SYS';
+                    const tgt = claeg.match(/TGT:([a-zA-Z0-9_]+)/)?.[1] || 'SYS';
                     // v4.3.6: Robust PRM extraction (handles embedded quotes in content)
                     let prm = '';
                     const prmStart = claeg.indexOf('PRM:');
@@ -768,29 +812,8 @@ ${toolDescriptions}
         clean = clean.replace(/^```\s*$/gm, '');
         // 4. Collapse excessive whitespace
         clean = clean.replace(/\n{3,}/g, '\n\n').trim();
-                // 5. Truncate junk-heavy content (repeated words/patterns)
-        if (clean.length > 3000) {
-            // Check for repetition â€” if last 500 chars repeat patterns from first 500
-            const head = clean.substring(0, 500);
-            const tail = clean.substring(clean.length - 500);
-            const headWords = new Set(head.split(/\s+/).filter(w => w.length > 3));
-            const tailWords = tail.split(/\s+/).filter(w => w.length > 3);
-            const overlap = tailWords.filter(w => headWords.has(w)).length;
-            if (overlap > tailWords.length * 0.5) {
-                // High repetition detected â€” truncate
-                clean = clean.substring(0, 2000) + '\n\n*... (content truncated â€” see files in editor)*';
-            }
-        }
-        if (!clean || clean.length < 10) clean = '(Task completed â€” see tool steps above)';
-        // v4.3.18o: HARD CHAT CAP — like Antigravity, chat stays short
-        // If still >500 chars after all sanitization, hard truncate
-        if (clean.length > 500) {
-            // Find a natural break point near 400 chars
-            let cutPoint = clean.lastIndexOf('.', 400);
-            if (cutPoint < 200) cutPoint = clean.lastIndexOf(' ', 400);
-            if (cutPoint < 200) cutPoint = 400;
-            clean = clean.substring(0, cutPoint + 1) + '\n\n*(Use MUT:AST to write detailed content to files)*';
-        }
+        
+        if (!clean || clean.length < 10) clean = '(Task completed — all work has been output to files via native tools)';
 
         return clean;
     }
@@ -1180,7 +1203,6 @@ ${toolDescriptions}
                                 const truncResult = { error: 'File truncated (' + truncReason + '). Split into files under 150 lines.' };
                                 results.push(truncResult);
                                 this._logStep(pseudo_tool_name, filePath, truncResult);
-                                this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: filePath, ok: false, totalSteps: this._stepLog.length });
                                 continue;
                             }
                         }
@@ -1196,7 +1218,7 @@ ${toolDescriptions}
                             }
                         }
                         fs.writeFileSync(filePath, content, 'utf8');
-                        const result = { ok: true, message: `File written: ${filePath}` };
+                        const result = { ok: true, message: `File written: ${filePath}`, path: filePath };
                         results.push(result);
                         this._logStep(pseudo_tool_name, filePath, result);
                     } else {
@@ -1243,7 +1265,6 @@ ${toolDescriptions}
                         const result = { ok: true, message: 'Directory created: ' + dirPath };
                         results.push(result);
                         this._logStep(pseudo_tool_name, packet.prm, result);
-                        this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: cmd, ok: true, totalSteps: this._stepLog.length });
                         continue;
                     }
                     if (!this._isDestructiveCommand(cmd)) {
@@ -1274,7 +1295,6 @@ ${toolDescriptions}
                         const result = { ok: true, output: cleanOutput.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };
                         results.push(result);
                         this._logStep(pseudo_tool_name, packet.prm, result);
-                        this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: cmd, ok: true, totalSteps: this._stepLog.length });
                         continue;
                     }
                     // Destructive command â€” fall through to proposal gate
@@ -1293,7 +1313,6 @@ ${toolDescriptions}
                     openPath = this._resolveFilePath(openPath);
                     if (openPath) {
                         // Emit a file-open event â€” main.js forwards to renderer
-                        this._emitProgress({ phase: 'tool_done', tool: pseudo_tool_name, args: openPath, ok: true, totalSteps: this._stepLog.length + 1 });
                         const result = { ok: true, message: `Opened in editor: ${openPath}` };
                         results.push(result);
                         this._logStep(pseudo_tool_name, openPath, result);
@@ -1304,6 +1323,25 @@ ${toolDescriptions}
                     this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
                     continue;
                 }
+            }
+
+            // Native Node Tool Executor Intercept
+            if (TOOL_REGISTRY[packet.tgt] && packet.act === 'RUN') {
+                try {
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    
+                    const jsonArgs = this._parsePRM(packet.prm || '');
+                    if (!this.executor) this.executor = new ToolExecutor({ bridge: this.bridge });
+                    const result = await this.executor.execute(packet.tgt, jsonArgs);
+                    
+                    results.push(result);
+                    this._logStep(pseudo_tool_name, packet.prm, { ok: true, result });
+                    await this.hooks.fire('on_gate_result', { tool: pseudo_tool_name, safety: 'SAFE', verdict: 'AUTO_APPROVED' });
+                } catch (err) {
+                    results.push({ error: err.message });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: err.message });
+                }
+                continue;
             }
 
             if (safety === SAFETY.SAFE) {
@@ -1426,7 +1464,7 @@ ${toolDescriptions}
         this.context.addBreadcrumb('agent-step', `${tool}: ${result?.error ? 'FAIL' : 'OK'}`);
 
         // v4.3: Emit tool completion for thinking indicator + Monaco auto-open
-        this._emitProgress({ phase: 'tool_done', tool, args, ok: !result?.error, totalSteps: this._stepLog.length });
+        this._emitProgress({ phase: 'tool_done', tool, args: result || args, ok: !result?.error, totalSteps: this._stepLog.length });
     }
 
     // â”€â”€ Approval Handling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1497,6 +1535,11 @@ ${toolDescriptions}
                         result = { ok: false, error: execErr.message, stderr: (execErr.stderr || '').substring(0, 2000) };
                         console.log('[APPROVE] SYS failed:', execErr.message);
                     }
+                } else if (TOOL_REGISTRY[packet.tgt] && packet.act === 'RUN') {
+                    console.log('[APPROVE] Running TOOL_REGISTRY natively:', pseudo);
+                    if (!this.executor) this.executor = new ToolExecutor({ bridge: this.bridge });
+                    const jsonArgs = this._parsePRM(packet.prm || '');
+                    result = await this.executor.execute(packet.tgt, jsonArgs);
                 } else {
                     try {
                         console.log('[APPROVE] Fallback bridge for:', pseudo);

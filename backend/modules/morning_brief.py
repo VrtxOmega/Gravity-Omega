@@ -56,11 +56,14 @@ def get_recent_sessions(conn, since_ts):
 
 def get_action_items(conn):
     """Get open action items."""
-    rows = conn.execute(
-        "SELECT description, priority, status FROM action_items "
-        "WHERE status != 'done' ORDER BY priority DESC"
-    ).fetchall()
-    return rows
+    try:
+        rows = conn.execute(
+            "SELECT description, priority, status FROM action_items "
+            "WHERE status != 'done' ORDER BY priority DESC"
+        ).fetchall()
+        return rows
+    except Exception:
+        return []
 
 
 def get_recent_timeline(conn, since_ts, limit=20):
@@ -306,6 +309,8 @@ def load_horizon():
                         target = now + timedelta(days=days_ahead)
                         items.append({'date': target.strftime('%Y-%m-%d'), 'label': desc})
                         break
+        except Exception:
+            pass
         finally:
             conn.close()
 
@@ -379,6 +384,27 @@ def streak_moment(streak):
         return "**You're back.** Let's get after it."
 
 
+def gather_moltbook_activity(since_dt):
+    """Fetch Moltbook posts made by Omega since the given timestamp."""
+    import sys
+    if "C:\\Veritas_Lab" not in sys.path:
+        sys.path.append("C:\\Veritas_Lab")
+    try:
+        from moltbook_client import MoltbookClient
+        client = MoltbookClient()
+        recent = client.get_own_posts(limit=10)
+        valid = []
+        for p in recent:
+            dt_str = p.get('created_at')
+            if dt_str:
+                from datetime import datetime
+                p_dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00')).replace(tzinfo=None)
+                if p_dt >= since_dt:
+                    valid.append(p)
+        return valid
+    except Exception as e:
+        return []
+
 # ── Briefing Generator ────────────────────────────────────────────
 
 def generate_briefing(target_date=None, auto_open=True):
@@ -397,7 +423,10 @@ def generate_briefing(target_date=None, auto_open=True):
     if conn:
         try:
             action_items = get_action_items(conn)
-            vault_doc_count = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            try:
+                vault_doc_count = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+            except Exception:
+                vault_doc_count = 0
         finally:
             conn.close()
 
@@ -407,6 +436,7 @@ def generate_briefing(target_date=None, auto_open=True):
     ki_count = len(scan_knowledge_items())
     streak = get_activity_streak()
     horizon = load_horizon()
+    moltbook_posts = gather_moltbook_activity(since_48h)
 
     # Derived data
     in_progress_items = []
@@ -562,6 +592,24 @@ def generate_briefing(target_date=None, auto_open=True):
                 lines.append(f"- {item.get('date', '?')} — {item.get('label', '?')}")
         lines.append("")
 
+    # ── Moltbook Activity ─────────────────────────────────────────
+
+    if moltbook_posts:
+        lines.append("### Moltbook Intel")
+        lines.append("")
+        if len(moltbook_posts) == 1:
+            lines.append("Your AI made **1 broadcast** to the hive today.")
+        else:
+            lines.append(f"Your AI made **{len(moltbook_posts)} broadcasts** to the hive today.")
+        lines.append("")
+        for p in moltbook_posts:
+            title = p.get('title', 'Untitled')
+            content = p.get('content', '').replace('\n', ' ')
+            if len(content) > 120:
+                content = content[:117] + '...'
+            lines.append(f"- **{title}**: *{content}*")
+        lines.append("")
+
     # ── Closing ───────────────────────────────────────────────────
 
     lines.append("> Let's build.")
@@ -618,6 +666,7 @@ def generate_weekly_rollup(auto_open=True):
     recent_captures = scan_recent_captures(week_start)
     ki_count = len(scan_knowledge_items())
     streak = get_activity_streak()
+    moltbook_posts = gather_moltbook_activity(week_start)
 
     total_completed = sum(len(t['completed']) for t in all_tasks)
     total_open = sum(len(t['open']) for t in all_tasks)
@@ -695,6 +744,22 @@ def generate_weekly_rollup(auto_open=True):
                 lines.append(f"- {d.strftime('%A, %b %d')} — {item['label']}")
             except Exception:
                 lines.append(f"- {item.get('date', '?')} — {item.get('label', '?')}")
+        lines.append("")
+
+    if moltbook_posts:
+        lines.append("### Moltbook Intel")
+        lines.append("")
+        if len(moltbook_posts) == 1:
+            lines.append("Your AI made **1 broadcast** this week.")
+        else:
+            lines.append(f"Your AI made **{len(moltbook_posts)} broadcasts** this week.")
+        lines.append("")
+        for p in moltbook_posts:
+            title = p.get('title', 'Untitled')
+            content = p.get('content', '').replace('\n', ' ')
+            if len(content) > 120:
+                content = content[:117] + '...'
+            lines.append(f"- **{title}**: *{content}*")
         lines.append("")
 
     lines.append("> Keep building.")

@@ -61,8 +61,19 @@ class ArchivistNode:
             doc_type TEXT,
             embedding BLOB,
             chunk_text TEXT,
-            indexed_at REAL
+            indexed_at REAL,
+            tier TEXT DEFAULT 'C',
+            retrieval_count INTEGER DEFAULT 0
         )''')
+        # Backwards compatibility migration
+        try:
+            db.execute("ALTER TABLE embeddings ADD COLUMN tier TEXT DEFAULT 'C'")
+        except Exception:
+            pass
+        try:
+            db.execute("ALTER TABLE embeddings ADD COLUMN retrieval_count INTEGER DEFAULT 0")
+        except Exception:
+            pass
         db.execute('''CREATE TABLE IF NOT EXISTS index_meta (
             key TEXT PRIMARY KEY,
             value TEXT
@@ -272,14 +283,41 @@ class ContextCompiler:
 
             fragments.append(fragment)
 
+        # Skeptical verification pass
+        verified_fragments = []
+        for f in fragments:
+            status = self.verify_fragment(f)
+            f['verification'] = status
+            if status != 'STALE':
+                verified_fragments.append(f)
+            else:
+                log.info(f'Provenance: demoting STALE fragment {f.get("content_hash", "")[:8]} from {f.get("source", "unknown")}')
+
         return {
             'run_id': run_id,
             'query': query,
             'timestamp': datetime.now(timezone.utc).isoformat(),
-            'fragment_count': len(fragments),
-            'fragments': fragments,
+            'fragment_count': len(verified_fragments),
+            'fragments': verified_fragments,
             'chain_head': chain_hash,
         }
+
+    def verify_fragment(self, fragment, current_file_state=None):
+        """Check if a retrieved fragment's source still matches disk state.
+        Returns: 'VERIFIED', 'STALE', or 'UNVERIFIABLE'"""
+        source = fragment.get('source', '')
+        text = fragment.get('text', '')
+        if not source or not os.path.exists(source):
+            return 'UNVERIFIABLE'
+        try:
+            with open(source, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            # Check if the fragment text still appears in the source file
+            if text.strip()[:200] in content:
+                return 'VERIFIED'
+            return 'STALE'
+        except Exception:
+            return 'UNVERIFIABLE'
 
     def to_system_prompt(self, compiled_context):
         """
@@ -480,6 +518,46 @@ class ProvenanceStack:
             'compiled_context': compiled,
             'system_prompt': system_prompt,
         }
+
+    def build_task_scoped_prompt(self, task_description, intent="TASK", tool_set=None, available_tokens=8192):
+        """Build a system prompt dynamically based on task context to save tokens."""
+        from pathlib import Path
+        context_dir = Path(r'C:\Users\rlope\.veritas')
+        
+        def read_ctx(name):
+            try: return (context_dir / name).read_text(encoding='utf-8')
+            except Exception: return ''
+
+        prompt_parts = []
+        base_core = read_ctx('omega_core.md')
+        if not base_core:
+            base_core = read_ctx('omega_context.md')
+        prompt_parts.append(base_core)
+
+        if intent in ('TASK', 'FOLLOWUP'):
+            prompt_parts.append(read_ctx('omega_rules.md'))
+            
+        if intent == 'TASK':
+            prompt_parts.append(read_ctx('omega_traps.md'))
+            
+            # Use RAG to fetch only the rules/style guidelines relevant to the specific sub-tasks
+            if task_description:
+                # Query for specific context so we don't load the entire omega_projects.md
+                rag_res = self.rag_query(task_description + " project guidelines rules styles", top_k=3)
+                if rag_res and rag_res.get('compiled_context', {}).get('fragment_count', 0) > 0:
+                    prompt_parts.append("## Task-Scoped Project Guidelines (RAG)\n" + rag_res['system_prompt'])
+                else:
+                    # Fallback
+                    prompt_parts.append(read_ctx('omega_projects.md'))
+
+        full_prompt = '\n\n'.join(p for p in prompt_parts if p.strip())
+        
+        # Heuristic 4 chars per token roughly
+        max_chars = available_tokens * 4
+        if len(full_prompt) > max_chars:
+            full_prompt = full_prompt[:max_chars] + "\n\n...[TRUNCATED FOR VRAM CONTEXT LIMIT]..."
+            
+        return full_prompt
 
     def seal_response(self, compiled_context, llm_response):
         """Seal a complete run with S.E.A.L."""

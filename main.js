@@ -7,7 +7,7 @@
  *   main.js → OmegaBridge → Python web_server.py (port 5000)
  *   main.js → OmegaAgent → Agentic Loop (Gemini/Ollama)
  */
-const { app, BrowserWindow, ipcMain, dialog, Menu, protocol, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, protocol, shell, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -29,6 +29,7 @@ const { OmegaContext } = require('./omega/omega_context');
 const { OmegaHooks } = require('./omega/omega_hooks');
 const { OmegaAgent } = require('./omega/omega_agent');
 const { OmegaBrowser } = require('./omega/omega_browser');
+const { ConversationStore } = require('./omega/conversation_store');
 
 // ── Global Instances ─────────────────────────────────────────
 const bridge = new OmegaBridge();
@@ -37,6 +38,7 @@ const context = new OmegaContext();
 const hooks = new OmegaHooks();
 const agent = new OmegaAgent({ context, hooks, bridge });
 const browser = new OmegaBrowser({ screenshotDir: path.join(__dirname, 'screenshots') });
+let conversationStore = null; // initialized after app.whenReady()
 
 // v4.2: Forward agent progress events to renderer for live thinking indicator
 agent.onProgress = (event) => {
@@ -48,17 +50,31 @@ agent.onProgress = (event) => {
                 let filePath = '';
                 const tool = event.tool;
                 // Only auto-open for actual file writes (MUT:AST) or UI open commands (MUT:UI)
-                if (tool === 'MUT:AST' || tool === 'writeFile' || tool === 'CREATE:AST') {
-                    filePath = typeof event.args === 'string' ? event.args : (event.args?.path || event.args?.prm || '');
-                    // Extract path from VTP prm format: "path=C:\..., content=..."
-                    const pathMatch = filePath.match(/path[=:]([^,"|]+)/);
-                    if (pathMatch) filePath = pathMatch[1].trim();
-                } else if (tool === 'MUT:UI' || tool === 'REQ:UI') {
-                    filePath = typeof event.args === 'string' ? event.args : (event.args?.prm || '');
-                    // Strip "open:" prefix from UI commands
-                    filePath = filePath.replace(/^open:/, '');
+                if (tool === 'MUT:AST' || tool === 'writeFile' || tool === 'RUN:writeFile' || tool === 'CREATE:AST' || tool === 'editFile') {
+                    filePath = typeof event.args === 'string' ? event.args : (event.args?.result?.path || event.args?.path || '');
+                } else if (tool === 'MUT:UI' || tool === 'REQ:UI' || tool === 'openFile') {
+                    // For UI tools, path is in args (string) or args.path
+                    if (typeof event.args === 'string') {
+                        filePath = event.args.replace(/^open:/, '').replace(/^['"]|['"]$/g, '').trim();
+                    } else if (event.args?.path) {
+                        filePath = event.args.path;
+                    }
+                } else if (tool === 'openTerminal') {
+                    // Send to renderer directly and skip file opening
+                    console.log(`[MAIN IPC DEBUG] Forwarding openTerminal to renderer with command: ${event.args.command || '(empty)'}`);
+                    mainWindow.webContents.send('omega:open-terminal', { command: event.args.command });
+                    return;
                 }
-                if (filePath && /\.\w{1,10}$/.test(filePath)) {
+                
+                console.log(`[MAIN IPC DEBUG] tool_done received. Tool: ${tool}, Extracted filePath: "${filePath}"`);
+                
+                const path = require('path');
+                if (filePath && path.extname(filePath.trim()).length > 0) {
+                    filePath = filePath.trim();
+                    if (!path.isAbsolute(filePath)) {
+                        filePath = path.resolve(process.cwd(), filePath);
+                    }
+                    console.log(`[MAIN IPC] Agent wrote file, triggering auto-open: ${filePath}`);
                     mainWindow.webContents.send('omega:open-file', filePath);
                 }
             }
@@ -97,6 +113,10 @@ try {
             crashLog('second-instance event fired');
             if (mainWindow) {
                 if (mainWindow.isMinimized()) mainWindow.restore();
+                if (!mainWindow.isVisible()) {
+                    mainWindow.maximize();
+                    mainWindow.show();
+                }
                 mainWindow.focus();
             }
         });
@@ -132,13 +152,18 @@ function createWindow() {
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: false,
+            webviewTag: true,
         },
     });
 
     // Start maximized after content is ready
     mainWindow.once('ready-to-show', () => {
-        mainWindow.maximize();
-        mainWindow.show();
+        if (!process.argv.includes('--daemon')) {
+            mainWindow.maximize();
+            mainWindow.show();
+        } else {
+            console.log('[Omega] Running in headless daemon mode.');
+        }
     });
 
     mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
@@ -238,6 +263,173 @@ function registerIPC() {
         const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
         if (result.canceled || result.filePaths.length === 0) return null;
         return result.filePaths[0];
+    });
+
+    // Media: shared folder scan (fully async — never blocks main process)
+    async function scanAudioFolder(dir) {
+        const audioExts = new Set(['.mp3', '.m4a', '.m4b', '.ogg', '.wav', '.flac', '.aac', '.wma', '.aax', '.aaxc']);
+        const fsp = require('fs').promises;
+
+        async function walkDir(currentDir) {
+            let entries = [];
+            try { entries = await fsp.readdir(currentDir, { withFileTypes: true }); } catch (_) { return []; }
+            let results = [];
+            for (const entry of entries) {
+                const fullPath = path.join(currentDir, entry.name);
+                if (entry.isDirectory()) {
+                    const sub = await walkDir(fullPath);
+                    results = results.concat(sub);
+                } else if (entry.isFile()) {
+                    const ext = path.extname(entry.name).toLowerCase();
+                    if (audioExts.has(ext)) {
+                        const relPath = path.relative(dir, fullPath);
+                        const displayName = relPath.includes(path.sep) ? relPath : entry.name;
+                        results.push({ name: displayName, path: fullPath });
+                    }
+                }
+            }
+            return results;
+        }
+
+        try {
+            const files = (await walkDir(dir)).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+            console.log(`[MEDIA] Scanned ${dir}: ${files.length} audio files found`);
+            return { dir, files, converted: [] };
+        } catch (e) { return { dir, files: [], error: e.message }; }
+    }
+
+    // Media: open folder via dialog
+    ipcMain.handle('media:openAudioFolder', async () => {
+        const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
+        if (result.canceled || result.filePaths.length === 0) return null;
+        return await scanAudioFolder(result.filePaths[0]);
+    });
+
+    // Media: scan a saved folder path (no dialog — for auto-scan on startup)
+    ipcMain.handle('media:scanFolder', async (_, folderPath) => {
+        if (!folderPath || !fs.existsSync(folderPath)) return null;
+        return await scanAudioFolder(folderPath);
+    });
+
+    // Media: decrypt AAX → M4B (fast remux, no re-encode)
+    ipcMain.handle('media:decryptAAX', async (_, aaxPath) => {
+        if (!aaxPath || !fs.existsSync(aaxPath)) return null;
+        const ext = path.extname(aaxPath).toLowerCase();
+        if (ext !== '.aax') return aaxPath; // Not AAX, return as-is
+
+        const m4bPath = aaxPath.replace(/\.aax$/i, '.m4b');
+        if (fs.existsSync(m4bPath)) return m4bPath; // Already converted
+
+        // Read activation bytes
+        let ab = '';
+        const abPath = path.join(os.homedir(), '.veritas', 'audible_activation_bytes.txt');
+        try { ab = fs.readFileSync(abPath, 'utf-8').trim(); } catch (_) {}
+        if (!ab) {
+            console.error('[MEDIA] No activation bytes found at', abPath);
+            return null;
+        }
+
+        console.log(`[MEDIA] Decrypting: ${path.basename(aaxPath)}`);
+        try {
+            execSync(`ffmpeg -y -activation_bytes ${ab} -i "${aaxPath}" -c copy "${m4bPath}"`, {
+                timeout: 300000, stdio: 'pipe'
+            });
+            if (fs.existsSync(m4bPath) && fs.statSync(m4bPath).size > 1000) {
+                console.log(`[MEDIA] Decrypted: ${path.basename(m4bPath)}`);
+                return m4bPath;
+            }
+            return null;
+        } catch (e) {
+            console.error(`[MEDIA] Decrypt failed:`, e.message?.slice(0, 200));
+            try { fs.unlinkSync(m4bPath); } catch (_) {}
+            return null;
+        }
+    });
+
+    // Media: extract metadata from audio file via ffprobe
+    ipcMain.handle('media:getMetadata', async (_, filePath) => {
+        if (!filePath || !fs.existsSync(filePath)) return null;
+        try {
+            const { execSync } = require('child_process');
+            const raw = execSync(
+                `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`,
+                { encoding: 'utf8', timeout: 15000 }
+            );
+            const data = JSON.parse(raw);
+            const fmt = data.format || {};
+            const tags = fmt.tags || {};
+            // Normalize tag keys (some are uppercase, some lowercase)
+            const t = {};
+            for (const [k, v] of Object.entries(tags)) { t[k.toLowerCase()] = v; }
+            return {
+                title: t.title || t.name || null,
+                artist: t.artist || t.album_artist || t.author || null,
+                album: t.album || null,
+                genre: t.genre || null,
+                duration: fmt.duration ? parseFloat(fmt.duration) : null,
+                narrator: t.narrator || t.composer || null,
+                year: t.date || t.year || null
+            };
+        } catch (_) { return null; }
+    });
+
+    // Media: extract cover art from audio file
+    const coverDir = path.join(os.homedir(), '.veritas', 'covers');
+    ipcMain.handle('media:getCoverArt', async (_, filePath) => {
+        if (!filePath || !fs.existsSync(filePath)) return null;
+        try {
+            if (!fs.existsSync(coverDir)) fs.mkdirSync(coverDir, { recursive: true });
+            // Use filename hash as cache key
+            const crypto = require('crypto');
+            const hash = crypto.createHash('md5').update(filePath).digest('hex').substring(0, 12);
+            const coverPath = path.join(coverDir, hash + '.jpg');
+            if (fs.existsSync(coverPath)) {
+                return 'file://' + coverPath.replace(/\\/g, '/');
+            }
+            // Extract with ffmpeg
+            execSync(`ffmpeg -y -i "${filePath}" -an -vcodec mjpeg -frames:v 1 "${coverPath}"`, {
+                timeout: 15000, stdio: 'pipe'
+            });
+            if (fs.existsSync(coverPath) && fs.statSync(coverPath).size > 100) {
+                return 'file://' + coverPath.replace(/\\/g, '/');
+            }
+            // Cleanup zero-byte files
+            try { fs.unlinkSync(coverPath); } catch (_) {}
+            return null;
+        } catch (_) { return null; }
+    });
+
+    // Media: persistent state
+    const mediaStatePath = path.join(os.homedir(), '.veritas', 'media_state.json');
+    const audiobookLibrary = path.join(os.homedir(), '.veritas', 'audiobooks');
+
+    ipcMain.handle('media:saveState', async (_, state) => {
+        try {
+            const dir = path.dirname(mediaStatePath);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(mediaStatePath, JSON.stringify(state, null, 2), 'utf-8');
+            return { ok: true };
+        } catch (e) { return { error: e.message }; }
+    });
+
+    ipcMain.handle('media:loadState', async () => {
+        try {
+            if (!fs.existsSync(mediaStatePath)) return null;
+            return JSON.parse(fs.readFileSync(mediaStatePath, 'utf-8'));
+        } catch (e) { return null; }
+    });
+
+    ipcMain.handle('media:importToLibrary', async (_, srcPath) => {
+        try {
+            if (!fs.existsSync(audiobookLibrary)) fs.mkdirSync(audiobookLibrary, { recursive: true });
+            const fileName = path.basename(srcPath);
+            const destPath = path.join(audiobookLibrary, fileName);
+            if (!fs.existsSync(destPath)) {
+                console.log(`[MEDIA] Importing to library: ${fileName}`);
+                fs.copyFileSync(srcPath, destPath);
+            }
+            return { name: fileName, path: destPath, imported: true };
+        } catch (e) { return { error: e.message }; }
     });
 
     ipcMain.handle('file:saveDialog', async (_, defaultName) => {
@@ -387,43 +579,60 @@ function registerIPC() {
     ipcMain.handle('chat:send', async (_, text, sessionId) => {
         context.addBreadcrumb('chat', `User: ${text.substring(0, 100)}`);
 
-        // Try agentic mode first — agent decides and executes autonomously
+        let agentErrorStr = null;
         try {
             const result = await agent.processRequest(text);
-            context.addBreadcrumb('chat', `Agent response: ${result.type}`);
-            // Only return if agent actually succeeded
-            if (result.type !== 'error' && result.message && !result.message.includes('empty response')) {
+            // v4.3.19e: Auto-open HTML dashboards in browser after successful task completion
+            // Uses Electron's shell.openPath — the only reliable way in the main process
+            if (result.type !== 'error' && result.steps > 0) {
+                try {
+                    const stepLog = result.stepLog || [];
+                    const touchedDirs = new Set();
+                    for (const step of stepLog) {
+                        const a = typeof step.args === 'string' ? step.args : (step.args?.prm || '');
+                        const cleaned = a.replace(/['"]/g, '').trim();
+                        const m = cleaned.match(/([A-Za-z]:\\[^\s]+)/);
+                        if (m) {
+                            const dir = path.dirname(m[1]);
+                            if (dir && dir.length > 3 && fs.existsSync(dir)) touchedDirs.add(dir);
+                        }
+                    }
+                    let bestHtml = null, bestMtime = 0;
+                    for (const dir of touchedDirs) {
+                        try {
+                            for (const file of fs.readdirSync(dir)) {
+                                if (!/\.html?$/i.test(file) || /template/i.test(file)) continue;
+                                const full = path.join(dir, file);
+                                const stat = fs.statSync(full);
+                                if ((Date.now() - stat.mtimeMs) < 300000 && stat.mtimeMs > bestMtime) {
+                                    const head = fs.readFileSync(full, 'utf8').substring(0, 500);
+                                    if (!head.includes('{{') && head.includes('<html')) {
+                                        bestMtime = stat.mtimeMs;
+                                        bestHtml = full;
+                                    }
+                                }
+                            }
+                        } catch (e) { /* skip unreadable dirs */ }
+                    }
+                    if (bestHtml) {
+                        console.log('[AUTO-OPEN] Opening HTML in browser:', bestHtml);
+                        shell.openPath(bestHtml).then(errMsg => {
+                            if (errMsg) console.warn('[AUTO-OPEN] shell.openPath error:', errMsg);
+                            else console.log('[AUTO-OPEN] Success:', bestHtml);
+                        });
+                    }
+                } catch (autoOpenErr) {
+                    console.warn('[AUTO-OPEN] Scan error:', autoOpenErr.message);
+                }
+            }
+            // Agent failed before doing any work — return the exact structured error
+            if (result.type === 'error') {
                 return result;
             }
-            // Agent failed — fall through to direct LLM
-            context.addBreadcrumb('chat', 'Agent returned error, trying direct Gemini', {}, 'warning');
+            return result;
         } catch (agentErr) {
             context.addBreadcrumb('chat', `Agent failed: ${agentErr.message}`, {}, 'warning');
-        }
-
-        // Fallback: direct chat via backend
-        const bridgeReady = await bridge.waitForBridge();
-        if (bridgeReady) {
-            try {
-                const response = await bridge.post('/api/chat', { text, session_id: sessionId });
-                return { type: 'chat', message: response.content || response.response || JSON.stringify(response) };
-            } catch { }
-        }
-
-        // Gemini direct (primary fallback)
-        try {
-            const response = await _geminiChat(text);
-            return { type: 'chat', message: response };
-        } catch (geminiErr) {
-            context.addBreadcrumb('chat', `Gemini fallback failed: ${geminiErr.message}`, {}, 'warning');
-        }
-
-        // Ollama direct (last resort)
-        try {
-            const response = await _ollamaChat(text);
-            return { type: 'chat', message: response };
-        } catch (e) {
-            return { type: 'chat', message: `Connection error: ${e.message}. Backend, Gemini, and Ollama all unreachable.` };
+            return { type: 'error', message: `Agent Crash: ${agentErr.message}\n\nNo fallback available. Agent must resolve this constraint.` };
         }
     });
 
@@ -480,6 +689,24 @@ function registerIPC() {
             console.error('[TTS:main] Exception:', e.message);
             return { error: e.message };
         }
+    });
+
+    // ── Conversation Threads (Persistence) ────────────────────
+    conversationStore = new ConversationStore();
+    ipcMain.handle('threads:list', async () => conversationStore.listThreads());
+    ipcMain.handle('threads:create', async () => conversationStore.createThread());
+    ipcMain.handle('threads:load', async (_, id) => conversationStore.loadThread(id));
+    ipcMain.handle('threads:append', async (_, id, msg) => {
+        conversationStore.appendMessage(id, msg);
+        return { ok: true };
+    });
+    ipcMain.handle('threads:rename', async (_, id, title) => {
+        conversationStore.renameThread(id, title);
+        return { ok: true };
+    });
+    ipcMain.handle('threads:delete', async (_, id) => {
+        conversationStore.deleteThread(id);
+        return { ok: true };
     });
 
     // ── Agent (Agentic Loop) ─────────────────────────────────
@@ -738,7 +965,7 @@ function _ollamaChat(text) {
     return new Promise((resolve, reject) => {
         const http = require('http');
         const payload = JSON.stringify({
-            model: 'qwen2.5:7b',
+            model: 'qwen3:8b',
             messages: [
                 { role: 'system', content: 'You are Omega, a powerful local AI assistant. Be direct, helpful, and precise.' },
                 { role: 'user', content: text },
@@ -832,6 +1059,17 @@ app.whenReady().then(async () => {
     buildMenu();
     createWindow();
 
+    // ── Media Player: Global play/pause shortcut ─────────────
+    try {
+        globalShortcut.register('MediaPlayPause', () => {
+            mainWindow?.webContents.send('omega:media-toggle');
+        });
+        // Fallback for keyboards without media keys
+        globalShortcut.register('Ctrl+Shift+Space', () => {
+            mainWindow?.webContents.send('omega:media-toggle');
+        });
+    } catch (e) { console.warn('[Omega] Media shortcuts failed:', e.message); }
+
     // Git auto-update (silent, non-blocking)
     try {
         const { execFile } = require('child_process');
@@ -887,6 +1125,10 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
     crashLog(`window-all-closed fired, platform=${process.platform}`);
     if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
 });
 
 // ── Graceful Shutdown ────────────────────────────────────────

@@ -17,9 +17,10 @@ const crypto = require('crypto');
 const EventEmitter = require('events');
 
 const PORT = 5000;
-const MAX_RETRIES = 5;
-const HEALTH_INTERVAL = 3000;
+const MAX_RETRIES = 999; // Never give up — unkillable backend
+const HEALTH_INTERVAL = 60000; // Check every 60s — less noise, still catches zombies
 const STARTUP_TIMEOUT = 30000;
+const HEALTHY_RESET_MS = 60000; // Reset retry count after 60s of healthy operation
 
 class OmegaBridge extends EventEmitter {
     constructor() {
@@ -32,11 +33,19 @@ class OmegaBridge extends EventEmitter {
         this._healthTimer = null;
         this._ready = false;
         this._startupResolve = null;
+        this._lastHealthyAt = 0; // Track when backend was last known healthy
+        this._respawning = false; // Prevent concurrent respawn attempts
     }
 
     // ── Start Backend ────────────────────────────────────────
     async start() {
-        if (this._process) return;
+        // Guard: skip if process is alive AND healthy
+        if (this._process && this._ready) return;
+        // Clean up dead/unhealthy process reference
+        if (this._process && !this._ready) {
+            try { this._process.kill('SIGKILL'); } catch { }
+            this._process = null;
+        }
 
         this._setStatus('STARTING');
 
@@ -202,7 +211,7 @@ class OmegaBridge extends EventEmitter {
                     'X-Omega-Token': this._authToken,
                     ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
                 },
-                timeout: 60000,
+                timeout: 300000,
             }, (res) => {
                 let data = '';
                 res.on('data', c => data += c);
@@ -239,12 +248,27 @@ class OmegaBridge extends EventEmitter {
 
     _startHealth() {
         this._stopHealth();
+        this._lastHealthyAt = Date.now();
         this._healthTimer = setInterval(async () => {
             const ok = await this._checkHealth();
-            if (!ok && this._ready) {
+            if (ok) {
+                this._lastHealthyAt = Date.now();
+                // Reset retry counter after sustained healthy period
+                if (this._retries > 0 && (Date.now() - this._lastHealthyAt) > HEALTHY_RESET_MS) {
+                    console.log('[Bridge] Backend stable for 60s — resetting retry counter');
+                    this._retries = 0;
+                }
+                if (!this._ready) {
+                    console.log('[Bridge] Health restored — marking READY');
+                    this._ready = true;
+                    this._setStatus('READY');
+                }
+            } else if (this._ready) {
                 this._ready = false;
                 this._setStatus('UNHEALTHY');
                 this.emit('error', new Error('Health check failed'));
+                console.warn('[Bridge] Backend UNHEALTHY — triggering auto-respawn');
+                this._autoRespawn();
             }
             // Poll sentinel alerts
             if (this._ready) {
@@ -279,6 +303,39 @@ class OmegaBridge extends EventEmitter {
     _setStatus(s) {
         this._status = s;
         this.emit('status', s);
+    }
+
+    // ── Auto-Respawn (triggered by health check failure) ────
+    async _autoRespawn() {
+        if (this._respawning) return; // Prevent concurrent respawns
+        this._respawning = true;
+
+        try {
+            console.log(`[Bridge] Auto-respawn starting (attempt ${this._retries + 1})`);
+
+            // Kill dead process if it exists
+            if (this._process) {
+                try { this._process.kill('SIGKILL'); } catch { }
+                this._process = null;
+            }
+
+            // Brief delay before restart
+            const delay = Math.min(2000 * Math.pow(1.5, Math.min(this._retries, 8)), 30000);
+            console.log(`[Bridge] Respawning in ${Math.round(delay)}ms`);
+            await new Promise(r => setTimeout(r, delay));
+
+            this._retries++;
+
+            // Restart
+            await this.start();
+            console.log('[Bridge] Auto-respawn SUCCEEDED');
+        } catch (err) {
+            console.error(`[Bridge] Auto-respawn FAILED: ${err.message}`);
+            // Schedule another attempt via the health timer
+            // (health timer will detect UNHEALTHY again and call _autoRespawn)
+        } finally {
+            this._respawning = false;
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────

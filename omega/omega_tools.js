@@ -70,6 +70,11 @@ const TOOL_REGISTRY = {
         description: 'Get current hardware stats (CPU, RAM, disk, GPU)',
         args: {},
     },
+    spawnSubAgent: {
+        safety: SAFETY.SAFE,
+        description: 'Spawn a parallel sub-agent to handle a complex, independent sub-task. The sub-agent shares your context but runs independently. Logs output to main thread with [SUB-X]. Results are returned upon completion. Max 3 concurrent sub-agents allowed to prevent VRAM overflow.',
+        args: { task: { type: 'string', required: true } },
+    },
     fileInfo: {
         safety: SAFETY.SAFE,
         description: 'Get detailed info about a file (size, permissions, timestamps)',
@@ -147,6 +152,11 @@ const TOOL_REGISTRY = {
         description: 'Execute a native C:\\Veritas_Lab sovereign Python module via the Omega backend API',
         args: { moduleId: { type: 'string', required: true }, params: { type: 'object', description: 'JSON object containing arguments for the module' } },
     },
+    omega_assess_file: {
+        safety: SAFETY.SAFE,
+        description: 'Run the VERITAS 9-Gate canonical pipeline on a Python file to check for safety and compliance. Returns the evaluation envelope (SOVEREIGN, SHIELDED, CONTAINED, or VIOLATION) and gate results.',
+        args: { path: { type: 'string', required: true } },
+    },
 
     // ── RESTRICTED (3) — Always requires approval ────────────
     deleteFile: {
@@ -193,7 +203,7 @@ class ToolExecutor {
         const { BrowserWindow } = require('electron');
         const windows = BrowserWindow.getAllWindows();
         if (windows.length > 0) {
-            windows[0].webContents.send('agent:open-file', { path: p, line: line || 1 });
+            windows[0].webContents.send('omega:open-file', p);
         }
         return { opened: true, path: p, line: line || 1, message: `Opened ${path.basename(p)} in the editor` };
     }
@@ -397,7 +407,12 @@ class ToolExecutor {
     async _exec_exec({ command, cwd: execCwd, timeout }) {
         const t = timeout || 30000;
         try {
-            const output = execSync(command, {
+            // On Windows, execSync defaults to cmd.exe — force PowerShell
+            let cmd = command;
+            if (process.platform === 'win32' && !command.toLowerCase().startsWith('powershell')) {
+                cmd = `powershell -NoProfile -Command "${command.replace(/"/g, '\\"')}"`;
+            }
+            const output = execSync(cmd, {
                 cwd: execCwd || process.env.HOME || os.homedir(),
                 encoding: 'utf-8', timeout: t,
                 maxBuffer: 1024 * 1024 * 10,
@@ -445,6 +460,17 @@ class ToolExecutor {
             return result;
         } catch (e) {
             return { error: `Sovereign module execution failed: ${e.message}` };
+        }
+    }
+
+    async _exec_omega_assess_file({ path: p }) {
+        try {
+            // Fast-path bypass local MCP client overhead for 0s execution
+            const cmd = `python -c "import sys; sys.path.append(r'C:\\Users\\rlope\\.gemini\\antigravity\\scratch\\VERITAS_COMMAND_CENTER'); import json; from veritas_canonical import run_canonical_9_gate, calibrate_canonical; import ast; src = open(r'${p}', 'r', encoding='utf-8').read(); res, fhash = run_canonical_9_gate(src, r'${p}'); report = calibrate_canonical(res); print(json.dumps({'envelope': report.envelope, 'gates': report.gate_summary}))"`;
+            const out = require('child_process').execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+            return JSON.parse(out);
+        } catch (e) {
+            return { error: `File Assessment failed: ${e.stdout || e.message}` };
         }
     }
 

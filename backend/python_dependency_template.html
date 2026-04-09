@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Module Dependency Map - Gravity Omega Backend</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300,400,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --veritas-gold: #D4A843;
+            --dark-bg: #1a1a2e;
+            --card-bg: #2a2a3e;
+            --text-color: #e0e0e0;
+            --border-color: #444;
+            --success-color: #4CAF50;
+            --warning-color: #FFC107;
+            --error-color: #F44336;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        h1 {
+            color: var(--veritas-gold);
+            text-align: center;
+            margin-bottom: 30px;
+            grid-column: 1 / -1;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+        .card h2 {
+            color: var(--veritas-gold);
+            margin-top: 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--text-color);
+            text-align: center;
+            margin: 10px 0;
+        }
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .list-item span:first-child {
+            font-weight: 400;
+        }
+        .list-item span:last-child {
+            color: var(--veritas-gold);
+            font-weight: 700;
+        }
+        .bar-chart {
+            margin-top: 15px;
+        }
+        .bar-chart-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .bar-chart-label {
+            flex: 0 0 150px; /* Fixed width for labels */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 10px;
+            font-size: 0.9em;
+        }
+        .bar-chart-bar-container {
+            flex-grow: 1;
+            background-color: #333;
+            border-radius: 4px;
+            height: 18px;
+            overflow: hidden;
+            position: relative;
+        }
+        .bar-chart-bar {
+            height: 100%;
+            background-color: var(--veritas-gold);
+            border-radius: 4px;
+            transition: width 0.5s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 5px;
+            box-sizing: border-box;
+        }
+        .bar-chart-value {
+            color: var(--dark-bg);
+            font-size: 0.8em;
+            font-weight: 700;
+            text-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        .circular-deps ul, .orphan-modules ul {
+            list-style: none;
+            padding: 0;
+        }
+        .circular-deps li, .orphan-modules li {
+            background-color: #3a3a4a;
+            margin-bottom: 8px;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid var(--error-color);
+            font-size: 0.9em;
+        }
+        .orphan-modules li {
+            border-left: 4px solid var(--warning-color);
+        }
+        .no-findings {
+            color: #888;
+            font-style: italic;
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Python Module Dependency Map - Gravity Omega Backend</h1>
+    <div class="container">
+        <div class="card">
+            <h2>Overview</h2>
+            <div class="list-item">
+                <span>Total Modules:</span>
+                <span id="total-modules">{total_modules}</span>
+            </div>
+            <div class="list-item">
+                <span>Total Internal Import Edges:</span>
+                <span id="total-edges">{total_internal_edges}</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Top 5 Most Imported Modules (In-Degree)</h2>
+            <div class="bar-chart" id="top-in-degree">
+                {top_in_degree_bars}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Top 5 Modules with Most Dependencies (Out-Degree)</h2>
+            <div class="bar-chart" id="top-out-degree">
+                {top_out_degree_bars}
+            </div>
+        </div>
+
+        <div class="card circular-deps">
+            <h2>Circular Dependencies</h2>
+            <div id="circular-dependencies">
+                {circular_dependencies_list}
+            </div>
+        </div>
+
+        <div class="card orphan-modules">
+            <h2>Orphan Modules</h2>
+            <div id="orphan-modules">
+                {orphan_modules_list}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

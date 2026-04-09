@@ -1,0 +1,322 @@
+[
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:watcher",
+    "original_call": "window.omega.watcher"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:terminal",
+    "original_call": "window.omega.terminal"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:terminal",
+    "original_call": "window.omega.terminal"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:terminal",
+    "original_call": "window.omega.terminal"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:terminal",
+    "original_call": "window.omega.terminal"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:terminal",
+    "original_call": "window.omega.terminal"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:chat",
+    "original_call": "window.omega.chat"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:removeListener",
+    "original_call": "window.omega.removeListener"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:removeListener",
+    "original_call": "window.omega.removeListener"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:chat",
+    "original_call": "window.omega.chat"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:threads",
+    "original_call": "window.omega.threads"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:agent",
+    "original_call": "window.omega.agent"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:chat",
+    "original_call": "window.omega.chat"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:agent",
+    "original_call": "window.omega.agent"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:status",
+    "original_call": "window.omega.status"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:modules",
+    "original_call": "window.omega.modules"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:vault",
+    "original_call": "window.omega.vault"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:vault",
+    "original_call": "window.omega.vault"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:vault",
+    "original_call": "window.omega.vault"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:security",
+    "original_call": "window.omega.security"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:tools",
+    "original_call": "window.omega.tools"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:search",
+    "original_call": "window.omega.search"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:window",
+    "original_call": "window.omega.window"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:window",
+    "original_call": "window.omega.window"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:window",
+    "original_call": "window.omega.window"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:vault",
+    "original_call": "window.omega.vault"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:vault",
+    "original_call": "window.omega.vault"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:security",
+    "original_call": "window.omega.security"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:security",
+    "original_call": "window.omega.security"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:security",
+    "original_call": "window.omega.security"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:security",
+    "original_call": "window.omega.security"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:security",
+    "original_call": "window.omega.security"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:tools",
+    "original_call": "window.omega.tools"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:tools",
+    "original_call": "window.omega.tools"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:ledger",
+    "original_call": "window.omega.ledger"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:watcher",
+    "original_call": "window.omega.watcher"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:on",
+    "original_call": "window.omega.on"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:file",
+    "original_call": "window.omega.file"
+  },
+  {
+    "file": "C:\\\\Veritas_Lab\\\\gravity-omega-v2\\\\renderer\\app.js",
+    "resolved_url": "UNMAPPED_CHANNEL:omega:hardware",
+    "original_call": "window.omega.hardware"
+  }
+]

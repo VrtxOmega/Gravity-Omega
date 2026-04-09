@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OMEGA APPROVAL v4.1 â€” Two-Phase Commit Gate
  * Immutable proposal records with audit trail.
  * Used by the agent for GATED/RESTRICTED tool approval.
@@ -59,6 +59,28 @@ class ApprovalGate {
         this._proposals = new Map();
         this._auditLog = [];
         this._maxAudit = maxAudit;
+        this._permissionCache = new Set();
+    }
+
+    _getCacheKey(tool, args) {
+        const hashStr = `${tool}::${JSON.stringify(args || {})}`;
+        return crypto.createHash('sha256').update(hashStr).digest('hex');
+    }
+
+    check_permission_cache(tool, args) {
+        const key = this._getCacheKey(tool, args);
+        return this._permissionCache.has(key);
+    }
+
+    grant_permission(tool, args) {
+        const key = this._getCacheKey(tool, args);
+        this._permissionCache.add(key);
+        this._auditLog.push({ action: 'CACHE_GRANT', tool: tool, ts: new Date().toISOString() });
+    }
+
+    clear_permission_cache() {
+        this._permissionCache.clear();
+        this._auditLog.push({ action: 'CACHE_CLEAR', ts: new Date().toISOString() });
     }
 
     propose(proposal) {

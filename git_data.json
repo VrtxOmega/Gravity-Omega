@@ -1,0 +1,116 @@
+{
+    "total_commits": 94,
+    "first_commit_date": "2026-03-19",
+    "last_commit_date": "2026-03-28",
+    "most_changed_files": [
+        {
+            "count": 53,
+            "file": "omega/omega_agent.js"
+        },
+        {
+            "count": 25,
+            "file": "renderer/app.js"
+        },
+        {
+            "count": 16,
+            "file": "backend/web_server.py"
+        },
+        {
+            "count": 10,
+            "file": "renderer/index.html"
+        },
+        {
+            "count": 9,
+            "file": "renderer/styles/omega.css"
+        },
+        {
+            "count": 8,
+            "file": "main.js"
+        },
+        {
+            "count": 5,
+            "file": "preload.js"
+        },
+        {
+            "count": 5,
+            "file": "omega/omega_tools.js"
+        },
+        {
+            "count": 5,
+            "file": "backend/omega_sentinel.py"
+        },
+        {
+            "count": 4,
+            "file": "omega/omega_bridge.js"
+        }
+    ],
+    "commit_activity_by_day": [
+        {
+            "day": "Mon",
+            "count": 0
+        },
+        {
+            "day": "Tue",
+            "count": 0
+        },
+        {
+            "day": "Wed",
+            "count": 0
+        },
+        {
+            "day": "Thu",
+            "count": 23
+        },
+        {
+            "day": "Fri",
+            "count": 67
+        },
+        {
+            "day": "Sat",
+            "count": 4
+        },
+        {
+            "day": "Sun",
+            "count": 0
+        }
+    ],
+    "largest_single_commit_diff": {
+        "diff_size": 0,
+        "commit_hash": "N/A",
+        "files": []
+    },
+    "recent_velocity": [
+        {
+            "week": "2026-06",
+            "count": 0
+        },
+        {
+            "week": "2026-07",
+            "count": 0
+        },
+        {
+            "week": "2026-08",
+            "count": 0
+        },
+        {
+            "week": "2026-09",
+            "count": 0
+        },
+        {
+            "week": "2026-10",
+            "count": 0
+        },
+        {
+            "week": "2026-11",
+            "count": 26
+        },
+        {
+            "week": "2026-12",
+            "count": 68
+        },
+        {
+            "week": "2026-13",
+            "count": 0
+        }
+    ]
+}

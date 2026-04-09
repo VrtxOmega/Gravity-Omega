@@ -34,6 +34,7 @@ Started by omega_bridge.js with OMEGA_AUTH_TOKEN env var.
 import os
 import sys
 import json
+import traceback
 import time
 import hashlib
 import threading
@@ -54,6 +55,7 @@ from omega_ssrf_shield import SSRFShield
 from omega_process_identity import BinaryIdentityCache
 from omega_ancestor_verify import AncestorVerification
 from omega_bypass_trap import BypassTrap
+from modules.state_monitor import snapshot_state, diff_state
 
 ssrf_shield = SSRFShield()
 proc_identity = BinaryIdentityCache()
@@ -93,6 +95,36 @@ log = logging.getLogger('omega')
 
 app = Flask(__name__)
 
+# v4.3.22: C5 — Global error handlers (no naked 500s)
+@app.errorhandler(500)
+def handle_500(e):
+    return jsonify({
+        'error': str(e),
+        'route': getattr(request, 'endpoint', 'unknown'),
+        'status': 'error',
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Catch-all for unhandled exceptions — prevents server crash."""
+    import traceback as tb
+    tb.print_exc()
+    return jsonify({
+        'error': str(e),
+        'type': type(e).__name__,
+        'route': getattr(request, 'endpoint', 'unknown'),
+        'status': 'error',
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }), 500
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({
+        'error': 'Route not found',
+        'status': 'error',
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }), 404
 
 def require_auth(f):
     """Verify X-Omega-Token header matches the handshake token."""
@@ -837,7 +869,7 @@ def _ollama_generate(messages, max_tokens, temperature):
     """Generate via local Ollama."""
     import urllib.request
     payload = json.dumps({
-        'model': 'qwen2.5:7b',
+        'model': 'qwen3:8b',
         'messages': messages,
         'stream': False,
         'options': {'temperature': temperature, 'num_predict': max_tokens},
@@ -850,7 +882,7 @@ def _ollama_generate(messages, max_tokens, temperature):
     with urllib.request.urlopen(req, timeout=120) as resp:
         data = json.loads(resp.read())
     return {'content': data.get('message', {}).get('content', ''),
-            'model': 'qwen2.5:7b', 'backend': 'ollama'}
+            'model': 'qwen3:8b', 'backend': 'ollama'}
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -942,73 +974,109 @@ def api_tts():
 @app.route('/api/sentinel/status', methods=['GET'])
 @require_auth
 def api_sentinel_status():
-    sentinel = get_sentinel()
-    return jsonify(sentinel.get_status())
+    try:
+        sentinel = get_sentinel()
+        return jsonify(sentinel.get_status())
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_status: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 @app.route('/api/sentinel/baseline', methods=['POST'])
 @require_auth
 def api_sentinel_baseline():
-    sentinel = get_sentinel()
-    sentinel.create_baseline(force=True)
-    return jsonify({'status': 'baseline_created', 'files': len(sentinel.state.get('file_hashes', {}))})
+    try:
+        sentinel = get_sentinel()
+        sentinel.create_baseline(force=True)
+        return jsonify({'status': 'baseline_created', 'files': len(sentinel.state.get('file_hashes', {}))})
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_baseline: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 @app.route('/api/sentinel/heal', methods=['POST'])
 @require_auth
 def api_sentinel_heal():
-    sentinel = get_sentinel()
-    healed = sentinel.heal()
-    return jsonify({'healed': healed, 'count': len(healed)})
+    try:
+        sentinel = get_sentinel()
+        healed = sentinel.heal()
+        return jsonify({'healed': healed, 'count': len(healed)})
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_heal: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 @app.route('/api/sentinel/alerts', methods=['GET'])
 @require_auth
 def api_sentinel_alerts():
-    sentinel = get_sentinel()
-    alerts = sentinel.get_alerts()
-    return jsonify({'alerts': alerts, 'count': len(alerts)})
+    try:
+        sentinel = get_sentinel()
+        alerts = sentinel.get_alerts()
+        return jsonify({'alerts': alerts, 'count': len(alerts)})
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_alerts: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 @app.route('/api/sentinel/accept', methods=['POST'])
 @require_auth
 def api_sentinel_accept():
-    sentinel = get_sentinel()
-    sentinel.accept_changes()
-    return jsonify({'status': 'changes_accepted'})
+    try:
+        sentinel = get_sentinel()
+        sentinel.accept_changes()
+        return jsonify({'status': 'changes_accepted'})
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_accept: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 @app.route('/api/sentinel/pause', methods=['POST'])
 @require_auth
 def api_sentinel_pause():
-    sentinel = get_sentinel()
-    sentinel.pause()
-    return jsonify({'status': 'paused', 'paused': True})
+    try:
+        sentinel = get_sentinel()
+        sentinel.pause()
+        return jsonify({'status': 'paused', 'paused': True})
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_pause: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 @app.route('/api/sentinel/resume', methods=['POST'])
 @require_auth
 def api_sentinel_resume():
-    sentinel = get_sentinel()
-    sentinel.resume()
-    return jsonify({'status': 'resumed', 'paused': False})
+    try:
+        sentinel = get_sentinel()
+        sentinel.resume()
+        return jsonify({'status': 'resumed', 'paused': False})
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_resume: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 
 @app.route('/api/status', methods=['GET'])
 @require_auth
 def api_status():
-    return jsonify({
-        'status': 'READY',
-        'port': PORT,
-        'pid': os.getpid(),
-        'modules': len(MODULE_REGISTRY),
-        'uptime_s': round(time.time() - _start_time, 1),
-        'platform': platform.platform(),
-        'python': sys.version.split()[0],
-    })
+    try:
+        return jsonify({
+            'status': 'READY',
+            'port': PORT,
+            'pid': os.getpid(),
+            'modules': len(MODULE_REGISTRY),
+            'uptime_s': round(time.time() - _start_time, 1),
+            'platform': platform.platform(),
+            'python': sys.version.split()[0],
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error in api_status: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 
 @app.route('/api/modules', methods=['GET'])
 @require_auth
 def api_modules():
-    return jsonify([
-        {k: v for k, v in mod.items() if k != 'handler'}
-        for mod in MODULE_REGISTRY.values()
-    ])
+    try:
+        return jsonify([
+            {k: v for k, v in mod.items() if k != 'handler'}
+            for mod in MODULE_REGISTRY.values()
+        ])
+    except Exception as e:
+        current_app.logger.error(f"Error in api_modules: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 
 # ── VTP GATEWAY (Veritas Transfer Protocol v2.0) ──
@@ -1027,10 +1095,41 @@ class OllamaClientWrapper:
 
 import os
 import json
+import traceback
 import subprocess
 
 def _vtp_direct_executor(packet: vtp_codec.VTPPacket) -> str:
-    """Fast-path deterministic execution without LLM overhead."""
+    """Fast-path deterministic execution wrapped with State Anomaly Detection."""
+    track_state = packet.act in ("MUT", "REQ") and packet.tgt in ("AST", "SYS", "PY", "JS", "CSS", "JSON", "MD", "TXT")
+    scope = os.getcwd()
+    before_state = {}
+    expected_mods = set()
+
+    if track_state:
+        before_state = snapshot_state(scope)
+        try:
+            if packet.tgt != "SYS":
+                prm_data = json.loads(packet.prm)
+                if prm_data.get("path"):
+                    expected_mods.add(os.path.normpath(str(prm_data["path"])))
+        except Exception:
+            parts = str(packet.prm).strip('"\'').split("::")
+            if len(parts) >= 2 and packet.tgt != "SYS":
+                expected_mods.add(os.path.normpath(parts[0]))
+
+    result = _vtp_direct_executor_inner(packet)
+    
+    if track_state:
+        after_state = snapshot_state(scope)
+        anomalies = diff_state(before_state, after_state, expected_mods)
+        if anomalies:
+            log.warning(f"STATE_ANOMALY DETECTED: {len(anomalies)} files modified outside target. {str(anomalies)[:500]}")
+            # If using VERITAS SEAL, we append a forensic note here to vtp packet or ledger
+            # The ledger is passed in VTPRouter, handled separately. We just log for now to raise visibility.
+            
+    return result
+
+def _vtp_direct_executor_inner(packet: vtp_codec.VTPPacket) -> str:
     # File Reads
     if packet.act == "EXT" and packet.tgt in ("AST", "CSS", "PY", "JS", "JSON", "MD", "TXT"):
         path = str(packet.prm).strip().strip('"\'')
@@ -1085,10 +1184,22 @@ def _vtp_direct_executor(packet: vtp_codec.VTPPacket) -> str:
         except Exception as e:
             return f"ERROR: SYS EXEC -> {e}"
             
-    # Vault search
+    # Vault search (VLT)
     if packet.act == "EXT" and packet.tgt == "VLT":
         query = str(packet.prm).strip('"\'')
-        return f"VAULT DIRECT EXTRACT: {query}"
+        try:
+            db = sqlite3.connect(str(VAULT_DB))
+            rows = db.execute(
+                'SELECT content, timestamp FROM entries WHERE content LIKE ? ORDER BY timestamp DESC LIMIT 5',
+                (f'%{query}%',)
+            ).fetchall()
+            db.close()
+            if rows:
+                results = [f"[{r[1]}] {r[0][:300]}" for r in rows]
+                return f"VAULT SEARCH '{query}' ({len(rows)} results):\n" + "\n---\n".join(results)
+            return f"VAULT SEARCH '{query}': No matching entries."
+        except Exception as e:
+            return f"VAULT SEARCH ERROR: {e}"
 
     # Web search (EXT:NET) — uses DuckDuckGo HTML scraping
     if packet.act == "EXT" and packet.tgt == "NET":
@@ -1185,10 +1296,14 @@ def api_module_run(module_id):
 @app.route('/api/modules/<module_id>/describe', methods=['GET'])
 @require_auth
 def api_module_describe(module_id):
-    mod = MODULE_REGISTRY.get(module_id)
-    if not mod:
-        return jsonify({'error': f'Module not found: {module_id}'}), 404
-    return jsonify({k: v for k, v in mod.items() if k != 'handler'})
+    try:
+        mod = MODULE_REGISTRY.get(module_id)
+        if not mod:
+            return jsonify({'error': f'Module not found: {module_id}'}), 404
+        return jsonify({k: v for k, v in mod.items() if k != 'handler'})
+    except Exception as e:
+        current_app.logger.error(f"Error in api_module_describe: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
 
 # â”€â”€ Agent Thinking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1551,6 +1666,35 @@ def api_provenance_seal():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/provenance/autodream', methods=['POST'])
+@require_auth
+def api_provenance_autodream():
+    """v4.3: Idle autoDream consolidation"""
+    try:
+        import threading as _t
+        import sys as _s
+        _s.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
+        from autodream import run_autodream
+        _t.Thread(target=run_autodream, daemon=True).start()
+        return jsonify({'status': 'autodream_initiated'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/provenance/prompt', methods=['POST'])
+@require_auth
+def api_provenance_prompt():
+    """Build dynamic task-scoped system prompt."""
+    try:
+        data = request.json or {}
+        task = data.get('task', '')
+        intent = data.get('intent', 'TASK')
+        tokens = data.get('available_tokens', 8192)
+        stack = get_provenance_stack()
+        prompt = stack.build_task_scoped_prompt(task, intent=intent, available_tokens=tokens)
+        return jsonify({'prompt': prompt})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 # â”€â”€ Outbound Context Filtering (v4.0) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1661,7 +1805,10 @@ def api_cortex_intercept():
     similarity = _cosine_similarity(baseline_vector, action_vector)
     
     # Tunable threshold — lowered to allow diverse tool usage
-    drift_threshold = 0.25
+    # Aligning with VTP drift thresholds
+    drift_thresholds = {"SAFE": 0.15, "GATED": 0.25, "RSTR": 0.45}
+    # We default the webhook checking to GATED if not provided
+    drift_threshold = drift_thresholds.get(data.get('rgm', 'GATED'), 0.25)
     
     if similarity < drift_threshold:
         return jsonify({
@@ -1712,6 +1859,61 @@ def api_evolution_proposals():
             except Exception:
                 pass
     return jsonify(proposals)
+
+@app.route('/api/evolution/log-failures', methods=['POST'])
+@require_auth
+def api_evolution_log_failures():
+    """Receive agentic failure details and write to audit ledger for Evolution Engine."""
+    data = request.json or {}
+    failures = data.get('failures', [])
+    task_desc = data.get('task', '')
+    exit_reason = data.get('exit_reason', '')
+    total_steps = data.get('total_steps', 0)
+    failed_steps = data.get('failed_steps', 0)
+
+    if not failures:
+        return jsonify({'status': 'no_failures'})
+
+    # Write to the VERITAS audit ledger (same format as file assessments)
+    # so the Evolution Engine's find_failures() can read them
+    try:
+        import sys as _s
+        _s.path.insert(0, os.path.join(os.path.dirname(__file__), 'modules'))
+        from audit_ledger import AuditLedger
+        ledger = AuditLedger()
+
+        # Build gate verdicts from failure details
+        gate_verdicts = []
+        for f in failures[:10]:  # Cap at 10 to prevent bloat
+            gate_verdicts.append({
+                'gate': 'AGENTIC_EXECUTION',
+                'verdict': 'VIOLATION',
+                'tool': f.get('tool', 'unknown'),
+                'error': f.get('error', '')[:300],
+                'args': f.get('args', '')[:200],
+            })
+
+        record = ledger.append(
+            filename=f'agentic_run_{data.get("timestamp", "unknown")}',
+            file_hash=hashlib.sha256(task_desc.encode()).hexdigest()[:32],
+            gate_verdicts=gate_verdicts,
+            envelope='VIOLATION',
+            risk_score=min(1.0, failed_steps / max(1, total_steps)),
+            metadata={
+                'type': 'AGENTIC_FAILURE',
+                'task': task_desc[:300],
+                'exit_reason': exit_reason,
+                'total_steps': total_steps,
+                'failed_steps': failed_steps,
+            }
+        )
+
+        log.info(f'[EVOLUTION] Logged agentic failures: {failed_steps}/{total_steps} steps, seal={record.seal_hash[:12]}')
+        return jsonify({'status': 'logged', 'seal_hash': record.seal_hash[:16], 'failures_logged': len(gate_verdicts)})
+    except Exception as e:
+        log.error(f'[EVOLUTION] Failed to log agentic failures: {e}')
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
 
 @app.route('/api/evolution/scan', methods=['POST'])
 @require_auth
@@ -1856,6 +2058,137 @@ def api_facebook_find_groups():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+
+# ═══ VERITAS ANALYZER ENDPOINT ═══
+import io, json, re, requests, uuid
+from werkzeug.utils import secure_filename
+from flask import request, jsonify
+
+try:
+    import pdfplumber
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+try:
+    from docx import Document as DocxDocument
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
+OLLAMA_URL = "http://127.0.0.1:11434"
+MAX_CHARS = 14_000
+
+SYSTEM_PROMPT = """You are the VERITAS structured analysis engine for Gravity Omega.
+Analyze the document and return a single JSON report object.
+
+RETURN ONLY RAW JSON. No markdown. No backticks. No explanation. Just the JSON.
+
+Required schema:
+{
+  "title": "Document title — concise and descriptive",
+  "subtitle": "One-line description of document type and purpose",
+  "session_id": "0xABCD-TOPIC-AUDIT",
+  "mode": "Analysis mode e.g. Investigative Review · Evidence Extraction",
+  "sections": [
+    {
+      "number": "01",
+      "title": "UPPERCASE SECTION TITLE",
+      "intro": "One sentence framing this section.",
+      "items": [
+        {
+          "label": "Item label",
+          "status": "fatal|warning|pass|note|info",
+          "content": "Precise analytical content. One to three sentences.",
+          "note": null,
+          "verdict": null
+        }
+      ]
+    }
+  ],
+  "feasible_set": [
+    {
+      "number": "01",
+      "title": "Finding or conclusion title",
+      "tier": 1,
+      "content": "Description of this finding.",
+      "subitems": ["Supporting detail one", "Supporting detail two"]
+    }
+  ],
+  "witness": "2-3 sentence analytical summary. Declarative, precise, no hedging on confirmed facts.",
+  "trace_id": "Omega-1.0-TOPIC-0x99A"
+}
+
+Rules:
+- 2 to 5 sections. Each section 1 to 4 items.
+- 3 to 7 feasible_set items representing key conclusions.
+- tier: 1=confirmed fact or direct evidence, 2=well-supported conclusion, 3=inference or leading hypothesis
+- status: fatal=critical issue or failure, warning=concern or risk, pass=verified or confirmed, note=supplementary, info=neutral
+- subitems: 2-3 strings per item
+- note and verdict: null if not applicable
+- Be concise and analytical. Never verbose."""
+
+def extract_text(file_bytes, filename):
+    ext = os.path.splitext(filename)[1].lower()
+    if ext in {".txt", ".md", ".csv"}:
+        return file_bytes.decode("utf-8", errors="replace")
+    if ext == ".json":
+        text = file_bytes.decode("utf-8", errors="replace")
+        try: return json.dumps(json.loads(text), indent=2)
+        except: return text
+    if ext == ".docx":
+        if not DOCX_AVAILABLE: raise RuntimeError("python-docx not installed.")
+        doc = DocxDocument(io.BytesIO(file_bytes))
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    if ext == ".pdf":
+        if not PDF_AVAILABLE: raise RuntimeError("pdfplumber not installed.")
+        text_parts = []
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages[:40]:
+                t = page.extract_text()
+                if t: text_parts.append(t)
+        return "\n".join(text_parts)
+    raise ValueError(f"Unsupported file type: {ext}")
+
+def call_ollama(text, model):
+    truncated = text if len(text) <= MAX_CHARS else text[:MAX_CHARS] + "\n\n[Content truncated]"
+    payload = {
+        "model": model, "stream": False, "format": "json",
+        "options": {"temperature": 0.15, "num_predict": 3500},
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"Analyze this document and return the JSON report:\n\n{truncated}"}
+        ]
+    }
+    resp = requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=180)
+    resp.raise_for_status()
+    raw = resp.json().get("message", {}).get("content", "")
+    clean = re.sub(r"^```json\s*", "", raw.strip())
+    clean = re.sub(r"```\s*$", "", clean).strip()
+    return json.loads(clean)
+
+@app.route("/api/analyze_document", methods=["POST"])
+def analyze_document():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded."}), 400
+    
+    f = request.files["file"]
+    model = request.form.get("model", "qwen3:8b").strip()
+    filename = secure_filename(f.filename or "upload.txt")
+    
+    try:
+        file_bytes = f.read()
+        raw_text = extract_text(file_bytes, filename)
+    except Exception as e:
+        return jsonify({"error": f"Extraction failed: {str(e)}"}), 422
+    
+    try:
+        report_data = call_ollama(raw_text, model)
+        report_data["_meta"] = {"source_file": filename, "model": model, "trace": f"Omega-1.0-{str(uuid.uuid4())[:8].upper()}"}
+        return jsonify(report_data)
+    except Exception as e:
+        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     log.info(f'=== GRAVITY OMEGA BACKEND v3.0 ===')

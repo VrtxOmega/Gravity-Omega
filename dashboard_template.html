@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Route Intelligence Map</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {{
+            --body-bg: #0a0a0a;
+            --container-bg: #111111;
+            --card-bg: #1a1a1a;
+            --hover-bg: #222222;
+            --border: #2a2a2a;
+            --gold-accent: #d4a843;
+            --gold-bright: #f0c040;
+            --gold-glow: rgba(212, 168, 67, 0.25);
+            --text-primary: #e0e0e0;
+            --text-secondary: #999999;
+            --red-critical: #e06060;
+            --green-success: #60c060;
+            --font-family: 'Inter', 'Roboto', sans-serif;
+        }}
+        body {{
+            background: var(--body-bg);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 20px auto;
+            background: var(--container-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px var(--gold-glow);
+            padding: 30px;
+            border: 1px solid var(--border);
+        }}
+        h1, h2, h3 {{
+            color: var(--gold-accent);
+            text-align: center;
+            margin-bottom: 25px;
+            text-shadow: 0 0 5px var(--gold-glow);
+        }}
+        .metrics-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }}
+        .metric-card {{
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }}
+        .metric-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px var(--gold-glow);
+        }}
+        .metric-card h3 {{
+            color: var(--gold-bright);
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }}
+        .metric-card p {{
+            font-size: 2.2em;
+            font-weight: bold;
+            color: var(--text-primary);
+            margin: 0;
+        }}
+        .metric-card p.percentage {{
+            color: var(--green-success);
+        }}
+        .metric-card p.percentage.low {{
+            color: var(--red-critical);
+        }}
+        .list-section {{
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-top: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }}
+        .list-section h3 {{
+            color: var(--gold-bright);
+            text-align: left;
+            margin-top: 0;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }}
+        .list-section ul {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }}
+        .list-section li {{
+            background: var(--container-bg);
+            border: 1px solid var(--border);
+            margin-bottom: 10px;
+            padding: 12px 15px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s ease-in-out;
+        }}
+        .list-section li:hover {{
+            background: var(--hover-bg);
+        }}
+        .list-section li span {{
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }}
+        .list-section li strong {{
+            color: var(--text-primary);
+        }}
+        .list-section li.critical-item {{
+            border-left: 5px solid var(--red-critical);
+        }}
+        .list-section li.orphan-item {{
+            border-left: 5px solid var(--gold-accent);
+        }}
+        .no-items {{
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>API Route Intelligence Map for Gravity Omega v2</h1>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>Total API Surface Area</h3>
+                <p>{total_api_surface_area}</p>
+            </div>
+            <div class="metric-card">
+                <h3>Auth Coverage</h3>
+                <p class="percentage {auth_coverage_class}">{auth_coverage_percentage}%</p>
+            </div>
+            <div class="metric-card">
+                <h3>Error Handling Coverage</h3>
+                <p class="percentage {error_handling_coverage_class}">{error_handling_coverage_percentage}%</p>
+            </div>
+            <div class="metric-card">
+                <h3>Dead Endpoints</h3>
+                <p>{dead_endpoints_count}</p>
+            </div>
+            <div class="metric-card">
+                <h3>Orphan Calls</h3>
+                <p>{orphan_calls_count}</p>
+            </div>
+        </div>
+
+        <div class="list-section">
+            <h3>Critical Routes with No Error Handling</h3>
+            <ul>
+                {critical_routes_no_error_handling_list}
+            </ul>
+        </div>
+
+        <div class="list-section">
+            <h3>Dead Endpoints</h3>
+            <ul>
+                {dead_endpoints_list}
+            </ul>
+        </div>
+
+        <div class="list-section">
+            <h3>Orphan Frontend Calls</h3>
+            <ul>
+                {orphan_calls_list}
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

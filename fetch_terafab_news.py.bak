@@ -1,0 +1,27 @@
+import requests
+import json
+import os
+
+def fetch_terafab_news(query='Terafab', api_key='ceb2eca8f2ff49aeac2de93cd0240047', language='en', sort_by='publishedAt'):
+    '''
+    Fetches recent news articles related to 'Terafab' using the NewsAPI.
+    '''
+    base_url = 'https://newsapi.org/v2/everything'
+    params = {
+        'q': query,
+        'apiKey': api_key,
+        'language': language,
+        'sortBy': sort_by
+    }
+
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
+        news_data = response.json()
+        return news_data.get('articles', [])
+    except requests.exceptions.HTTPError as http_err:
+        print(f'HTTP error occurred: {http_err}')
+        return []
+    except Exception as err:
+        print(f'Other error occurred: {err}')
+        return []

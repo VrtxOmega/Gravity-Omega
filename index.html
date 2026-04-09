@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constraint Lab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Constraint Lab</h1>
+        </header>
+
+        <div class="card constraint-editor">
+            <h2>Constraint Editor</h2>
+            <textarea id="constraint-input" placeholder="Enter constraints here, one per line. E.g., 'User must be over 18', 'Balance cannot go below 0'"></textarea>
+            <button id="add-constraint-btn">Add Constraint</button>
+            <div id="constraints-list"></div>
+        </div>
+
+        <div class="card simulation-engine">
+            <h2>Simulation Engine</h2>
+            <button id="run-simulation-btn">Run Simulation</button>
+            <div id="activity-log"></div>
+        </div>
+
+        <div class="card results-panel">
+            <h2>Results</h2>
+            <div id="results-summary"></div>
+            <div id="constraint-results"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

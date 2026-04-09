@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gravity Omega Security Posture Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --veritas-gold: #D4A843;
+            --dark-bg: #1a1a2e;
+            --card-bg: #2a2a3e;
+            --text-color: #e0e0e0;
+            --critical-color: #e74c3c;
+            --high-color: #f39c12;
+            --medium-color: #f1c40f;
+            --info-color: #3498db;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        h1, h2, h3 {
+            color: var(--veritas-gold);
+            border-bottom: 2px solid var(--veritas-gold);
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+        .card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .severity-summary {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .severity-item {
+            flex: 1;
+            min-width: 150px;
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            color: #fff;
+        }
+        .severity-item.critical { background-color: var(--critical-color); }
+        .severity-item.high { background-color: var(--high-color); }
+        .severity-item.medium { background-color: var(--medium-color); }
+        .severity-item.info { background-color: var(--info-color); }
+
+        .finding-category h3 {
+            color: var(--text-color);
+            border-bottom: 1px dashed var(--card-bg);
+            margin-top: 20px;
+            padding-bottom: 5px;
+        }
+        .finding-item {
+            background-color: #3a3a4e;
+            border-left: 5px solid;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        .finding-item.CRITICAL { border-color: var(--critical-color); }
+        .finding-item.HIGH { border-color: var(--high-color); }
+        .finding-item.MEDIUM { border-color: var(--medium-color); }
+
+        .finding-item p {
+            margin: 5px 0;
+        }
+        .finding-item strong {
+            color: var(--veritas-gold);
+        }
+        .finding-item .context {
+            font-family: 'Courier New', monospace;
+            background-color: #222;
+            padding: 5px;
+            border-radius: 4px;
+            display: block;
+            margin-top: 5px;
+            overflow-x: auto;
+        }
+        .no-findings {
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gravity Omega Security Posture Dashboard</h1>
+
+        <div class="card">
+            <h2>Summary of Findings by Severity</h2>
+            <div class="severity-summary">
+                <div class="severity-item critical">CRITICAL: {{ total_critical }}</div>
+                <div class="severity-item high">HIGH: {{ total_high }}</div>
+                <div class="severity-item medium">MEDIUM: {{ total_medium }}</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Detailed Findings</h2>
+
+            <div class="finding-category">
+                <h3>Hardcoded Secrets (CRITICAL/HIGH)</h3>
+                {{ hardcoded_secrets_findings }}
+            </div>
+
+            <div class="finding-category">
+                <h3>Sensitive Files (HIGH)</h3>
+                {{ sensitive_files_findings }}
+            </div>
+
+            <div class="finding-category">
+                <h3>Exposed Network Bindings (CRITICAL)</h3>
+                {{ exposed_bindings_findings }}
+            </div>
+
+            <div class="finding-category">
+                <h3>Eval/Exec Usage (CRITICAL)</h3>
+                {{ eval_exec_usage_findings }}
+            </div>
+
+            <div class="finding-category">
+                <h3>Missing Input Validation (MEDIUM)</h3>
+                {{ missing_validation_findings }}
+            </div>
+
+            <div class="finding-category">
+                <h3>Errors During Scan</h3>
+                {{ scan_errors }}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

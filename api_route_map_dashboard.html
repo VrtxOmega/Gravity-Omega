@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Route Intelligence Map</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #0a0a0a;
+            --bg-container: #111111;
+            --bg-card: #1a1a1a;
+            --bg-hover: #222222;
+            --border-color: #2a2a2a;
+            --gold-accent: #d4a843;
+            --gold-bright: #f0c040;
+            --gold-glow: rgba(212, 168, 67, 0.25);
+            --text-primary: #e0e0e0;
+            --text-secondary: #999999;
+            --red-critical: #e06060;
+            --green-success: #60c060;
+            --border-radius: 8px;
+            --shadow: 0 4px 12px var(--gold-glow);
+        }
+
+        body {
+            font-family: 'Inter', 'Roboto', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background-color: var(--bg-container);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        h1, h2 {
+            color: var(--gold-bright);
+            text-align: center;
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--gold-accent);
+            padding-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+        }
+
+        h2 {
+            font-size: 1.8em;
+            margin-top: 40px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            background-color: var(--bg-hover);
+        }
+
+        .metric-card h3 {
+            color: var(--gold-accent);
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+
+        .metric-card p {
+            font-size: 2em;
+            font-weight: 600;
+            margin: 10px 0 0;
+            color: var(--text-primary);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+            background-color: var(--bg-card);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: var(--gold-accent);
+            color: var(--bg-body);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+
+        tr:nth-child(even) {
+            background-color: #151515;
+        }
+
+        tr:hover {
+            background-color: var(--bg-hover);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .status-badge.yes {
+            background-color: var(--green-success);
+            color: var(--bg-body);
+        }
+
+        .status-badge.no {
+            background-color: var(--red-critical);
+            color: var(--bg-body);
+        }
+
+        .list-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .list-section li {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: var(--border-radius);
+            color: var(--text-secondary);
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .list-section li:hover {
+            background-color: var(--bg-hover);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>API Route Intelligence Map for gravity-omega-v2</h1>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>Total API Surface Area</h3>
+                <p>52</p>
+            </div>
+            <div class="metric-card">
+                <h3>Auth Coverage</h3>
+                <p>75.00%</p>
+            </div>
+            <div class="metric-card">
+                <h3>Error Handling Coverage</h3>
+                <p>5.77%</p>
+            </div>
+        </div>
+
+        <h2>Backend Routes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>URL Pattern</th>
+                    <th>HTTP Methods</th>
+                    <th>Function Name</th>
+                    <th>Line</th>
+                    <th>Error Handling</th>
+                    <th>Auth Check</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                <tr>
+                    <td>/api/tts</td>
+                    <td>POST</td>
+                    <td>api_tts</td>
+                    <td>880</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/sentinel/status</td>
+                    <td>GET</td>
+                    <td>api_sentinel_status</td>
+                    <td>942</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/sentinel/baseline</td>
+                    <td>POST</td>
+                    <td>api_sentinel_baseline</td>
+                    <td>948</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/sentinel/heal</td>
+                    <td>POST</td>
+                    <td>api_sentinel_heal</td>
+                    <td>955</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/sentinel/alerts</td>
+                    <td>GET</td>
+                    <td>api_sentinel_alerts</td>
+                    <td>962</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/sentinel/accept</td>
+                    <td>POST</td>
+                    <td>api_sentinel_accept</td>
+                    <td>969</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/sentinel/pause</td>
+                    <td>POST</td>
+                    <td>api_sentinel_pause</td>
+                    <td>976</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/sentinel/resume</td>
+                    <td>POST</td>
+                    <td>api_sentinel_resume</td>
+                    <td>983</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/status</td>
+                    <td>GET</td>
+                    <td>api_status</td>
+                    <td>991</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/modules</td>
+                    <td>GET</td>
+                    <td>api_modules</td>
+                    <td>1005</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/vtp</td>
+                    <td>POST</td>
+                    <td>vtp_entry</td>
+                    <td>1142</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/modules/<module_id>/run</td>
+                    <td>POST</td>
+                    <td>api_module_run</td>
+                    <td>1160</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/modules/<module_id>/describe</td>
+                    <td>GET</td>
+                    <td>api_module_describe</td>
+                    <td>1185</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/agent/think</td>
+                    <td>POST</td>
+                    <td>api_agent_think</td>
+                    <td>1196</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/search/text</td>
+                    <td>POST</td>
+                    <td>api_search_text</td>
+                    <td>1230</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/search/web</td>
+                    <td>POST</td>
+                    <td>api_search_web</td>
+                    <td>1239</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/hardware</td>
+                    <td>GET</td>
+                    <td>api_hardware</td>
+                    <td>1279</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/vault/search</td>
+                    <td>POST</td>
+                    <td>api_vault_search</td>
+                    <td>1304</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/vault/context</td>
+                    <td>GET</td>
+                    <td>api_vault_context</td>
+                    <td>1311</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/vault/sessions</td>
+                    <td>GET</td>
+                    <td>api_vault_sessions</td>
+                    <td>1317</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/vault/ki-health</td>
+                    <td>GET</td>
+                    <td>api_vault_ki_health</td>
+                    <td>1323</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/vault/sweep</td>
+                    <td>POST</td>
+                    <td>api_vault_sweep</td>
+                    <td>1329</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/security/scan</td>
+                    <td>GET</td>
+                    <td>api_security_scan</td>
+                    <td>1337</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/security/shield/<shield></td>
+                    <td>POST</td>
+                    <td>api_security_shield</td>
+                    <td>1343</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/security/containment</td>
+                    <td>GET</td>
+                    <td>api_security_containment</td>
+                    <td>1360</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/security/full-scan</td>
+                    <td>POST</td>
+                    <td>api_security_full_scan</td>
+                    <td>1366</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/reports/drafts</td>
+                    <td>GET</td>
+                    <td>api_reports_drafts</td>
+                    <td>1380</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/reports/targets</td>
+                    <td>GET</td>
+                    <td>api_reports_targets</td>
+                    <td>1386</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/reports/rainmaker</td>
+                    <td>GET</td>
+                    <td>api_reports_rainmaker</td>
+                    <td>1392</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/reports/pipeline</td>
+                    <td>GET</td>
+                    <td>api_reports_pipeline</td>
+                    <td>1398</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/tools/credits</td>
+                    <td>GET</td>
+                    <td>api_tools_credits</td>
+                    <td>1406</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/tools/brain</td>
+                    <td>GET</td>
+                    <td>api_tools_brain</td>
+                    <td>1412</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/tools/vision</td>
+                    <td>GET</td>
+                    <td>api_tools_vision</td>
+                    <td>1418</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/tools/send-email</td>
+                    <td>POST</td>
+                    <td>api_tools_email</td>
+                    <td>1424</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/tools/code-review</td>
+                    <td>POST</td>
+                    <td>api_tools_code_review</td>
+                    <td>1431</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/tools/auto-audit</td>
+                    <td>POST</td>
+                    <td>api_tools_auto_audit</td>
+                    <td>1438</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/ledger/stats</td>
+                    <td>GET</td>
+                    <td>api_ledger_stats</td>
+                    <td>1447</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/ledger/search</td>
+                    <td>POST</td>
+                    <td>api_ledger_search</td>
+                    <td>1453</td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/provenance/status</td>
+                    <td>GET</td>
+                    <td>api_provenance_status</td>
+                    <td>1487</td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/provenance/ingest</td>
+                    <td>POST</td>
+                    <td>api_provenance_ingest</td>
+                    <td>1496</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/provenance/search</td>
+                    <td>POST</td>
+                    <td>api_provenance_search</td>
+                    <td>1509</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/provenance/seals</td>
+                    <td>GET</td>
+                    <td>api_provenance_seals</td>
+                    <td>1524</td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/provenance/seal</td>
+                    <td>POST</td>
+                    <td>api_provenance_seal</td>
+                    <td>1534</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/vault/outbound-context</td>
+                    <td>POST</td>
+                    <td>api_vault_outbound</td>
+                    <td>1589</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/cortex/intercept</td>
+                    <td>POST</td>
+                    <td>api_cortex_intercept</td>
+                    <td>1627</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/modules</td>
+                    <td>GET</td>
+                    <td>api_modules_list</td>
+                    <td>1678</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge yes">Yes</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/evolution/proposals</td>
+                    <td>GET</td>
+                    <td>api_evolution_proposals</td>
+                    <td>1695</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/evolution/scan</td>
+                    <td>POST</td>
+                    <td>api_evolution_scan</td>
+                    <td>1716</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/evolution/resolve</td>
+                    <td>POST</td>
+                    <td>api_evolution_resolve</td>
+                    <td>1743</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/facebook/scrape</td>
+                    <td>POST</td>
+                    <td>api_facebook_scrape</td>
+                    <td>1798</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/facebook/job/<job_id></td>
+                    <td>GET</td>
+                    <td>api_facebook_job</td>
+                    <td>1831</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+                <tr>
+                    <td>/api/facebook/find-groups</td>
+                    <td>POST</td>
+                    <td>api_facebook_find_groups</td>
+                    <td>1839</td>
+                    <td><span class="status-badge no">No</span></td>
+                    <td><span class="status-badge no">No</span></td>
+                </tr>
+        
+            </tbody>
+        </table>
+
+        <h2>Frontend Calls</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint URL</th>
+                    <th>Source File</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+            </tbody>
+        </table>
+
+        <div class="list-section">
+            <h2>Dead Endpoints</h2>
+            <ul>
+                <li>/api/tts</li><li>/api/sentinel/status</li><li>/api/sentinel/baseline</li><li>/api/sentinel/heal</li><li>/api/sentinel/alerts</li><li>/api/sentinel/accept</li><li>/api/sentinel/pause</li><li>/api/sentinel/resume</li><li>/api/status</li><li>/api/modules</li><li>/vtp</li><li>/api/modules/<module_id>/run</li><li>/api/modules/<module_id>/describe</li><li>/api/agent/think</li><li>/api/search/text</li><li>/api/search/web</li><li>/api/hardware</li><li>/api/vault/search</li><li>/api/vault/context</li><li>/api/vault/sessions</li><li>/api/vault/ki-health</li><li>/api/vault/sweep</li><li>/api/security/scan</li><li>/api/security/shield/<shield></li><li>/api/security/containment</li><li>/api/security/full-scan</li><li>/api/reports/drafts</li><li>/api/reports/targets</li><li>/api/reports/rainmaker</li><li>/api/reports/pipeline</li><li>/api/tools/credits</li><li>/api/tools/brain</li><li>/api/tools/vision</li><li>/api/tools/send-email</li><li>/api/tools/code-review</li><li>/api/tools/auto-audit</li><li>/api/ledger/stats</li><li>/api/ledger/search</li><li>/api/provenance/status</li><li>/api/provenance/ingest</li><li>/api/provenance/search</li><li>/api/provenance/seals</li><li>/api/provenance/seal</li><li>/api/vault/outbound-context</li><li>/api/cortex/intercept</li><li>/api/modules</li><li>/api/evolution/proposals</li><li>/api/evolution/scan</li><li>/api/evolution/resolve</li><li>/api/facebook/scrape</li><li>/api/facebook/job/<job_id></li><li>/api/facebook/find-groups</li>
+            </ul>
+        </div>
+
+        <div class="list-section">
+            <h2>Orphan Calls</h2>
+            <ul>
+                <li>No orphan calls found.</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

@@ -365,7 +365,7 @@ def cmd_repl(model: str = DEFAULT_MODEL, workspace: str = ""):
 def main():
     # Enable ANSI on Windows
     if sys.platform == "win32":
-        os.system("")
+        subprocess.run("")
 
     parser = argparse.ArgumentParser(
         description="Omega Claw — VERITAS-Gated Autonomous Agent",

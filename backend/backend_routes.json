@@ -1,0 +1,522 @@
+[
+  {
+    "url": "/api/tts",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_tts",
+    "line_number": 881,
+    "has_error_handling": true,
+    "has_auth_check": true
+  },
+  {
+    "url": "/api/sentinel/status",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_sentinel_status",
+    "line_number": 943,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/sentinel/baseline",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_sentinel_baseline",
+    "line_number": 953,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/sentinel/heal",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_sentinel_heal",
+    "line_number": 964,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/sentinel/alerts",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_sentinel_alerts",
+    "line_number": 975,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/sentinel/accept",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_sentinel_accept",
+    "line_number": 986,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/sentinel/pause",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_sentinel_pause",
+    "line_number": 997,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/sentinel/resume",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_sentinel_resume",
+    "line_number": 1008,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/status",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_status",
+    "line_number": 1020,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/modules",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_modules",
+    "line_number": 1038,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/vtp",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "vtp_entry",
+    "line_number": 1180,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/modules/<module_id>/run",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_module_run",
+    "line_number": 1198,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/modules/<module_id>/describe",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_module_describe",
+    "line_number": 1223,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/agent/think",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_agent_think",
+    "line_number": 1238,
+    "has_error_handling": true,
+    "has_auth_check": true
+  },
+  {
+    "url": "/api/search/text",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_search_text",
+    "line_number": 1272,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/search/web",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_search_web",
+    "line_number": 1281,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/hardware",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_hardware",
+    "line_number": 1321,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/vault/search",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_vault_search",
+    "line_number": 1346,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/vault/context",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_vault_context",
+    "line_number": 1353,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/vault/sessions",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_vault_sessions",
+    "line_number": 1359,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/vault/ki-health",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_vault_ki_health",
+    "line_number": 1365,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/vault/sweep",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_vault_sweep",
+    "line_number": 1371,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/security/scan",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_security_scan",
+    "line_number": 1379,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/security/shield/<shield>",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_security_shield",
+    "line_number": 1385,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/security/containment",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_security_containment",
+    "line_number": 1402,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/security/full-scan",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_security_full_scan",
+    "line_number": 1408,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/reports/drafts",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_reports_drafts",
+    "line_number": 1422,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/reports/targets",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_reports_targets",
+    "line_number": 1428,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/reports/rainmaker",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_reports_rainmaker",
+    "line_number": 1434,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/reports/pipeline",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_reports_pipeline",
+    "line_number": 1440,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/tools/credits",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_tools_credits",
+    "line_number": 1448,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/tools/brain",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_tools_brain",
+    "line_number": 1454,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/tools/vision",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_tools_vision",
+    "line_number": 1460,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/tools/send-email",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_tools_email",
+    "line_number": 1466,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/tools/code-review",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_tools_code_review",
+    "line_number": 1473,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/tools/auto-audit",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_tools_auto_audit",
+    "line_number": 1480,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/ledger/stats",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_ledger_stats",
+    "line_number": 1489,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/ledger/search",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_ledger_search",
+    "line_number": 1495,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/provenance/status",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_provenance_status",
+    "line_number": 1529,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/provenance/ingest",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_provenance_ingest",
+    "line_number": 1538,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/provenance/search",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_provenance_search",
+    "line_number": 1551,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/provenance/seals",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_provenance_seals",
+    "line_number": 1566,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/provenance/seal",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_provenance_seal",
+    "line_number": 1576,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/vault/outbound-context",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_vault_outbound",
+    "line_number": 1631,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/cortex/intercept",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_cortex_intercept",
+    "line_number": 1669,
+    "has_error_handling": true,
+    "has_auth_check": true
+  },
+  {
+    "url": "/api/modules",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_modules_list",
+    "line_number": 1720,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/evolution/proposals",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_evolution_proposals",
+    "line_number": 1737,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/evolution/scan",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_evolution_scan",
+    "line_number": 1758,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/evolution/resolve",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_evolution_resolve",
+    "line_number": 1785,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/facebook/scrape",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_facebook_scrape",
+    "line_number": 1840,
+    "has_error_handling": true,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/facebook/job/<job_id>",
+    "methods": [
+      "GET"
+    ],
+    "function_name": "api_facebook_job",
+    "line_number": 1873,
+    "has_error_handling": false,
+    "has_auth_check": false
+  },
+  {
+    "url": "/api/facebook/find-groups",
+    "methods": [
+      "POST"
+    ],
+    "function_name": "api_facebook_find_groups",
+    "line_number": 1881,
+    "has_error_handling": true,
+    "has_auth_check": false
+  }
+]

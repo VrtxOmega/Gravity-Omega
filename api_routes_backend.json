@@ -1,0 +1,522 @@
+[
+    {
+        "url_pattern": "/api/tts",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_tts",
+        "line_number": 880,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/sentinel/status",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_sentinel_status",
+        "line_number": 942,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/sentinel/baseline",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_sentinel_baseline",
+        "line_number": 948,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/sentinel/heal",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_sentinel_heal",
+        "line_number": 955,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/sentinel/alerts",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_sentinel_alerts",
+        "line_number": 962,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/sentinel/accept",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_sentinel_accept",
+        "line_number": 969,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/sentinel/pause",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_sentinel_pause",
+        "line_number": 976,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/sentinel/resume",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_sentinel_resume",
+        "line_number": 983,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/status",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_status",
+        "line_number": 991,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/modules",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_modules",
+        "line_number": 1005,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/vtp",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "vtp_entry",
+        "line_number": 1142,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/modules/<module_id>/run",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_module_run",
+        "line_number": 1160,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/modules/<module_id>/describe",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_module_describe",
+        "line_number": 1185,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/agent/think",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_agent_think",
+        "line_number": 1196,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/search/text",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_search_text",
+        "line_number": 1230,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/search/web",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_search_web",
+        "line_number": 1239,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/hardware",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_hardware",
+        "line_number": 1279,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/vault/search",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_vault_search",
+        "line_number": 1304,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/vault/context",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_vault_context",
+        "line_number": 1311,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/vault/sessions",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_vault_sessions",
+        "line_number": 1317,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/vault/ki-health",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_vault_ki_health",
+        "line_number": 1323,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/vault/sweep",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_vault_sweep",
+        "line_number": 1329,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/security/scan",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_security_scan",
+        "line_number": 1337,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/security/shield/<shield>",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_security_shield",
+        "line_number": 1343,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/security/containment",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_security_containment",
+        "line_number": 1360,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/security/full-scan",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_security_full_scan",
+        "line_number": 1366,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/reports/drafts",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_reports_drafts",
+        "line_number": 1380,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/reports/targets",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_reports_targets",
+        "line_number": 1386,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/reports/rainmaker",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_reports_rainmaker",
+        "line_number": 1392,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/reports/pipeline",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_reports_pipeline",
+        "line_number": 1398,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/tools/credits",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_tools_credits",
+        "line_number": 1406,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/tools/brain",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_tools_brain",
+        "line_number": 1412,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/tools/vision",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_tools_vision",
+        "line_number": 1418,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/tools/send-email",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_tools_email",
+        "line_number": 1424,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/tools/code-review",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_tools_code_review",
+        "line_number": 1431,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/tools/auto-audit",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_tools_auto_audit",
+        "line_number": 1438,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/ledger/stats",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_ledger_stats",
+        "line_number": 1447,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/ledger/search",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_ledger_search",
+        "line_number": 1453,
+        "has_error_handling": true,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/provenance/status",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_provenance_status",
+        "line_number": 1487,
+        "has_error_handling": true,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/provenance/ingest",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_provenance_ingest",
+        "line_number": 1496,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/provenance/search",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_provenance_search",
+        "line_number": 1509,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/provenance/seals",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_provenance_seals",
+        "line_number": 1524,
+        "has_error_handling": true,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/provenance/seal",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_provenance_seal",
+        "line_number": 1534,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/vault/outbound-context",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_vault_outbound",
+        "line_number": 1589,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/cortex/intercept",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_cortex_intercept",
+        "line_number": 1627,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/modules",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_modules_list",
+        "line_number": 1678,
+        "has_error_handling": false,
+        "has_auth_check": true
+    },
+    {
+        "url_pattern": "/api/evolution/proposals",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_evolution_proposals",
+        "line_number": 1695,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/evolution/scan",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_evolution_scan",
+        "line_number": 1716,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/evolution/resolve",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_evolution_resolve",
+        "line_number": 1743,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/facebook/scrape",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_facebook_scrape",
+        "line_number": 1798,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/facebook/job/<job_id>",
+        "http_methods": [
+            "GET"
+        ],
+        "function_name": "api_facebook_job",
+        "line_number": 1831,
+        "has_error_handling": false,
+        "has_auth_check": false
+    },
+    {
+        "url_pattern": "/api/facebook/find-groups",
+        "http_methods": [
+            "POST"
+        ],
+        "function_name": "api_facebook_find_groups",
+        "line_number": 1839,
+        "has_error_handling": false,
+        "has_auth_check": false
+    }
+]

@@ -1,0 +1,41 @@
+<?xml version=\"1.0\" encoding=\"UTF-16\"?>
+<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">
+  <RegistrationInfo>
+    <Date>2023-10-27T10:00:00</Date>
+    <Author>OMEGA</Author>
+    <Description>Hourly Terafab Intelligence Monitor</Description>
+    <URI>\\TerafabMonitor</URI>
+  </RegistrationInfo>
+  <Triggers>
+    <TimeTrigger>
+      <StartBoundary>2023-10-27T10:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByFrequency>
+        <Interval>1H</Interval>
+        <Unit>Hours</Unit>
+      </ScheduleByFrequency>
+    </TimeTrigger>
+  </Triggers>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfOnBatteries>false</StopIfOnBatteries>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>false</StartWhenAvailable>
+    <RunInSeparateProcess>false</RunInSeparateProcess>
+    <UseUnifiedBackgroundTasks>true</UseUnifiedBackgroundTasks>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context=\"Author\">
+    <Exec>
+      <Command>C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe</Command>
+      <Arguments>-ExecutionPolicy Bypass -File \"C:\\Veritas_Lab\\gravity-omega-v2\\run_terafab_monitor.ps1\"</Arguments>
+    </Exec>
+  </Actions>
+</Task>

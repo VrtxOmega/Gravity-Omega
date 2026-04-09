@@ -1,0 +1,102 @@
+{
+    "total_api_surface_area": 5,
+    "auth_coverage_percentage": 20.0,
+    "error_handling_coverage_percentage": 0.0,
+    "dead_endpoints_count": 5,
+    "dead_endpoints": [
+        {
+            "url_pattern": "/api/tts",
+            "http_methods": [
+                "POST"
+            ],
+            "function_name": "api_tts",
+            "line_number": 881,
+            "has_error_handling": false,
+            "has_auth_check": true
+        },
+        {
+            "url_pattern": "/vtp",
+            "http_methods": [
+                "POST"
+            ],
+            "function_name": "vtp_entry",
+            "line_number": 1180,
+            "has_error_handling": false,
+            "has_auth_check": false
+        },
+        {
+            "url_pattern": "/api/facebook/scrape",
+            "http_methods": [
+                "POST"
+            ],
+            "function_name": "api_facebook_scrape",
+            "line_number": 1840,
+            "has_error_handling": false,
+            "has_auth_check": false
+        },
+        {
+            "url_pattern": "/api/facebook/job/<job_id>",
+            "http_methods": [
+                "GET"
+            ],
+            "function_name": "api_facebook_job",
+            "line_number": 1873,
+            "has_error_handling": false,
+            "has_auth_check": false
+        },
+        {
+            "url_pattern": "/api/facebook/find-groups",
+            "http_methods": [
+                "POST"
+            ],
+            "function_name": "api_facebook_find_groups",
+            "line_number": 1881,
+            "has_error_handling": false,
+            "has_auth_check": false
+        }
+    ],
+    "orphan_calls_count": 0,
+    "orphan_calls": [],
+    "critical_routes_no_error_handling": [
+        {
+            "url_pattern": "/api/tts",
+            "http_methods": [
+                "POST"
+            ],
+            "function_name": "api_tts",
+            "line_number": 881,
+            "has_error_handling": false,
+            "has_auth_check": true
+        },
+        {
+            "url_pattern": "/api/facebook/scrape",
+            "http_methods": [
+                "POST"
+            ],
+            "function_name": "api_facebook_scrape",
+            "line_number": 1840,
+            "has_error_handling": false,
+            "has_auth_check": false
+        },
+        {
+            "url_pattern": "/api/facebook/job/<job_id>",
+            "http_methods": [
+                "GET"
+            ],
+            "function_name": "api_facebook_job",
+            "line_number": 1873,
+            "has_error_handling": false,
+            "has_auth_check": false
+        },
+        {
+            "url_pattern": "/api/facebook/find-groups",
+            "http_methods": [
+                "POST"
+            ],
+            "function_name": "api_facebook_find_groups",
+            "line_number": 1881,
+            "has_error_handling": false,
+            "has_auth_check": false
+        }
+    ]
+}

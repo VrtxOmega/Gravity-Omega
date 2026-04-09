@@ -1,0 +1,230 @@
+{
+    "total_findings_by_severity": {
+        "CRITICAL": 1,
+        "HIGH": 13,
+        "MEDIUM": 16
+    },
+    "detailed_findings": {
+        "hardcoded_secrets": [
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\config.py",
+                "line": 1,
+                "severity": "HIGH",
+                "finding": "Hardcoded secret detected: ruLv***",
+                "context": "NEWS_API_KEY = 'ruLvPCLVF7dNe2uHOj0nqIB4BgB7P1wCGIzCVCq3'"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\fetch_terafab_news.py",
+                "line": 5,
+                "severity": "HIGH",
+                "finding": "Hardcoded secret detected: ceb2***",
+                "context": "def fetch_terafab_news(query='Terafab', api_key='ceb2eca8f2ff49aeac2de93cd0240047', language='en', sort_by='publishedAt'):"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\vtp_codec.js",
+                "line": 11,
+                "severity": "HIGH",
+                "finding": "Hardcoded secret detected: REPL***",
+                "context": "const NODE_SECRET = 'REPLACE_WITH_ENV_SECRET'; // In production, pull from env"
+            }
+        ],
+        "sensitive_files": [
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\.env",
+                "line": 1,
+                "severity": "HIGH",
+                "finding": ".env file detected.",
+                "context": "Contains environment variables, potentially secrets."
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\.env",
+                "line": 1,
+                "severity": "HIGH",
+                "finding": ".env file detected.",
+                "context": "Contains environment variables, potentially secrets."
+            }
+        ],
+        "exposed_bindings": [
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\security_scanner_modules\\_bindings.py",
+                "line": 2,
+                "severity": "CRITICAL",
+                "finding": "Exposed network binding (0.0.0.0) detected.",
+                "context": "if \"host='0.0.0.0'\" in line or 'host=\"0.0.0.0\"' in line:"
+            }
+        ],
+        "eval_exec_usage": [
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\collect_git_data.py",
+                "line": 13,
+                "severity": "MEDIUM",
+                "finding": "subprocess with shell=True (command injection risk).",
+                "context": "shell=True,"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1081,
+                "severity": "MEDIUM",
+                "finding": "subprocess with shell=True (command injection risk).",
+                "context": "out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=60)"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\security_scanner_modules\\_eval_exec.py",
+                "line": 24,
+                "severity": "MEDIUM",
+                "finding": "subprocess with shell=True (command injection risk).",
+                "context": "'finding': \"subprocess with shell=True (command injection risk).\","
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_agent.js",
+                "line": 815,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via exec() detected.",
+                "context": "while ((match = vtpRegex.exec(text)) !== null) {"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_agent.js",
+                "line": 1417,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via exec() detected.",
+                "context": "exec('Start-Process \"' + resolved + '\"', { shell: true, timeout: 10000 }, () => resolve());"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_agent.js",
+                "line": 1442,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via exec() detected.",
+                "context": "exec(cmd, { encoding: 'utf8', timeout: 120000, cwd: execCwd, shell: true }, (err, stdout, stderr) => {"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_agent.js",
+                "line": 1656,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via exec() detected.",
+                "context": "exec(cmd, { encoding: 'utf8', timeout: 60000, shell: true }, (err, stdout, stderr) => {"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_agent.js",
+                "line": 1671,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via exec() detected.",
+                "context": "exec(cmd, { encoding: 'utf8', timeout: 30000, cwd: process.cwd(), shell: true }, (err, stdout, stderr) => {"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_browser.js",
+                "line": 70,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via eval() detected.",
+                "context": "const text = await this._page.$eval(selector, el => el.textContent);"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_tools.js",
+                "line": 289,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via exec() detected.",
+                "context": "while ((m = pat.exec(content)) !== null) {"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\omega\\omega_tools.js",
+                "line": 300,
+                "severity": "HIGH",
+                "finding": "Dynamic code execution via exec() detected.",
+                "context": "while ((m = pat.exec(content)) !== null) {"
+            }
+        ],
+        "missing_validation": [
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1169,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "args = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1233,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1244,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1307,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1346,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1427,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1434,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1441,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1456,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1593,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1631,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1721,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            },
+            {
+                "file": "C:\\Veritas_Lab\\gravity-omega-v2\\backend\\web_server.py",
+                "line": 1747,
+                "severity": "MEDIUM",
+                "finding": "Request args used without visible validation.",
+                "context": "data = request.json or {}"
+            }
+        ],
+        "errors": []
+    }
+}

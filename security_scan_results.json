@@ -1,0 +1,101 @@
+{
+    "severity_counts": {
+        "CRITICAL": 3,
+        "HIGH": 2,
+        "MEDIUM": 9
+    },
+    "findings_by_category": {
+        "Hardcoded Secrets": [
+            {
+                "severity": "CRITICAL",
+                "category": "Hardcoded Secrets",
+                "file": ".env",
+                "finding": "Google API Key: AIza***"
+            },
+            {
+                "severity": "CRITICAL",
+                "category": "Hardcoded Secrets",
+                "file": "fetch_terafab_news.py",
+                "finding": "Variable Assignment Secret: ceb2***"
+            },
+            {
+                "severity": "CRITICAL",
+                "category": "Hardcoded Secrets",
+                "file": "backend\\security_findings.json",
+                "finding": "Variable Assignment Secret: ceb2***"
+            }
+        ],
+        "Sensitive File": [
+            {
+                "severity": "HIGH",
+                "category": "Sensitive File",
+                "file": ".env",
+                "finding": ".env file detected, likely contains credentials."
+            },
+            {
+                "severity": "HIGH",
+                "category": "Sensitive File",
+                "file": "backend\\.env",
+                "finding": ".env file detected, likely contains credentials."
+            }
+        ],
+        "Code Injection Risk": [
+            {
+                "severity": "MEDIUM",
+                "category": "Code Injection Risk",
+                "file": "collect_git_data.py",
+                "finding": "subprocess.run with shell=True detected."
+            },
+            {
+                "severity": "MEDIUM",
+                "category": "Code Injection Risk",
+                "file": "eval_exec_detector.py",
+                "finding": "Usage of eval() or exec() detected."
+            },
+            {
+                "severity": "MEDIUM",
+                "category": "Code Injection Risk",
+                "file": "security_scan_results.json",
+                "finding": "Usage of eval() or exec() detected."
+            },
+            {
+                "severity": "MEDIUM",
+                "category": "Code Injection Risk",
+                "file": "backend\\security_findings.json",
+                "finding": "Usage of eval() or exec() detected."
+            },
+            {
+                "severity": "MEDIUM",
+                "category": "Code Injection Risk",
+                "file": "omega\\omega_agent.js",
+                "finding": "Usage of eval() or exec() detected."
+            },
+            {
+                "severity": "MEDIUM",
+                "category": "Code Injection Risk",
+                "file": "omega\\omega_browser.js",
+                "finding": "Usage of eval() or exec() detected."
+            },
+            {
+                "severity": "MEDIUM",
+                "category": "Code Injection Risk",
+                "file": "omega\\omega_tools.js",
+                "finding": "Usage of eval() or exec() detected."
+            }
+        ],
+        "Exposed Network Binding": [
+            {
+                "severity": "MEDIUM",
+                "category": "Exposed Network Binding",
+                "file": "backend\\security_findings.json",
+                "finding": "Network binding to 0.0.0.0 detected."
+            },
+            {
+                "severity": "MEDIUM",
+                "category": "Exposed Network Binding",
+                "file": "backend\\security_scanner_modules\\_bindings.py",
+                "finding": "Network binding to 0.0.0.0 detected."
+            }
+        ]
+    }
+}

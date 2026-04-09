@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob: data:; media-src 'self' blob: data:; connect-src 'self' http://127.0.0.1:* https://generativelanguage.googleapis.com;">
+        content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob: data:; media-src 'self' file: blob: data:; img-src 'self' data: https://api.qrserver.com; connect-src 'self' http://127.0.0.1:* https://generativelanguage.googleapis.com;">
     <title>Gravity Omega</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/omega.css">
@@ -116,6 +116,11 @@
             <button class="activity-btn" data-panel="tools" title="Tools — Operations">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+                </svg>
+            </button>
+            <button class="activity-btn" data-panel="media" title="Media Player (Ctrl+Shift+Space)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
                 </svg>
             </button>
 
@@ -266,8 +271,10 @@
                         <div class="reports-section-header"><span>🤖 AI MODEL</span></div>
                         <div class="tools-form">
                             <select id="settings-ai-model" class="tool-input">
-                                <option value="qwen2.5:7b">Ollama — qwen2.5:7b (local)</option>
-                                <option value="llama3.1:8b">Ollama — llama3.1:8b (local)</option>
+                                <option value="qwen3:8b">Ollama — qwen3:8b (local, 44 t/s)</option>
+                                <option value="gemma3:4b">Ollama — gemma3:4b (local, 80 t/s)</option>
+                                <option value="phi4-mini">Ollama — phi4-mini (local, 86 t/s)</option>
+                                <option value="deepseek-r1:7b">Ollama — deepseek-r1:7b (local, 46 t/s)</option>
                                 <option value="gemini-2.5-flash">Vertex AI — gemini-2.5-flash</option>
                                 <option value="gpt-4o">OpenAI — gpt-4o</option>
                             </select>
@@ -322,6 +329,16 @@
                         </div>
                     </div>
                     <div class="reports-section">
+                        <div class="reports-section-header"><span>📱 MOBILE PAIRING</span></div>
+                        <div class="tools-form">
+                            <button id="btn-generate-qr" class="reports-action-btn" style="width: 100%; margin-bottom: 8px;">Generate Pairing QR</button>
+                            <div id="qr-code-container" class="hidden" style="text-align: center; background: #fff; padding: 10px; border-radius: 4px;">
+                                <img id="qr-code-img" src="" style="width: 160px; height: 160px; display: block; margin: 0 auto;" />
+                            </div>
+                            <div id="qr-status-text" class="hidden" style="font-size:10px;color:var(--text-tertiary);margin-top:4px;text-align:center;">Scan this with Omega Mobile</div>
+                        </div>
+                    </div>
+                    <div class="reports-section">
                         <div class="reports-section-header"><span>ℹ️ ABOUT</span></div>
                         <div style="padding:8px 12px;font-size:11px;color:var(--text-tertiary)">
                             <div><strong style="color:var(--gold)">Gravity Omega v4.1</strong></div>
@@ -331,11 +348,88 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Media panel -->
+                <div class="sidebar-panel hidden" data-panel="media">
+                    <div class="media-panel">
+                        <!-- Source Toggle -->
+                        <div class="media-source-toggle">
+                            <button class="media-source-btn active" data-source="yt" id="media-src-yt">🎵 YouTube Music</button>
+                            <button class="media-source-btn" data-source="local" id="media-src-local">📁 Local</button>
+                        </div>
+
+                        <!-- Track Info with Cover Art -->
+                        <div class="media-track-info" id="media-track-info">
+                            <div class="media-cover-art" id="media-cover-art">
+                                <span class="media-cover-fallback">Ω</span>
+                                <img class="media-cover-img hidden" id="media-cover-img" alt="" />
+                            </div>
+                            <div class="media-track-text">
+                                <div class="media-track-title" id="media-track-title">No track playing</div>
+                                <div class="media-track-artist" id="media-track-artist"></div>
+                            </div>
+                        </div>
+
+                        <!-- Transport Controls -->
+                        <div class="media-controls">
+                            <button class="media-btn" id="media-prev" title="Previous">⏮</button>
+                            <button class="media-btn media-btn-play" id="media-play" title="Play/Pause">▶</button>
+                            <button class="media-btn" id="media-next" title="Next">⏭</button>
+                            <button class="media-btn media-speed-btn" id="media-speed" title="Playback Speed">1×</button>
+                        </div>
+
+                        <!-- Seek bar (local files only) -->
+                        <div class="media-seek hidden" id="media-seek-area">
+                            <span class="media-seek-time" id="media-seek-cur">0:00</span>
+                            <input type="range" class="media-seek-slider" id="media-seek" min="0" max="100" value="0" />
+                            <span class="media-seek-time" id="media-seek-dur">0:00</span>
+                        </div>
+
+                        <!-- Volume -->
+                        <div class="media-volume">
+                            <span class="media-volume-icon" id="media-vol-icon">🔊</span>
+                            <input type="range" id="media-volume" class="media-volume-slider" min="0" max="100" value="70" />
+                            <span class="media-volume-val" id="media-vol-val">70</span>
+                        </div>
+
+                        <!-- Expand toggle -->
+                        <button class="media-expand-btn" id="media-expand-btn">▸ Expand Player</button>
+
+                        <!-- Webview container (expanded view) -->
+                        <div class="media-webview-container collapsed" id="media-webview-container">
+                            <webview id="media-wv-yt" partition="persist:media"
+                                     style="width:100%;height:100%;display:none;"></webview>
+                            <webview id="media-wv-audible" partition="persist:media"
+                                     style="width:100%;height:100%;display:none;"
+                                     allowpopups></webview>
+                        </div>
+
+                        <!-- Local Files Player (hidden until Local tab active) -->
+                        <div class="media-local-panel hidden" id="media-local-panel">
+                            <!-- Search bar -->
+                            <div class="media-search-bar">
+                                <input type="text" class="media-search-input" id="media-search" placeholder="Search library..." />
+                                <span class="media-search-count" id="media-search-count"></span>
+                                <button class="media-search-clear hidden" id="media-search-clear">×</button>
+                            </div>
+                            <!-- Book/Podcast sub-tabs -->
+                            <div class="media-local-tabs">
+                                <button class="media-local-tab active" data-ltab="books" id="media-tab-books">📚 Books</button>
+                                <button class="media-local-tab" data-ltab="podcasts" id="media-tab-podcasts">🎙 Podcasts</button>
+                            </div>
+                            <button class="media-local-folder-btn" id="media-local-folder">📂 Select Audiobook Folder</button>
+                            <div class="media-local-playlist" id="media-local-playlist"></div>
+                        </div>
+
+                        <!-- Hidden audio element for local playback -->
+                        <audio id="media-local-audio" preload="auto"></audio>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- Sidebar resize -->
-        <div class="resize-handle" id="sidebar-resize"></div>
+        <div class="resize-handle" id="sidebar-resize"><button class="resize-lock-btn" id="lock-sidebar" title="Lock/Unlock sidebar resize">🔓</button></div>
 
         <!-- Main Editor Area -->
         <div id="main-area">
@@ -355,13 +449,74 @@
                         </div>
                     </div>
                 </div>
+                <div id="editor-actions" style="position:absolute; right:10px; top:5px; z-index:100" class="hidden">
+                    <button id="btn-toggle-markdown" class="titlebar-btn" style="border:1px solid var(--gold); border-radius:3px; padding:2px 8px; font-size:11px; margin-right:5px; background:var(--black2); color:var(--gold);">PREVIEW</button>
+                    <button id="btn-analyzer" class="titlebar-btn" style="border:1px solid var(--gold); border-radius:3px; padding:2px 8px; font-size:11px; background:var(--gold); color:var(--black);">ANALYZE REPORT</button>
+                </div>
                 <div id="monaco-container" class="hidden"></div>
                 <div id="json-viewer" class="viewer hidden"></div>
                 <div id="markdown-viewer" class="viewer hidden"></div>
                 <div id="image-viewer" class="viewer hidden"><img id="image-viewer-img" /></div>
+                
+                <!-- VERITAS ANALYZER -->
+                <div id="analyzer-container" class="viewer hidden">
+                    <!-- UPLOAD SCREEN -->
+                    <div id="upload-screen">
+                      <div class="upload-omega">Ω</div>
+                      <div class="upload-brand">Gravity Omega</div>
+                      <div class="upload-sub">Veritas Report Generator</div>
+
+                      <div class="drop-zone" id="drop-zone">
+                        <span class="drop-icon">⬡</span>
+                        <div class="drop-title">Analyze Document</div>
+                        <div class="drop-hint">Local LLM Extraction</div>
+                        <div class="drop-types">
+                          <span class="type-tag">.MD</span><span class="type-tag">.TXT</span>
+                          <span class="type-tag">.JSON</span><span class="type-tag">.DOCX</span>
+                          <span class="type-tag">.PDF</span>
+                        </div>
+                        <input type="file" id="file-input" accept=".md,.txt,.json,.docx,.pdf,.csv" style="display:none">
+                      </div>
+
+                      <div class="config-row">
+                        <span class="config-label">Ollama Model</span>
+                        <select class="config-input" id="model-input">
+                          <option value="qwen3:8b">qwen3:8b (Complex)</option>
+                          <option value="gemma3:4b">gemma3:4b (Fastest)</option>
+                          <option value="phi4-mini">phi4-mini</option>
+                          <option value="deepseek-r1:7b">deepseek-r1:7b (Reasoning)</option>
+                        </select>
+                      </div>
+
+                      <div id="upload-error" class="error-msg hidden"></div>
+                    </div>
+
+                    <!-- PROCESSING SCREEN -->
+                    <div id="processing-screen" class="hidden">
+                      <div class="proc-omega">Ω</div>
+                      <div class="proc-title">Veritas Analysis Engine — Active</div>
+                      <div class="proc-terminal" id="proc-terminal"></div>
+                    </div>
+
+                    <!-- REPORT SCREEN -->
+                    <div id="report-screen" class="hidden">
+                      <div class="report-toolbar">
+                        <div>
+                          <div class="toolbar-brand">Ω &nbsp; VERITAS Report</div>
+                          <div class="toolbar-file" id="toolbar-file"></div>
+                        </div>
+                        <div class="toolbar-actions">
+                          <button class="btn-rst" id="btn-analyzer-reset">← New Document</button>
+                          <button class="btn-dl" id="btn-analyzer-download">↓ Download HTML</button>
+                        </div>
+                      </div>
+                      <div id="report-body"></div>
+                    </div>
+                </div>
+
             </div>
 
-            <div class="resize-handle-h" id="panel-resize"></div>
+            <div class="resize-handle-h" id="panel-resize"><button class="resize-lock-btn" id="lock-panel" title="Lock/Unlock terminal resize">🔓</button></div>
 
             <!-- Bottom Panel -->
             <div id="bottom-panel">
@@ -381,14 +536,21 @@
         </div>
 
         <!-- Chat resize -->
-        <div class="resize-handle" id="chat-resize"></div>
+        <div class="resize-handle" id="chat-resize"><button class="resize-lock-btn" id="lock-chat" title="Lock/Unlock chat resize">🔓</button></div>
 
         <!-- ═══ Omega Chat Panel (Right Side) ═══ -->
         <div id="omega-chat-panel">
             <div class="chat-header">
                 <span class="chat-header-title">Ω OMEGA</span>
-                <span class="chat-header-model" id="chat-model-badge">Ω OMEGA v4.1</span>
+                <div class="chat-thread-selector" id="chat-thread-selector">
+                    <span class="chat-thread-title" id="chat-thread-title" title="Click to switch threads">New Conversation ▾</span>
+                    <div class="chat-thread-dropdown hidden" id="chat-thread-dropdown">
+                        <input type="text" class="chat-thread-search" id="chat-thread-search" placeholder="Search threads..." />
+                        <div class="chat-thread-list" id="chat-thread-list"></div>
+                    </div>
+                </div>
                 <div class="chat-header-actions">
+                    <button class="chat-action-btn" id="btn-new-thread" title="New conversation">+</button>
                     <button class="chat-action-btn" id="btn-clear-chat" title="Clear conversation">⌫</button>
                     <button class="chat-action-btn" id="btn-toggle-chat" title="Close panel">✕</button>
                 </div>
@@ -443,7 +605,13 @@
         // Workers can't importScripts from file:// (opaque origin restriction).
         // Monaco gracefully runs tokenization on main thread without workers.
         // Suppress worker attempts entirely to eliminate console error spam.
-        window.MonacoEnvironment = {};
+        window.MonacoEnvironment = {
+            getWorkerUrl: function (moduleId, label) {
+                // v4.3.22: Return no-op blob worker. Electron file:// can't importScripts relative paths.
+                // Monaco gracefully falls back to main-thread tokenization.
+                return URL.createObjectURL(new Blob([''], { type: 'application/javascript' }));
+            }
+        };
 
         const loaderScript = document.createElement('script');
         loaderScript.src = monacoPath + '/loader.js';
@@ -457,6 +625,7 @@
         };
         document.body.appendChild(loaderScript);
     </script>
+    <script src="mobile_qr.js"></script>
 </body>
 
 </html>

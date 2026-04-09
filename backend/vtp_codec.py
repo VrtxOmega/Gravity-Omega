@@ -20,6 +20,7 @@ import json
 import time
 import uuid
 import ipaddress
+import random
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, Set
@@ -49,7 +50,7 @@ FAST_PATH_ROUTES = {
     # Read operations (safe)
     ("EXT", "AST"), ("EXT", "CSS"), ("EXT", "PY"), ("EXT", "JS"),
     ("EXT", "JSON"), ("EXT", "MD"), ("EXT", "TXT"),
-    ("EXT", "VLT"), ("EXT", "DB"), ("EXT", "NET"),
+    ("EXT", "VLT"), ("EXT", "DB"), ("EXT", "NET"), ("EXT", "SYS"),
     # Write operations (handled by direct_executor)
     ("MUT", "AST"), ("MUT", "CSS"), ("MUT", "PY"), ("MUT", "JS"),
     ("MUT", "JSON"), ("MUT", "MD"), ("MUT", "TXT"), ("MUT", "VLT"),
@@ -58,14 +59,18 @@ FAST_PATH_ROUTES = {
     # System ops
     ("REQ", "SYS"), ("REQ", "NET"),
     # Verify ops
-    ("VFY", "AST"),
+    ("VFY", "AST"), ("VFY", "VLT"), ("VFY", "DB"),
 }
 
 # Replay attack window
 MAX_PACKET_AGE_MS = 5000
 
-# Intent drift floor — lowered to allow diverse tool usage
-INTENT_DRIFT_FLOOR = 0.30
+# Intent drift thresholds — per category
+INTENT_DRIFT_THRESHOLDS = {
+    "SAFE": 0.15,
+    "GATED": 0.25,
+    "RSTR": 0.45,
+}
 
 # SSRF blocked ranges
 BLOCKED_RANGES = [
@@ -172,6 +177,47 @@ def intent_fingerprint(prm: str) -> str:
 # ─────────────────────────────────────────────
 # CODEC — ENCODE / DECODE
 # ─────────────────────────────────────────────
+
+# ─────────────────────────────────────────────
+# EXACT TGT PAYLOAD SCHEMAS
+# ─────────────────────────────────────────────
+def _validate_mut_ast(prm: str) -> tuple[bool, str]:
+    try:
+        data = json.loads(prm)
+    except Exception:
+        # Legacy fallback support
+        parts = str(prm).strip('"\'').split('::')
+        if len(parts) in (2, 3):
+            return True, "OK"
+        return False, "SCHEMA_INVALID_JSON"
+    
+    if not isinstance(data, dict): return False, "SCHEMA_NOT_DICT"
+    if "path" not in data: return False, "SCHEMA_MISSING_FIELD:path"
+    if "content" not in data and "find" not in data: return False, "SCHEMA_MISSING_FIELD:content_or_find"
+    return True, "OK"
+
+def _validate_req_sys(prm: str) -> tuple[bool, str]:
+    if not prm or len(str(prm).strip()) == 0:
+        return False, "SCHEMA_MISSING_COMMAND"
+    return True, "OK"
+
+def _validate_req_net(prm: str) -> tuple[bool, str]:
+    if not prm or len(str(prm).strip()) == 0:
+        return False, "SCHEMA_MISSING_URL"
+    return True, "OK"
+
+VTP_SCHEMAS = {
+    "MUT:AST": _validate_mut_ast,
+    "REQ:SYS": _validate_req_sys,
+    "REQ:NET": _validate_req_net
+}
+
+def validate_tgt_schema(act: str, tgt: str, prm: str) -> tuple[bool, str]:
+    pseudo = f"{act}:{tgt}"
+    if pseudo not in VTP_SCHEMAS:
+        return True, "OK"
+    return VTP_SCHEMAS[pseudo](prm)
+
 class VTPCodec:
 
     @staticmethod
@@ -405,6 +451,19 @@ class ImmutableLedger:
 # ─────────────────────────────────────────────
 # TRI-NODE FSM ROUTER
 # ─────────────────────────────────────────────
+def validate_packet_structure(raw_packet: str) -> tuple[bool, str]:
+    """Pre-HMAC structural validation. Catches malformed packets before expensive seal check."""
+    if not raw_packet or not isinstance(raw_packet, str):
+        return False, "EMPTY_PACKET"
+    parts = raw_packet.strip().split("::")
+    if len(parts) != 4:
+        return False, f"SEGMENT_COUNT:{len(parts)}"
+    if not parts[3].strip().startswith("[HASH:"):
+        return False, "MISSING_HASH_BLOCK"
+    if not parts[1].strip().startswith("[ACT:"):
+        return False, "MISSING_CLAEG_BLOCK"
+    return True, "OK"
+
 class VTPRouter:
     """
     Fail-closed FSM Tri-Node router.
@@ -436,16 +495,34 @@ class VTPRouter:
         # ── S0: RECEIVE ──────────────────────────────
         self.state = RouterState.S0_RECEIVE
 
-        # ── S1: PARSE ────────────────────────────────
+                # ── S1: PARSE ────────────────────────────────
         self.state = RouterState.S1_PARSE
+        
+        # Pre-HMAC structural validation
+        struct_ok, struct_reason = validate_packet_structure(raw_packet)
+        if not struct_ok:
+            return self._fail(RouterState.F1_PARSE_FAIL, None, f"MALFORMED:{struct_reason}", parent_seal)
+            
         try:
             packet = VTPCodec.decode(raw_packet)
         except ValueError as e:
             return self._fail(RouterState.F1_PARSE_FAIL, None, str(e), parent_seal)
 
+        # ── S1.5: SCHEMA VALIDATE ────────────────────────────────
+        schema_ok, schema_reason = validate_tgt_schema(packet.act, packet.tgt, packet.prm)
+        if not schema_ok:
+            return self._fail(RouterState.F1_PARSE_FAIL, packet, f"SCHEMA_FAIL:{schema_reason}", parent_seal)
+
+
         # ── AUTH: Seal verification ───────────────────
         if not verify_seal(packet, parent_seal):
-            return self._fail(RouterState.F5_AUTH_FAIL, packet, "SEAL_INVALID", parent_seal)
+            # Aggressive seal retry with exponential backoff
+            time.sleep(0.1 + random.uniform(0, 0.05))
+            if not verify_seal(packet, parent_seal):
+                time.sleep(0.2 + random.uniform(0, 0.1))
+                if not verify_seal(packet, parent_seal):
+                    return self._fail(RouterState.F5_AUTH_FAIL, packet, "SEAL_INVALID_AFTER_RETRY", parent_seal)
+            self.ledger.append("SEAL_RETRY_OK", packet, "retry_succeeded", RouterState.S0_RECEIVE)
 
         # ── REPLAY: Nonce + TTL ───────────────────────
         now_ms = int(time.time() * 1000)
@@ -459,7 +536,46 @@ class VTPRouter:
         if packet.tgt == "NET" and is_ssrf_target(packet.prm):
             return self._fail(RouterState.F7_SSRF_FAIL, packet, "SSRF_BLOCKED", parent_seal)
 
-        # ── ZERO-LLM FAST PATH ────────────────────────
+                # ── VERITAS Ω 9-GATE PIPELINE (MCP Orchestration) ──
+        # Gates 3-8: EVIDENCE -> MATH -> COST -> INCENTIVE -> IRREVERSIBILITY -> ADVERSARY
+        if packet.act == "MUT" and packet.tgt in ("AST", "PY"):
+            # Elevate irreversibility thresholds if altering python code
+            mcp = get_mcp_client()
+            
+            prm_data = {}
+            try:
+                prm_data = json.loads(packet.prm)
+            except Exception:
+                pass
+                
+            path = prm_data.get('path') if isinstance(prm_data, dict) else None
+            new_content = prm_data.get('content') if isinstance(prm_data, dict) else None
+            
+            if path and new_content and path.endswith('.py'):
+                # Write to temp file for assessing
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.py', encoding='utf-8') as tmp_f:
+                    tmp_f.write(new_content)
+                    tmp_path = tmp_f.name
+                
+                try:
+                    assessment = mcp.assess_file_sync(tmp_path, mode="veritas")
+                    verdict = assessment.get("verdict", "INCONCLUSIVE")
+                    
+                    if verdict in ("VIOLATION", "MODEL_BOUND", "INCONCLUSIVE"):
+                        os.unlink(tmp_path)
+                        return self._fail(RouterState.F2_NAEF_FAIL, packet, f"VERITAS_GATE_FAIL:{verdict}", parent_seal)
+                        
+                    # Also log to ledger that MCP assessed it
+                    self.ledger.append("MCP_ASSESS", packet, f"verdict={verdict}", RouterState.S2_NAEF)
+                finally:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+        
+        # ── S9: TRACE/SEAL ───────────────────────────
+        # Handled at execution completion by appending TRACE_CHAIN to ledger mapping PolicyHash.
+        
+# ── ZERO-LLM FAST PATH ────────────────────────
         if (packet.act, packet.tgt) in FAST_PATH_ROUTES and direct_executor:
             self.ledger.append("FAST_PATH", packet, "zero_llm", RouterState.S5_EXECUTE)
             result = direct_executor(packet)
@@ -483,7 +599,8 @@ class VTPRouter:
         # Channel 1: Semantic similarity
         payload_embedding = self._embed(packet.prm)
         similarity = self._cosine(prompt_embedding, payload_embedding)
-        if similarity < INTENT_DRIFT_FLOOR:
+        drift_floor = INTENT_DRIFT_THRESHOLDS.get(packet.rgm, 0.25)
+        if similarity < drift_floor:
             return self._fail(
                 RouterState.F4_DRIFT_FAIL, packet,
                 f"SEMANTIC_DRIFT:sim={similarity:.4f}", parent_seal

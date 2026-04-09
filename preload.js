@@ -21,6 +21,14 @@ contextBridge.exposeInMainWorld('omega', {
         mkdir:      (p) => ipcRenderer.invoke('file:mkdir', p),
         delete:     (p, r) => ipcRenderer.invoke('file:delete', p, r),
         rename:     (o, n) => ipcRenderer.invoke('file:rename', o, n),
+        openAudioFolder: () => ipcRenderer.invoke('media:openAudioFolder'),
+        saveMediaState: (state) => ipcRenderer.invoke('media:saveState', state),
+        loadMediaState: () => ipcRenderer.invoke('media:loadState'),
+        importToLibrary: (srcPath) => ipcRenderer.invoke('media:importToLibrary', srcPath),
+        scanFolder: (folderPath) => ipcRenderer.invoke('media:scanFolder', folderPath),
+        getMetadata: (filePath) => ipcRenderer.invoke('media:getMetadata', filePath),
+        getCoverArt: (filePath) => ipcRenderer.invoke('media:getCoverArt', filePath),
+        decryptAAX: (filePath) => ipcRenderer.invoke('media:decryptAAX', filePath),
     },
 
     // ── Terminal (PTY) ───────────────────────────────────────
@@ -55,6 +63,16 @@ contextBridge.exposeInMainWorld('omega', {
         send:  (text, sessionId) => ipcRenderer.invoke('chat:send', text, sessionId),
         abort: (sessionId) => ipcRenderer.invoke('chat:abort', sessionId),
         tts:   (text) => ipcRenderer.invoke('chat:tts', text),
+    },
+
+    // ── Conversation Threads (Persistence) ───────────────────
+    threads: {
+        list:   ()          => ipcRenderer.invoke('threads:list'),
+        create: ()          => ipcRenderer.invoke('threads:create'),
+        load:   (id)        => ipcRenderer.invoke('threads:load', id),
+        append: (id, msg)   => ipcRenderer.invoke('threads:append', id, msg),
+        rename: (id, title) => ipcRenderer.invoke('threads:rename', id, title),
+        delete: (id)        => ipcRenderer.invoke('threads:delete', id),
     },
 
     // ── Agent (Agentic Loop) ─────────────────────────────────
@@ -141,6 +159,7 @@ contextBridge.exposeInMainWorld('omega', {
             'omega:backend-ready', 'omega:agent-action',
             'omega:agent-step', 'omega:agent-complete',
             'omega:sentinel-alert', 'omega:open-file',
+            'omega:media-toggle',
         ];
         if (allowed.includes(channel)) {
             const wrapper = (_, ...args) => cb(...args);

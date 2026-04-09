@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git History Intelligence Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --veritas-gold: #D4A843;
+            --dark-bg: #1a1a2e;
+            --card-bg: #2a2a3e;
+            --text-color: #e0e0e0;
+            --border-color: #44445a;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        h1 {
+            color: var(--veritas-gold);
+            text-align: center;
+            margin-bottom: 40px;
+            font-weight: 700;
+        }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        h2 {
+            color: var(--veritas-gold);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-weight: 400;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .chart-bar-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        .chart-bar-label {
+            width: 80px;
+            flex-shrink: 0;
+            color: var(--text-color);
+        }
+        .chart-bar {
+            flex-grow: 1;
+            height: 20px;
+            background-color: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+        .chart-bar-fill {
+            height: 100%;
+            background-color: var(--veritas-gold);
+            width: 0%; /* Will be set by JS/data */
+            transition: width 0.5s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 5px;
+            box-sizing: border-box;
+            color: var(--dark-bg);
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+        .sparkline-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            height: 80px;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sparkline-bar {
+            flex-grow: 1;
+            background-color: var(--veritas-gold);
+            margin: 0 2px;
+            border-radius: 2px;
+            transition: height 0.5s ease-out;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-size: 0.7em;
+            color: var(--dark-bg);
+            font-weight: bold;
+        }
+        .sparkline-bar span {
+            position: absolute;
+            top: -15px;
+            color: var(--text-color);
+            font-size: 0.6em;
+            white-space: nowrap;
+        }
+        .sparkline-bar-value {
+            position: absolute;
+            bottom: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Git History Intelligence Dashboard</h1>
+
+    <div class="container">
+        <div class="card">
+            <h2>Overview</h2>
+            <p><strong>Total Commits:</strong> {{ total_commits }}</p>
+            <p><strong>First Commit:</strong> {{ first_commit_date }}</p>
+            <p><strong>Last Commit:</strong> {{ last_commit_date }}</p>
+        </div>
+
+        <div class="card">
+            <h2>Top 10 Most-Changed Files</h2>
+            <div id="most-changed-files-chart">
+                <!-- Bars will be injected here -->
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Commit Activity by Day</h2>
+            <div id="day-of-week-chart">
+                <!-- Bars will be injected here -->
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Largest Single-Commit Diff</h2>
+            <p><strong>Diff Size (lines):</strong> {{ largest_diff.diff_size }}</p>
+            <p><strong>Commit Hash:</strong> <code>{{ largest_diff.commit_hash }}</code></p>
+            <p><strong>Files Changed:</strong></p>
+            <ul>
+                {{ largest_diff_files }}
+            </ul>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+            <h2>Recent Velocity (Last 8 Weeks)</h2>
+            <div class="sparkline-container" id="velocity-sparkline">
+                <!-- Sparkline bars will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const data = {{ data_json }}; // Data injected by Python
+
+        function renderBarChart(containerId, items, labelKey, valueKey) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const maxVal = Math.max(...items.map(item => item[valueKey]));
+
+            items.forEach(item => {
+                const percentage = maxVal > 0 ? (item[valueKey] / maxVal) * 100 : 0;
+                container.innerHTML += `
+                    <div class="chart-bar-container">
+                        <div class="chart-bar-label">${item[labelKey]}</div>
+                        <div class="chart-bar">
+                            <div class="chart-bar-fill" style="width: ${percentage}%;">${item[valueKey]}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderSparkline(containerId, items, labelKey, valueKey) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const maxVal = Math.max(...items.map(item => item[valueKey]));
+
+            items.forEach(item => {
+                const heightPercentage = maxVal > 0 ? (item[valueKey] / maxVal) * 100 : 0;
+                container.innerHTML += `
+                    <div class="sparkline-bar" style="height: ${heightPercentage}%;">
+                        <span>${item[labelKey]}</span>
+                        <span class="sparkline-bar-value">${item[valueKey]}</span>
+                    </div>
+                `;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderBarChart('most-changed-files-chart', data.most_changed_files, 'file', 'count');
+            renderBarChart('day-of-week-chart', data.commit_activity_by_day, 'day', 'count');
+            renderSparkline('velocity-sparkline', data.recent_velocity, 'week', 'count');
+        });
+    </script>
+</body>
+</html>

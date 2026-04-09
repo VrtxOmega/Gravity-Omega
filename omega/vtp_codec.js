@@ -8,10 +8,29 @@
 const crypto = require('crypto');
 
 // Must match Python exactly
-const NODE_SECRET = 'REPLACE_WITH_ENV_SECRET'; // In production, pull from env
+const NODE_SECRET = process.env.NODE_SECRET || ""
 const MAX_PACKET_AGE_MS = 5000;
 
 class VTPCodec {
+    static validate_tgt_schema(act, tgt, prm) {
+        const pseudo = `${act}:${tgt}`;
+        if (pseudo === 'MUT:AST') {
+            try {
+                const data = JSON.parse(prm);
+                if (!data.path) return { ok: false, reason: "SCHEMA_MISSING_FIELD:path" };
+                if (!data.content && !data.find) return { ok: false, reason: "SCHEMA_MISSING_FIELD:content_or_find" };
+            } catch (e) {
+                const parts = String(prm).replace(/^["']|["']$/g, '').split('::');
+                if (parts.length < 2) return { ok: false, reason: "SCHEMA_INVALID_JSON" };
+            }
+        } else if (pseudo === 'REQ:SYS') {
+            if (!prm || String(prm).trim().length === 0) return { ok: false, reason: "SCHEMA_MISSING_COMMAND" };
+        } else if (pseudo === 'REQ:NET') {
+            if (!prm || String(prm).trim().length === 0) return { ok: false, reason: "SCHEMA_MISSING_URL" };
+        }
+        return { ok: true, reason: "OK" };
+    }
+
     static encode(op, act, tgt, prm, bnd, rgm, fal, parent_seal, drift = null, res = null, nonce = null) {
         const ts = Date.now();
         nonce = nonce || crypto.randomBytes(6).toString('hex'); // 12 chars

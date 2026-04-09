@@ -1,0 +1,54 @@
+{
+  "name": "gravity-omega",
+  "version": "4.0.0",
+  "description": "Gravity Omega — VERITAS Command Center v4.0 (Provenance-Sealed)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.veritas.gravity-omega",
+    "productName": "Gravity Omega",
+    "icon": "omega.ico",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "launch.js",
+      "omega/**/*",
+      "renderer/**/*",
+      "node_modules/**/*",
+      "omega.ico"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  },
+  "dependencies": {
+    "chokidar": "4.0.3",
+    "dompurify": "3.3.3",
+    "monaco-editor": "0.52.2",
+    "node-pty": "1.1.0",
+    "puppeteer": T.39.1",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  }
+}

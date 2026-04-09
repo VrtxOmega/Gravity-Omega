@@ -1,0 +1,522 @@
+[
+    {
+        "url": "/api/tts",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_tts",
+        "lineNumber": 880,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/sentinel/status",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_sentinel_status",
+        "lineNumber": 942,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/sentinel/baseline",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_sentinel_baseline",
+        "lineNumber": 948,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/sentinel/heal",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_sentinel_heal",
+        "lineNumber": 955,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/sentinel/alerts",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_sentinel_alerts",
+        "lineNumber": 962,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/sentinel/accept",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_sentinel_accept",
+        "lineNumber": 969,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/sentinel/pause",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_sentinel_pause",
+        "lineNumber": 976,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/sentinel/resume",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_sentinel_resume",
+        "lineNumber": 983,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/status",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_status",
+        "lineNumber": 991,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/modules",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_modules",
+        "lineNumber": 1005,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/vtp",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "vtp_entry",
+        "lineNumber": 1142,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/modules/<module_id>/run",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_module_run",
+        "lineNumber": 1160,
+        "hasErrorHandling": true,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/modules/<module_id>/describe",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_module_describe",
+        "lineNumber": 1185,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/agent/think",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_agent_think",
+        "lineNumber": 1196,
+        "hasErrorHandling": true,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/search/text",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_search_text",
+        "lineNumber": 1230,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/search/web",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_search_web",
+        "lineNumber": 1239,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/hardware",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_hardware",
+        "lineNumber": 1279,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/vault/search",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_vault_search",
+        "lineNumber": 1304,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/vault/context",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_vault_context",
+        "lineNumber": 1311,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/vault/sessions",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_vault_sessions",
+        "lineNumber": 1317,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/vault/ki-health",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_vault_ki_health",
+        "lineNumber": 1323,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/vault/sweep",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_vault_sweep",
+        "lineNumber": 1329,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/security/scan",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_security_scan",
+        "lineNumber": 1337,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/security/shield/<shield>",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_security_shield",
+        "lineNumber": 1343,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/security/containment",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_security_containment",
+        "lineNumber": 1360,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/security/full-scan",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_security_full_scan",
+        "lineNumber": 1366,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/reports/drafts",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_reports_drafts",
+        "lineNumber": 1380,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/reports/targets",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_reports_targets",
+        "lineNumber": 1386,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/reports/rainmaker",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_reports_rainmaker",
+        "lineNumber": 1392,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/reports/pipeline",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_reports_pipeline",
+        "lineNumber": 1398,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/tools/credits",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_tools_credits",
+        "lineNumber": 1406,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/tools/brain",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_tools_brain",
+        "lineNumber": 1412,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/tools/vision",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_tools_vision",
+        "lineNumber": 1418,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/tools/send-email",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_tools_email",
+        "lineNumber": 1424,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/tools/code-review",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_tools_code_review",
+        "lineNumber": 1431,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/tools/auto-audit",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_tools_auto_audit",
+        "lineNumber": 1438,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/ledger/stats",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_ledger_stats",
+        "lineNumber": 1447,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/ledger/search",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_ledger_search",
+        "lineNumber": 1453,
+        "hasErrorHandling": true,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/provenance/status",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_provenance_status",
+        "lineNumber": 1487,
+        "hasErrorHandling": true,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/provenance/ingest",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_provenance_ingest",
+        "lineNumber": 1496,
+        "hasErrorHandling": true,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/provenance/search",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_provenance_search",
+        "lineNumber": 1509,
+        "hasErrorHandling": true,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/provenance/seals",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_provenance_seals",
+        "lineNumber": 1524,
+        "hasErrorHandling": true,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/provenance/seal",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_provenance_seal",
+        "lineNumber": 1534,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/vault/outbound-context",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_vault_outbound",
+        "lineNumber": 1589,
+        "hasErrorHandling": true,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/cortex/intercept",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_cortex_intercept",
+        "lineNumber": 1627,
+        "hasErrorHandling": true,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/modules",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_modules_list",
+        "lineNumber": 1678,
+        "hasErrorHandling": false,
+        "hasAuthCheck": true
+    },
+    {
+        "url": "/api/evolution/proposals",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_evolution_proposals",
+        "lineNumber": 1695,
+        "hasErrorHandling": true,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/evolution/scan",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_evolution_scan",
+        "lineNumber": 1716,
+        "hasErrorHandling": true,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/evolution/resolve",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_evolution_resolve",
+        "lineNumber": 1743,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/facebook/scrape",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_facebook_scrape",
+        "lineNumber": 1798,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/facebook/job/<job_id>",
+        "methods": [
+            "GET"
+        ],
+        "funcName": "api_facebook_job",
+        "lineNumber": 1831,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    },
+    {
+        "url": "/api/facebook/find-groups",
+        "methods": [
+            "POST"
+        ],
+        "funcName": "api_facebook_find_groups",
+        "lineNumber": 1839,
+        "hasErrorHandling": false,
+        "hasAuthCheck": false
+    }
+]
