@@ -279,13 +279,13 @@ class CorpusStore:
         """Remove chunks for files not in live_files."""
         indexed = self.indexed_files()
         stale = indexed - live_files
-        removed = 0
-        for fp in stale:
-            self._conn.execute("DELETE FROM chunks WHERE file_path=?", (fp,))
-            removed += 1
         if stale:
+            self._conn.executemany(
+                "DELETE FROM chunks WHERE file_path=?",
+                [(fp,) for fp in stale]
+            )
             self._conn.commit()
-        return removed
+        return len(stale)
 
     def close(self):
         self._conn.close()
