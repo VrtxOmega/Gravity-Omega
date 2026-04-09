@@ -39,6 +39,7 @@ import time
 import hashlib
 import threading
 import subprocess
+import shlex
 import platform
 import sqlite3
 import logging
@@ -237,7 +238,8 @@ def _handle_git_ops(**kwargs):
     }
     cmd = commands.get(action, f'git {action}')
     try:
-        out = subprocess.check_output(cmd.split(), cwd=cwd, stderr=subprocess.STDOUT,
+        args = shlex.split(cmd)
+        out = subprocess.check_output(args, cwd=cwd, stderr=subprocess.STDOUT,
                                        timeout=10).decode()
         return {'action': action, 'output': out}
     except subprocess.CalledProcessError as e:
@@ -1177,10 +1179,13 @@ def _vtp_direct_executor_inner(packet: vtp_codec.VTPPacket) -> str:
     if packet.act == "REQ" and packet.tgt == "SYS":
         try:
             cmd = str(packet.prm).strip('"\'')
-            out = subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT, timeout=60)
+            args = shlex.split(cmd)
+            out = subprocess.check_output(args, shell=False, stderr=subprocess.STDOUT, timeout=60)
             return out.decode('utf-8', errors='replace')
         except subprocess.CalledProcessError as e:
             return f"ERROR: SYS EXEC FAILED ({e.returncode}) -> {e.output.decode('utf-8', errors='replace')}"
+        except FileNotFoundError:
+            return f"ERROR: SYS EXEC -> Command not found: {cmd}"
         except Exception as e:
             return f"ERROR: SYS EXEC -> {e}"
             
