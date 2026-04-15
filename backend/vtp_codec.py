@@ -477,7 +477,7 @@ class VTPRouter:
     def __init__(self, ollama_client, ledger_path: str):
         self.ollama        = ollama_client
         self.ledger        = ImmutableLedger(ledger_path)
-        self.seen_nonces:  Set[str] = set()
+        self.seen_nonces:  dict[str, int] = {}  # {nonce: timestamp_ms}
         self.last_seal     = "GENESIS"
         self.state         = RouterState.S0_RECEIVE
 
@@ -508,13 +508,8 @@ class VTPRouter:
         except ValueError as e:
             return self._fail(RouterState.F1_PARSE_FAIL, None, str(e), parent_seal)
 
-        # ── S1.5: SCHEMA VALIDATE ────────────────────────────────
-        schema_ok, schema_reason = validate_tgt_schema(packet.act, packet.tgt, packet.prm)
-        if not schema_ok:
-            return self._fail(RouterState.F1_PARSE_FAIL, packet, f"SCHEMA_FAIL:{schema_reason}", parent_seal)
-
-
         # ── AUTH: Seal verification ───────────────────
+        # Validate seal first to prevent pre-auth CPU exhaustion via complex schema parsing
         if not verify_seal(packet, parent_seal):
             # Aggressive seal retry with exponential backoff
             time.sleep(0.1 + random.uniform(0, 0.05))
@@ -524,13 +519,25 @@ class VTPRouter:
                     return self._fail(RouterState.F5_AUTH_FAIL, packet, "SEAL_INVALID_AFTER_RETRY", parent_seal)
             self.ledger.append("SEAL_RETRY_OK", packet, "retry_succeeded", RouterState.S0_RECEIVE)
 
+        # ── S1.5: SCHEMA VALIDATE ────────────────────────────────
+        schema_ok, schema_reason = validate_tgt_schema(packet.act, packet.tgt, packet.prm)
+        if not schema_ok:
+            return self._fail(RouterState.F1_PARSE_FAIL, packet, f"SCHEMA_FAIL:{schema_reason}", parent_seal)
+
+
         # ── REPLAY: Nonce + TTL ───────────────────────
         now_ms = int(time.time() * 1000)
         if (now_ms - packet.ts) > MAX_PACKET_AGE_MS:
             return self._fail(RouterState.F6_REPLAY_FAIL, packet, "STALE_PACKET", parent_seal)
+
+        # Prune expired nonces to prevent unbounded memory leak
+        expired = [n for n, ts in self.seen_nonces.items() if (now_ms - ts) > MAX_PACKET_AGE_MS]
+        for n in expired:
+            del self.seen_nonces[n]
+
         if packet.nonce in self.seen_nonces:
             return self._fail(RouterState.F6_REPLAY_FAIL, packet, "REPLAY_DETECTED", parent_seal)
-        self.seen_nonces.add(packet.nonce)
+        self.seen_nonces[packet.nonce] = packet.ts
 
         # ── SSRF: Block before NET ops ────────────────
         if packet.tgt == "NET" and is_ssrf_target(packet.prm):
