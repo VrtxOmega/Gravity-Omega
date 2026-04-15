@@ -11,6 +11,7 @@ Uses Ollama nomic-embed-text for semantic embeddings.
 """
 
 import hashlib
+import hmac
 import json
 import logging
 import math
@@ -21,6 +22,8 @@ import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
+
+NODE_SECRET = b'REPLACE_WITH_ENV_SECRET'
 
 log = logging.getLogger('provenance')
 
@@ -386,10 +389,9 @@ class TraceSealer:
             ).hexdigest(),
         }
 
-        # Final seal = hash of entire trace
-        seal_hash = hashlib.sha256(
-            json.dumps(trace, sort_keys=True).encode()
-        ).hexdigest()
+        # Final seal = hash of entire trace (secured with HMAC)
+        raw_trace = json.dumps(trace, sort_keys=True).encode()
+        seal_hash = hmac.new(NODE_SECRET, raw_trace, hashlib.sha256).hexdigest()
         trace['seal_hash'] = seal_hash
 
         # Persist seal to disk
@@ -406,9 +408,8 @@ class TraceSealer:
 
         trace = json.loads(seal_path.read_text())
         stored_hash = trace.pop('seal_hash', '')
-        recomputed = hashlib.sha256(
-            json.dumps(trace, sort_keys=True).encode()
-        ).hexdigest()
+        raw_trace = json.dumps(trace, sort_keys=True).encode()
+        recomputed = hmac.new(NODE_SECRET, raw_trace, hashlib.sha256).hexdigest()
 
         return {
             'valid': recomputed == stored_hash,

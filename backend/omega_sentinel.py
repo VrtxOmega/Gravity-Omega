@@ -427,16 +427,15 @@ class OmegaSentinel:
                                 log.info(f'Sentinel: [{c["type"]}] {c["file"]} — git-committed, auto-accepting')
                             self.accept_changes(silent=True)
 
-                        # ── HEALTHY_UNCOMMITTED: Info alert, accept new baseline ──
+                        # ── HEALTHY_UNCOMMITTED: Info alert, do NOT accept new baseline ──
                         elif uncommitted_healthy and not corruption:
                             files = [c['file'] for c in uncommitted_healthy]
                             for c in uncommitted_healthy:
-                                log.info(f'Sentinel: [{c["type"]}] {c["file"]} — uncommitted but healthy')
-                            # Accept since system is healthy
-                            self.accept_changes(silent=True)
+                                log.warning(f'Sentinel: [{c["type"]}] {c["file"]} — uncommitted but healthy. REQUIRES MANUAL GIT COMMIT TO ACCEPT.')
+
                             self.pending_alerts.append({
-                                'severity': 'info',
-                                'message': f'Detected changes in {len(files)} file(s) — system healthy, accepted: {", ".join(files)}'
+                                'severity': 'warning',
+                                'message': f'Detected changes in {len(files)} file(s) — system healthy, but NOT accepted (must be committed): {", ".join(files)}'
                             })
 
                         # ── CORRUPTION: Auto-heal + critical alert ──
