@@ -399,13 +399,25 @@ class TraceSealer:
         return trace
 
     def verify_seal(self, run_id):
-        """Verify a seal's integrity by recomputing the hash."""
+        """Verify a seal's integrity by recomputing the hash and recursive chain."""
         seal_path = self.seal_dir / f'{run_id}.seal.json'
         if not seal_path.exists():
             return {'valid': False, 'error': 'Seal not found'}
 
         trace = json.loads(seal_path.read_text())
         stored_hash = trace.pop('seal_hash', '')
+        
+        # 1. Verify recursive chain of custody
+        computed_chain_head = hashlib.sha256(run_id.encode()).hexdigest()
+        for f_hash in trace.get('fragment_hashes', []):
+            computed_chain_head = hashlib.sha256(
+                f'{computed_chain_head}:{f_hash}'.encode()
+            ).hexdigest()
+            
+        if computed_chain_head != trace.get('context_chain_head'):
+            return {'valid': False, 'error': 'S.E.A.L. chain truncation detected'}
+
+        # 2. Verify overall seal hash
         recomputed = hashlib.sha256(
             json.dumps(trace, sort_keys=True).encode()
         ).hexdigest()

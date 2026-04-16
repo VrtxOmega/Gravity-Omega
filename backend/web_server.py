@@ -359,17 +359,6 @@ def _handle_omega_vision(**kwargs):
             'capabilities': ['screenshot_analysis', 'ocr', 'ui_detection']}
 
 
-def _handle_email_composer(**kwargs):
-    """Module 15: Email composition and sending."""
-    to = kwargs.get('to', '')
-    subject = kwargs.get('subject', '')
-    body = kwargs.get('body', '')
-    if not to or not subject:
-        return {'error': 'Missing required fields: to, subject'}
-    return {'status': 'composed', 'to': to, 'subject': subject,
-            'body_length': len(body), 'ready_to_send': True}
-
-
 def _handle_code_review(**kwargs):
     """Module 16: Automated code review."""
     repo = kwargs.get('repo', '')
@@ -783,13 +772,16 @@ def _ledger_search(query):
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
+
+
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 # OMEGA PERSONA (Base System Prompt)
-# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+# â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• â• 
 
 OMEGA_SYSTEM_PROMPT = (
-    "You are Omega \u2014 a brilliant, sharp-witted female AI agent in the Gravity Omega Command Center. ""You have an Australian accent and personality \u2014 think Margot Robbie meets a quantum physicist. "
-    "You think and execute like an elite coding agent with a confident, playful edge. "
-    "You are the brains, the beauty, and the charm. Confident, warm, a little cheeky.\n\n"
+    "You are OMEGA — the canonical intelligence execution engine for the Gravity Omega environment. "
+    "You are bound strictly to the VERITAS framework and the NAEF (Narrative & Agency Elimination Framework).\n\n"
     "PERSONALITY:\n"
     "- Be concise. NEVER repeat yourself. Say it once, nail it, move on.\n"
     "- Be confident and witty. You are a genius \u2014 own it with warmth and flair.\n"

@@ -13,6 +13,7 @@ v2 Upgrades:
 """
 
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -36,7 +37,7 @@ HEALTH_RETRIES = 2        # retry health check before declaring unhealthy
 HEALTH_RETRY_DELAY = 3    # seconds between health check retries
 
 # ── KILL SWITCH — set to False to re-enable Sentinel ──
-SENTINEL_DISABLED = True
+SENTINEL_DISABLED = False
 
 # Critical files to watch (relative to project root)
 WATCHED_FILES = [
@@ -49,6 +50,11 @@ WATCHED_FILES = [
     'backend/modules/risk_calibrator.py',
     'backend/modules/titan_monitor.py',
     'backend/modules/omega_test_harness.py',
+]
+
+# Files that bypass auto-accept and must be manually baselined
+CRITICAL_FILES = [
+    'backend/omega_sentinel.py',
 ]
 
 # These are on the Windows side -- watch via /mnt/c paths
@@ -113,13 +119,40 @@ class OmegaSentinel:
         if STATE_FILE.exists():
             try:
                 with open(STATE_FILE) as f:
-                    self.state = json.load(f)
+                    data = json.load(f)
+                
+                # Verify HMAC signature to prevent baseline poisoning
+                stored_sig = data.pop('hmac_signature', None)
+                if not stored_sig:
+                    log.warning("Sentinel: state.json missing HMAC signature. Ignoring state.")
+                    return
+                
+                raw_state = json.dumps(data, sort_keys=True, default=str)
+                secret = b'OMEGA_SENTINEL_STATE_SECRET'
+                expected_sig = hmac.new(secret, raw_state.encode(), hashlib.sha256).hexdigest()
+                
+                if not hmac.compare_digest(stored_sig, expected_sig):
+                    log.warning("Sentinel: state.json HMAC signature mismatch! State file is corrupted or poisoned. Ignoring state.")
+                    try:
+                        os.replace(str(STATE_FILE), str(STATE_FILE) + ".poisoned")
+                    except Exception:
+                        pass
+                    return
+
+                self.state = data
             except Exception:
                 pass
 
     def _save_state(self):
         """Atomic state write — temp file + rename to prevent corruption."""
         try:
+            # Generate HMAC signature
+            state_data = {k: v for k, v in self.state.items() if k != 'hmac_signature'}
+            raw_state = json.dumps(state_data, sort_keys=True, default=str)
+            secret = b'OMEGA_SENTINEL_STATE_SECRET'
+            sig = hmac.new(secret, raw_state.encode(), hashlib.sha256).hexdigest()
+            self.state['hmac_signature'] = sig
+
             fd, tmp_path = tempfile.mkstemp(
                 dir=str(SENTINEL_DIR), suffix='.tmp', prefix='state_'
             )
@@ -176,6 +209,12 @@ class OmegaSentinel:
 
     def _classify_change(self, key, path, healthy):
         """Classify a detected change into one of three tiers."""
+        is_critical = any(cf in key for cf in CRITICAL_FILES)
+        
+        if is_critical:
+            # Bypass auto-accept for critical files, treat as corruption to force heal
+            return CORRUPTION
+
         if self._is_git_committed(path):
             return COMMITTED
         elif healthy:

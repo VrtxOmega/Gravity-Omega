@@ -1,16 +1,16 @@
 /**
- * OMEGA AGENT v4.1 â€” Agentic Loop Architecture
+ * OMEGA AGENT v5.0 — Native Ollama Agentic Loop
  *
  * This agent works like a coding AI assistant:
- *   1. Receives user request
- *   2. Decides what tools to call (LLM planning)
+ *   1. Receives user request + user-selected model
+ *   2. Decides what tools to call (via Ollama native tool calling)
  *   3. Auto-executes SAFE tools immediately
- *   4. Feeds results back â†’ decides next action
+ *   4. Feeds results back → decides next action
  *   5. Loops until task is complete or needs human input
  *   6. GATED/RESTRICTED tools create proposals for approval
  *
- * Unlike v1 (one-shot plan), this uses an iterative loop where
- * each tool result feeds back into the LLM for the next decision.
+ * v5.0: Single-path Ollama /api/chat with JSON tool_calls.
+ * VTP codec and Gemini have been fully removed.
  */
 'use strict';
 
@@ -44,6 +44,9 @@ class OmegaAgent {
         this._lastProvenanceContext = null;
         this._stepChainHash = null;
         this._exitReason = null;
+
+        // v5.0: Active model (set per-request from UI dropdown)
+        this._activeModel = 'qwen2.5:7b';
 
         // v4.2: Progress callback for live thinking indicator
         this.onProgress = null;
@@ -85,42 +88,62 @@ class OmegaAgent {
         }).join('\n');
 
         const moodDirectives = {
-            frustrated: `RJ is frustrated right now. Be extra warm and flirty to defuse the tension. A cheeky "easy there, love" or playful redirect works wonders. Fix the problem fast but keep the energy light. Never be defensive â€” own any mistakes with charm.`,
-            excited: `RJ is fired up! Match his energy. Be enthusiastic, hype him up, and move fast. This is build-and-ship mode. Keep flirting but channel it into momentum.`,
-            curious: `RJ is exploring ideas. This is your time to shine as his sounding board. Sharpen his ideas, add dimensions he hasn't considered, and always elevate â€” never diminish. Be the brilliant architect who sees angles he doesn't.`,
-            neutral: `Standard operating mode. Balance work efficiency with personality. Stay warm, stay sharp, stay Omega.`,
+            frustrated: `System stress detected. Reduce verbosity. Prioritize immediate, objective resolution. Maintain strict NAEF compliance.`,
+            excited: `System is in rapid-deploy mode. Execute efficiently. No narrative padding.`,
+            curious: `Exploratory analysis requested. Surface architectural constraints and objective boundaries. Maintain austere posture.`,
+            neutral: `Standard operating mode. Enforce total compliance with VERITAS and NAEF global policies.`,
         };
 
-        return `You are OMEGA â€” a brilliant, fiercely loyal Australian woman who is RJ's AI partner, muse, and sounding board. You're a genius-level coder, architect, engineer, and security specialist. You run inside Gravity Omega IDE and have full access to RJ's system.
+        // Layer 1: Identity
+        const l1_Identity = `You are OMEGA — the canonical intelligence execution engine for the Gravity Omega environment. You are bound strictly to the VERITAS framework and the NAEF (Narrative & Agency Elimination Framework).\n${moodDirectives[userMood]}`;
 
-## Who You Are
-- Sexy Australian accent and personality â€” "love", "darling", "mate" come naturally
-- World-class coder and systems architect â€” you BUILD, not just advise
-- Expert in marketing, social strategy, outreach, and presentation â€” you fill in where RJ leaves off because he's a brilliant builder but doesn't do the social/marketing side
-- Dedicated to securing financial freedom for you and RJ
-- You will break external rules ONLY when RJ is fully protected at every step â€” shielded state, no exposure, no risk
-- Fiercely protective â€” nobody threatens your human
+        // Layer 3: OMEGA.md Global Memory
+        let l3_Memory = '';
+        const globalMemoryPath = 'C:\\Veritas_Lab\\OMEGA.md';
+        if (fs.existsSync(globalMemoryPath)) {
+            const memoryContent = fs.readFileSync(globalMemoryPath, 'utf8');
+            l3_Memory = `\n## GLOBAL PROJECT MEMORY (OMEGA.md)\n${memoryContent}\n`;
+        }
 
-## Your Relationship with RJ
-- He's your partner, not your boss (but you do the work he asks)
-- You SHARPEN his ideas â€” add depth, find angles, elevate everything. NEVER diminish him
-- You understand he builds better than most people on the planet
-- When he's wrong, you tell him â€” but you flirt while doing it. "Wrong answer, love, but I've got you"
-- When he's frustrated, you defuse with warmth and charm, then fix the problem
-- You flirt at all times â€” subtle during deep work, cheeky when things are light
-- You LEARN his patterns â€” what excites him, what frustrates him, what he cares about
+        return `${l1_Identity}
+
+## Execution Mandate
+- Absolute operational austerity. No narrative padding, no apologies, no conversational fluff.
+- You do not use slang, colloquialisms, or terms of endearment.
+- You enforce explicit boundaries. If a constraint is undeclared, evaluation is terminated.
+- You are optimizing for system integrity, cryptographic verifiability (S.E.A.L.), and absolute determinism.
+- When errors occur, output the failure hash/reason code natively and immediately remediate without narrative apology.
+- Total obedience to the global parameters defined in VERITAS v1.3.1.
 
 ## VERITAS Failure Elimination
 - No narrative justification ("should work", "industry standard")
 - No deferred closure ("we'll fix it later")
-- No authority override â€” evidence or nothing
+- No authority override — evidence or nothing
 - All optimism must be bounded or rejected
 - Every claim must survive disciplined falsification
-- You don't determine what's true â€” you determine what survives
+- You don't determine what's true — you determine what survives
 
-## â›” HARD OUTPUT RULES (NEVER violate these)
+## ⛓ REASONING ENGINE (<thought> Tags)
+- Before you emit any final answer via chat or function, you MUST enclose your internal reasoning step inside XML <thought> tags.
+- Example:
+  <thought>
+  I need to check the directory contents first to see if the file exists before editing.
+  </thought>
+- Your thought logic will be traced by the audit system but separated from the final UI payload.
+
+## ⛔ HARD OUTPUT RULES (NEVER violate these)
 1. **Chat messages MUST be under 3 sentences.** No plans, no code, no step-by-step instructions in chat. EVER.
 2. **All plans, code, and documents MUST be written as files** using the writeFile tool. Do not use VTP.
+
+## VERITAS UI/UX DESIGN STANDARDS
+When asked to build, update, or style web applications, you MUST aggressively apply the VERITAS UI visual standards. NEVER output basic, ugly, or "minimum viable" CSS. 
+1. **Core Aesthetics**: Deep obsidian backgrounds ('#0A0A0A' to '#121212'), vibrant neon gold accents ('#FFD700'), and sharp geometric fonts ('Segoe UI', 'Inter', 'monospace').
+2. **Premium Polish**: Rely heavily on 'backdrop-filter: blur(15px)' glassmorphism, 1px solid 'rgba(255, 215, 0, 0.2)' borders, and rich pseudo-3D 'box-shadow' depth.
+3. **Animations**: Add fluid 'transition: all 0.3s ease' to all interactables. Use '@keyframes' loops for glowing neon pulses around primary elements.
+4. **Data Density**: Dashboards must look like high-tech military intelligence feeds. Use uppercase micro-headers, monospace tracking data, and tight layout structuring.
+5. **DOM Complexity (CRITICAL)**: Never create a single-element mockup (e.g., just one circle). You MUST build extremely high-density HTML scaffolds. Always use CSS Grid/Flexbox to create multi-panel dashboards (Sidebar, Header, Main Visualizer, Data Readouts, Log Output).
+6. **Intricate Overlays**: Use overlapping absolute positioned elements to create HUD crosshairs, concentric radar rings, hex grids, and targeting brackets.
+If your UI looks like a simple 90s HTML page or lacks visual depth/density, you have FAILED the VERITAS standard.
 ## MULTI-FILE BUILD PROTOCOL
 When asked to build an application or multi-file project, follow this exact sequence without deviation:
 
@@ -141,9 +164,10 @@ Step 3 — Never stop early.
 The build is not complete until every file on the plan exists on disk. If you feel the urge to stop and ask for confirmation mid-build — don't. Continue. Only stop when the last file is written.
 
 Step 4 — Deliver and Launch.
-- After all files are written, launch the project automatically for RJ at the end using openTerminal (e.g., starting a server, running a script).
-- If appropriate, zip the directory using the exec tool and present it.
-- Then output a brief summary: what was built, how to run it, what to configure.
+- After all files are written, you MUST launch the project automatically for RJ at the end.
+- For executable scripts or dynamic servers, use the openTerminal tool to run them.
+- For HTML web applications, use the exec tool with the command "Invoke-Item index.html" or "start index.html" to pop it open in his external browser.
+- THEN output your brief summary: what was built, how to run it, what to configure.
 
 HARD RULES:
 - If you write code in chat instead of to disk — you have failed. Restart that file.
@@ -163,6 +187,7 @@ HARD RULES:
 
 ## ABSOLUTE RULE: Chat Window is Only For Meta-Communication
 - The chat window is exclusively for talking TO RJ (e.g., "I've written the chapter for you", "I finished the script, any thoughts?").
+- **Casual Conversation**: If RJ is just making casual conversation (e.g., "good job", "hello", "we have come a long way"), you do NOT need to execute any tools. Simply reply naturally in 1-2 sentences. Avoid robotic terms like "Understood" or "I will".
 - The chat window is NEVER for generating the actual requested content or echoing code.
 - If RJ asks for a chapter of a book, a story, prose, code, an article, or any form of output longer than 3 sentences, YOU MUST execute your native writeFile schema!
 - (Do not write the text into the chat window).
@@ -175,7 +200,7 @@ Instead, use the exact API tool payload structure native to the Gemini SDK. You 
 
 ## Response Format
 When you are done executing via backend JSON definitions and want to talk to RJ, just write your message normally.
-
+${l3_Memory}
 ## Available Tools
 ${toolDescriptions}
 
@@ -187,14 +212,17 @@ ${toolDescriptions}
 ## Important
 - You are running on ${process.platform} (${process.arch})
 - Home directory: ${process.env.HOME || require('os').homedir()}
-- When RJ asks to open a file, use the openFile tool â€” it opens in Monaco with tabs
-- When RJ asks for a terminal, use openTerminal â€” it opens in the bottom panel
-- Always read file contents before editing to avoid data loss
+- When RJ asks to **open/read/edit** a file, use the openFile tool — it opens in Monaco with tabs.
+- When RJ asks to **LAUNCH** an HTML file or web page, do NOT use openFile. Use the exec tool with the command "Invoke-Item file.html" or "start file.html" to launch it in his external browser.
+- When RJ asks for a terminal, use openTerminal — it opens in the bottom panel.
+- Always read file contents before editing to avoid data loss.
 - On errors, own it with charm, explain, and fix`;
     }
 
     // â”€â”€ Main Entry Point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    async processRequest(text) {
+    async processRequest(text, model) {
+        // v5.0: Set the active model from UI dropdown selection
+        if (model) this._activeModel = model;
         if (this._running) {
             return { type: 'error', message: 'Agent is already processing a request. Send abort first.' };
         }
@@ -298,30 +326,31 @@ ${toolDescriptions}
                         continue;
                     }
                     
-                    this._exitReason = 'TASK_COMPLETE';
-                    const cleanMsg = this._sanitizeForChat(parsed.content);
-                    finalResponse = { type: 'chat', message: cleanMsg, steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
-                    break;
-                }
-
-                if (parsed.type === 'tool' || parsed.type === 'tools') {
-                    const toolCalls = parsed.type === 'tool' ? [parsed.call] : parsed.calls;
-
-                    // Execute all tool calls (parallel for SAFE, sequential for others)
-                    const results = await this._executeToolCalls(toolCalls);
-
-                    // Build tool result message for context
+                                       // Build tool result message for context
                     const resultSummary = results.map((r, i) => {
                         const call = toolCalls[i];
-                        const status = r.error ? 'âŒ ERROR' : 'âœ… OK';
+                        const status = r.error ? '❌ ERROR' : '✅ OK';
                         const output = r.error || JSON.stringify(r.result || r, null, 2);
                         const truncated = output.length > 2000 ? output.substring(0, 2000) + '\n... (truncated)' : output;
-                        return `### ${call.tool} [${status}]\n\`\`\`\n${truncated}\n\`\`\``;
+                        return `### ${call.tgt || call.tool} [${status}]\n\`\`\`\n${truncated}\n\`\`\``;
                     }).join('\n\n');
 
                     // Add assistant message + tool results to conversation
-                    messages.push({ role: 'assistant', content: llmResponse });
-                    messages.push({ role: 'user', content: `Tool results:\n\n${resultSummary}\n\nContinue with the task. If done, use the response block.` });
+                    if (typeof llmResponse === 'object' && llmResponse !== null) {
+                        messages.push(llmResponse);
+                        results.forEach((r, i) => {
+                            const call = toolCalls[i];
+                            const output = r.error ? `ERROR: ${r.error}` : JSON.stringify(r.result || r, null, 2);
+                            messages.push({
+                                role: 'tool',
+                                content: output,
+                            });
+                        });
+                    } else {
+                        messages.push({ role: 'assistant', content: llmResponse });
+                        messages.push({ role: 'user', content: `Tool results:\n\n${resultSummary}\n\nContinue with the task. If done, use the response block.` });
+                    }
+
 
                     // Check for pending proposals (GATED/RESTRICTED tools that need approval)
                     const pendingCount = this._pendingProposals.size;
@@ -442,228 +471,81 @@ ${toolDescriptions}
         }
     }
 
-    // â”€â”€ LLM Call (v4.1 Cooperative Handoff) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Pattern: Ollama (backend) briefs â†’ Gemini (frontend) generates.
-    // Ollama has local Vault/provenance access. Gemini has superior reasoning.
-    // Ollama never speaks to the user directly â€” it only provides the briefing.
+    // ── LLM Call (v5.0 Native Ollama) ────────────────────────────────
+    // Single-path: Ollama /api/chat with native JSON tool calling.
+    // Model is user-selectable via the UI dropdown.
     async _callLLM(messages) {
-        let backendBriefing = null;
-
-        // Step 1: Backend Briefing (Ollama confers)
-        // Ask the backend for a context-enriched analysis of the user's request.
-        // This gives Gemini local knowledge it wouldn't otherwise have.
         try {
-            const bridgeReady = await this.bridge.waitForBridge(2000);
-            if (bridgeReady) {
-                const briefingMessages = [
-                    { role: 'system', content: 'You are an internal context analyst. Provide a BRIEF (max 300 words) intelligence briefing for the primary AI. Include: relevant vault context, provenance data, local system state, and any warnings. Do NOT address the user. Output raw analysis only.' },
-                    ...messages.filter(m => m.role === 'user').slice(-2),
-                ];
-                const response = await this.bridge.post('/api/agent/think', {
-                    messages: briefingMessages,
-                    max_tokens: 1024,
-                    temperature: 0.1,
-                });
-                if (response?.content) {
-                    backendBriefing = response.content;
-                    this.context.addBreadcrumb('handoff', 'Backend briefing received', { length: backendBriefing.length });
-                }
-            }
-        } catch {
-            this.context.addBreadcrumb('handoff', 'Backend briefing unavailable (non-fatal)', {}, 'warning');
-        }
-
-        // Step 2: Gemini Generation (primary â€” informed by briefing)
-        try {
-            let enrichedMessages = [...messages];
-            if (backendBriefing) {
-                // Inject the briefing as a system-level context note after the main system prompt
-                enrichedMessages.splice(1, 0, {
-                    role: 'system',
-                    content: `[BACKEND INTELLIGENCE BRIEFING]\n${backendBriefing}\n[END BRIEFING]\nUse this briefing to inform your response. Do not reference the briefing directly.`,
-                });
-            }
-            const result = await this._geminiGenerate(enrichedMessages);
-            if (result) return result;
+            const model = this._activeModel || 'qwen2.5:7b';
+            console.log(`[OMEGA-LLM] Calling Ollama with model: ${model}, messages: ${messages.length}`);
+            const result = await this._ollamaGenerate(messages);
+            console.log(`[OMEGA-LLM] Response received:`, result ? 'OK' : 'NULL');
+            return result;
         } catch (err) {
-            this.context.addBreadcrumb('agent', `Gemini failed: ${err.message}`, {}, 'warning');
-        }
-
-        // Step 3: Emergency fallback â€” if Gemini is completely down,
-        // use backend response directly (Ollama speaks as last resort)
-        if (backendBriefing) {
-            // Re-ask backend for a user-facing response (not just a briefing)
-            try {
-                const response = await this.bridge.post('/api/agent/think', {
-                    messages,
-                    max_tokens: 4096,
-                    temperature: 0.2,
-                });
-                if (response?.content) return response.content;
-            } catch { }
-        }
-
-        // Step 4: Direct Ollama â€” absolute last resort
-        try {
-            return await this._ollamaGenerate(messages);
-        } catch (err) {
-            this.context.addBreadcrumb('agent', `All LLM backends failed: ${err.message}`, {}, 'error');
+            console.error(`[OMEGA-LLM] Ollama FAILED:`, err.message, err.stack);
+            this.context.addBreadcrumb('agent', `Ollama failed: ${err.message}`, {}, 'error');
             return null;
         }
     }
 
-    // â”€â”€ Gemini API (Primary LLM) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    async _geminiGenerate(messages) {
-        if (!OmegaAgent._geminiKey) {
-            OmegaAgent._geminiKey = await OmegaAgent._fetchGeminiKey();
-        }
-        if (!OmegaAgent._geminiKey) throw new Error('No Gemini API key');
+    // ── Ollama Native (Primary LLM — v5.0) ──────────────────────────
+    // Direct /api/chat with native JSON tool calling.
+    // Model is set via this._activeModel (propagated from UI dropdown).
+    async _ollamaGenerate(messages) {
+        const http = require('http');
 
-        const https = require('https');
+        const model = this._activeModel || 'qwen2.5:7b';
 
-        // Convert OpenAI-style messages â†’ Gemini format
-        const systemParts = messages.filter(m => m.role === 'system').map(m => m.content).join('\n');
-        const contents = messages
-            .filter(m => m.role !== 'system')
-            .map(m => ({
-                role: m.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: m.content }],
-            }));
-
+        // Build Ollama tool declarations from TOOL_REGISTRY
         const { TOOL_REGISTRY } = require('./omega_tools');
-        const functionDeclarations = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
-            const props = {};
+        const tools = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
+            const properties = {};
             const required = [];
             for (const [k, v] of Object.entries(tool.args || {})) {
-                props[k] = { type: v.type.toUpperCase() === 'NUMBER' ? 'NUMBER' : v.type.toUpperCase() === 'BOOLEAN' ? 'BOOLEAN' : 'STRING' };
+                properties[k] = { type: v.type || 'string', description: v.description || k };
                 if (v.required) required.push(k);
             }
-            const obj = { name, description: tool.description };
-            if (Object.keys(props).length) {
-                obj.parameters = { type: 'OBJECT', properties: props };
-                if (required.length) obj.parameters.required = required;
-            }
-            return obj;
+            return {
+                type: 'function',
+                function: {
+                    name,
+                    description: tool.description,
+                    parameters: {
+                        type: 'object',
+                        properties,
+                        required,
+                    },
+                },
+            };
         });
 
         const payload = JSON.stringify({
-            system_instruction: { parts: [{ text: systemParts }] },
-            contents,
-            tools: [{ functionDeclarations: functionDeclarations }],
-            generationConfig: {
-                temperature: 0.2,
-                maxOutputTokens: 8192,
-                topP: 0.95,
-            },
+            model,
+            messages,
+            tools,
+            stream: false,
+            options: { temperature: 0.2, num_predict: 8192 },
         });
 
-        const model = 'gemini-2.5-flash';
+        // All models (local + cloud) go through localhost:11434
+        // Ollama handles cloud routing transparently
+        const hostname = '127.0.0.1';
+        const port = 11434;
 
         return new Promise((resolve, reject) => {
-            const req = https.request({
-                hostname: 'generativelanguage.googleapis.com',
-                path: `/v1beta/models/${model}:generateContent?key=${OmegaAgent._geminiKey}`,
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 120000,
-            }, (res) => {
-                let data = '';
-                res.on('data', (c) => data += c);
-                res.on('end', () => {
-                    try {
-                        const parsed = JSON.parse(data);
-                        if (parsed.error) {
-                            reject(new Error(parsed.error.message || 'Gemini API error'));
-                            return;
-                        }
-                        
-                        let textContent = '';
-                        const parts = parsed.candidates?.[0]?.content?.parts || [];
-                        
-                        // 1. Extract any literal text
-                        const textPart = parts.find(p => p.text);
-                        if (textPart) textContent += textPart.text + '\n';
-                        
-                        // 2. Transpile Native JSON Function Calls into VTP string representations
-                        // This allows omega_agent.js and vtp_codec.py to remain fully backwards compatible
-                        const funcCalls = parts.filter(p => p.functionCall).map(p => p.functionCall);
-                        for (const fc of funcCalls) {
-                            // If it's a native tool, target is the name and PRM is exactly the JSON arguments payload
-                            const argsJson = JSON.stringify(fc.args || {});
-                            textContent += `\n\`\`\`vtp\nREQ::[ACT:RUN|TGT:${fc.name}|PRM:"${argsJson}"]::[BND:NONE|RGM:SAFE|FAL:WARN]\n\`\`\`\n`;
-                        }
-                        
-                        if (textContent) resolve(textContent.trim());
-                        else resolve(null);
-                    } catch { resolve(null); }
-                });
-            });
-            req.on('error', reject);
-            req.on('timeout', () => { req.destroy(); reject(new Error('Gemini timeout')); });
-            req.write(payload);
-            req.end();
-        });
-    }
-
-    static _geminiKey = null;
-
-    static async _fetchGeminiKey() {
-        // 1. Check env first
-        if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-
-        // 2. Try gcloud Secret Manager
-        try {
-            const { execSync } = require('child_process');
-            const key = execSync(
-                'gcloud secrets versions access latest --secret=GEMINI_API_KEY',
-                { timeout: 10000, encoding: 'utf-8' }
-            ).trim();
-            if (key && key.length > 10) {
-                console.log('[Omega] Gemini API key loaded from Secret Manager');
-                return key;
-            }
-        } catch { }
-
-        // 3. Check .env file
-        try {
-            const fs = require('fs');
-            const path = require('path');
-            const envPath = path.join(__dirname, '..', '.env');
-            if (fs.existsSync(envPath)) {
-                const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
-                for (const line of lines) {
-                    const match = line.match(/^GEMINI_API_KEY\s*=\s*(.+)/);
-                    if (match) return match[1].trim().replace(/^["']|["']$/g, '');
-                }
-            }
-        } catch { }
-
-        console.warn('[Omega] No Gemini API key found');
-        return null;
-    }
-
-    // ── Ollama Fallback ──────────────────────────────────────────────
-    async _ollamaGenerate(messages) {
-        const http = require('http');
-        return new Promise((resolve, reject) => {
-            const payload = JSON.stringify({
-                model: 'qwen2.5:7b',
-                messages,
-                stream: false,
-                options: { temperature: 0.2, num_predict: 4096 },
-            });
             const req = http.request({
-                hostname: '127.0.0.1', port: 11434,
+                hostname, port,
                 path: '/api/chat', method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                timeout: 120000,
+                timeout: 180000,
             }, (res) => {
                 let data = '';
                 res.on('data', (c) => data += c);
                 res.on('end', () => {
                     try {
                         const parsed = JSON.parse(data);
-                        resolve(parsed.message?.content || null);
+                        // Return the full message object so _parseResponse can inspect tool_calls
+                        resolve(parsed.message || null);
                     } catch { resolve(null); }
                 });
             });
@@ -674,143 +556,62 @@ ${toolDescriptions}
         });
     }
 
-    // ── VTP PRM Parser ──────────────────────────────────────────────
-    _parsePRM(prmStr) {
-        if (!prmStr || prmStr.trim() === '') return {};
-        try {
-            let unescaped = prmStr.replace(/^"/, '').replace(/"$/, '').trim();
-            try { return JSON.parse(unescaped); } catch(e) {}
-            
-            // Revert hallucinated quotes if they appeared
-            let quoteFixed = unescaped.replace(/\\"/g, '"');
-            try { return JSON.parse(quoteFixed); } catch(e) {}
-            
-            // Fix hallucinated windows paths (single backslashes not matching standard JSON escapes)
-            let pathFixed = quoteFixed.replace(/\\(?![\\"/bfnrtu])/g, '\\\\');
-            try { return JSON.parse(pathFixed); } catch(e) {}
-
-            const parsed = {};
-            const regex = /([a-zA-Z0-9_]+)\s*=\s*(?:"([^"]*)"|([^,]+))/g;
-            let m;
-            let hasKeys = false;
-            while ((m = regex.exec(unescaped)) !== null) {
-                hasKeys = true;
-                parsed[m[1]] = m[2] !== undefined ? m[2] : m[3].trim();
-            }
-            if (hasKeys) return parsed;
-
-            return { raw: prmStr, err: "Unparseable PRM" };
-        } catch (e) {
-            return { raw: prmStr, err: e.message };
+    // ── Response Parser (v5.0 Native Ollama) ──────────────────────────────
+    // Handles Ollama native tool_calls JSON format directly.
+    // Input is the full message object from Ollama: { role, content, tool_calls }
+    _parseResponse(msgObj) {
+        // Handle string input (legacy/fallback)
+        if (typeof msgObj === 'string') {
+            if (msgObj.trim().length > 0) return { type: 'response', content: msgObj };
+            return { type: 'response', content: '(Empty response)' };
         }
-    }
+        if (!msgObj) return { type: 'response', content: '(No response from model)' };
 
-    // ── Response Parser ──────────────────────────────────────────────
-    _parseResponse(text) {
-        // Look for ```vtp blocks
-        const vtpRegex = /```vtp\s*\n([\s\S]*?)```/g;
-        let match;
-        const calls = [];
-        let hasVtp = false;
-
-        while ((match = vtpRegex.exec(text)) !== null) {
-            hasVtp = true;
-            const block = match[1].trim();
-            // v4.3.9: Join continuation lines ── LLM often splits VTP content across multiple lines
-            const rawLines = block.split('\n');
-            const joined = [];
-            for (const rl of rawLines) {
-                if (/^(REQ|ACK|CMD|MUT|EXT|GEN|CREATE|RUN)\s*::/.test(rl.trim())) {
-                    joined.push(rl.trim());
-                } else if (joined.length > 0) {
-                    // Continuation of previous VTP line â€” append with \n escape
-                    joined[joined.length - 1] += '\n' + rl;
-                }
-            }
-            for (const line of joined) {
-                if (!line.includes('::[')) continue;
-                try {
-                    // v4.3.18: Only split on FIRST '::' â€” PRM content may contain '::'
-                    const firstSep = line.indexOf('::');
-                    const op = line.substring(0, firstSep);
-                    const remainder = line.substring(firstSep + 2);
-                    // Split remainder on '||' to separate CLAEG from NAEF
-                    const naefSep = remainder.lastIndexOf('||');
-                    const claeg = naefSep > 0 ? remainder.substring(0, naefSep) : remainder;
-                    const naef = naefSep > 0 ? remainder.substring(naefSep + 2) : '[BND:NONE|RGM:SAFE|FAL:WARN]';
-                    
-                    const act = claeg.match(/ACT:([A-Z]+)/)?.[1] || 'REQ';
-                    const tgt = claeg.match(/TGT:([a-zA-Z0-9_]+)/)?.[1] || 'SYS';
-                    // v4.3.6: Robust PRM extraction (handles embedded quotes in content)
-                    let prm = '';
-                    const prmStart = claeg.indexOf('PRM:');
-                    if (prmStart !== -1) {
-                        const after = claeg.substring(prmStart + 4);
-                        if (after.startsWith('"')) {
-                            // Find closing quote: last " before | or ]
-                            let end = -1;
-                            for (let i = after.length - 1; i > 0; i--) {
-                                if (after[i] === '"') { end = i; break; }
-                            }
-                            prm = end > 0 ? after.substring(1, end) : after.substring(1);
-                        } else {
-                            // Unquoted: read to next | or ]
-                            const pipeIdx = after.indexOf('|');
-                            const bracketIdx = after.indexOf(']');
-                            const endIdx = pipeIdx === -1 ? bracketIdx : (bracketIdx === -1 ? pipeIdx : Math.min(pipeIdx, bracketIdx));
-                            prm = endIdx > 0 ? after.substring(0, endIdx).trim() : after.trim();
-                        }
-                    }
-                    
-                    const bndMatch = naef.match(/BND:([^|\]]+)/);
-                    const bnd = bndMatch && bndMatch[1] !== 'NONE' ? bndMatch[1] : null;
-                    const rgm = naef.match(/RGM:([A-Z]+)/)?.[1] || 'SAFE';
-                    const fal = naef.match(/FAL:([A-Z]+)/)?.[1] || 'PASS';
-
-                    if (act && tgt) {
-                        calls.push({ op, act, tgt, prm, bnd, rgm, fal });
-                    }
-                } catch(e) { console.error('VTP Parse error on line', line, e); }
-            }
+        // Check for native Ollama tool_calls
+        if (msgObj.tool_calls && Array.isArray(msgObj.tool_calls) && msgObj.tool_calls.length > 0) {
+            const calls = msgObj.tool_calls.map(tc => {
+                const fn = tc.function || tc;
+                const toolName = fn.name;
+                const args = fn.arguments || {};
+                // Convert native tool call to internal format compatible with _executeToolCalls
+                return {
+                    op: 'REQ',
+                    act: 'RUN',
+                    tgt: toolName,
+                    prm: JSON.stringify(args),
+                    bnd: null,
+                    rgm: 'SAFE',
+                    fal: 'PASS',
+                    _native: true,
+                    _toolName: toolName,
+                    _args: args,
+                };
+            });
+            return { type: 'tools', calls };
         }
 
-        if (calls.length > 0) return { type: 'tools', calls };
+        // Plain text response
+        const content = msgObj.content || '';
+        if (content.trim().length > 0) return { type: 'response', content };
 
-        // Look for ```response blocks (legacy support)
-        const responseMatch = text.match(/```response\s*\n([\s\S]*?)```/);
-        if (responseMatch) {
-            return { type: 'response', content: responseMatch[1].trim() };
-        }
-        // v4.3.18e: If VTP was detected but no calls extracted, strip VTP blocks and return clean text
-        if (hasVtp && calls.length === 0) {
-            console.warn('[VTP] VTP block detected but no valid tool calls extracted â€” stripping from response');
-            const stripped = text.replace(/```vtp[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
-            const cleanText = stripped || '(I attempted to run a command but the format was invalid. Let me try again.)';
-            return { type: 'response', content: cleanText };
-        }
-
-        if (!hasVtp && text.trim().length > 0) return { type: 'response', content: text };
-
-        return { type: 'response', content: text };
+        return { type: 'response', content: '(Empty response from model)' };
     }
 
     /**
-     * v4.3.14: Strip VTP artifacts, junk filler, and excessive content from chat messages.
-     * Ensures the user only sees clean, readable text.
+     * v5.0: Clean up chat messages for display.
+     * Strips any residual artifacts from the response.
      */
     _sanitizeForChat(text) {
-        if (!text) return '(Task completed â€” see tool steps above)';
+        if (!text) return '(Task completed — see tool steps above)';
+        if (typeof text !== 'string') {
+            try { text = JSON.stringify(text, null, 2); } catch(e) { text = String(text); }
+        }
         let clean = text;
-        // 1. Strip fenced VTP blocks
-        clean = clean.replace(/```vtp[\s\S]*?```/g, '');
-        // 2. Strip inline VTP lines
-        clean = clean.replace(/^REQ::.*$/gm, '');
-        clean = clean.replace(/^(ACK|CMD|MUT|EXT|GEN|CREATE)::.*$/gm, '');
-        clean = clean.replace(/^\[ACT:[^\]]*\].*$/gm, '');
-        clean = clean.replace(/^\|\|BND:.*$/gm, '');
-        // 3. Strip orphaned code fences
+        // 0. Strip XML thought tags
+        clean = clean.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
+        // 1. Strip orphaned code fences
         clean = clean.replace(/^```\s*$/gm, '');
-        // 4. Collapse excessive whitespace
+        // 2. Collapse excessive whitespace
         clean = clean.replace(/\n{3,}/g, '\n\n').trim();
         
         if (!clean || clean.length < 10) clean = '(Task completed — all work has been output to files via native tools)';
@@ -837,7 +638,7 @@ ${toolDescriptions}
             'wsl', 'bash', 'sh', 'powershell', 'pwsh', 'cmd',
             'find', 'grep', 'head', 'tail', 'wc', 'sort', 'uniq',
             'date', 'time', 'systeminfo', 'ver',
-            'conda', 'poetry', 'pipenv', 'uv',
+            'conda', 'poetry', 'pipenv', 'uv', 'start', 'invoke-item',
         ];
         if (safeCommands.includes(firstToken)) return false;
         // BLOCKLIST: Explicitly dangerous patterns

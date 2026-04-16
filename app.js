@@ -1,190 +1,41 @@
 
-document.addEventListener('DOMContentLoaded', () => {
-    const constraintInput = document.getElementById('constraint-input');
-    const addConstraintBtn = document.getElementById('add-constraint-btn');
-    const constraintsList = document.getElementById('constraints-list');
-    const runSimulationBtn = document.getElementById('run-simulation-btn');
-    const resultsPanel = document.getElementById('results-panel');
-    const activityLog = document.getElementById('activity-log');
+const logOutput = document.getElementById('log-output');
 
-    let constraints = [];
+const systemLogs = [
+    "INIT: Veritas Protocol 7.1.2 engaged...",
+    "STATUS: Global Memory Array nominal. 98.7% capacity.",
+    "ALERT: Sub-agent [ALPHA-7] reporting anomalous data stream. Investigating...",
+    "LOG: Initiating data integrity check on Veritas_Lab/Project_Veritas_Legacy.hc...",
+    "STATUS: Active Protocol [GUARDIAN] maintaining perimeter integrity.",
+    "LOG: System diagnostics complete. No critical errors detected.",
+    "ALERT: Unauthorized access attempt detected on port 443. Firewall engaged.",
+    "STATUS: Quantum entanglement module online. Processing data packets.",
+    "LOG: Syncing with Veritas Vault. Data transfer rate: 1.2 TB/s.",
+    "INIT: Deploying counter-intrusion protocols. Threat neutralized.",
+    "STATUS: All systems nominal. Awaiting further directives."
+];
 
-    // --- State Persistence ---
-    const saveConstraints = () => {
-        localStorage.setItem('constraints', JSON.stringify(constraints));
-    };
+let logIndex = 0;
+let charIndex = 0;
 
-    const loadConstraints = () => {
-        const storedConstraints = localStorage.getItem('constraints');
-        if (storedConstraints) {
-            constraints = JSON.parse(storedConstraints);
-            renderConstraints();
+function typeLog() {
+    if (logIndex < systemLogs.length) {
+        const currentLog = systemLogs[logIndex];
+        if (charIndex < currentLog.length) {
+            logOutput.innerHTML += currentLog.charAt(charIndex);
+            charIndex++;
+            setTimeout(typeLog, 50); // Typing speed
         } else {
-            // Preload with example constraints if none are stored
-            constraints = [
-                { id: Date.now(), text: "User must be over 18" },
-                { id: Date.now() + 1, text: "Balance cannot go below 0" }
-            ];
-            saveConstraints();
-            renderConstraints();
+            logOutput.innerHTML += '<br>'; // New line after each log
+            logIndex++;
+            charIndex = 0;
+            setTimeout(typeLog, 1500); // Delay before next log
         }
-    };
+    } else {
+        logIndex = 0; // Loop back to the beginning
+        logOutput.innerHTML = ''; // Clear terminal for fresh loop
+        setTimeout(typeLog, 1500); // Delay before restarting
+    }
+}
 
-    // --- Activity Log ---
-    const logActivity = (message, type = 'info') => {
-        const logEntry = document.createElement('div');
-        logEntry.classList.add('log-entry', type);
-        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-        activityLog.prepend(logEntry); // Add to top
-        if (activityLog.children.length > 10) { // Keep log clean
-            activityLog.removeChild(activityLog.lastChild);
-        }
-    };
-
-    // --- Constraint Editor ---
-    const addConstraint = () => {
-        const text = constraintInput.value.trim();
-        if (text) {
-            constraints.push({ id: Date.now(), text });
-            constraintInput.value = '';
-            renderConstraints();
-            saveConstraints();
-            logActivity(`Added constraint: "${text}"`);
-        }
-    };
-
-    const deleteConstraint = (id) => {
-        const constraintText = constraints.find(c => c.id === id)?.text;
-        constraints = constraints.filter(c => c.id !== id);
-        renderConstraints();
-        saveConstraints();
-        logActivity(`Deleted constraint: "${constraintText}"`);
-    };
-
-    const renderConstraints = () => {
-        constraintsList.textContent = '';
-        constraints.forEach(constraint => {
-            const li = document.createElement('li');
-            li.classList.add('constraint-item');
-            li.textContent = `
-                <span>${constraint.text}</span>
-                <button class="delete-btn" data-id="${constraint.id}">X</button>
-            `;
-            constraintsList.appendChild(li);
-        });
-
-        document.querySelectorAll('.delete-btn').forEach(button => {
-            button.onclick = (e) => deleteConstraint(parseInt(e.target.dataset.id));
-        });
-    };
-
-    addConstraintBtn.addEventListener('click', addConstraint);
-    constraintInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            addConstraint();
-        }
-    });
-
-    // --- Simulation Engine ---
-    const generateTestCases = (count) => {
-        const testCases = [];
-        for (let i = 0; i < count; i++) {
-            testCases.push({
-                userAge: Math.floor(Math.random() * 60) + 10, // 10-69
-                balance: parseFloat((Math.random() * 200 - 50).toFixed(2)), // -50 to 150
-                // Add more random properties as needed for future constraints
-            });
-        }
-        return testCases;
-    };
-
-    const evaluateConstraint = (constraintText, testCase) => {
-        // Simple parsing for example constraints.
-        // In a real app, this would be a more robust rule engine.
-        if (constraintText.includes("User must be over 18")) {
-            return testCase.userAge > 18;
-        }
-        if (constraintText.includes("Balance cannot go below 0")) {
-            return testCase.balance >= 0;
-        }
-        // Default to true if constraint not recognized for simplicity
-        return true;
-    };
-
-    const runSimulation = () => {
-        if (constraints.length === 0) {
-            logActivity("No constraints to simulate. Add some first!", 'warning');
-            return;
-        }
-
-        logActivity("Generating 100 test cases...", 'info');
-        const testCases = generateTestCases(100);
-        logActivity("Evaluating constraints...", 'info');
-
-        const results = {};
-        constraints.forEach(constraint => {
-            results[constraint.id] = {
-                text: constraint.text,
-                failures: 0,
-                firstFailingExample: null,
-                passes: 0
-            };
-        });
-
-        testCases.forEach(testCase => {
-            constraints.forEach(constraint => {
-                const passed = evaluateConstraint(constraint.text, testCase);
-                if (!passed) {
-                    results[constraint.id].failures++;
-                    if (!results[constraint.id].firstFailingExample) {
-                        results[constraint.id].firstFailingExample = testCase;
-                    }
-                } else {
-                    results[constraint.id].passes++;
-                }
-            });
-        });
-
-        renderResults(results, testCases.length);
-        logActivity("Simulation complete!", 'success');
-    };
-
-    runSimulationBtn.addEventListener('click', runSimulation);
-
-    // --- Results Panel ---
-    const renderResults = (results, totalTests) => {
-        resultsPanel.textContent = `
-            <h3>Simulation Results</h3>
-            <p>Total Test Cases: ${totalTests}</p>
-            <div id="constraint-results-detail"></div>
-        `;
-        const detailPanel = document.getElementById('constraint-results-detail');
-
-        Object.values(results).forEach(result => {
-            const resultCard = document.createElement('div');
-            resultCard.classList.add('result-card');
-            if (result.failures > 0) {
-                resultCard.classList.add('failing');
-            } else {
-                resultCard.classList.add('passing');
-            }
-
-            resultCard.textContent = `
-                <h4>${result.text}</h4>
-                <p>Failures: ${result.failures} / ${totalTests}</p>
-                ${result.firstFailingExample ? `
-                    <p>First Failing Example:</p>
-                    <pre>${JSON.stringify(result.firstFailingExample, null, 2)}</pre>
-                ` : '<p>No failures found.</p>'}
-            `;
-            detailPanel.appendChild(resultCard);
-        });
-    };
-
-    // --- Initialization ---
-    loadConstraints();
-    renderConstraints(); // Ensure constraints are rendered on load
-    logActivity("Constraint Lab loaded. Ready for action!", 'info');
-    // Auto-run simulation on load with preloaded constraints
-    runSimulation();
-});
+typeLog();

@@ -1,186 +1,74 @@
 
 body {
+    background-color: #0A0A0A;
+    color: #FFD700;
     font-family: 'Arial', sans-serif;
-    background-color: #000000; /* Black background */
-    color: #FFD700; /* Gold text */
     margin: 0;
-    padding: 20px;
+    padding: 0;
     display: flex;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
     min-height: 100vh;
-    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .container {
-    width: 100%;
-    max-width: 900px;
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 20px;
-}
-
-header {
-    text-align: center;
-    margin-bottom: 20px;
+    padding: 20px;
+    max-width: 1200px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 h1 {
+    grid-column: 1 / -1;
+    text-align: center;
     color: #FFD700;
     font-size: 2.5em;
-    margin-bottom: 0;
+    margin-bottom: 30px;
+}
+
+.panel {
+    background: rgba(255, 215, 0, 0.1); /* Gold with transparency for glassmorphism */
+    border-radius: 15px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 25px;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 200px;
+}
+
+.panel:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: 0 12px 48px 0 rgba(0, 0, 0, 0.5);
 }
 
 h2 {
     color: #FFD700;
-    font-size: 1.8em;
-    border-bottom: 2px solid #FFD700;
-    padding-bottom: 10px;
     margin-top: 0;
-    margin-bottom: 20px;
-}
-
-.card {
-    background-color: #1a1a1a; /* Darker black for cards */
-    border: 1px solid #333333;
-    border-radius: 8px;
-    padding: 25px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease-in-out;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-}
-
-textarea {
-    width: calc(100% - 20px);
-    padding: 10px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.5);
+    padding-bottom: 10px;
     margin-bottom: 15px;
-    border: 1px solid #FFD700;
-    border-radius: 4px;
-    background-color: #333333;
-    color: #FFD700;
-    font-size: 1em;
-    resize: vertical;
-    min-height: 80px;
 }
 
-button {
-    background-color: #FFD700;
-    color: #000000;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: bold;
-    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-button:hover {
-    background-color: #e6c200; /* Slightly darker gold on hover */
-}
-
-#constraints-list {
-    margin-top: 20px;
-    border-top: 1px solid #333333;
-    padding-top: 15px;
-}
-
-#constraints-list div {
-    background-color: #2a2a2a;
-    border: 1px solid #444444;
-    border-radius: 4px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.95em;
-}
-
-#constraints-list div span {
-    flex-grow: 1;
-}
-
-#constraints-list div button {
-    width: auto;
-    padding: 5px 10px;
-    margin-left: 10px;
-    background-color: #cc0000; /* Red for delete */
-    color: white;
-    font-size: 0.8em;
-}
-
-#constraints-list div button:hover {
-    background-color: #990000;
-}
-
-#activity-log {
-    background-color: #2a2a2a;
-    border: 1px solid #444444;
-    border-radius: 4px;
-    padding: 10px;
-    margin-top: 20px;
-    font-size: 0.9em;
-    min-height: 50px;
-    max-height: 150px;
+.terminal-feed {
+    grid-column: 1 / -1; /* Span across all columns */
+    max-height: 400px;
     overflow-y: auto;
+    font-family: 'Consolas', 'Monaco', monospace;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 215, 0, 0.5);
+    padding: 15px;
+    color: #00FF00; /* Green text for terminal */
 }
 
-#activity-log p {
-    margin: 5px 0;
-    color: #FFD700;
-}
-
-#results-summary {
-    margin-bottom: 20px;
-    font-size: 1.1em;
-}
-
-#constraint-results div {
-    background-color: #2a2a2a;
-    border: 1px solid #444444;
-    border-radius: 4px;
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    font-size: 0.95em;
-}
-
-.pass {
-    color: #00ff00; /* Green for passing */
-}
-
-.fail {
-    color: #ff0000; /* Red for failing */
-}
-
-.first-fail-example {
-    font-size: 0.85em;
-    color: #aaaaaa;
-    margin-top: 5px;
-}
-
-@media (min-width: 768px) {
-    .container {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .constraint-editor {
-        grid-column: 1 / 2;
-        grid-row: 2 / 4;
-    }
-
-    .simulation-engine {
-        grid-column: 2 / 3;
-        grid-row: 2 / 3;
-    }
-
-    .results-panel {
-        grid-column: 2 / 3;
-        grid-row: 3 / 4;
-    }
+.terminal-feed div {
+    margin-bottom: 5px;
 }

@@ -576,12 +576,12 @@ function registerIPC() {
     });
 
     // ── Chat (Agentic) ───────────────────────────────────────
-    ipcMain.handle('chat:send', async (_, text, sessionId) => {
+    ipcMain.handle('chat:send', async (_, text, sessionId, model) => {
         context.addBreadcrumb('chat', `User: ${text.substring(0, 100)}`);
 
         let agentErrorStr = null;
         try {
-            const result = await agent.processRequest(text);
+            const result = await agent.processRequest(text, model);
             // v4.3.19e: Auto-open HTML dashboards in browser after successful task completion
             // Uses Electron's shell.openPath — the only reliable way in the main process
             if (result.type !== 'error' && result.steps > 0) {

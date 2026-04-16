@@ -1,0 +1,12 @@
+{
+  "run_id": "test_run_123",
+  "timestamp": "2026-04-16T06:11:13.666204+00:00",
+  "query_hash": "050579eeae87a0436e1ff56d7a8388c2ee9b71b5f9170eb7aaaec1bcb405ca12",
+  "context_chain_head": "d9c9db678d6bdb1a768c42e33d03f79e03ef0d4dc161a84ff291b52728524e71",
+  "fragment_hashes": [
+    "frag1",
+    "frag3"
+  ],
+  "response_hash": "3ed59d9f6e32da0f3c9784f5f1f178565b7627537b7be4314d2fcfe2d284f912",
+  "seal_hash": "8ab7a0a4027cfdc632f863dd7187a5459282667a1c6006d66927f90ccaefe513"
+}

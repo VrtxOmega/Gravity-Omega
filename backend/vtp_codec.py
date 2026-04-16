@@ -21,6 +21,7 @@ import time
 import uuid
 import ipaddress
 import random
+import sqlite3
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, Set
@@ -449,6 +450,48 @@ class ImmutableLedger:
 
 
 # ─────────────────────────────────────────────
+# NONCE STORE (SQLITE-BACKED)
+# ─────────────────────────────────────────────
+class NonceStore:
+    """
+    SQLite-backed nonce store to prevent replay attacks across service restarts.
+    """
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+        self._init_db()
+        
+    def _init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS nonces (
+                    nonce TEXT PRIMARY KEY,
+                    ts INTEGER NOT NULL
+                )
+            ''')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_ts ON nonces(ts)')
+            
+    def check_and_add(self, nonce: str) -> bool:
+        """Returns True if nonce was added successfully (not a replay)."""
+        now_ms = int(time.time() * 1000)
+        try:
+            with sqlite3.connect(self.db_path, timeout=5.0) as conn:
+                conn.execute('INSERT INTO nonces (nonce, ts) VALUES (?, ?)', (nonce, now_ms))
+            return True
+        except sqlite3.IntegrityError:
+            return False
+            
+    def prune(self, max_age_ms: int):
+        """Prune nonces older than the max age."""
+        now_ms = int(time.time() * 1000)
+        cutoff = now_ms - max_age_ms
+        try:
+            with sqlite3.connect(self.db_path, timeout=5.0) as conn:
+                conn.execute('DELETE FROM nonces WHERE ts < ?', (cutoff,))
+        except Exception:
+            pass
+
+
+# ─────────────────────────────────────────────
 # TRI-NODE FSM ROUTER
 # ─────────────────────────────────────────────
 def validate_packet_structure(raw_packet: str) -> tuple[bool, str]:
@@ -477,7 +520,11 @@ class VTPRouter:
     def __init__(self, ollama_client, ledger_path: str):
         self.ollama        = ollama_client
         self.ledger        = ImmutableLedger(ledger_path)
-        self.seen_nonces:  Set[str] = set()
+        
+        # Nonce store sits alongside ledger
+        nonce_db_path      = ledger_path + ".nonces.db"
+        self.nonce_store   = NonceStore(nonce_db_path)
+        
         self.last_seal     = "GENESIS"
         self.state         = RouterState.S0_RECEIVE
 
@@ -528,9 +575,13 @@ class VTPRouter:
         now_ms = int(time.time() * 1000)
         if (now_ms - packet.ts) > MAX_PACKET_AGE_MS:
             return self._fail(RouterState.F6_REPLAY_FAIL, packet, "STALE_PACKET", parent_seal)
-        if packet.nonce in self.seen_nonces:
+            
+        # Probabilistic pruning to save I/O overhead on hot path
+        if random.random() < 0.05:
+            self.nonce_store.prune(MAX_PACKET_AGE_MS)
+            
+        if not self.nonce_store.check_and_add(packet.nonce):
             return self._fail(RouterState.F6_REPLAY_FAIL, packet, "REPLAY_DETECTED", parent_seal)
-        self.seen_nonces.add(packet.nonce)
 
         # ── SSRF: Block before NET ops ────────────────
         if packet.tgt == "NET" and is_ssrf_target(packet.prm):

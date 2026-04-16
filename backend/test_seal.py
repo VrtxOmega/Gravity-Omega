@@ -1,46 +1,56 @@
-#!/usr/bin/env python3
-"""Quick test: POST to /api/provenance/seal without run_id and verify the fix."""
-import urllib.request
-import json
+import asyncio
+import os
+from datetime import datetime, timezone
+import hashlib
+from omega_sentinel import OmegaSentinel
+from vtp_codec import VTPRouter
+from provenance_stack import TraceSealer
 
-url = 'http://127.0.0.1:5000/api/provenance/seal'
-body = json.dumps({
-    'context': {
-        'task': 'GOLIATH Master Living Report 110-Fact Provenance Seal',
-        'fact_count': 110,
-        'tier_a': 89,
-        'tier_b': 21,
-        'session_id': '5475dc2c-fc97-4f49-a0a6-9185a4c76400',
-        'files': [
-            'C:\\GOLIATH_WORKSPACE\\INTEL\\MASTER_LIVING_REPORT.md',
-            'C:\\GOLIATH_WORKSPACE\\INTEL\\GOLIATH2\\THREAD4_GEOSPATIAL_ANALYSIS.md',
-        ],
-        'key_facts': {
-            'constructive_knowledge': 'UCMR5 Nov 1 2023 PFOS above MCL at IL American-Peoria 811 days before S-4',
-            'geospatial': 'TIER A subsurface feature 315 Tolle Lane 5 temporal data points Oct 2009-2022',
-            's4_breach': "O Neill Exhibit 3.00 confirms 16-20 IAW systems vs threshold of 15",
-        }
-    },
-    'response': 'GOLIATH Master Living Report v1.3 — 110 confirmed facts. AWK/WTRG PFAS merger securities disclosure gap Rule 10b-5. Constructive knowledge November 1 2023. O Neill Exhibit 3.00 confirms 16-20 IAW systems. Thread 4 TIER A subsurface feature 315 Tolle Lane Oct 2009 to 2022. 89 TIER A 21 TIER B 72 triggers. Sealed 2026-03-25. Ready for SEC Form TCR.'
-}).encode('utf-8')
+def test_seal_verification():
+    sealer = TraceSealer(seal_dir="test_seals")
+    
+    run_id = "test_run_123"
+    compiled_context = {
+        'query': 'test query',
+        'chain_head': hashlib.sha256(run_id.encode()).hexdigest(),
+        'fragments': [
+            {'content_hash': 'frag1'},
+            {'content_hash': 'frag2'}
+        ]
+    }
+    
+    # Manually compute chain head with fragments
+    expected_chain_head = compiled_context['chain_head']
+    for f in compiled_context['fragments']:
+        expected_chain_head = hashlib.sha256(f"{expected_chain_head}:{f['content_hash']}".encode()).hexdigest()
+    
+    compiled_context['chain_head'] = expected_chain_head
+    llm_response = 'test response'
+    
+    trace = sealer.seal_trace(run_id, compiled_context, llm_response)
+    print("Generated Trace:", trace)
+    
+    verify_res = sealer.verify_seal(run_id)
+    print("Verification:", verify_res)
+    assert verify_res['valid']
 
-req = urllib.request.Request(
-    url,
-    data=body,
-    headers={
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer sentinel',
-    },
-    method='POST'
-)
+    # Test broken chain
+    seal_path = sealer.seal_dir / f'{run_id}.seal.json'
+    import json
+    broken_trace = json.loads(seal_path.read_text())
+    broken_trace['fragment_hashes'][-1] = 'frag3'
+    # Recalculate overall seal hash to bypass the second check and hit the chain check
+    broken_trace.pop('seal_hash', None)
+    new_seal_hash = hashlib.sha256(json.dumps(broken_trace, sort_keys=True).encode()).hexdigest()
+    broken_trace['seal_hash'] = new_seal_hash
+    seal_path.write_text(json.dumps(broken_trace, indent=2))
+    
+    verify_res2 = sealer.verify_seal(run_id)
+    print("Broken Chain Verification:", verify_res2)
+    assert not verify_res2['valid']
+    assert verify_res2['error'] == 'S.E.A.L. chain truncation detected'
 
-try:
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        result = json.loads(resp.read())
-        print('SUCCESS:')
-        print(json.dumps(result, indent=2))
-except urllib.error.HTTPError as e:
-    body_err = e.read().decode()
-    print(f'HTTP ERROR {e.code}: {body_err}')
-except Exception as ex:
-    print(f'ERROR: {ex}')
+    print("SEAL verification passed!")
+
+if __name__ == '__main__':
+    test_seal_verification()

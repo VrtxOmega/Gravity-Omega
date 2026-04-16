@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Veritas Work Graph</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #0056b3;
+            margin-bottom: 30px;
+        }
+        #graphDiv {
+            width: 90%;
+            max-width: 1200px;
+            height: 600px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Veritas Work Overview</h1>
+    <div id='graphDiv'></div>
+
+    <script>
+        // Sample data for the graph, inspired by Veritas work artifacts
+        const veritasWorkData = {
+            x: ['Walkthroughs', 'Implementation Plans', 'Artifact Fragments', 'Code Modules', 'Documentation'],
+            y: [3, 2, 5, 7, 4], // Example counts for each category
+            type: 'bar',
+            marker: {
+                color: ['#007bff', '#28a745', '#ffc107', '#dc3545', '#6c757d']
+            }
+        };
+
+        const layout = {
+            title: 'Veritas Project Contributions',
+            xaxis: {
+                title: 'Work Categories'
+            },
+            yaxis: {
+                title: 'Number of Items'
+            },
+            font: {
+                family: 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+                size: 12,
+                color: '#333'
+            },
+            plot_bgcolor: '#f8f9fa',
+            paper_bgcolor: '#fff'
+        };
+
+        Plotly.newPlot('graphDiv', [veritasWorkData], layout);
+    </script>
+</body>
+</html>

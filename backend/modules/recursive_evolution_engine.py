@@ -27,6 +27,9 @@ EVOLUTION_MODEL = "qwen3:8b"
 PROPOSALS_DIR = Path(__file__).parent.parent / "data" / "evolution_proposals"
 PROCESSED_HASHES_FILE = PROPOSALS_DIR / "_processed_hashes.json"
 
+# Ensure root dir exists on import
+PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
+
 SYSTEM_PROMPT = """You are OMEGA_DEVOPS_OPTIMIZER.
 Your sole purpose is to evaluate the Gravity Omega execution harness based on audit logs of agentic task failures.
 Analyze the following failure trace. Identify the root cause — common categories include:
@@ -186,6 +189,7 @@ def _extract_pattern_key(proposal):
 
 def _check_graduation_threshold(proposals_dir):
     """B1 — If 3+ proposals share a root cause pattern, draft a rule proposal."""
+    proposals_dir.mkdir(parents=True, exist_ok=True)
     manifests = list(proposals_dir.glob('manifest_*.json'))
     pattern_counts = {}
     pattern_examples = {}
@@ -227,6 +231,7 @@ def _check_graduation_threshold(proposals_dir):
 
 def _write_session_delta(proposals_dir, cycle_stats):
     """B5 — Write session delta summary (the learning heartbeat)."""
+    proposals_dir.mkdir(parents=True, exist_ok=True)
     delta = {
         'protocol': 'SESSION_DELTA_B5',
         'timestamp': time.time(),

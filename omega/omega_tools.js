@@ -397,23 +397,107 @@ class ToolExecutor {
     async _exec_editFile({ path: p, find, replace }) {
         const content = fs.readFileSync(p, 'utf-8');
         if (!content.includes(find)) {
+            // Give a soft fallback for Windows vs Unix line endings
+            const normalizedContent = content.replace(/\r\n/g, '\n');
+            const normalizedFind = find.replace(/\r\n/g, '\n');
+            if (normalizedContent.includes(normalizedFind)) {
+                const newContent = normalizedContent.split(normalizedFind).join(replace.replace(/\r\n/g, '\n'));
+                fs.writeFileSync(p, newContent, 'utf-8');
+                return { path: p, success: true, replaced: true, note: 'Matched using normalized line endings.' };
+            }
             return { error: `Target text not found in ${p}`, path: p };
         }
-        const newContent = content.replace(find, replace);
+        const newContent = content.split(find).join(replace);
         fs.writeFileSync(p, newContent, 'utf-8');
         return { path: p, success: true, replaced: true };
     }
 
     async _exec_exec({ command, cwd: execCwd, timeout }) {
         const t = timeout || 30000;
-        try {
-            // On Windows, execSync defaults to cmd.exe — force PowerShell
-            let cmd = command;
-            if (process.platform === 'win32' && !command.toLowerCase().startsWith('powershell')) {
-                cmd = `powershell -NoProfile -Command "${command.replace(/"/g, '\\"')}"`;
+        
+        // v4.3.18x: Upgrade to Stateful Persistent PowerShell
+        if (process.platform === 'win32') {
+            if (!this._psProc) {
+                const { spawn } = require('child_process');
+                this._psProc = spawn('powershell.exe', ['-NoProfile', '-NoExit', '-Command', '-'], {
+                    cwd: process.env.HOME || require('os').homedir(),
+                    env: process.env,
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                this._psOut = '';
+                this._psErr = '';
+                this._psQueue = [];
+                
+                this._psProc.stdout.on('data', d => {
+                    this._psOut += d.toString();
+                    this._checkPsQueue();
+                });
+                this._psProc.stderr.on('data', d => {
+                    this._psErr += d.toString();
+                });
+                
+                this._checkPsQueue = () => {
+                    if (this._psQueue.length === 0) return;
+                    const top = this._psQueue[0];
+                    if (this._psOut.includes(top.marker)) {
+                        const markerIdx = this._psOut.indexOf(top.marker);
+                        const stdout = this._psOut.substring(0, markerIdx).trim();
+                        // Reset output to anything after the marker
+                        this._psOut = this._psOut.substring(markerIdx + top.marker.length).trim();
+                        
+                        const stderr = this._psErr.trim();
+                        this._psErr = ''; // reset stderr for next command
+                        
+                        clearTimeout(top.timer);
+                        this._psQueue.shift();
+                        
+                        // Wait briefly to allow any trailing stderr to flush
+                        setTimeout(() => {
+                            top.resolve({
+                                command: top.command,
+                                stdout: stdout.substring(0, 10000),
+                                stderr: stderr.substring(0, 5000),
+                                exitCode: stderr.length > 0 ? 1 : 0
+                            });
+                        }, 50);
+                    }
+                };
             }
-            const output = execSync(cmd, {
-                cwd: execCwd || process.env.HOME || os.homedir(),
+            
+            const marker = `OMEGA_MARKER_${require('crypto').randomUUID()}`;
+            
+            return new Promise((resolve) => {
+                const timer = setTimeout(() => {
+                    const idx = this._psQueue.findIndex(q => q.marker === marker);
+                    if (idx !== -1) {
+                        this._psQueue.splice(idx, 1);
+                        resolve({
+                            command,
+                            stdout: this._psOut.substring(0, 10000),
+                            stderr: this._psErr.substring(0, 5000) + `\n\n[TIMEOUT after ${t}ms]`,
+                            exitCode: 124
+                        });
+                        this._psOut = '';
+                        this._psErr = '';
+                    }
+                }, t);
+                
+                this._psQueue.push({ resolve, timer, marker, command });
+                
+                let targetCwd = execCwd || process.cwd();
+                let cdCmd = `Set-Location -Path "${targetCwd}"; `;
+                
+                const fullCmd = `${cdCmd}${command}; Write-Output "${marker}"\r\n`;
+                this._psProc.stdin.write(fullCmd);
+            });
+        }
+        
+        // Non-Windows fallback (stateless)
+        const { execSync } = require('child_process');
+        try {
+            const output = execSync(command, {
+                cwd: execCwd || process.env.HOME || require('os').homedir(),
                 encoding: 'utf-8', timeout: t,
                 maxBuffer: 1024 * 1024 * 10,
             });

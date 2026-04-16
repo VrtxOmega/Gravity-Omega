@@ -242,15 +242,7 @@
                         <div class="reports-section-header"><span>🧠 OMEGA BRAIN</span></div>
                         <div id="tools-brain" class="reports-list"><div class="reports-empty">Loading...</div></div>
                     </div>
-                    <div class="reports-section">
-                        <div class="reports-section-header"><span>📧 EMAIL COMPOSER</span></div>
-                        <div id="tools-email" class="tools-form">
-                            <input type="text" id="email-to" placeholder="recipient@email.com" class="tool-input" />
-                            <input type="text" id="email-subject" placeholder="Subject" class="tool-input" />
-                            <textarea id="email-body" placeholder="Email body..." class="tool-textarea" rows="3"></textarea>
-                            <button id="email-send-btn" class="reports-action-btn">Send Email</button>
-                        </div>
-                    </div>
+
                     <div class="reports-section">
                         <div class="reports-section-header"><span>🔍 CODE REVIEW</span></div>
                         <div id="tools-review" class="tools-form">
@@ -549,7 +541,33 @@
                         <div class="chat-thread-list" id="chat-thread-list"></div>
                     </div>
                 </div>
-                <div class="chat-header-actions">
+                <!-- Inline Chat Model Selector -->
+                <div class="chat-model-selector" style="margin-left:8px;">
+                    <select id="chat-model-dropdown" class="chat-header-model" style="border:none; cursor:pointer;">
+                        <optgroup label="☁️ Cloud Models">
+                            <option value="qwen3.5:397b-cloud">qwen3.5 · 397B (Cloud)</option>
+                            <option value="deepseek-v3.1:671b-cloud">deepseek-v3.1 · 671B (Cloud)</option>
+                            <option value="qwen3-coder:480b-cloud">qwen3-coder · 480B (Cloud)</option>
+                            <option value="kimi-k2:1t-cloud">kimi-k2 · 1T (Cloud)</option>
+                            <option value="gpt-oss:120b-cloud">gpt-oss · 120B (Cloud)</option>
+                            <option value="gpt-oss:20b-cloud">gpt-oss · 20B (Cloud)</option>
+                            <option value="qwen3-vl:235b-cloud">qwen3-vl · 235B (Cloud)</option>
+                            <option value="glm-4.6:cloud">glm-4.6 (Cloud)</option>
+                        </optgroup>
+                        <optgroup label="💻 Local Models">
+                            <option value="qwen3:8b">qwen3 · 8B</option>
+                            <option value="qwen2.5:7b">qwen2.5 · 7B</option>
+                            <option value="qwen2.5:3b">qwen2.5 · 3B</option>
+                            <option value="gemma3:4b">gemma3 · 4B</option>
+                            <option value="gemma2:9b">gemma2 · 9B</option>
+                            <option value="deepseek-r1:7b">deepseek-r1 · 7B</option>
+                            <option value="phi4-mini">phi4-mini</option>
+                            <option value="veritas-omni:latest">veritas-omni</option>
+                            <option value="gemma2:sentinel-omega">gemma2 · sentinel-omega</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="chat-header-actions" style="margin-left: auto;">
                     <button class="chat-action-btn" id="btn-new-thread" title="New conversation">+</button>
                     <button class="chat-action-btn" id="btn-clear-chat" title="Clear conversation">⌫</button>
                     <button class="chat-action-btn" id="btn-toggle-chat" title="Close panel">✕</button>

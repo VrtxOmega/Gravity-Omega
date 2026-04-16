@@ -3,35 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Constraint Lab</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Veritas Defense Grid</title>
+    <link rel="stylesheet" href="grid.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Constraint Lab</h1>
-        </header>
+    <div class="dashboard-container">
+        <aside class="sidebar glassmorphism">
+            <div class="logo">VERITAS</div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active">Overview</a>
+                <a href="#" class="nav-item">Threats</a>
+                <a href="#" class="nav-item">Logs</a>
+                <a href="#" class="nav-item">Systems</a>
+                <a href="#" class="nav-item">Settings</a>
+            </nav>
+            <div class="system-status glassmorphism">
+                <h3>System Status</h3>
+                <p>Core Integrity: <span class="status-ok">ONLINE</span></p>
+                <p>Threat Level: <span class="status-warning">ELEVATED</span></p>
+            </div>
+        </aside>
 
-        <div class="card constraint-editor">
-            <h2>Constraint Editor</h2>
-            <textarea id="constraint-input" placeholder="Enter constraints here, one per line. E.g., 'User must be over 18', 'Balance cannot go below 0'"></textarea>
-            <button id="add-constraint-btn">Add Constraint</button>
-            <div id="constraints-list"></div>
-        </div>
+        <main class="main-content">
+            <header class="header glassmorphism">
+                <h1>Veritas Defense Grid // Active Monitoring</h1>
+                <div class="user-profile">
+                    <span>Agent R.J.</span>
+                    <div class="avatar"></div>
+                </div>
+            </header>
 
-        <div class="card simulation-engine">
-            <h2>Simulation Engine</h2>
-            <button id="run-simulation-btn">Run Simulation</button>
-            <div id="activity-log"></div>
-        </div>
+            <section class="grid-panel glassmorphism">
+                <div id="hexGridOverlay"></div>
+                <div id="radarSweep"></div>
+                <div id="blipContainer"></div>
+            </section>
 
-        <div class="card results-panel">
-            <h2>Results</h2>
-            <div id="results-summary"></div>
-            <div id="constraint-results"></div>
-        </div>
+            <div class="data-panels">
+                <div class="data-card glassmorphism">
+                    <h3>Intrusion Attempts</h3>
+                    <p id="intrusionCount">0</p>
+                </div>
+                <div class="data-card glassmorphism">
+                    <h3>Clean Payloads</h3>
+                    <p id="cleanPayloadCount">0</p>
+                </div>
+                <div class="data-card glassmorphism">
+                    <h3>System Uptime</h3>
+                    <p id="uptime">00:00:00</p>
+                </div>
+            </div>
+        </main>
     </div>
-
-    <script src="app.js"></script>
+    <script src="grid.js"></script>
 </body>
 </html>

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veritas Work Flow</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #000000; /* Black */
+            color: #FFD700; /* Gold */
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            color: #FFD700;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .flowchart-container {
+            width: 90%;
+            max-width: 1200px;
+            background-color: #1a1a1a; /* Darker black for container */
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+        svg {
+            width: 100%;
+            height: auto;
+            min-height: 600px;
+            display: block;
+            margin: auto;
+        }
+        .node-rect {
+            fill: #333333; /* Dark grey for nodes */
+            stroke: #FFD700; /* Gold border */
+            stroke-width: 2;
+            rx: 8; /* Rounded corners */
+            ry: 8;
+        }
+        .node-text {
+            fill: #FFD700; /* Gold text */
+            font-size: 14px;
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+        .arrow {
+            stroke: #FFD700; /* Gold arrows */
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+        #arrowhead {
+            fill: #FFD700;
+        }
+    </style>
+</head>
+<body>
+    <h1>Veritas Work Flow & Graph</h1>
+
+    <div class="flowchart-container">
+        <svg viewBox="0 0 1000 700">
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" />
+                </marker>
+            </defs>
+
+            <!-- Nodes -->
+            <g>
+                <rect class="node-rect" x="50" y="50" width="200" height="80" />
+                <text class="node-text" x="150" y="90">Veritas Research Suite</text>
+            </g>
+
+            <g>
+                <rect class="node-rect" x="350" y="50" width="200" height="80" />
+                <text class="node-text" x="450" y="90">Host Orchestration V3</text>
+            </g>
+
+            <g>
+                <rect class="node-rect" x="650" y="50" width="200" height="80" />
+                <text class="node-text" x="750" y="90">Artifact Creation (Payload)</text>
+            </g>
+
+            <g>
+                <rect class="node-rect" x="650" y="200" width="200" height="80" />
+                <text class="node-text" x="750" y="240">Deployment (VRP Detonation)</text>
+            </g>
+
+            <g>
+                <rect class="node-rect" x="50" y="200" width="200" height="80" />
+                <text class="node-text" x="150" y="240">Reconstruction Plan</text>
+            </g>
+
+            <g>
+                <rect class="node-rect" x="350" y="200" width="200" height="80" />
+                <text class="node-text" x="450" y="240">Dead Code Identification</text>
+            </g>
+
+            <g>
+                <rect class="node-rect" x="50" y="350" width="200" height="80" />
+                <text class="node-text" x="150" y="390">Current DOM Analysis</text>
+            </g>
+
+            <!-- Edges -->
+            <line class="arrow" x1="250" y1="90" x2="350" y2="90" />
+            <line class="arrow" x1="550" y1="90" x2="650" y2="90" />
+            <line class="arrow" x1="750" y1="130" x2="750" y2="200" />
+
+            <line class="arrow" x1="150" y1="130" x2="150" y2="200" />
+            <line class="arrow" x1="250" y1="240" x2="350" y2="240" />
+
+            <!-- Additional connections for a more graph-like representation -->
+            <line class="arrow" x1="150" y1="280" x2="150" y2="350" /> <!-- Reconstruction Plan to DOM Analysis -->
+            <line class="arrow" x1="450" y1="280" x2="150" y2="350" /> <!-- Dead Code ID to DOM Analysis (indirect influence) -->
+            <line class="arrow" x1="450" y1="130" x2="450" y2="200" /> <!-- Host Orchestration V3 to Dead Code ID (as part of audit) -->
+
+        </svg>
+    </div>
+</body>
+</html>
