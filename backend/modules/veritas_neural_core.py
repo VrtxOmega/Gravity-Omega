@@ -2,9 +2,8 @@
 VERITAS NEURAL CORE
 Advanced conversational AI routing with memory and context awareness
 """
-import json
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from datetime import datetime
 from collections import deque
 

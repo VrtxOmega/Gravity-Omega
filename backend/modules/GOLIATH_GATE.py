@@ -15,19 +15,16 @@ def boot_log(msg):
         # Explicit UTF-8 for log file, but message should be ASCII anyway
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [BOOT] {msg}\n")
-    except: pass
+    except Exception as e: pass
 
 # ==============================================================================
 # GLOBAL DEPENDENCIES
 # ==============================================================================
 try:
     import json
-    import hashlib
-    import shutil
     import math
     import collections
     import re
-    import zipfile
     
     # Mirroring Veritas Lib
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -72,7 +69,7 @@ class Logger:
             log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BREADCRUMB.log")
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] [PY-LOG] {clean_msg}\n")
-        except: pass
+        except Exception as e: pass
 
 class RealitySynthesizer:
     @staticmethod
@@ -314,7 +311,7 @@ if __name__ == "__main__":
         try:
             # Last ditch attempt to print crash info
             traceback.print_exc()
-        except:
+        except Exception as e:
             print("Traceback contains unprintable characters.")
         print("!"*80)
         input("\nPRESS ENTER TO CLOSE GOLIATH TERMINAL...")
@@ -329,7 +326,7 @@ if __name__ == "__main__":
         try:
             # Last ditch attempt to print crash info
             traceback.print_exc()
-        except:
+        except Exception as e:
             print("Traceback contains unprintable characters.")
         print("!"*80)
         input("\nPRESS ENTER TO CLOSE GOLIATH TERMINAL...")

@@ -1,5 +1,4 @@
 import re
-import os
 import json
 
 def scan_backend_routes(file_path):

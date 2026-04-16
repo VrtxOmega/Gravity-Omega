@@ -11,7 +11,6 @@ NO "PROMISING" ALLOWED.
 """
 
 import numpy as np
-from scipy import signal
 from scipy.fft import stft
 from dataclasses import dataclass
 from typing import List, Tuple, Optional

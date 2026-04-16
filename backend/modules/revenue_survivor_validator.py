@@ -9,9 +9,9 @@ through CLAEG/NAEF gates with economic primitives.
 import sys
 sys.path.insert(0, r'c:\Veritas_Lab')
 
-from thermal_shield_forge import Primitive, PrimitiveLibrary, VerificationGate
+from thermal_shield_forge import VerificationGate
 from dataclasses import dataclass, asdict
-from typing import Dict, Any, List
+from typing import Dict, Any
 import json
 from datetime import datetime
 

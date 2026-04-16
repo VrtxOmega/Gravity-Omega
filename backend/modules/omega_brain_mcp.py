@@ -34,7 +34,6 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 from urllib import request as urllib_request
 from urllib.error import URLError, HTTPError
 

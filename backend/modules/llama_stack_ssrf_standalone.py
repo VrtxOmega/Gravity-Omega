@@ -17,7 +17,6 @@ import sys
 import threading
 import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
 
 # === HTTP Canary (catches the SSRF callback) === #
 
@@ -58,7 +57,6 @@ class CanaryHandler(BaseHTTPRequestHandler):
     
     def log_message(self, format, *args):
         """Suppress default logging — we handle it ourselves."""
-        pass
 
 
 def start_canary(port=18888):

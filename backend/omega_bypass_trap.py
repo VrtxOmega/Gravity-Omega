@@ -19,7 +19,6 @@ Regime(name="R_ACTIVE_MONITOR", predicate="MESSAGE_SOURCE = 'KMSG'")
 EvidenceItem(id="e4", variable="BYPASS_DETECTED", value={"v": "FALSE"}, method={"protocol": "iptables_log_scan", "repeatable": True}, provenance={"source_id": "kernel_ring_buffer", "tier": "A"})
 """
 
-import os
 import re
 import logging
 

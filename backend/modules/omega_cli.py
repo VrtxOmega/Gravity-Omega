@@ -36,12 +36,11 @@ if sys.platform == "win32":
 # Add project root
 sys.path.insert(0, str(Path(__file__).parent))
 
-from omega_agent import OmegaAgent, DEFAULT_MODEL, OLLAMA_URL
+from omega_agent import OmegaAgent, DEFAULT_MODEL
 from omega_claw_daemon import OmegaClawDaemon
 from gate_pipeline import run_gate_pipeline
 from risk_calibrator import calibrate, SOVEREIGN, SHIELDED, CONTAINED
 from audit_ledger import AuditLedger
-from omega_soul import OmegaSoul
 
 
 # ══════════════════════════════════════════════════════════════

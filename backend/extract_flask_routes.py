@@ -75,7 +75,7 @@ def extract_flask_routes(file_path):
     return routes
 
 if __name__ == '__main__':
-    backend_dir = r'C:\\Veritas_Lab\\gravity-omega-v2\\backend'
+    backend_dir = r'backend'
     web_server_path = os.path.join(backend_dir, 'web_server.py')
     output_json_path = os.path.join(backend_dir, 'backend_routes.json')
 

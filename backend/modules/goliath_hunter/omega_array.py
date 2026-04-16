@@ -28,8 +28,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
-from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 
 # ── IntelNode: the atomic intelligence unit ─────────────────────────────────

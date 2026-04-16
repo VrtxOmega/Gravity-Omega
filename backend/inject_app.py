@@ -1,6 +1,5 @@
-import sys, os
 
-APP_PATH = "c:/Veritas_Lab/gravity-omega-v2/backend/web_server.py"
+APP_PATH = "backend/web_server.py"
 
 with open(APP_PATH, "r", encoding="utf-8") as f:
     orig = f.read()
@@ -82,7 +81,7 @@ def extract_text(file_bytes, filename):
     if ext == ".json":
         text = file_bytes.decode("utf-8", errors="replace")
         try: return json.dumps(json.loads(text), indent=2)
-        except: return text
+        except Exception as e: return text
     if ext == ".docx":
         if not DOCX_AVAILABLE: raise RuntimeError("python-docx not installed.")
         doc = DocxDocument(io.BytesIO(file_bytes))

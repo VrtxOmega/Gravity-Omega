@@ -31,8 +31,7 @@ import urllib.request
 import urllib.parse
 from datetime import datetime
 from html.parser import HTMLParser
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 
 from .omega_array import IntelNode
 

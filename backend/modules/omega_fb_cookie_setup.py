@@ -8,10 +8,9 @@ RUN ONCE:
 """
 
 import json
-import time
 from pathlib import Path
 
-COOKIES_FILE = Path("C:/GOLIATH_WORKSPACE/FB_EVIDENCE/.fb_cookies.json")
+COOKIES_FILE = Path("FB_EVIDENCE/.fb_cookies.json")
 
 def setup():
     from playwright.sync_api import sync_playwright

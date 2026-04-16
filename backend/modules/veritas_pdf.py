@@ -26,7 +26,6 @@ Everything else renders as justified body text.
 
 import argparse
 import re
-import sys
 import os
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
@@ -35,9 +34,9 @@ from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, PageBreak, Preformatted
+    HRFlowable, PageBreak
 )
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_LEFT, TA_JUSTIFY
 
 # ── BRAND COLORS ─────────────────────────────────────────────────────────
 GOLD     = HexColor('#C9A84C')

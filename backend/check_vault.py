@@ -2,7 +2,7 @@ import sqlite3
 
 def clean_vault():
     try:
-        conn = sqlite3.connect('c:/Veritas_Lab/gravity-omega-v2/backend/vault.db')
+        conn = sqlite3.connect('backend/vault.db')
         c = conn.cursor()
         
         # Check tables

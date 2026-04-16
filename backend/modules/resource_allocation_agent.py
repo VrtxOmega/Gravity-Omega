@@ -15,7 +15,6 @@ WARNING: This module requires Administrative Privileges
 import socket
 import threading
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 import tkinter as tk
@@ -53,7 +52,7 @@ class KineticSiphonEngine:
         self.logger.setLevel(logging.INFO)
         
         # Create logs directory
-        self.log_directory = Path("c:/Veritas_Lab/Compliance_Logs")
+        self.log_directory = Path("Compliance_Logs")
         self.log_directory.mkdir(parents=True, exist_ok=True)
         
         # Setup file handler
@@ -197,7 +196,7 @@ class KineticSiphonEngine:
         if self.audit_socket:
             try:
                 self.audit_socket.close()
-            except:
+            except Exception as e:
                 pass
         
         # Wait for thread to finish
@@ -238,7 +237,7 @@ class ComplianceTriggerGenerator:
             (bool, str) - Success status and file path or error message
         """
         if output_path is None:
-            output_dir = Path("c:/Veritas_Lab/Compliance_Triggers")
+            output_dir = Path("Compliance_Triggers")
             output_dir.mkdir(parents=True, exist_ok=True)
             output_path = output_dir / f"audit_trigger_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
         

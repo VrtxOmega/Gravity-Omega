@@ -15,7 +15,6 @@ Usage:
 import os
 import sys
 import json
-import glob
 import re
 import sqlite3
 import subprocess
@@ -387,8 +386,8 @@ def streak_moment(streak):
 def gather_moltbook_activity(since_dt):
     """Fetch Moltbook posts made by Omega since the given timestamp."""
     import sys
-    if "C:\\Veritas_Lab" not in sys.path:
-        sys.path.append("C:\\Veritas_Lab")
+    if "." not in sys.path:
+        sys.path.append(".")
     try:
         from moltbook_client import MoltbookClient
         client = MoltbookClient()

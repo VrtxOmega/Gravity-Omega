@@ -1,7 +1,5 @@
 import os
 import sys
-import hashlib
-import time
 from pathlib import Path
 from esm_monitor import ESMEngine # Import from your deployed defense
 from cwe338_scanner import EntropyAudit

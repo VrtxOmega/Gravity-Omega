@@ -4,7 +4,6 @@ import time
 import random
 import zlib
 import lzma
-import shutil
 import hashlib
 import sys
 from sentinel_expanse import GodTierEngine

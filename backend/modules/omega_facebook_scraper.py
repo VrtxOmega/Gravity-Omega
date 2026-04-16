@@ -12,7 +12,7 @@ OPTIONS:
   --query        Keyword filter (only grab matching posts)
   --limit        Max posts to collect (default: 100)
   --no-images    Skip image downloads
-  --out-dir      Output folder (default: C:/GOLIATH_WORKSPACE/FB_EVIDENCE/)
+  --out-dir      Output folder (default: FB_EVIDENCE/)
   --find-groups  Search for relevant local groups by keyword
   --chrome-profile  Chrome profile dir (auto-detected if omitted)
 
@@ -30,10 +30,8 @@ import argparse
 import json
 import os
 import re
-import shutil
 import sqlite3
 import subprocess
-import sys
 import time
 import tempfile
 import urllib.request
@@ -42,8 +40,8 @@ from base64 import b64decode
 from datetime import datetime
 from pathlib import Path
 
-DEFAULT_OUTDIR = Path("C:/GOLIATH_WORKSPACE/FB_EVIDENCE")
-COOKIES_FILE   = Path("C:/GOLIATH_WORKSPACE/FB_EVIDENCE/.fb_cookies.json")
+DEFAULT_OUTDIR = Path("FB_EVIDENCE")
+COOKIES_FILE   = Path("FB_EVIDENCE/.fb_cookies.json")
 
 
 # ── Chrome Cookie Extraction ─────────────────────────────────────────────────
@@ -97,7 +95,6 @@ def _copy_locked_db(src: Path) -> Path:
     Falls back to robocopy if ctypes fails.
     """
     import ctypes
-    import ctypes.wintypes as wt
 
     tmp_dir = Path(tempfile.mkdtemp())
     dst = tmp_dir / src.name

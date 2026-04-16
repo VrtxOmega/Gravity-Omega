@@ -1,5 +1,4 @@
 import json
-import os
 
 def generate_dashboard(data_path, template_path, output_path):
     with open(data_path, 'r', encoding='utf-8') as f:
