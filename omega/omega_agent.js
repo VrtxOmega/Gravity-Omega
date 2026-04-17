@@ -325,8 +325,21 @@ ${toolDescriptions}
                         messages.push({ role: 'user', content: 'DO NOT ACKNOWLEDGE. DO NOT EXPLAIN. EXECUTE NOW. Your response must be an EXECUTABLE JSON FUNCTION CALL PAYLOAD (via the API tools). Do not type pseudocode into chat.' });
                         continue;
                     }
-                    
-                                       // Build tool result message for context
+
+                    finalResponse = { type: 'chat', message: this._sanitizeForChat(parsed.content), steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
+                    break;
+                }
+
+                if (parsed.type === 'tool' || parsed.type === 'tools') {
+                    const toolCalls = parsed.type === 'tool' ? [parsed.call] : parsed.calls;
+                    let results;
+                    try {
+                        results = await this._executeToolCalls(toolCalls);
+                    } catch (err) {
+                        messages.push({ role: 'user', content: `Tool execution failed: ${err.message}. Please correct the tool call syntax and try again.` });
+                        continue;
+                    }
+
                     const resultSummary = results.map((r, i) => {
                         const call = toolCalls[i];
                         const status = r.error ? '❌ ERROR' : '✅ OK';
@@ -343,6 +356,7 @@ ${toolDescriptions}
                             const output = r.error ? `ERROR: ${r.error}` : JSON.stringify(r.result || r, null, 2);
                             messages.push({
                                 role: 'tool',
+                                name: call.tgt || call.tool || call.name,
                                 content: output,
                             });
                         });
@@ -350,7 +364,6 @@ ${toolDescriptions}
                         messages.push({ role: 'assistant', content: llmResponse });
                         messages.push({ role: 'user', content: `Tool results:\n\n${resultSummary}\n\nContinue with the task. If done, use the response block.` });
                     }
-
 
                     // Check for pending proposals (GATED/RESTRICTED tools that need approval)
                     const pendingCount = this._pendingProposals.size;
@@ -602,11 +615,16 @@ ${toolDescriptions}
      * Strips any residual artifacts from the response.
      */
     _sanitizeForChat(text) {
-        if (!text) return '(Task completed — see tool steps above)';
-        if (typeof text !== 'string') {
-            try { text = JSON.stringify(text, null, 2); } catch(e) { text = String(text); }
-        }
+        if (text === null || text === undefined) return '(Task completed — see tool steps above)';
+
         let clean = text;
+        if (typeof clean !== 'string') {
+            try {
+                clean = JSON.stringify(clean, null, 2);
+            } catch(e) {
+                clean = String(clean);
+            }
+        }
         // 0. Strip XML thought tags
         clean = clean.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
         // 1. Strip orphaned code fences
@@ -1381,6 +1399,7 @@ ${toolDescriptions}
     async _continueAfterApproval(toolName, toolResult) {
         const messages = this._pendingMessages;
         if (!messages) return null;
+        this._running = true;
 
         // Inject the approved tool result into the conversation
         const resultText = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult, null, 2);
@@ -1419,11 +1438,17 @@ ${toolDescriptions}
 
                 if (parsed.type === 'tool' || parsed.type === 'tools') {
                     const toolCalls = parsed.type === 'tool' ? [parsed.call] : parsed.calls;
-                    const results = await this._executeToolCalls(toolCalls);
+                    let results;
+                    try {
+                        results = await this._executeToolCalls(toolCalls);
+                    } catch (err) {
+                        messages.push({ role: 'user', content: `Tool execution failed: ${err.message}. Please correct the tool call syntax and try again.` });
+                        continue;
+                    }
 
                     const resultSummary = results.map((r, i) => {
                         const call = toolCalls[i];
-                        const status = r.error ? 'âŒ ERROR' : 'âœ… OK';
+                        const status = r.error ? '❌ ERROR' : '✅ OK';
                         const output = r.error || JSON.stringify(r.result || r, null, 2);
                         const t = output.length > 2000 ? output.substring(0, 2000) + '\n... (truncated)' : output;
                         return `### ${call.tool} [${status}]\n\`\`\`\n${t}\n\`\`\``;
@@ -1452,6 +1477,8 @@ ${toolDescriptions}
             }
         } catch (err) {
             finalResponse = { type: 'error', message: err.message };
+        } finally {
+            this._running = false;
         }
 
         // Emit the continuation response to the renderer

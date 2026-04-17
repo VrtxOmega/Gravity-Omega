@@ -629,6 +629,48 @@ function registerIPC() {
             if (result.type === 'error') {
                 return result;
             }
+
+            // v5.0: [OPTIMIZATION] IPC Race Condition & Bottleneck mitigation.
+            // Strip massive token-streaming artifacts (like full file contents in arguments or outputs)
+            // from the stepLog before passing across the IPC bridge, as it blocks the UI thread during serialization.
+            if (result.stepLog && Array.isArray(result.stepLog)) {
+                result.stepLog = result.stepLog.map(step => {
+                    const cleanStep = { ...step };
+
+                    // Since the UI purely uses stepLog for visual rendering, we replace giant payloads
+                    // with a placeholder to avoid JSON parse crashes or blocking the IPC channel.
+                    if (cleanStep.args) {
+                        if (typeof cleanStep.args === 'string' && cleanStep.args.length > 1000) {
+                            cleanStep.args = cleanStep.args.substring(0, 1000) + '... [IPC truncated]';
+                        } else if (typeof cleanStep.args === 'object' && cleanStep.args !== null && !Array.isArray(cleanStep.args)) {
+                            const clone = { ...cleanStep.args };
+                            for (const k of Object.keys(clone)) {
+                                if (typeof clone[k] === 'string' && clone[k].length > 1000) {
+                                    clone[k] = clone[k].substring(0, 1000) + '... [IPC truncated]';
+                                }
+                            }
+                            cleanStep.args = clone;
+                        }
+                    }
+
+                    if (cleanStep.result) {
+                        if (typeof cleanStep.result === 'string' && cleanStep.result.length > 1000) {
+                            cleanStep.result = cleanStep.result.substring(0, 1000) + '... [IPC truncated]';
+                        } else if (typeof cleanStep.result === 'object' && cleanStep.result !== null && !Array.isArray(cleanStep.result)) {
+                            const cleanResult = { ...cleanStep.result };
+                            if (cleanResult.output && typeof cleanResult.output === 'string') {
+                                cleanResult.output = cleanResult.output.length > 1000 ? cleanResult.output.substring(0, 1000) + '... [IPC truncated]' : cleanResult.output;
+                            }
+                            if (cleanResult.data && typeof cleanResult.data === 'string') {
+                                cleanResult.data = cleanResult.data.length > 1000 ? cleanResult.data.substring(0, 1000) + '... [IPC truncated]' : cleanResult.data;
+                            }
+                            cleanStep.result = cleanResult;
+                        }
+                    }
+                    return cleanStep;
+                });
+            }
+
             return result;
         } catch (agentErr) {
             context.addBreadcrumb('chat', `Agent failed: ${agentErr.message}`, {}, 'warning');
