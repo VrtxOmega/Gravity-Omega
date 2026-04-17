@@ -11,9 +11,15 @@
 
 ---
 
-Gravity Omega is a sovereign AI development environment built on the **VERITAS** framework. It integrates a full-stack Electron frontend with a hardened Python backend running 60+ autonomous modules across 4 execution DAGs.
+Gravity Omega is a sovereign AI development environment built on the [**VERITAS Ω-CODE v2.0 Protocol**](https://github.com/VrtxOmega/VERITAS-Omega-CODE). It integrates a full-stack Electron frontend with a hardened Python backend running 60+ autonomous modules across 4 execution DAGs.
 
 > **Zero cloud dependency. Everything runs on your hardware.**
+
+<div align="center">
+  <img src="screenshots/gravity_omega_dashboard.png" width="800" alt="Gravity Omega Command Center V4.1 Interface" />
+  <br />
+  <sub><i>Gravity Omega Command Center V4.1 executing Python module dependency scanning in the VERITAS gold-and-obsidian layout.</i></sub>
+</div>
 
 ## Architecture
 
