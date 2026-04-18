@@ -290,6 +290,11 @@ ${toolDescriptions}
                 this._emitProgress({ phase: 'thinking', label: `Reasoning step ${iteration}`, iteration, totalSteps: this._stepLog.length });
                 const llmResponse = await this._callLLM(messages);
                 if (!llmResponse) {
+                    // v4.3.19: If tools already ran, fall through to LOOP_EXHAUSTED summary
+                    if (this._stepLog.length > 0) {
+                        this.context.addBreadcrumb('agent', 'LLM empty after ' + this._stepLog.length + ' steps - summary fallback', {}, 'warning');
+                        break; // finalResponse stays null -> triggers LOOP_EXHAUSTED path
+                    }
                     finalResponse = { type: 'error', message: 'LLM returned empty response' };
                     break;
                 }

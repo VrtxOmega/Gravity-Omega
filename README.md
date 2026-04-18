@@ -1,108 +1,78 @@
-<div align="center">
-  <img src="omega_icon.png" width="120" alt="Gravity Omega" />
-  <h1>GRAVITY OMEGA</h1>
-  <p><strong>Autonomous AI-Powered IDE & Intelligence Platform</strong></p>
-  <p><em>Examina omnia, venerare nihil, pro te cogita.</em></p>
-</div>
+# VERITAS Flask API Analyzer
 
-![Status](https://img.shields.io/badge/Status-ACTIVE-success?style=for-the-badge&labelColor=000000&color=d4af37)
-![Platform](https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge&labelColor=000000)
-![Stack](https://img.shields.io/badge/Stack-Electron%20%2B%20Python-informational?style=for-the-badge&labelColor=000000)
-
----
-
-Gravity Omega is a sovereign AI development environment built on the [**VERITAS Ω-CODE v2.0 Protocol**](https://github.com/VrtxOmega/VERITAS-Omega-CODE). It integrates a full-stack Electron frontend with a hardened Python backend running 60+ autonomous modules across 4 execution DAGs.
-
-> **Zero cloud dependency. Everything runs on your hardware.**
-
-<div align="center">
-  <img src="screenshots/gravity_omega_dashboard.png" width="800" alt="Gravity Omega Command Center V4.1 Interface" />
-  <br />
-  <sub><i>Gravity Omega Command Center V4.1 executing Python module dependency scanning in the VERITAS gold-and-obsidian layout.</i></sub>
-</div>
-
-## Architecture
-
-```
-+------------------------------------+
-|         GRAVITY OMEGA v2           |
-+------------------------------------+
-| ELECTRON MAIN (main.js)           |
-|   IPC Bridge + Window Management  |
-+------------------------------------+
-| RENDERER (HTML/CSS/JS)            |
-|   Monaco Editor + Terminal HUD    |
-+------------------------------------+
-| PYTHON BACKEND (60+ modules)      |
-|   Tri-Node VTP Architecture       |
-|   Brain / Bridge / Cortex / Shield|
-+------------------------------------+
-```
-
-### Tri-Node VTP Engine
-
-| Node | Role | Function |
-|------|------|----------|
-| **Brain** | Intelligence Core | Multi-model LLM routing (Vertex AI, Ollama, OpenAI), context assembly, provenance RAG |
-| **Bridge** | Execution Layer | VTP parser (5 strategies, 12 post-parse gates), system command executor, file operations |
-| **Cortex** | Validation Layer | Tri-node approval gating, semantic similarity checks, drift correction |
-| **Shield** | Security Layer | A3 anti-pattern gate, known-fixes memory (27+ patterns), pre-flight validation |
-
-### 4 Execution DAGs
-
-| DAG | Scope |
-|-----|-------|
-| **Code DAG** | Write, edit, refactor, deploy |
-| **Research DAG** | Web search, document analysis, knowledge synthesis |
-| **System DAG** | OS commands, process management, file operations |
-| **Meta DAG** | Self-improvement, prompt tuning, context optimization |
+A Flask-based API endpoint for analyzing Python code through the VERITAS intake gate system.
 
 ## Features
 
-- **Autonomous Agentic Loop** - Multi-turn task execution with self-correction
-- **Monaco Code Editor** - Full VS Code editing experience with syntax highlighting
-- **Integrated Terminal** - Direct shell access with output capture
-- **Multi-Model LLM Backend** - Vertex AI, Ollama (local), OpenAI with automatic fallback
-- **Provenance RAG** - Semantic search over ingested knowledge with VERITAS scoring
-- **SEAL Audit Chain** - Tamper-evident SHA-256 hash chain for all operations
-- **Project Context Loader** - Automatic file tree analysis and context injection
-- **Known Fixes Memory** - Pattern-matched solutions from historical resolutions
-- **Unkillable Backend** - Watchdog with auto-respawn (MAX_RETRIES=999)
+- **POST /analyze** - Accepts Python code and returns VERITAS analysis results
+- **Structured JSON Response** - Includes verdict, claim_id, violations, and timestamp
+- **Error Handling** - Proper validation and error responses
+- **Temporary File Management** - Secure handling of code analysis
 
-## Quick Start
+## Installation
 
-### Requirements
-- Node.js 20+
-- Python 3.10+
-- Ollama (for local LLM inference)
-
-### Install
-
+1. Install dependencies:
 ```bash
-# Install Electron dependencies
-npm install
-
-# Install Python backend dependencies
-cd backend
 pip install -r requirements.txt
-
-# Start the application
-npm start
 ```
 
-## Security
+2. Run the Flask application:
+```bash
+python app.py
+```
 
-- **Zero-Trust IPC** - All renderer-to-backend communication passes through validated IPC channels
-- **A3 Content Gate** - 6 anti-pattern detectors (4 hard-reject, 2 soft-warn) block dangerous operations
-- **Pre-Flight Validation** - Node-fetch, debug flags, and venv checks before execution
-- **Process Isolation** - Python backend runs in separate process with health-check monitoring
+## Usage
 
-## License
+### API Endpoint
 
-MIT
+**POST** `http://localhost:5000/analyze`
 
----
+**Request Body:**
+```json
+{
+    "code": "your_python_code_here"
+}
+```
 
-<div align="center">
-  <sub>Built by <a href="https://github.com/VrtxOmega">RJ Lopez</a> | VERITAS Framework</sub>
-</div>
+**Response:**
+```json
+{
+    "claim_id": "VERITAS_20231201_143022",
+    "verdict": "SOVEREIGN",
+    "timestamp": "2023-12-01T14:30:22.123456",
+    "violations": [],
+    "summary": "Code analysis complete - SOVEREIGN verdict"
+}
+```
+
+### Testing
+
+Run the test script to verify functionality:
+```bash
+python test_analyze.py
+```
+
+## Response Codes
+
+- **200** - Analysis completed successfully
+- **400** - Invalid request (missing code or invalid JSON)
+- **500** - Internal server error during analysis
+
+## Integration with VERITAS
+
+The current implementation uses a mock `omega_assess_file` function. To integrate with the actual VERITAS sovereign module:
+
+1. Replace the mock function with a call to `runSovereignModule`
+2. Configure proper module parameters and error handling
+3. Set up appropriate security contexts for code execution
+
+## Security Notes
+
+- Code is analyzed in isolated temporary files
+- No code execution occurs - only static analysis
+- All file operations are properly cleaned up
+- Input validation prevents malformed requests
+
+## Development
+
+This API is designed for integration with the VERITAS Research Suite and follows the VERITAS UI/UX standards for structured, deterministic responses.

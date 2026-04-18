@@ -983,7 +983,7 @@ async function sendChatMessage() {
 function addClickableStepsBadge(parentEl, steps, stepLog) {
     const badge = document.createElement('div');
     badge.className = 'msg-steps clickable';
-    badge.textContent = `⚡ ${steps} tool steps executed <span class="steps-toggle">▸</span>`;
+    badge.innerHTML = `⚡ ${steps} tool steps executed <span class="steps-toggle">▸</span>`;
 
     const details = document.createElement('div');
     details.className = 'steps-detail collapsed';

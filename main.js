@@ -101,30 +101,26 @@ try { chokidar = require('chokidar'); } catch { console.warn('[Omega] chokidar n
 // WINDOW
 // ══════════════════════════════════════════════════════════════
 
-// Prevent multiple windows — focus existing if already running
-try {
-    const gotLock = app.requestSingleInstanceLock();
-    crashLog(`Single instance lock: gotLock=${gotLock}`);
-    if (!gotLock) {
-        crashLog('EXITING: second instance detected, calling app.quit()');
-        app.quit();
-    } else {
-        app.on('second-instance', () => {
-            crashLog('second-instance event fired');
-            if (mainWindow) {
-                if (mainWindow.isMinimized()) mainWindow.restore();
-                if (!mainWindow.isVisible()) {
-                    mainWindow.maximize();
-                    mainWindow.show();
-                }
-                mainWindow.focus();
-            }
-        });
-    }
-} catch (e) {
-    crashLog(`Single instance lock EXCEPTION: ${e.message}`);
-    console.warn('[Omega] Single instance lock failed:', e.message);
+// Prevent multiple windows — hard-exit if another instance is already running
+const gotLock = app.requestSingleInstanceLock();
+crashLog(`Single instance lock: gotLock=${gotLock}`);
+if (!gotLock) {
+    crashLog('EXITING: second instance detected, calling app.quit()');
+    app.quit();
+    // CRITICAL: return/exit immediately so app.whenReady() never fires
+    return;
 }
+app.on('second-instance', () => {
+    crashLog('second-instance event fired');
+    if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        if (!mainWindow.isVisible()) {
+            mainWindow.maximize();
+            mainWindow.show();
+        }
+        mainWindow.focus();
+    }
+});
 
 // Catch EPIPE and other stream errors that crash Electron
 process.on('uncaughtException', (err) => {
@@ -173,6 +169,17 @@ function createWindow() {
     }
 
     mainWindow.on('closed', () => { mainWindow = null; });
+
+    // ── Prevent duplicate windows from popups, target="_blank", or webview allowpopups ──
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        crashLog(`Blocked new window request: ${url}`);
+        console.log(`[Omega] Blocked popup window, opening in browser: ${url}`);
+        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            shell.openExternal(url);
+        }
+        return { action: 'deny' };
+    });
+
     context.addBreadcrumb('lifecycle', 'Window created');
 
     // ── Crash Recovery ──────────────────────────────────────
