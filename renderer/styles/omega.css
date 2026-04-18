@@ -669,6 +669,17 @@ body {
     padding: 1px 4px; border-radius: 3px;
 }
 .chat-msg.assistant strong { color: var(--gold-bright); }
+.chat-msg.assistant em { color: var(--text-secondary); font-style: italic; }
+.chat-msg.assistant h1,
+.chat-msg.assistant h2,
+.chat-msg.assistant h3 {
+    color: var(--gold-bright); margin: 8px 0 4px; font-weight: 600;
+    line-height: 1.3;
+}
+.chat-msg.assistant h1 { font-size: 16px; }
+.chat-msg.assistant h2 { font-size: 14px; }
+.chat-msg.assistant h3 { font-size: 13px; }
+.chat-msg.assistant .md-ol { display: block; padding-left: 4px; }
 .chat-msg .msg-steps {
     margin-top: 6px; font-size: 10px; color: var(--text-tertiary);
     border-top: 1px solid var(--border); padding-top: 4px;

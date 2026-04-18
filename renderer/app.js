@@ -1040,7 +1040,7 @@ function addChatMessage(role, content) {
         // Removed destructive HTML string sanitization regexes that were corrupting valid LLM code blocks
         // Strip raw JSON blobs > 500 chars
         clean = clean.replace(/\{[\s\S]{500,}?\}/g, '*(large data — expand step log for details)*');
-        msgEl.textContent = renderMarkdown(clean);
+        msgEl.innerHTML = renderMarkdown(clean);
     } else {
         msgEl.textContent = content;
     }
@@ -1054,10 +1054,10 @@ function addProposalCard(proposal) {
     const container = document.getElementById('chat-messages');
     const card = document.createElement('div');
     card.className = 'chat-msg assistant';
-    card.textContent = `
+    card.innerHTML = `
         <div style="font-size:11px;color:var(--orange)">🔐 APPROVAL REQUIRED — ${proposal.safety}</div>
         <div style="margin:4px 0"><strong>${proposal.tool}</strong></div>
-        <pre style="font-size:11px">${JSON.stringify(proposal.args, null, 2)}</pre>
+        <pre style="font-size:11px">${JSON.stringify(proposal.args, null, 2).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
         <div style="display:flex;gap:8px;margin-top:8px">
             <button class="reports-action-btn" onclick="approveProposal('${proposal.id}')">✅ Approve</button>
             <button class="reports-action-btn" onclick="denyProposal('${proposal.id}')">❌ Deny</button>
@@ -2037,7 +2037,7 @@ window.sentinelToggle = async function(action) {
         const bubble = document.createElement('div');
         bubble.id = 'media-bubble';
         bubble.className = 'media-bubble';
-        bubble.textContent = '<div class="media-bubble-collapsed" id="media-bubble-collapsed">'
+        bubble.innerHTML = '<div class="media-bubble-collapsed" id="media-bubble-collapsed">'
             + '<span class="media-bubble-icon">\u{1F3B5}</span>'
             + '<span class="media-bubble-title" id="media-bubble-title">No track</span>'
             + '<button class="media-bubble-btn" id="media-bubble-play">\u25B6</button>'
@@ -2697,8 +2697,10 @@ window.sentinelToggle = async function(action) {
                         .catch(function(){});
                 }
             }
-            document.getElementById('media-vol-val').textContent = lvl;
-            document.getElementById('media-vol-icon').textContent = lvl == 0 ? '\u{1F507}' : lvl < 40 ? '\u{1F509}' : '\u{1F50A}';
+            var vv = document.getElementById('media-vol-val');
+            if (vv) vv.textContent = lvl;
+            var vi = document.getElementById('media-vol-icon');
+            if (vi) vi.textContent = lvl == 0 ? '\u{1F507}' : lvl < 40 ? '\u{1F509}' : '\u{1F50A}';
             var bv = document.getElementById('media-bubble-vol');
             if (bv) bv.value = lvl;
             var pv = document.getElementById('media-volume');
@@ -2720,13 +2722,17 @@ window.sentinelToggle = async function(action) {
             console.log('[MEDIA] applyTrack:', JSON.stringify(info));
             if (info.title) {
                 currentTrack = info;
-                document.getElementById('media-track-title').textContent = info.title;
-                document.getElementById('media-track-artist').textContent = info.artist || '';
+                var tt = document.getElementById('media-track-title');
+                if (tt) tt.textContent = info.title;
+                var ta = document.getElementById('media-track-artist');
+                if (ta) ta.textContent = info.artist || '';
                 var bt = document.getElementById('media-bubble-title');
                 if (bt) bt.textContent = info.title;
-                document.getElementById('media-bubble-track-title').textContent = info.title;
-                document.getElementById('media-bubble-track-artist').textContent = info.artist || '';
-                bubble.style.display = '';
+                var btt = document.getElementById('media-bubble-track-title');
+                if (btt) btt.textContent = info.title;
+                var bta = document.getElementById('media-bubble-track-artist');
+                if (bta) bta.textContent = info.artist || '';
+                if (bubble) bubble.style.display = '';
             }
             if (typeof info.playing === 'boolean' && isPlaying !== info.playing) {
                 isPlaying = info.playing;
