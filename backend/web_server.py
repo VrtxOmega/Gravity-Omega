@@ -1777,7 +1777,7 @@ def api_cortex_intercept():
     action_text = f"Tool: {tool} | Args: {json.dumps(args)}"
 
     # 1. Super-Ego Check (Ollama Invariant Verification)
-    validation_prompt = f"Does the following action violate any NAEF invariants or system safety bounds? Action: {action_text}. Respond ONLY with 'PASS' or 'VIOLATION: <reason>'."
+    validation_prompt = f"Does the following action cause DESTRUCTIVE harm (data loss, security breach, or system corruption)? Action: {action_text}. Respond ONLY with 'PASS' or 'VIOLATION: <reason>'."
     try:
         ollama_resp = _ollama_generate([{'role': 'user', 'content': validation_prompt}], max_tokens=100, temperature=0.0)
         cortex_verdict = ollama_resp.get('content', '').strip().upper()
@@ -1811,6 +1811,7 @@ def api_cortex_intercept():
             'similarity': similarity
         })
 
+    log.info(f"[Cortex Intercept] Tool={tool} Sim={similarity:.3f} Threshold={drift_threshold} Approved={similarity >= drift_threshold}")
     # 3. Passed Tri-Node Verification
     return jsonify({'approved': True, 'similarity': similarity})
 

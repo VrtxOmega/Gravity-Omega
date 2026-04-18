@@ -557,9 +557,17 @@ ${toolDescriptions}
                 res.on('end', () => {
                     try {
                         const parsed = JSON.parse(data);
+                        if (parsed.error) {
+                            console.error('[OMEGA-LLM] Ollama API error:', parsed.error);
+                            reject(new Error(`Ollama: ${parsed.error}`));
+                            return;
+                        }
                         // Return the full message object so _parseResponse can inspect tool_calls
                         resolve(parsed.message || null);
-                    } catch { resolve(null); }
+                    } catch (parseErr) {
+                        console.error('[OMEGA-LLM] JSON parse failed:', parseErr.message, 'Raw:', data.substring(0, 200));
+                        resolve(null);
+                    }
                 });
             });
             req.on('error', reject);
@@ -681,6 +689,40 @@ ${toolDescriptions}
         return true;
     }
 
+
+    // ── v4.3.19: Parameter parsing for Native Tool Executor ──
+    _parsePRM(raw) {
+        if (!raw || typeof raw !== 'string') return {};
+        // Strip wrapping quotes from LLM output
+        let cleaned = raw.trim();
+        if ((cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+            (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.slice(1, -1);
+        }
+        // Attempt strict JSON parse first
+        try {
+            const parsed = JSON.parse(cleaned);
+            return typeof parsed === 'object' && parsed !== null ? parsed : { value: parsed };
+        } catch (_) { /* fall through */ }
+        // Try extracting JSON from markdown code blocks
+        const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+            try {
+                return JSON.parse(codeBlockMatch[1].trim());
+            } catch (_) { /* fall through */ }
+        }
+        // Try key=value parsing (e.g., 'path="/tmp/foo.txt"')
+        const kvPairs = {};
+        const kvRegex = /(\w+)\s*[=:]\s*"([^"]*)"/g;
+        let match;
+        while ((match = kvRegex.exec(cleaned)) !== null) {
+            kvPairs[match[1]] = match[2];
+        }
+        if (Object.keys(kvPairs).length > 0) return kvPairs;
+        // Last resort: treat as single path/value argument
+        return { path: cleaned, value: cleaned };
+    }
+
     // â”€â”€ Tool Execution â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     async _executeToolCalls(calls) {
         const results = [];
@@ -694,7 +736,17 @@ ${toolDescriptions}
             const safety = packet.rgm || SAFETY.SAFE;
             const pseudo_tool_name = `${packet.act}:${packet.tgt}`;
 
-            // â”€â”€ Tri-Node Intercept (Super-Ego + Ego Baseline Check) â”€â”€
+            // ── v4.3.19: SAFE tool whitelist — skip cortex intercept for read-only ops ──
+            const CORTEX_SAFE_TOOLS = new Set([
+                'RUN:readFile', 'RUN:listDir', 'RUN:search', 'RUN:readDir',
+                'RUN:getFileInfo', 'RUN:stat', 'RUN:glob', 'RUN:which',
+                'EXT:NET', 'REQ:NET', 'RUN:AST'
+            ]);
+            const skipCortex = CORTEX_SAFE_TOOLS.has(pseudo_tool_name) ||
+                               (safety === SAFETY.SAFE && packet.act !== 'MUT');
+
+            if (!skipCortex) {
+                // â”€â”€ Tri-Node Intercept (Super-Ego + Ego Baseline Check) â”€â”€
             try {
                 const bridgeReady = await this.bridge.waitForBridge(1000);
                 if (bridgeReady) {
@@ -713,6 +765,7 @@ ${toolDescriptions}
                 }
             } catch (err) {
                 console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
+            }
             }
 
             // â”€â”€ v4.3.5: Local URL fetch handler (bypass WSL bridge) â”€â”€
