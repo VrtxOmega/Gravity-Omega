@@ -545,6 +545,8 @@ window.omega.terminal.onExit((id, code) => {
     const info = state.terminal.instances.get(id);
     if (info) {
         info.terminal.write(`\r\n[Process exited with code ${code}]\r\n`);
+        info.terminal.dispose();          // ← CRITICAL FIX: free xterm.js listeners + DOM
+        info.fitAddon?.dispose?.();
         state.terminal.instances.delete(id);
         const tab = document.querySelector(`.terminal-tab[data-term-id="${id}"]`);
         if (tab) tab.remove();
@@ -1095,6 +1097,9 @@ function addChatMessage(role, content) {
     const msgEl = document.createElement('div');
     msgEl.className = `chat-msg ${role}`;
 
+    const wrapperEl = document.createElement('div');
+    wrapperEl.className = 'msg-content-wrapper';
+
     if (role === 'assistant') {
         // v4.3.18l: Sanitize raw content leaks before rendering
         let clean = content;
@@ -1106,12 +1111,35 @@ function addChatMessage(role, content) {
         // Removed destructive HTML string sanitization regexes that were corrupting valid LLM code blocks
         // Strip raw JSON blobs > 500 chars
         clean = clean.replace(/\{[\s\S]{500,}?\}/g, '*(large data — expand step log for details)*');
-        msgEl.innerHTML = renderMarkdown(clean);
+        wrapperEl.innerHTML = renderMarkdown(clean);
     } else {
-        msgEl.textContent = content;
+        wrapperEl.textContent = content;
     }
 
+    msgEl.appendChild(wrapperEl);
     container.appendChild(msgEl);
+
+    // Apply collapsing if content is very long
+    setTimeout(() => {
+        if (wrapperEl.scrollHeight > 450) {
+            wrapperEl.classList.add('collapsible');
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'msg-toggle-btn';
+            toggleBtn.textContent = 'Show More ▼';
+            toggleBtn.onclick = () => {
+                const isExpanded = wrapperEl.classList.contains('expanded');
+                if (isExpanded) {
+                    wrapperEl.classList.remove('expanded');
+                    toggleBtn.textContent = 'Show More ▼';
+                } else {
+                    wrapperEl.classList.add('expanded');
+                    toggleBtn.textContent = 'Show Less ▲';
+                }
+            };
+            msgEl.appendChild(toggleBtn);
+        }
+    }, 10);
+
     scrollChat();
     return msgEl;
 }

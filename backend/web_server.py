@@ -67,10 +67,10 @@ bypass_trap = BypassTrap()
 
 # Flask
 try:
-    from flask import Flask, request, jsonify, abort
+    from flask import Flask, request, jsonify, abort, current_app
 except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'flask'])
-    from flask import Flask, request, jsonify, abort
+    from flask import Flask, request, jsonify, abort, current_app
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 # CONFIG

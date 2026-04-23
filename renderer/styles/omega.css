@@ -1650,3 +1650,40 @@ body {
   padding: 0;
   color: #c8c8b4;
 }
+
+/* ── Collapsible Chat Messages ──────────────────────────────── */
+.msg-content-wrapper {
+    position: relative;
+    transition: max-height 0.3s ease;
+}
+.msg-content-wrapper.collapsible {
+    max-height: 400px;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+.msg-content-wrapper.collapsible.expanded {
+    max-height: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+}
+.msg-toggle-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: transparent;
+    border: none;
+    color: var(--gold-bright);
+    font-size: 11px;
+    padding: 6px 0 2px;
+    cursor: pointer;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: color var(--transition), text-shadow var(--transition);
+    margin-top: 4px;
+}
+.msg-toggle-btn:hover {
+    color: var(--gold);
+    text-shadow: 0 0 8px var(--gold-glow);
+}

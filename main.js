@@ -95,6 +95,8 @@ let watcher = null;
 let chokidar = null;
 try { chokidar = require('chokidar'); } catch { console.warn('[Omega] chokidar not available'); }
 
+let ipcRegistered = false;
+
 // (GPU flags removed — native Windows Electron handles GPU properly)
 
 // ══════════════════════════════════════════════════════════════
@@ -1208,7 +1210,11 @@ app.whenReady().then(async () => {
         callback({ path: filePath });
     });
 
-    registerIPC();
+    // Guard: only register IPC handlers once to prevent duplicate listeners
+    if (!ipcRegistered) {
+        registerIPC();
+        ipcRegistered = true;
+    }
     buildMenu();
     createWindow();
 
