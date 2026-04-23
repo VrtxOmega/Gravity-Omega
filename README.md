@@ -7,7 +7,7 @@
 <div align="center">
 
 ![Status](https://img.shields.io/badge/Status-ACTIVE-success?style=for-the-badge&labelColor=000000&color=d4af37)
-![Version](https://img.shields.io/badge/Version-v4.0.0--SEALED-informational?style=for-the-badge&labelColor=000000&color=d4af37)
+![Version](https://img.shields.io/badge/Version-v2.0.0--SEALED-informational?style=for-the-badge&labelColor=000000&color=d4af37)
 ![Stack](https://img.shields.io/badge/Stack-Electron%20%2B%20Python%20%2B%20Node.js-informational?style=for-the-badge&labelColor=000000)
 ![Models](https://img.shields.io/badge/Models-Ollama%20%7C%20Mistral%20%7C%20Gemini-blue?style=for-the-badge&labelColor=000000)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge&labelColor=000000)
@@ -28,7 +28,7 @@ Gravity Omega is the command surface of the VERITAS & Sovereign Ecosystem — th
 
 ## Overview
 
-Gravity Omega v4 is an Electron desktop application combining three operational layers:
+Gravity Omega v2 is an Electron desktop application combining three operational layers:
 
 | Layer | Technology | Role |
 |---|---|---|
@@ -146,56 +146,6 @@ npm run dist
 
 ---
 
-## AI-Powered Setup
-
-Feed this exact prompt to your Hermes Agent, Claude, ChatGPT, or any AI coding assistant to set up Gravity Omega in one shot:
-
-```
-You are setting up GRAVITY OMEGA — a sovereign AI operator platform
-by VrtxOmega (https://github.com/VrtxOmega/Gravity-Omega).
-
-Complete the following steps in order. Do not skip any.
-
-1. Clone the repository:
-   git clone https://github.com/VrtxOmega/Gravity-Omega.git
-   cd Gravity-Omega
-
-2. Install Node.js dependencies:
-   npm install
-
-3. Install Python dependencies:
-   pip install -r requirements.txt
-
-4. Create backend/.env with this content:
-   OLLAMA_API_KEY=<your-ollama-cloud-api-key>
-   # If you don't have an Ollama Cloud key, leave it blank
-   # and the app will use local Ollama on port 11434.
-
-5. Pull at least one local model (requires Ollama running):
-   ollama pull qwen2.5:7b
-   ollama pull mistral:7b
-
-6. Start the application:
-   npm start
-
-7. Confirm the app launches. The Electron window should appear
-   with the VERITAS gold-on-black interface. If the Python backend
-   starts on port 5000, you're good.
-
-   If you hit model routing errors, check:
-   - Ollama is running: ollama list
-   - backend/.env has OLLAMA_API_KEY set (for cloud models)
-   - Both main.js and backend/web_server.py default to a model
-     that actually exists in your environment
-
-Report what worked and what didn't. Do not modify any source files
-unless you hit an error that requires a fix.
-```
-
-Drop this into any capable AI agent and it'll walk through the full setup. If Ollama isn't running locally, the agent will tell you — just start it and retry.
-
----
-
 ## Configuration
 
 | Path | Content |
@@ -265,21 +215,6 @@ The original standalone [OmegaMobile](https://github.com/VrtxOmega/OmegaMobile) 
 | [drift](https://github.com/VrtxOmega/drift) | 3D visualization of GitHub development universe |
 
 ---
-
-> 📖 Read the master narrative: [Why Sovereign AI?](https://github.com/VrtxOmega/veritas-portfolio/blob/main/content/SOVEREIGN_AI.md)
-
-## 🌐 VERITAS Omega Ecosystem
-
-This project is part of the [VERITAS Omega Universe](https://github.com/VrtxOmega/veritas-portfolio) — a sovereign AI infrastructure stack.
-
-- [VERITAS-Omega-CODE](https://github.com/VrtxOmega/VERITAS-Omega-CODE) — Deterministic verification spec (10-gate pipeline)
-- [omega-brain-mcp](https://github.com/VrtxOmega/omega-brain-mcp) — Governance MCP server (Triple-A rated on Glama)
-- [Gravity-Omega](https://github.com/VrtxOmega/Gravity-Omega) — Desktop AI operator platform
-- [Ollama-Omega](https://github.com/VrtxOmega/Ollama-Omega) — Ollama MCP bridge for any IDE
-- [OmegaWallet](https://github.com/VrtxOmega/OmegaWallet) — Desktop Ethereum wallet (renderer-cannot-sign)
-- [veritas-vault](https://github.com/VrtxOmega/veritas-vault) — Local-first AI knowledge engine
-- [sovereign-arcade](https://github.com/VrtxOmega/sovereign-arcade) — 8-game arcade with VERITAS design system
-- [SSWP](https://github.com/VrtxOmega/sswp-mcp) — Deterministic build attestation protocol
 
 ## License
 
