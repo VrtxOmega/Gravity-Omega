@@ -82,6 +82,9 @@ contextBridge.exposeInMainWorld('omega', {
         approve:    (id, text) => ipcRenderer.invoke('agent:approve', id, text),
         deny:       (id, reason) => ipcRenderer.invoke('agent:deny', id, reason),
         approveAll: () => ipcRenderer.invoke('agent:approve-all'),
+        // v5.1: Hermes ACP integration — start/stop Hermes channel and toggle backend
+        startHermes: () => ipcRenderer.invoke('agent:start-hermes'),
+        stopHermes:  () => ipcRenderer.invoke('agent:stop-hermes'),
     },
 
     // ── Hardware ─────────────────────────────────────────────

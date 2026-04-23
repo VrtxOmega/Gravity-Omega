@@ -31,6 +31,7 @@ import shutil
 import sys
 import threading
 import time
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -45,6 +46,7 @@ INTEL_DIR.mkdir(parents=True, exist_ok=True)
 
 # In-memory job registry
 _jobs: Dict[str, dict] = {}
+_jobs_lock = threading.Lock()
 
 
 # ── Local imports ─────────────────────────────────────────────────────────────
@@ -93,12 +95,19 @@ class HuntRun:
 
     def execute(self, job_id: str = ""):
         """Run the full pipeline. Updates _jobs[job_id] with status."""
+        # Add _prune_jobs inside the lock to prevent race
+        _prune_jobs()
+        
         def _update(status, msg="", progress=0):
             if job_id:
-                _jobs[job_id].update({
-                    "status": status, "message": msg, "progress": progress,
-                    "updated_at": datetime.utcnow().isoformat()
-                })
+                _jobs_lock.acquire()
+                try:
+                    _jobs[job_id].update({
+                        "status": status, "message": msg, "progress": progress,
+                        "updated_at": datetime.utcnow().isoformat()
+                    })
+                finally:
+                    _jobs_lock.release()
             print(f"[HUNTER] [{status}] {msg}")
 
         all_nodes: List[IntelNode] = []
@@ -121,6 +130,8 @@ class HuntRun:
             )
             nodes = array.run()
             all_nodes.extend(nodes)
+            if len(all_nodes) > 5000:
+                all_nodes = all_nodes[-5000:]
 
             # Save raw nodes for this cycle
             raw_path = self.run_dir / f"raw_nodes_cycle{cycle}.json"
@@ -150,6 +161,8 @@ class HuntRun:
 
             new_seeds = report.new_seeds
             all_seeds.update(new_seeds)
+            if len(all_seeds) > 5000:
+                all_seeds = set(list(all_seeds)[-5000:])
 
             if cycle == self.depth or not new_seeds:
                 break
@@ -207,8 +220,31 @@ class HuntRun:
             "contradicted":       len(break_report.contradicted_claims),
         }
         if job_id:
-            _jobs[job_id]["result"] = result
+            _jobs_lock.acquire()
+            try:
+                _jobs[job_id]["result"] = result
+            finally:
+                _jobs_lock.release()
         return result
+
+    def _execute_wrapped(self, job_id: str = ""):
+        """Wrapper that catches ALL exceptions in daemon thread so jobs don't zombie."""
+        try:
+            return self.execute(job_id)
+        except Exception as exc:
+            _jobs_lock.acquire()
+            try:
+                if job_id in _jobs:
+                    _jobs[job_id].update({
+                        "status": "FAILED",
+                        "message": str(exc),
+                        "updated_at": datetime.utcnow().isoformat()
+                    })
+            finally:
+                _jobs_lock.release()
+            log = logging.getLogger('goliath')
+            log.error(f"Hunt job {job_id} crashed: {exc}", exc_info=True)
+            raise
 
     def _load_vectors(self, cycle: int):
         """Load contradiction vectors saved by pattern engine."""
@@ -272,41 +308,70 @@ def run_hunt(seed: str, depth: int = 1, domains: str = "",
     job_id = hashlib.sha256(
         f"{seed}{time.time()}".encode()).hexdigest()[:16].upper()
 
-    _jobs[job_id] = {
-        "job_id":     job_id,
-        "seeds":      seeds,
-        "depth":      depth,
-        "max_fetch":  max_fetch,
-        "status":     "QUEUED",
-        "message":    "Queued",
-        "progress":   0,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-        "result":     None,
-    }
+    _jobs_lock.acquire()
+    try:
+        _jobs[job_id] = {
+            "job_id":     job_id,
+            "seeds":      seeds,
+            "depth":      depth,
+            "max_fetch":  max_fetch,
+            "status":     "QUEUED",
+            "message":    "Queued",
+            "progress":   0,
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+            "result":     None,
+        }
+    finally:
+        _jobs_lock.release()
 
     hunt = HuntRun(seeds=seeds, depth=depth, domains=domain_list,
                    county=county, state=state,
                    gh_token=gh_token, max_fetch=max_fetch, dry_run=dry_run)
 
-    thread = threading.Thread(target=hunt.execute, args=(job_id,), daemon=True)
+    thread = threading.Thread(target=hunt._execute_wrapped, args=(job_id,), daemon=True)
     thread.start()
     return job_id
 
 
+def _prune_jobs():
+    """Remove completed/failed jobs older than 24h to prevent unbounded memory growth."""
+    cutoff = datetime.utcnow().timestamp() - 86400
+    _jobs_lock.acquire()
+    try:
+        stale = [
+            jid for jid, j in _jobs.items()
+            if j.get("status") in ("COMPLETED", "FAILED")
+            and datetime.fromisoformat(j.get("updated_at", "2000-01-01")).timestamp() < cutoff
+        ]
+        for jid in stale:
+            del _jobs[jid]
+    finally:
+        _jobs_lock.release()
+
+
 def get_job_status(job_id: str) -> dict:
-    return _jobs.get(job_id, {"error": "job not found"})
+    _jobs_lock.acquire()
+    try:
+        return _jobs.get(job_id, {"error": "job not found"})
+    finally:
+        _jobs_lock.release()
 
 
 def list_jobs() -> list:
-    return list(_jobs.values())
+    _prune_jobs()
+    _jobs_lock.acquire()
+    try:
+        return list(_jobs.values())
+    finally:
+        _jobs_lock.release()
 
 
 # ── Omega Route Registration ──────────────────────────────────────────────────
 # This function is called by web_server.py with the Flask app.
 # web_server.py adds ONE LINE:  from goliath_hunter.omega_conductor import register_routes
 
-def register_routes(app):
+def register_routes(app, conductor_instance=None):
     """Register GOLIATH HUNTER API routes on the Flask app."""
     import re as _re  # local to avoid collision with module-level re
 

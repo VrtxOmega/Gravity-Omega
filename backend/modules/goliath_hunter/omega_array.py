@@ -22,6 +22,7 @@ No Omega files are modified. All output is IntelNode objects.
 
 import hashlib
 import json
+import logging
 import re
 import time
 import urllib.parse
@@ -30,6 +31,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 # ── IntelNode: the atomic intelligence unit ─────────────────────────────────
@@ -73,7 +76,8 @@ def _get(url: str, timeout: int = 15, as_json: bool = True):
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read().decode("utf-8", errors="ignore")
             return json.loads(raw) if as_json else raw
-    except Exception:
+    except Exception as e:
+        logger.warning(f"HARVEST_ERROR: {e}", exc_info=True)
         return None
 
 
@@ -411,7 +415,8 @@ class GitHubHarvester:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=15) as r:
                 data = json.loads(r.read().decode("utf-8"))
-        except Exception:
+        except Exception as e:
+            logger.warning(f"HARVEST_ERROR: {e}", exc_info=True)
             return nodes
 
         for item in data.get("items", [])[:20]:

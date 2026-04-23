@@ -862,66 +862,23 @@ def ai_generate(messages, max_tokens=4096, temperature=0.2):
 
 
 def _ollama_generate(messages, max_tokens, temperature):
-    """Generate via Ollama Cloud (primary) with local fallback."""
-    import urllib.request, os, re
-
-    api_key = os.environ.get('OLLAMA_API_KEY', '')
-    if not api_key:
-        env_path = os.path.expanduser('~/.hermes/.env')
-        if os.path.exists(env_path):
-            with open(env_path, 'r') as f:
-                for line in f:
-                    m = re.match(r'^OLLAMA_API_KEY\s*=\s*(.+)', line.strip())
-                    if m:
-                        api_key = m.group(1).strip().strip('"').strip("'")
-                        break
-
-    model = os.environ.get('GRAVITY_OMEGA_MODEL', 'qwen3:8b')
-
-    # Try Ollama Cloud first
-    if api_key:
-        try:
-            payload = json.dumps({
-                'model': model,
-                'messages': messages,
-                'temperature': temperature,
-                'max_tokens': max_tokens,
-                'stream': False,
-            }).encode()
-            req = urllib.request.Request(
-                'https://ollama.com/v1/chat/completions',
-                data=payload,
-                headers={'Content-Type': 'application/json',
-                         'Authorization': f'Bearer {api_key}'},
-            )
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                data = json.loads(resp.read())
-            content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-            if content:
-                return {'content': content, 'model': model, 'backend': 'ollama-cloud'}
-        except Exception as e:
-            log.warning(f'Ollama Cloud failed (falling back to local): {e}')
-
-    # Fallback to local Ollama
-    try:
-        payload = json.dumps({
-            'model': model,
-            'messages': messages,
-            'stream': False,
-            'options': {'temperature': temperature, 'num_predict': max_tokens},
-        }).encode()
-        req = urllib.request.Request(
-            'http://127.0.0.1:11434/api/chat',
-            data=payload,
-            headers={'Content-Type': 'application/json'},
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read())
-        return {'content': data.get('message', {}).get('content', ''),
-                'model': model, 'backend': 'ollama-local'}
-    except Exception as e:
-        log.error(f'Local Ollama also failed: {e}')
-        raise
+    """Generate via local Ollama."""
+    import urllib.request
+    payload = json.dumps({
+        'model': 'qwen3:8b',
+        'messages': messages,
+        'stream': False,
+        'options': {'temperature': temperature, 'num_predict': max_tokens},
+    }).encode()
+    req = urllib.request.Request(
+        'http://127.0.0.1:11434/api/chat',
+        data=payload,
+        headers={'Content-Type': 'application/json'},
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        data = json.loads(resp.read())
+    return {'content': data.get('message', {}).get('content', ''),
+            'model': 'qwen3:8b', 'backend': 'ollama'}
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

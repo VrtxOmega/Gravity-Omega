@@ -77,8 +77,12 @@ class OmegaBridge extends EventEmitter {
                 PYTHONUNBUFFERED: '1',
             };
 
+            // Find server path dynamically
+            const serverPath = this._findServer() || '~/gravity-omega-v2/backend/web_server.py';
+            const pythonBin = this._findPython() || 'python3';
+            
             // Spawn via WSL — Python backend lives on Linux side
-            const wslCmd = `cd ~/gravity-omega-v2 && .venv/bin/python backend/web_server.py`;
+            const wslCmd = `cd $(dirname ${serverPath}) && ${pythonBin} $(basename ${serverPath})`;
             this._process = spawn('wsl', ['--', 'bash', '-c', wslCmd], {
                 env,
                 stdio: ['pipe', 'pipe', 'pipe'],
@@ -340,23 +344,36 @@ class OmegaBridge extends EventEmitter {
 
     // ── Helpers ──────────────────────────────────────────────
     _findServer() {
-        // Server lives on WSL side — check it exists
+        // Server lives on WSL side — check the canonical new path first
+        try {
+            execSync('wsl -- test -f /mnt/c/Veritas_Lab/gravity-omega-v2/backend/web_server.py', { timeout: 5000 });
+            return '/mnt/c/Veritas_Lab/gravity-omega-v2/backend/web_server.py';
+        } catch { }
+        // Legacy fallback
         try {
             execSync('wsl -- test -f ~/gravity-omega-v2/backend/web_server.py', { timeout: 5000 });
             return '~/gravity-omega-v2/backend/web_server.py';
-        } catch { return null; }
+        } catch { }
+        return null;
     }
 
     _findPython() {
-        // Python lives on WSL side in the venv
+        // New canonical venv first
         try {
-            execSync('wsl -- ~/gravity-omega-v2/.venv/bin/python --version', { timeout: 5000, stdio: 'pipe' });
-            console.log('[Bridge] Using WSL venv Python');
-            return 'wsl';
+            execSync('wsl -- test -x /mnt/c/Veritas_Lab/gravity-omega-v2/.venv/bin/python', { timeout: 5000 });
+            console.log('[Bridge] Using new WSL venv Python');
+            return '/mnt/c/Veritas_Lab/gravity-omega-v2/.venv/bin/python';
         } catch { }
+        // Legacy venv fallback
+        try {
+            execSync('wsl -- test -x ~/gravity-omega-v2/.venv/bin/python', { timeout: 5000 });
+            console.log('[Bridge] Using legacy WSL venv Python');
+            return '~/gravity-omega-v2/.venv/bin/python';
+        } catch { }
+        // System python fallback
         try {
             execSync('wsl -- python3 --version', { timeout: 5000, stdio: 'pipe' });
-            return 'wsl';
+            return 'python3';
         } catch { }
         return null;
     }

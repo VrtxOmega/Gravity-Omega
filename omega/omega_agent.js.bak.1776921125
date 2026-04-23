@@ -665,125 +665,40 @@ ${toolDescriptions}
             options: { temperature: 0.2, num_predict: 8192 },
         });
 
-        // Ollama Cloud Primary, Local Fallback
-        const https = require('https');
-        const fs = require('fs');
-        const path = require('path');
-
-        function _getOllamaKey() {
-            if (process.env.OLLAMA_API_KEY) return process.env.OLLAMA_API_KEY;
-            try {
-                const envFile = path.join(require('os').homedir(), '.hermes', '.env');
-                if (fs.existsSync(envFile)) {
-                    const lines = fs.readFileSync(envFile, 'utf-8').split('\n');
-                    for (const line of lines) {
-                        const m = line.match(/^OLLAMA_API_KEY\s*=\s*(.+)/);
-                        if (m) return m[1].trim().replace(/^["']|["']$/g, '');
-                    }
-                }
-            } catch (e) { console.warn('[OMEGA-LLM] Could not read Hermes .env:', e.message); }
-            return null;
-        }
-
-        const ollamaKey = _getOllamaKey();
-        const { cloud: cloudModel, local: localModel } = this._resolveModel(this._activeModel);
+        // All models (local + cloud) go through localhost:11434
+        // Ollama handles cloud routing transparently
+        const hostname = '127.0.0.1';
+        const port = 11434;
 
         return new Promise((resolve, reject) => {
-            // --- Ollama Cloud path ---
-            if (ollamaKey) {
-                console.log(`[OMEGA-LLM] Ollama Cloud: model=${cloudModel}, msgs=${messages.length}`);
-                const cloudPayload = JSON.stringify({
-                    model: cloudModel,
-                    messages: messages,
-                    stream: false,
-                    temperature: 0.2,
-                    max_tokens: 8192,
-                });
-                const cloudReq = https.request({
-                    hostname: 'ollama.com', port: 443,
-                    path: '/v1/chat/completions',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${ollamaKey}`,
-                    },
-                    timeout: 180000,
-                }, (res) => {
-                    let data = '';
-                    res.on('data', (c) => data += c);
-                    res.on('end', () => {
-                        try {
-                            const parsed = JSON.parse(data);
-                            if (parsed.error) {
-                                console.error('[OMEGA-LLM] Ollama Cloud error:', parsed.error);
-                            } else {
-                                const content = parsed.choices?.[0]?.message?.content;
-                                if (content && content.trim().length > 0) {
-                                    console.log('[OMEGA-LLM] Ollama Cloud OK, length:', content.length);
-                                    resolve({ role: 'assistant', content });
-                                    return;
-                                }
-                            }
-                        } catch (e) { /* fall through */ }
-                        console.warn('[OMEGA-LLM] Ollama Cloud empty/invalid, falling back');
-                        _tryLocal();
-                    });
-                });
-                cloudReq.on('error', (e) => {
-                    console.warn('[OMEGA-LLM] Ollama Cloud network error:', e.message);
-                    _tryLocal();
-                });
-                cloudReq.on('timeout', () => {
-                    cloudReq.destroy();
-                    console.warn('[OMEGA-LLM] Ollama Cloud timeout, falling back');
-                    _tryLocal();
-                });
-                cloudReq.write(cloudPayload);
-                cloudReq.end();
-            } else {
-                console.log('[OMEGA-LLM] No OLLAMA_API_KEY, using local Ollama');
-                _tryLocal();
-            }
-
-            // --- Local Ollama path ---
-            function _tryLocal() {
-                // Rebuild payload with local-safe model name
-                const localPayload = JSON.stringify({
-                    model: localModel,
-                    messages,
-                    tools,
-                    stream: false,
-                    options: { temperature: 0.2, num_predict: 8192 },
-                });
-                console.log(`[OMEGA-LLM] Local Ollama: model=${localModel}`);
-                const localReq = http.request({
-                    hostname: '127.0.0.1', port: 11434,
-                    path: '/api/chat', method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 180000,
-                }, (res) => {
-                    let data = '';
-                    res.on('data', (c) => data += c);
-                    res.on('end', () => {
-                        try {
-                            const parsed = JSON.parse(data);
-                            if (parsed.error) {
-                                console.error('[OMEGA-LLM] Local Ollama API error:', parsed.error);
-                                reject(new Error(`Ollama: ${parsed.error}`));
-                                return;
-                            }
-                            resolve(parsed.message || null);
-                        } catch (parseErr) {
-                            console.error('[OMEGA-LLM] JSON parse failed:', parseErr.message, 'Raw:', data.substring(0, 200));
-                            resolve(null);
+            const req = http.request({
+                hostname, port,
+                path: '/api/chat', method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 180000,
+            }, (res) => {
+                let data = '';
+                res.on('data', (c) => data += c);
+                res.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.error) {
+                            console.error('[OMEGA-LLM] Ollama API error:', parsed.error);
+                            reject(new Error(`Ollama: ${parsed.error}`));
+                            return;
                         }
-                    });
+                        // Return the full message object so _parseResponse can inspect tool_calls
+                        resolve(parsed.message || null);
+                    } catch (parseErr) {
+                        console.error('[OMEGA-LLM] JSON parse failed:', parseErr.message, 'Raw:', data.substring(0, 200));
+                        resolve(null);
+                    }
                 });
-                localReq.on('error', reject);
-                localReq.on('timeout', () => { localReq.destroy(); reject(new Error('Ollama timeout')); });
-                localReq.write(localPayload);
-                localReq.end();
-            }
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('Ollama timeout')); });
+            req.write(payload);
+            req.end();
         });
     }
 
@@ -1814,34 +1729,6 @@ ${toolDescriptions}
             // Keep system context + recent messages
             this._conversationHistory = this._conversationHistory.slice(-this._maxHistory);
         }
-    }
-
-    // v5.2: Model name resolver — maps UI/friendly names to exact backend names.
-    _resolveModel(raw) {
-        if (!raw) raw = this._activeModel || 'qwen3:8b';
-        const key = raw.toLowerCase().trim().replace(/\s+/g, '-').replace(/-+$/g, '').trim();
-        const CLOUD_MAP = {
-            'qwen3:8b': 'deepseek-v3.1:671b',
-            'qwen2.5:7b': 'deepseek-v3.1:671b',
-            'qwen2.5:14b': 'deepseek-v3.1:671b',
-            'gemini-3-flash-preview': 'gemini-3-flash-preview',
-            'gemini-3-flash': 'gemini-3-flash-preview',
-            'deepseek-v3.1:671b': 'deepseek-v3.1:671b',
-            'deepseek-v3.1': 'deepseek-v3.1:671b',
-        };
-        const LOCAL_MAP = {
-            'qwen3:8b': 'qwen3:8b',
-            'qwen2.5:7b': 'qwen2.5:7b',
-            'qwen2.5:14b': 'qwen2.5:14b',
-            'deepseek-v3.1:671b': 'qwen3:8b',
-            'deepseek-v3.1': 'qwen3:8b',
-            'gemini-3-flash-preview': 'qwen3:8b',
-        };
-        return {
-            raw: raw,
-            cloud: CLOUD_MAP[key] || CLOUD_MAP['qwen3:8b'],
-            local: LOCAL_MAP[key] || LOCAL_MAP['qwen3:8b'],
-        };
     }
 }
 

@@ -14,6 +14,11 @@
  * Every UI action routes through window.omega (preload.js bridge).
  */
 'use strict';
+let _hwPoll = null;
+
+function __esc(s) {
+    return String(s).replace(/[\u0026<>'"]/g, c => ({'\u0026':'\u0026amp;','\u003c':'\u0026lt;','\u003e':'\u0026gt;','"':'\u0026quot;',"'":'\u0026#39;'}[c]));
+}
 
 // ══════════════════════════════════════════════════════════════
 // STATE
@@ -40,6 +45,10 @@ const state = {
 
 function showToast(message, type = 'info', duration = 4000) {
     const container = document.getElementById('toast-container');
+    if (!container) {
+        console.warn('[showToast] toast-container not found:', message);
+        return;
+    }
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
@@ -352,7 +361,7 @@ function closeTab(filePath) {
     state.openFiles.delete(filePath);
 
     const tab = document.querySelector(`#editor-tabs .tab[data-tab="${CSS.escape(filePath)}"]`);
-    if (tab) tab.remove();
+    if (tab) { tab.replaceWith(tab.cloneNode(true)); }
 
     if (state.activeFile === filePath) {
         const remaining = [...state.openFiles.keys()];
@@ -396,7 +405,7 @@ function createFileEntry(entry, depth) {
     el.style.paddingLeft = `${12 + depth * 16}px`;
 
     const icon = entry.isDirectory ? '📁' : getFileIcon(entry.name);
-    el.textContent = `<span class="file-icon">${icon}</span><span class="file-name">${entry.name}</span>`;
+    el.innerHTML = `<span class="file-icon">${icon}</span><span class="file-name">${entry.name}</span>`;
 
     if (entry.isDirectory) {
         el.dataset.dir = entry.path;
@@ -559,21 +568,71 @@ state.chat.messageHistory = [];  // Full session context — never lost
 state.chat.abortController = null;
 
 // v5.0: Restore model dropdown from localStorage
+// v5.1: Intercept "hermes-acp" to start/stop Hermes ACP channel
 (function initModelDropdown() {
     const dd = document.getElementById('chat-model-dropdown');
     if (dd) {
         const saved = localStorage.getItem('omega_active_model');
         if (saved) {
-            // Check if the saved value exists in the dropdown options
             const optValues = Array.from(dd.options).map(o => o.value);
             if (optValues.includes(saved)) dd.value = saved;
         }
-        dd.addEventListener('change', () => {
-            localStorage.setItem('omega_active_model', dd.value);
-            console.log('[MODEL] Switched to:', dd.value);
+        dd.addEventListener('change', async () => {
+            const model = dd.value;
+            // v5.1: Hermes ACP toggle
+            if (model === 'hermes-acp') {
+                try {
+                    showToast('🤖 Connecting to Hermes ACP...', 'info');
+                    const res = await window.omega.agent.startHermes();
+                    if (res && res.ok) {
+                        showToast('🤖 Hermes ACP connected — Full Agent mode active', 'success');
+                        _updateHermesBadge(true);
+                    } else {
+                        showToast('⚠️ Hermes connection failed: ' + (res ? res.error : 'Unknown error'), 'error');
+                        // Revert dropdown to previous non-hermes value
+                        const prev = localStorage.getItem('omega_active_model') || 'qwen2.5:7b';
+                        if (prev === 'hermes-acp') dd.value = 'qwen2.5:7b';
+                    }
+                } catch (err) {
+                    showToast('⚠️ Hermes error: ' + err.message, 'error');
+                }
+            } else {
+                // Switching away from Hermes — stop the channel if it was running
+                const wasHermes = localStorage.getItem('omega_active_model') === 'hermes-acp';
+                if (wasHermes) {
+                    try { await window.omega.agent.stopHermes(); } catch (_) {}
+                    _updateHermesBadge(false);
+                }
+                localStorage.setItem('omega_active_model', model);
+            }
+            console.log('[MODEL] Switched to:', model);
         });
     }
 })();
+
+// v5.1: Update the UI to reflect Hermes ACP connection state
+function _updateHermesBadge(active) {
+    const badge = document.getElementById('hermes-status-badge');
+    if (badge) {
+        badge.textContent = active ? '🤖 HERMES' : '';
+        badge.style.display = active ? 'inline' : 'none';
+    }
+    // Also tint the model dropdown gold when Hermes is active
+    const dd = document.getElementById('chat-model-dropdown');
+    if (dd) {
+        dd.style.background = active ? 'rgba(212,168,67,0.15)' : '';
+        dd.style.color = active ? 'var(--gold-bright)' : '';
+    }
+    // Probe adapter health after connecting — log result to console for now
+    // (Gravity Omega UI will surface this via the Vault health panel in a future patch)
+    if (active && window.omega?.agent?._hermesChannel) {
+        setTimeout(() => {
+            window.omega.agent._hermesChannel.ping().then(h => {
+                console.log('[HermesChannel] Initial heartbeat:', h);
+            }).catch(() => {});
+        }, 2000);
+    }
+}
 
 function toggleVoice() {
     state.chat.voiceEnabled = !state.chat.voiceEnabled;
@@ -934,8 +993,11 @@ async function sendChatMessage() {
     try {
         const modelDropdown = document.getElementById('chat-model-dropdown');
         const activeModel = modelDropdown ? modelDropdown.value : 'qwen2.5:7b';
+        // v5.1: Don't pass 'hermes-acp' to the main process — Hermes mode is already set
+        // via _useHermes on the agent. Pass null so _activeModel isn't overwritten.
+        const llmModel = (activeModel === 'hermes-acp') ? null : activeModel;
         localStorage.setItem('omega_active_model', activeModel);
-        const result = await window.omega.chat.send(text, state.chat.sessionId, activeModel);
+        const result = await window.omega.chat.send(text, state.chat.sessionId, llmModel);
         destroyThinkingIndicator();
         thinkingEl.remove();
 
@@ -1023,6 +1085,10 @@ function addClickableStepsBadge(parentEl, steps, stepLog) {
 
 function addChatMessage(role, content) {
     const container = document.getElementById('chat-messages');
+    if (!container) {
+        console.warn('[addChatMessage] chat-messages not found');
+        return;
+    }
     const welcome = container.querySelector('.chat-welcome');
     if (welcome) welcome.remove();
 
@@ -1105,10 +1171,12 @@ async function approveProposal(id) {
             try {
                 const contModelDropdown = document.getElementById('chat-model-dropdown');
                 const contActiveModel = contModelDropdown ? contModelDropdown.value : 'qwen2.5:7b';
+                // v5.1: Same guard — don't pass 'hermes-acp' as the model name to main process
+                const contLlmModel = (contActiveModel === 'hermes-acp') ? null : contActiveModel;
                 const contResult = await window.omega.chat.send(
                     'The approved action was executed successfully. Continue with the original task.',
                     state.chat.sessionId,
-                    contActiveModel
+                    contLlmModel
                 );
                 destroyThinkingIndicator();
                 contThinkingEl.remove();
@@ -1923,16 +1991,16 @@ window.loadEvolutionPanel = async function() {
         
         queueEl.innerHTML = proposals.map(p => `
             <div class="search-result" style="cursor: default; padding: 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px;">
-                <div class="file-path" style="font-size: 14px; font-weight: bold; color: var(--gold)">Evolution Manifest: ${p.manifest_id.substring(0,8)} ${p.failure_type === 'AGENTIC_FAILURE' ? '<span style="color: var(--orange); font-size: 10px; border: 1px solid var(--orange); padding: 1px 6px; border-radius: 3px;">AGENTIC</span>' : '<span style="color: var(--blue); font-size: 10px; border: 1px solid var(--blue); padding: 1px 6px; border-radius: 3px;">VERITAS</span>'}</div>
-                <div class="match-text" style="color: var(--text); margin-bottom: 6px;">Target: <span style="color: var(--blue)">${p.target_file || p.target_module || 'unknown'}</span></div>
-                <div class="match-text" style="color: var(--textSubtitle); font-size: 11px;">Root Cause: ${p.root_cause_analysis || p.rationale || ''}</div>
-                <div class="match-text" style="color: var(--textSubtitle); font-size: 11px; margin-top: 4px;">Fix: ${p.proposed_optimization || ''}</div>
+                <div class="file-path" style="font-size: 14px; font-weight: bold; color: var(--gold)">Evolution Manifest: ${__esc(p.manifest_id).substring(0,8)} ${p.failure_type === 'AGENTIC_FAILURE' ? '<span style="color: var(--orange); font-size: 10px; border: 1px solid var(--orange); padding: 1px 6px; border-radius: 3px;">AGENTIC</span>' : '<span style="color: var(--blue); font-size: 10px; border: 1px solid var(--blue); padding: 1px 6px; border-radius: 3px;">VERITAS</span>'}</div>
+                <div class="match-text" style="color: var(--text); margin-bottom: 6px;">Target: <span style="color: var(--blue)">${__esc(p.target_file || p.target_module || 'unknown')}</span></div>
+                <div class="match-text" style="color: var(--textSubtitle); font-size: 11px;">Root Cause: ${__esc(p.root_cause_analysis || p.rationale || '')}</div>
+                <div class="match-text" style="color: var(--textSubtitle); font-size: 11px; margin-top: 4px;">Fix: ${__esc(p.proposed_optimization || '')}</div>
                 <div style="background: var(--bgDarker); padding: 8px; border-radius: 4px; margin-top: 8px; font-family: monospace; font-size: 11px; color: var(--textSubtitle); border: 1px solid var(--borderLighter);">
-                    Proposed Patch:<br/><span style="color: var(--green)">${typeof p.exact_patch === 'string' ? p.exact_patch.substring(0, 500) : JSON.stringify(p.exact_patch || p.proposed_patch || '')}</span>
+                    Proposed Patch:<br/><span style="color: var(--green)">${__esc(typeof p.exact_patch === 'string' ? p.exact_patch.substring(0, 500) : JSON.stringify(p.exact_patch || p.proposed_patch || ''))}</span>
                 </div>
                 <div style="margin-top: 12px; display: flex; gap: 8px;">
-                    <button class="reports-action-btn" onclick="resolveEvolution('${p.manifest_id}', 'approve')" style="color: var(--green); flex: 1; justify-content: center; background: var(--bgDarker)">Accept Re-Write</button>
-                    <button class="reports-action-btn" onclick="resolveEvolution('${p.manifest_id}', 'reject')" style="color: var(--red); flex: 1; justify-content: center; background: var(--bgDarker)">Reject</button>
+                    <button class="reports-action-btn" onclick="resolveEvolution('${__esc(p.manifest_id)}', 'approve')" style="color: var(--green); flex: 1; justify-content: center; background: var(--bgDarker)">Accept Re-Write</button>
+                    <button class="reports-action-btn" onclick="resolveEvolution('${__esc(p.manifest_id)}', 'reject')" style="color: var(--red); flex: 1; justify-content: center; background: var(--bgDarker)">Reject</button>
                 </div>
             </div>
         `).join('');
@@ -2002,7 +2070,7 @@ window.sentinelToggle = async function(action) {
     setTimeout(() => loadVaultPanel(), 2000);
 
     // Hardware polling (status bar)
-    setInterval(async () => {
+    _hwPoll = setInterval(async () => {
         try {
             const hw = await window.omega.hardware();
             if (hw.gpu) {
@@ -2330,6 +2398,7 @@ window.sentinelToggle = async function(action) {
 
             // Save on app close
             window.addEventListener('beforeunload', function() {
+                if (_hwPoll) clearInterval(_hwPoll);
                 saveMediaState();
                 stopPeriodicSave();
             });
@@ -2462,7 +2531,7 @@ window.sentinelToggle = async function(action) {
             keys.forEach(function(group) {
                 var header = document.createElement('div');
                 header.className = 'media-group-header';
-                header.textContent = '<span class="media-group-toggle">▼</span> ' + group
+                header.innerHTML = '<span class="media-group-toggle">▼</span> ' + group
                     + ' <span class="media-group-count">(' + groups[group].length + ')</span>';
                 header.style.cssText = 'padding:6px 10px;color:#d4a017;font-size:11px;font-weight:600;cursor:pointer;user-select:none;border-bottom:1px solid rgba(212,160,23,0.15);background:rgba(212,160,23,0.05);';
                 var section = document.createElement('div');
@@ -2502,7 +2571,7 @@ window.sentinelToggle = async function(action) {
                         thumbHtml = '<img class="media-item-thumb" src="' + cover + '" alt="" />';
                     }
 
-                    item.textContent = (thumbHtml || '<span class="media-local-item-icon">' + icon + '</span>')
+                    item.innerHTML = (thumbHtml || '<span class="media-local-item-icon">' + icon + '</span>')
                         + '<div class="media-local-item-info">'
                         + '<span class="media-local-item-name">' + titleText + '</span>'
                         + (subtitle ? '<span class="media-local-item-meta">' + subtitle + '</span>' : '')

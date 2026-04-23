@@ -13,6 +13,7 @@ Upgrades applied:
 8. Immutable hash-chained ledger
 """
 
+import math
 import re
 import hmac
 import hashlib
@@ -22,7 +23,6 @@ import uuid
 import ipaddress
 import random
 import sqlite3
-import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, Set
 from enum import Enum, auto
@@ -710,9 +710,14 @@ class VTPRouter:
 
     @staticmethod
     def _cosine(a: list, b: list) -> float:
-        a, b = np.array(a), np.array(b)
-        norm = np.linalg.norm(a) * np.linalg.norm(b)
-        return float(np.dot(a, b) / norm) if norm else 0.0
+        try:
+            dot = sum(x * y for x, y in zip(a, b))
+            norm_a = math.sqrt(sum(x * x for x in a))
+            norm_b = math.sqrt(sum(x * x for x in b))
+            norm = norm_a * norm_b
+            return float(dot / norm) if norm else 0.0
+        except Exception:
+            return 0.0
 
     def _ack(self, packet: VTPPacket, res: str, drift: float = None) -> str:
         return VTPCodec.encode(

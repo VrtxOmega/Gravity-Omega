@@ -565,7 +565,12 @@
                             <option value="veritas-omni:latest">veritas-omni</option>
                             <option value="gemma2:sentinel-omega">gemma2 · sentinel-omega</option>
                         </optgroup>
+                        <optgroup label="🤖 Agent Backends">
+                            <option value="hermes-acp">Hermes ACP · Full Agent</option>
+                        </optgroup>
                     </select>
+                    <!-- v5.1: Hermes ACP status badge — shown when Hermes is active -->
+                    <span id="hermes-status-badge" style="display:none; margin-left:6px; font-size:10px; font-weight:700; color:var(--gold-bright); background:var(--gold-glow); padding:1px 6px; border-radius:10px; letter-spacing:0.5px; vertical-align:middle;"></span>
                 </div>
                 <div class="chat-header-actions" style="margin-left: auto;">
                     <button class="chat-action-btn" id="btn-new-thread" title="New conversation">+</button>
