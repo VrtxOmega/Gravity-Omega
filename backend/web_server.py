@@ -1089,6 +1089,205 @@ def api_sentinel_resume():
         current_app.logger.error(f"Error in api_sentinel_resume: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
 
+@app.route('/api/sentinel/seal', methods=['POST'])
+@require_auth
+def api_sentinel_seal():
+    """VERITAS Sentinel Re-Baseline + Re-Seal flow.
+    Accepts current file state, creates new baseline, returns seal hash."""
+    try:
+        data = request.get_json(silent=True) or {}
+        sentinel = get_sentinel()
+        # Step 1: accept changes (update file_hashes from disk)
+        sentinel.accept_changes()
+        # Step 2: create new baseline snapshot
+        sentinel.create_baseline(force=True)
+        # Step 3: compute seal hash from current file_hashes state
+        import hashlib
+        snapshot = sentinel.state.get('file_hashes', {})
+        sorted_items = sorted(snapshot.items())
+        payload = '|'.join(f"{k}:{v}" for k, v in sorted_items)
+        seal_hash = hashlib.sha256(payload.encode()).hexdigest()
+        return jsonify({
+            'status': 'sealed',
+            'seal_hash': seal_hash,
+            'files_baselined': len(snapshot),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error in api_sentinel_seal: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+
+
+# ════════════════════════════════════════════════════════════════
+# THREAD PERSISTENCE — Save/Load Omega Chat History (v6.0)
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/api/threads', methods=['GET'])
+def api_threads_list():
+    """List all Omega chat threads."""
+    try:
+        db = sqlite3.connect(str(VAULT_DB))
+        db.row_factory = sqlite3.Row
+        rows = db.execute(
+            "SELECT id, title, summary, created_at, updated_at FROM sessions WHERE source='omega_chat' ORDER BY updated_at DESC"
+        ).fetchall()
+        db.close()
+        return jsonify({
+            'threads': [{k: r[k] for k in r.keys()} for r in rows]
+        })
+    except Exception as e:
+        current_app.logger.error(f"[threads] list failed: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/threads', methods=['POST'])
+def api_threads_create():
+    """Create a new Omega chat thread. Body: {title?}"""
+    try:
+        data = request.get_json(silent=True) or {}
+        import uuid, threading
+        thread_id = data.get('id') or str(uuid.uuid4())
+        title = data.get('title', 'New Thread')
+        now = datetime.now(timezone.utc).isoformat()
+        db = sqlite3.connect(str(VAULT_DB))
+        db.execute(
+            "INSERT INTO sessions (id, title, summary, source, created_at, updated_at) VALUES (?,?,?,'omega_chat',?,?)",
+            (thread_id, title, f'Omega thread created {now}', now, now)
+        )
+        db.commit()
+        db.close()
+        return jsonify({'status': 'created', 'id': thread_id, 'title': title})
+    except Exception as e:
+        current_app.logger.error(f"[threads] create failed: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/threads/<thread_id>', methods=['GET'])
+def api_threads_get(thread_id):
+    """Get full chat history for a thread."""
+    try:
+        db = sqlite3.connect(str(VAULT_DB))
+        db.row_factory = sqlite3.Row
+        meta = db.execute(
+            "SELECT id, title, summary, created_at, updated_at FROM sessions WHERE id=? AND source='omega_chat'",
+            (thread_id,)
+        ).fetchone()
+        if not meta:
+            return jsonify({'status': 'not_found', 'id': thread_id}), 404
+        rows = db.execute(
+            "SELECT id, role, content, timestamp FROM entries WHERE session_id=? ORDER BY id ASC",
+            (thread_id,)
+        ).fetchall()
+        db.close()
+        return jsonify({
+            'thread': {k: meta[k] for k in meta.keys()},
+            'history': [{k: r[k] for k in r.keys()} for r in rows]
+        })
+    except Exception as e:
+        current_app.logger.error(f"[threads] get failed: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/threads/<thread_id>/save', methods=['POST'])
+def api_threads_save(thread_id):
+    """Save messages to a thread. Body: {messages: [{role, content, timestamp?}]}."""
+    try:
+        data = request.get_json(silent=True) or {}
+        messages = data.get('messages', [])
+        if not messages:
+            return jsonify({'status': 'ok', 'saved': 0})
+        db = sqlite3.connect(str(VAULT_DB))
+        # Ensure thread exists
+        exists = db.execute("SELECT 1 FROM sessions WHERE id=? AND source='omega_chat'", (thread_id,)).fetchone()
+        now = datetime.now(timezone.utc).isoformat()
+        if not exists:
+            title = data.get('title', f'Thread {thread_id[:8]}')
+            db.execute(
+                "INSERT INTO sessions (id, title, summary, source, created_at, updated_at) VALUES (?,?,?,'omega_chat',?,?)",
+                (thread_id, title, f'Auto-created on {now}', now, now)
+            )
+        saved = 0
+        for msg in messages:
+            ts = msg.get('timestamp') or now
+            db.execute(
+                "INSERT INTO entries (session_id, role, content, timestamp) VALUES (?,?,?,?)",
+                (thread_id, msg.get('role', 'user'), msg.get('content', ''), ts)
+            )
+            saved += 1
+        db.execute("UPDATE sessions SET updated_at=? WHERE id=?", (now, thread_id))
+        db.commit()
+        db.close()
+        return jsonify({'status': 'saved', 'thread_id': thread_id, 'saved': saved, 'timestamp': now})
+    except Exception as e:
+        current_app.logger.error(f"[threads] save failed: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/threads/<thread_id>', methods=['DELETE'])
+def api_threads_delete(thread_id):
+    """Delete a thread and its history."""
+    try:
+        db = sqlite3.connect(str(VAULT_DB))
+        db.execute("DELETE FROM entries WHERE session_id=?", (thread_id,))
+        db.execute("DELETE FROM sessions WHERE id=? AND source='omega_chat'", (thread_id,))
+        db.commit()
+        db.close()
+        return jsonify({'status': 'deleted', 'id': thread_id})
+    except Exception as e:
+        current_app.logger.error(f"[threads] delete failed: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ════════════════════════════════════════════════════════════════
+# HERMES ↔ OMEGA BRIDGE — Bidirectional tool proxy endpoint (v1.0)
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/api/hermes/proxy', methods=['POST'])
+def api_hermes_proxy():
+    """Hermes calls Omega tools via this endpoint. Body: {tool, args}"""
+    try:
+        data = request.get_json(silent=True) or {}
+        tool_name = data.get('tool')
+        args = data.get('args', {})
+        if not tool_name:
+            return jsonify({'error': 'Missing "tool" field'}), 400
+
+        # Bridge: spawn Node.js to run Omega's JS ToolExecutor
+        import subprocess
+        import os
+        import json as _json
+        bridge_js = """
+const { ToolExecutor, TOOL_REGISTRY } = require('/mnt/c/Veritas_Lab/gravity-omega-v2/omega/omega_tools.js');
+const executor = new ToolExecutor({ bridge: null });
+(async () => {
+    const req = JSON.parse(process.argv[2]);
+    try {
+        const result = await executor.execute(req.tool, req.args);
+        console.log(JSON.stringify({ success: true, ...result }));
+    } catch(e) {
+        console.log(JSON.stringify({ success: false, error: e.stack || e.message }));
+    }
+})();
+"""
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.js', delete=False) as f:
+            f.write(bridge_js)
+            bridge_path = f.name
+        try:
+            payload = _json.dumps({'tool': tool_name, 'args': args})
+            result = subprocess.run(
+                ['node', bridge_path, payload],
+                capture_output=True, text=True, timeout=30
+            )
+            lines = [l for l in result.stdout.strip().split('\n') if l.strip()]
+            parsed = _json.loads(lines[-1]) if lines else {'error': 'empty stdout'}
+            return jsonify(parsed)
+        finally:
+            try:
+                os.unlink(bridge_path)
+            except:
+                pass
+    except Exception as e:
+        log.exception('[BRIDGE] Hermes->Omega proxy error')
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/status', methods=['GET'])
 @require_auth
@@ -1197,29 +1396,37 @@ def _vtp_direct_executor_inner(packet: vtp_codec.VTPPacket) -> str:
             content = prm_data.get('content')
             find = prm_data.get('find')
             replace = prm_data.get('replace')
-            
-            if find and replace and os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
+
+            # SECURITY: validate write path against SAFE_ROOTS
+            real_path = os.path.realpath(path)
+            if not any(real_path.startswith(r) for r in SAFE_ROOTS):
+                return f"ERROR: Access denied for path {path}"
+
+            if find and replace and os.path.exists(real_path):
+                with open(real_path, 'r', encoding='utf-8') as f:
                     data = f.read()
                 data = data.replace(find, replace)
-                with open(path, 'w', encoding='utf-8') as f:
+                with open(real_path, 'w', encoding='utf-8') as f:
                     f.write(data)
-                return f"SUCCESS: Reacted {find} with {replace} in {path}"
+                return f"SUCCESS: Reacted {find} with {replace} in {real_path}"
             elif content:
-                with open(path, 'w', encoding='utf-8') as f:
+                with open(real_path, 'w', encoding='utf-8') as f:
                     f.write(content)
-                return f"SUCCESS: Wrote {path}"
+                return f"SUCCESS: Wrote {real_path}"
         except:
             parts = str(packet.prm).strip('"\'').split('::')
             if len(parts) == 3:
                 path, find, replace = parts
-                if os.path.exists(path):
-                    with open(path, 'r', encoding='utf-8') as f:
+                real_path = os.path.realpath(path)
+                if not any(real_path.startswith(r) for r in SAFE_ROOTS):
+                    return f"ERROR: Access denied for path {path}"
+                if os.path.exists(real_path):
+                    with open(real_path, 'r', encoding='utf-8') as f:
                         data = f.read()
                     data = data.replace(find, replace)
-                    with open(path, 'w', encoding='utf-8') as f:
+                    with open(real_path, 'w', encoding='utf-8') as f:
                         f.write(data)
-                    return f"SUCCESS: Patched {path}"
+                    return f"SUCCESS: Patched {real_path}"
             elif len(parts) == 2 and parts[0] == "open":
                 return f"SUCCESS: Triggered UI to open {parts[1]}"
         return "ERROR: Invalid MUT parameters"

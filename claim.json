@@ -1,0 +1,83 @@
+{
+  "project": "gravity-omega-v2",
+  "version": "2.0.0",
+  "commit": "1234567890123456789012345678901234567890",
+  "primitives": [
+    {
+      "name": "TYPOGRAPHY_MIGRATED",
+      "domain": {
+        "type": "Interval",
+        "low": 0.0,
+        "high": 1.0,
+        "inclusive_low": true,
+        "inclusive_high": true
+      },
+      "units": "status",
+      "description": "Indicates whether all Omega symbols have been migrated to Georgia Serif."
+    }
+  ],
+  "operators": [],
+  "regimes": [],
+  "boundaries": [
+    {
+      "name": "migration_complete",
+      "constraint": {
+        "op": "==",
+        "left": "TYPOGRAPHY_MIGRATED",
+        "right": 1.0
+      },
+      "description": "Migration must be 100% complete."
+    }
+  ],
+  "loss_models": [],
+  "evidence": [
+    {
+      "id": "e1_migrated",
+      "variable": "TYPOGRAPHY_MIGRATED",
+      "value": {
+        "Numeric": {
+          "x": 1.0,
+          "units": "status",
+          "kind": "point"
+        }
+      },
+      "timestamp": "2026-04-23T09:00:00Z",
+      "method": {
+        "protocol": "manual_review",
+        "parameters": {
+          "files_checked": "renderer/index.html, renderer/styles/omega.css"
+        },
+        "repeatable": true
+      },
+      "provenance": {
+        "source_id": "auditor_antigravity",
+        "acquisition": "visual_code_inspection",
+        "tier": "A"
+      }
+    },
+    {
+      "id": "e2_migrated",
+      "variable": "TYPOGRAPHY_MIGRATED",
+      "value": {
+        "Numeric": {
+          "x": 1.0,
+          "units": "status",
+          "kind": "point"
+        }
+      },
+      "timestamp": "2026-04-23T09:05:00Z",
+      "method": {
+        "protocol": "dom_validation",
+        "parameters": {
+          "selector": ".omega-serif"
+        },
+        "repeatable": true
+      },
+      "provenance": {
+        "source_id": "test_script",
+        "acquisition": "dom_query",
+        "tier": "A"
+      }
+    }
+  ]
+}

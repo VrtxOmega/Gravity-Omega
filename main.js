@@ -594,6 +594,20 @@ function registerIPC() {
     ipcMain.handle('chat:send', async (_, text, sessionId, model) => {
         context.addBreadcrumb('chat', `User: ${text.substring(0, 100)}`);
 
+        // v6.0: Hydrate agent memory from persistent conversation store on every request
+        // so the agent retains full context even after renderer reload.
+        if (conversationStore && sessionId) {
+            try {
+                const thread = conversationStore.loadThread(sessionId);
+                if (thread && thread.messages && thread.messages.length > 0) {
+                    agent.setThreadHistory(thread.messages);
+                    console.log(`[AGENT] Hydrated thread ${sessionId} with ${thread.messages.length} messages from store`);
+                }
+            } catch (err) {
+                console.warn('[AGENT] Thread hydration failed (non-fatal):', err.message);
+            }
+        }
+
         let agentErrorStr = null;
         try {
             const result = await agent.processRequest(text, model);

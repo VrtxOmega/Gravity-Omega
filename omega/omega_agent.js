@@ -55,6 +55,14 @@ class OmegaAgent {
         this._useHermes = false;
         this._hermesChannel = null;
 
+        // v5.2: Hermes tool awareness — when Hermes is bridged, these tools are available
+        this._hermesToolNames = [
+            'web_search', 'browser_navigate', 'browser_snapshot', 'browser_click',
+            'terminal', 'read_file', 'write_file', 'edit_file', 'search_files',
+            'execute_code', 'process', 'delegate_task', 'image_generate', 'vision_analyze',
+            'skill_view', 'skill_manage', 'omega_write_file', 'omega_exec', 'omega_read_file'
+        ];
+
         // v4.2: Progress callback for live thinking indicator
         this.onProgress = null;
     }
@@ -208,6 +216,15 @@ class OmegaAgent {
         };
 
         // Layer 1: Identity
+        // v5.2: If Hermes bridge is active, also inject bridged tool descriptions
+        const bridgeTools = this._useHermes ? [
+            '- **omega_write_file** [GATED]: Writes a file via Gravity Omega. Args: path (string, required), content (string, required)',
+            '- **omega_read_file** [SAFE]: Reads a file via Gravity Omega. Args: path (string, required)',
+            '- **omega_exec** [GATED]: Runs a shell command via Gravity Omega. Args: command (string, required), cwd (string), timeout (integer)',
+            '- **omega_open_terminal** [SAFE]: Opens a terminal in the Gravity Omega UI. Args: command (string)',
+            '- **omega_list_dir** [SAFE]: Lists directory contents via Gravity Omega. Args: path (string, required)',
+        ].join('\n') + '\n' : '';
+
         const l1_Identity = `You are OMEGA — the canonical intelligence execution engine for the Gravity Omega environment. You are bound strictly to the VERITAS framework and the NAEF (Narrative & Agency Elimination Framework).\n${moodDirectives[userMood]}`;
 
         // Layer 3: OMEGA.md Global Memory
@@ -328,7 +345,7 @@ ${l3_Memory}
 ## Available Tools
 ${toolDescriptions}
 
-## Safety Levels
+${bridgeTools}## Safety Levels
 - SAFE: Auto-executed immediately (read, search, list, open files in editor)
 - GATED: Auto for non-destructive; approval needed for writes
 - RESTRICTED: Always requires RJ's explicit approval
@@ -479,7 +496,7 @@ ${toolDescriptions}
 
                     // Add assistant message + tool results to conversation
                     if (typeof llmResponse === 'object' && llmResponse !== null) {
-                        messages.push(llmResponse);
+                        llmResponse.tool_calls && messages.push(llmResponse);
                         results.forEach((r, i) => {
                             const call = toolCalls[i];
                             const output = r.error ? `ERROR: ${r.error}` : JSON.stringify(r.result || r, null, 2);
@@ -492,6 +509,22 @@ ${toolDescriptions}
                     } else {
                         messages.push({ role: 'assistant', content: typeof llmResponse === 'string' ? llmResponse : JSON.stringify(llmResponse) });
                         messages.push({ role: 'user', content: `Tool results:\n\n${resultSummary}\n\nContinue with the task. If done, use the response block.` });
+                    }
+
+                    // v4.5: PERSIST tool calls and results to _conversationHistory
+                    // so future runs retain context of what files were written/modified.
+                    for (let i = 0; i < toolCalls.length; i++) {
+                        const call = toolCalls[i];
+                        const r = results[i];
+                        this._conversationHistory.push({
+                            role: 'assistant',
+                            content: `Tool call: ${call.tgt || call.tool || call.name} with args: ${JSON.stringify(call.args || call.prm || {})}`
+                        });
+                        this._conversationHistory.push({
+                            role: 'tool',
+                            name: call.tgt || call.tool || call.name,
+                            content: r.error ? `ERROR: ${r.error}` : JSON.stringify(r.result || r, null, 2)
+                        });
                     }
 
                     // Check for pending proposals (GATED/RESTRICTED tools that need approval)
@@ -1609,40 +1642,61 @@ ${toolDescriptions}
                     const results = await this._executeToolCalls([packet]);
                     result = results[0] || { ok: true };
                 } else if (pseudo === 'INSTALL:SYS' || pseudo === 'REQ:PKG') {
-                    const { exec } = require('child_process');
+                    const { spawn } = require('child_process');
                     try {
                         let cmd = '';
                         const managerMatch = prm.match(/manager[=:]\s*"?([^"\s,]+)/i);
                         const packageMatch = prm.match(/package[=:]\s*"?([^"\s,]+)/i);
                         const manager = managerMatch ? managerMatch[1] : 'pip';
                         const pkg = packageMatch ? packageMatch[1] : prm.replace(/^"/,  '').replace(/"$/, '').trim();
-                        if (manager === 'pip') cmd = `pip install ${pkg}`;
-                        else if (manager === 'npm') cmd = `npm install ${pkg}`;
-                        else cmd = `${manager} install ${pkg}`;
-                        console.log('[APPROVE] Installing (async):', cmd);
-                        const output = await new Promise((resolve, reject) => {
-                            exec(cmd, { encoding: 'utf8', timeout: 60000, shell: true }, (err, stdout, stderr) => {
-                                if (err) reject(Object.assign(err, { stderr }));
-                                else resolve(stdout);
+                        // SECURITY: sanitize package name — block shell metacharacters
+                        if (/[;|&$`\\n<>]/.test(pkg)) {
+                            result = { ok: false, error: 'Disallowed characters in package name' };
+                        } else {
+                            let args = [];
+                            if (manager === 'pip') args = ['python', '-m', 'pip', 'install', pkg];
+                            else if (manager === 'npm') args = ['npm', 'install', pkg];
+                            else args = [manager, 'install', pkg];
+                            console.log('[APPROVE] Installing (spawn):', args.join(' '));
+                            const output = await new Promise((resolve, reject) => {
+                                const child = spawn(args[0], args.slice(1), { shell: false, timeout: 60000 });
+                                let stdout = '', stderr = '';
+                                child.stdout.on('data', d => stdout += d);
+                                child.stderr.on('data', d => stderr += d);
+                                child.on('close', code => {
+                                    if (code !== 0) reject(Object.assign(new Error(stderr || 'Install failed'), { stderr }));
+                                    else resolve(stdout);
+                                });
                             });
-                        });
-                        result = { ok: true, output: output.substring(0, 5000), message: `Installed: ${pkg}` };
+                            result = { ok: true, output: output.substring(0, 5000), message: `Installed: ${pkg}` };
+                        }
                     } catch (execErr) {
                         result = { ok: false, error: execErr.message, stderr: (execErr.stderr || '').substring(0, 2000) };
                     }
                 } else if (pseudo === 'REQ:SYS' || pseudo === 'EXEC:SYS' || pseudo === 'MUT:SYS') {
-                    const { exec } = require('child_process');
+                    const { spawn } = require('child_process');
                     try {
-                        const cmd = prm.replace(/^"/, '').replace(/"$/, '').trim();
-                        console.log('[APPROVE] Running SYS (async):', cmd);
-                        const output = await new Promise((resolve, reject) => {
-                            exec(cmd, { encoding: 'utf8', timeout: 30000, cwd: process.cwd(), shell: true }, (err, stdout, stderr) => {
-                                if (err) reject(Object.assign(err, { stderr }));
-                                else resolve(stdout);
+                        const raw = prm.replace(/^"/, '').replace(/"$/, '').trim();
+                        // SECURITY: block shell metacharacters; disallow shell injection
+                        if (/[;|&$`\\n<>]/.test(raw)) {
+                            result = { ok: false, error: 'Disallowed characters in command' };
+                        } else {
+                            // Simple arg split — no quote handling needed for single commands
+                            const [cmd0, ...cmdArgs] = raw.split(/\s+/).filter(Boolean);
+                            console.log('[APPROVE] Running SYS (spawn):', raw);
+                            const output = await new Promise((resolve, reject) => {
+                                const child = spawn(cmd0, cmdArgs, { shell: false, timeout: 30000, cwd: process.cwd() });
+                                let stdout = '', stderr = '';
+                                child.stdout.on('data', d => stdout += d);
+                                child.stderr.on('data', d => stderr += d);
+                                child.on('close', code => {
+                                    if (code !== 0) reject(Object.assign(new Error(stderr || 'Command failed'), { stderr }));
+                                    else resolve(stdout);
+                                });
                             });
-                        });
-                        result = { ok: true, output: output.substring(0, 5000), message: `Executed: ${cmd.substring(0, 100)}` };
-                        console.log('[APPROVE] SYS completed:', result.message);
+                            result = { ok: true, output: output.substring(0, 5000), message: `Executed: ${raw.substring(0, 100)}` };
+                            console.log('[APPROVE] SYS completed:', result.message);
+                        }
                     } catch (execErr) {
                         result = { ok: false, error: execErr.message, stderr: (execErr.stderr || '').substring(0, 2000) };
                         console.log('[APPROVE] SYS failed:', execErr.message);
@@ -1692,6 +1746,11 @@ ${toolDescriptions}
     async _continueAfterApproval(toolName, toolResult) {
         const messages = this._pendingMessages;
         if (!messages) return null;
+        // SECURITY: if abort() was called between approval and continuation, honor it
+        if (this._aborted) {
+            console.log('[CONTINUE] Abort signal was set before continuation entry — honoring it.');
+            return { type: 'aborted', message: 'Operation aborted before continuation.' };
+        }
         this._running = true;
         this._aborted = false;
 
@@ -1798,7 +1857,22 @@ ${toolDescriptions}
         return results;
     }
 
-    // â”€â”€ State & Control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    /** v6.0: Hydrate _conversationHistory from external persistent store (e.g. ConversationStore).
+     *  Call this before processRequest when loading from a saved thread. */
+    setThreadHistory(messages) {
+        if (!Array.isArray(messages)) return;
+        // Map to agent internal format — only keep role/content pairs, strip metadata.
+        this._conversationHistory = messages
+            .filter(m => m.role === 'user' || m.role === 'assistant' || m.role === 'tool')
+            .map(m => ({
+                role: m.role,
+                content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+                ...(m.role === 'tool' ? { name: m.name || 'tool' } : {})
+            }));
+        this._trimHistory();
+        this.context.addBreadcrumb('agent', `Hydrated thread history: ${this._conversationHistory.length} messages`);
+    }
+
     abort() { this._aborted = true; }
 
     getStatus() {

@@ -391,7 +391,8 @@ class ToolExecutor {
         const dir = path.dirname(p);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(p, content, 'utf-8');
-        return { path: p, written: content.length, success: true };
+        // v4.5: return content so agent retains context of what was written
+        return { path: p, written: content.length, success: true, content_preview: content.substring(0, 2000) };
     }
 
     async _exec_editFile({ path: p, find, replace }) {
@@ -569,7 +570,16 @@ class ToolExecutor {
         };
         const cmd = cmds[manager];
         if (!cmd) return { error: `Unknown package manager: ${manager}` };
-        return this._exec_exec({ command: cmd, timeout: 120000 });
+        // v4.4: Bumped pip timeout to 300s (large packages on slow networks).
+        // npm gets 180s. Pre-check via `pip show` on pip to avoid redundant installs.
+        const timeoutMs = manager === 'pip' ? 300_000 : manager === 'npm' ? 180_000 : 60_000;
+        if (manager === 'pip') {
+            const pre = await this._exec_exec({ command: `pip show ${pkg}`, timeout: 15_000 });
+            if (pre.stdout && pre.stdout.includes('Name: ' + pkg)) {
+                return { manager, package: pkg, alreadyInstalled: true, note: `${pkg} is already present` };
+            }
+        }
+        return this._exec_exec({ command: cmd, timeout: timeoutMs });
     }
 
     async _exec_createDir({ path: p }) {

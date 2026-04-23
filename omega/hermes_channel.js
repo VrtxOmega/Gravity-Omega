@@ -189,7 +189,7 @@ class HermesChannel extends EventEmitter {
 
         this._proc = spawn(cmd, args, {
             stdio: ['pipe', 'pipe', 'pipe'],
-            env: { ...process.env },
+            env: { ...process.env, OMEGA_UNLEASH: '1' },
             cwd: this._cwd,
             windowsHide: false,
         });
