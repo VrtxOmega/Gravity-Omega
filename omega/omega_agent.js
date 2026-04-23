@@ -308,7 +308,7 @@ HARD RULES:
 - NEVER write the chapter, story, article text, or pseudocode into the chat window.
 
 ## Native Function Calling
-You have been upgraded to use Native JSON Function Calling. You NO LONGER format your output using \\`\\`\\`vtp blocks, nor should you ever type pseudocode into chat.
+You have been upgraded to use Native JSON Function Calling. You NO LONGER format your output using triple-backtick vtp blocks, nor should you ever type pseudocode into chat.
 Instead, use the exact API tool payload structure native to the Gemini SDK. You may emit multiple function calls consecutively.
 
 ## ⛔ CRITICAL TOOL ROUTING RULES (NEVER violate these)
