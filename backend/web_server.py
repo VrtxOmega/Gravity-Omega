@@ -876,7 +876,7 @@ def _ollama_generate(messages, max_tokens, temperature):
                         api_key = m.group(1).strip().strip('"').strip("'")
                         break
 
-    model = os.environ.get('GRAVITY_OMEGA_MODEL', 'qwen3:8b')
+    model = os.environ.get('GRAVITY_OMEGA_MODEL', 'deepseek-v4-pro')
 
     # Try Ollama Cloud first
     if api_key:
@@ -896,32 +896,15 @@ def _ollama_generate(messages, max_tokens, temperature):
             )
             with urllib.request.urlopen(req, timeout=120) as resp:
                 data = json.loads(resp.read())
-            content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+            content = data.get('choices', [{}])[0].get('message', {}).get('content', '') or \
+                       data.get('choices', [{}])[0].get('message', {}).get('reasoning', '')
             if content:
                 return {'content': content, 'model': model, 'backend': 'ollama-cloud'}
         except Exception as e:
-            log.warning(f'Ollama Cloud failed (falling back to local): {e}')
+            log.error(f'Ollama Cloud failed: {e}')
+            raise
 
-    # Fallback to local Ollama
-    try:
-        payload = json.dumps({
-            'model': model,
-            'messages': messages,
-            'stream': False,
-            'options': {'temperature': temperature, 'num_predict': max_tokens},
-        }).encode()
-        req = urllib.request.Request(
-            'http://127.0.0.1:11434/api/chat',
-            data=payload,
-            headers={'Content-Type': 'application/json'},
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            data = json.loads(resp.read())
-        return {'content': data.get('message', {}).get('content', ''),
-                'model': model, 'backend': 'ollama-local'}
-    except Exception as e:
-        log.error(f'Local Ollama also failed: {e}')
-        raise
+    raise RuntimeError('No OLLAMA_API_KEY configured')
 
 
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

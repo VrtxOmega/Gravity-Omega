@@ -1,0 +1,354 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-05-03T07:20:26.326Z",
+  "target": {
+    "name": "gravity-omega",
+    "repo": "/mnt/c/Veritas_Lab/gravity-omega-v2",
+    "commitHash": "ed6d7e5738fa42ffa65b6464e11f8bac8a0110b6",
+    "branch": "master"
+  },
+  "environment": {
+    "nodeVersion": "v18.20.8",
+    "os": "linux",
+    "arch": "x64",
+    "ci": false
+  },
+  "dependencies": [
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.29.0",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/@modelcontextprotocol/sdk",
+      "integrity": "7ab20eba8fee70f3",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "chokidar",
+      "version": "4.0.3",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/chokidar",
+      "integrity": "4764fed21a281c69",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "dompurify",
+      "version": "3.3.3",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/dompurify",
+      "integrity": "4253c493c64d91ca",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "monaco-editor",
+      "version": "0.52.2",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/monaco-editor",
+      "integrity": "c793288e0f0c27d5",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "node-pty",
+      "version": "1.1.0",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/node-pty",
+      "integrity": "f8b6a14f7022c14f",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "puppeteer",
+      "version": "23.9.0",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/puppeteer",
+      "integrity": "3461ebb63369bea3",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "tesseract.js",
+      "version": "7.0.0",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/tesseract.js",
+      "integrity": "fa342f37afd66559",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "xterm",
+      "version": "5.3.0",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/xterm",
+      "integrity": "d324eb57f7134d28",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "xterm-addon-fit",
+      "version": "0.8.0",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/xterm-addon-fit",
+      "integrity": "6bd47031377f4717",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "electron",
+      "version": "33.4.11",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/electron",
+      "integrity": "aa6b28f3a59fa3a0",
+      "suspicious": false,
+      "riskScore": 0.1
+    },
+    {
+      "name": "electron-builder",
+      "version": "25.1.8",
+      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/electron-builder",
+      "integrity": "ddc43daa899f742d",
+      "suspicious": false,
+      "riskScore": 0.1
+    }
+  ],
+  "gates": [
+    {
+      "gate": "GIT_INTEGRITY",
+      "status": "FAIL",
+      "evidence": "Modified files: 30",
+      "durationMs": 1658
+    },
+    {
+      "gate": "LOCKFILE",
+      "status": "PASS",
+      "evidence": "package-lock.json present",
+      "durationMs": 1
+    },
+    {
+      "gate": "DETERMINISTIC_BUILD",
+      "status": "INCONCLUSIVE",
+      "evidence": "No build command detected",
+      "durationMs": 0
+    },
+    {
+      "gate": "TEST_PASS",
+      "status": "FAIL",
+      "evidence": "Tests failed: npm error Missing script: \"test\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: /home/veritas/.npm/_logs/2026-05-03T07_20_",
+      "durationMs": 154
+    },
+    {
+      "gate": "LINT",
+      "status": "PASS",
+      "evidence": "npx passed",
+      "durationMs": 3099
+    }
+  ],
+  "adversarial": {
+    "totalPackages": 11,
+    "suspiciousPackages": 0,
+    "probes": [
+      {
+        "package": "@modelcontextprotocol/sdk",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "@modelcontextprotocol/sdk",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 1.29.0"
+      },
+      {
+        "package": "@modelcontextprotocol/sdk",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: 7ab20eba8fee70f3"
+      },
+      {
+        "package": "chokidar",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "chokidar",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 4.0.3"
+      },
+      {
+        "package": "chokidar",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: 4764fed21a281c69"
+      },
+      {
+        "package": "dompurify",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "dompurify",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 3.3.3"
+      },
+      {
+        "package": "dompurify",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: 4253c493c64d91ca"
+      },
+      {
+        "package": "monaco-editor",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "monaco-editor",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 0.52.2"
+      },
+      {
+        "package": "monaco-editor",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: c793288e0f0c27d5"
+      },
+      {
+        "package": "node-pty",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "node-pty",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 1.1.0"
+      },
+      {
+        "package": "node-pty",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: f8b6a14f7022c14f"
+      },
+      {
+        "package": "puppeteer",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "puppeteer",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 23.9.0"
+      },
+      {
+        "package": "puppeteer",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: 3461ebb63369bea3"
+      },
+      {
+        "package": "tesseract.js",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "tesseract.js",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 7.0.0"
+      },
+      {
+        "package": "tesseract.js",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: fa342f37afd66559"
+      },
+      {
+        "package": "xterm",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "xterm",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 5.3.0"
+      },
+      {
+        "package": "xterm",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: d324eb57f7134d28"
+      },
+      {
+        "package": "xterm-addon-fit",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "xterm-addon-fit",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 0.8.0"
+      },
+      {
+        "package": "xterm-addon-fit",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: 6bd47031377f4717"
+      },
+      {
+        "package": "electron",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "electron",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 33.4.11"
+      },
+      {
+        "package": "electron",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: aa6b28f3a59fa3a0"
+      },
+      {
+        "package": "electron-builder",
+        "probe": "TYPO_SQUATTING",
+        "result": "PASS",
+        "detail": "Name heuristic clean"
+      },
+      {
+        "package": "electron-builder",
+        "probe": "VERSION_ANOMALY",
+        "result": "PASS",
+        "detail": "Pinned: 25.1.8"
+      },
+      {
+        "package": "electron-builder",
+        "probe": "METADATA_INTEGRITY",
+        "result": "PASS",
+        "detail": "Hash: ddc43daa899f742d"
+      },
+      {
+        "package": "system",
+        "probe": "KIMI_REASONING",
+        "result": "INCONCLUSIVE",
+        "detail": "OLLAMA_CLOUD_API_KEY is not set. Skipping Kimi adversarial analysis."
+      }
+    ],
+    "overallRisk": 0
+  },
+  "seal": {
+    "chainHash": "bee42fa57a582d7246fb5569b3770aaf316e99934ca514bed8582b4fc4a7e656",
+    "sequence": 5
+  },
+  "signature": "aed06ebdf6811f0a0b46224ba1fb6b630d6bfe8d18e5e0f8aa2d72a6efd1a40f"
+}

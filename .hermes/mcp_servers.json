@@ -1,0 +1,9 @@
+{
+  "gravity-omega-ide": {
+    "transport": "sse",
+    "url": "http://localhost:3002/sse",
+    "description": "Gravity Omega IDE — 39 native tools (Monaco, PTY, Puppeteer, Shell, Agent, VERITAS)",
+    "version": "2.1.0",
+    "auto_connect": true
+  }
+}

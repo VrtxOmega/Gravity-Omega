@@ -70,7 +70,7 @@ const state = {
 
     },
 
-    chat: { sessionId: crypto.randomUUID(), history: [], sending: false, activeThreadId: null, threadDropdownOpen: false },
+    chat: { sessionId: crypto.randomUUID(), history: [], sending: false, activeThreadId: null, threadDropdownOpen: false, pendingAttachments: [] },
 
     editor: null,
 
@@ -116,6 +116,113 @@ function showToast(message, type = 'info', duration = 4000) {
 
     }, duration);
 
+}
+
+
+
+// ══════════════════════════════════════════════════════════════
+
+// FILE ATTACHMENT HELPERS
+
+// ══════════════════════════════════════════════════════════════
+
+const ATTACH_ICONS = { image: '🖼️', video: '🎬', audio: '🎵', pdf: '📕', text: '📄', code: '📝', csv: '📊', json: '📋', generic: '📎' };
+
+function getAttachmentKind(file) {
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type.startsWith('video/')) return 'video';
+    if (file.type.startsWith('audio/')) return 'audio';
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'pdf') return 'pdf';
+    if (['txt','md'].includes(ext)) return 'text';
+    if (['js','ts','py','html','css','sol','json','csv'].includes(ext)) return 'code';
+    return 'generic';
+}
+
+function getDataUri(fileObj) {
+    if (fileObj.dataUrl) return Promise.resolve(fileObj.dataUrl);
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload  = (e) => resolve(e.target.result);
+        r.onerror = (e) => reject(e);
+        r.readAsDataURL(fileObj.file);
+    });
+}
+
+function renderAttachmentPreview(fileObj) {
+    const kind = getAttachmentKind(fileObj.file);
+    const wrap = document.createElement('div');
+    wrap.className = 'chat-attachment-preview';
+    wrap.dataset.name = fileObj.file.name;
+
+    let thumb;
+    if (kind === 'image' && fileObj.dataUrl) {
+        thumb = document.createElement('img');
+        thumb.src = fileObj.dataUrl; thumb.className = 'chat-attachment-thumb image';
+    } else {
+        thumb = document.createElement('div');
+        thumb.className = `chat-attachment-thumb ${kind}`;
+        thumb.textContent = ATTACH_ICONS[kind] || ATTACH_ICONS.generic;
+    }
+
+    const label = document.createElement('span');
+    label.className = 'chat-attachment-name';
+    label.textContent = fileObj.file.name;
+    label.title = fileObj.file.name + ' — ' + (fileObj.file.type || kind);
+
+    const remove = document.createElement('button');
+    remove.className = 'chat-attachment-remove';
+    remove.textContent = '×';
+    remove.title = 'Remove attachment';
+    remove.onclick = (e) => {
+        e.stopPropagation();
+        state.chat.pendingAttachments = state.chat.pendingAttachments.filter(a => a.file.name !== fileObj.file.name);
+        renderPendingAttachments();
+    };
+
+    wrap.appendChild(thumb);
+    wrap.appendChild(label);
+    wrap.appendChild(remove);
+    return wrap;
+}
+
+function renderPendingAttachments() {
+    const bar = document.getElementById('chat-attachments');
+    if (!bar) return;
+    bar.innerHTML = '';
+    if (state.chat.pendingAttachments.length === 0) {
+        bar.classList.remove('has-files');
+        return;
+    }
+    bar.classList.add('has-files');
+    for (const f of state.chat.pendingAttachments) {
+        bar.appendChild(renderAttachmentPreview(f));
+    }
+}
+
+async function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    const added = [];
+    for (const file of Array.from(files)) {
+        if (file.size > 25 * 1024 * 1024) {
+            showToast(`Skipped ${file.name} — exceeds 25MB`, 'warning');
+            continue;
+        }
+        try {
+            const dataUrl = await getDataUri({ file });
+            added.push({ file, dataUrl });
+        } catch (e) {
+            showToast(`Failed to read ${file.name}`, 'error');
+        }
+    }
+    const existing = new Set(state.chat.pendingAttachments.map(a => a.file.name));
+    for (const a of added) {
+        if (!existing.has(a.file.name)) {
+            state.chat.pendingAttachments.push(a);
+            existing.add(a.file.name);
+        }
+    }
+    renderPendingAttachments();
 }
 
 
@@ -556,13 +663,19 @@ function switchToFile(filePath) {
 
                 const raw = file.model.getValue();
 
-                const html = window.DOMPurify ? window.DOMPurify.sanitize(window.marked.parse(raw)) : raw;
+                // Use the built-in renderMarkdown() — no external library needed
+                mdEl.innerHTML = renderMarkdown(raw);
 
-                mdEl.textContent = html;
+                // Apply preview styling
+                mdEl.style.padding = '24px 32px';
+                mdEl.style.overflowY = 'auto';
+                mdEl.style.color = '#e0d9c8';
+                mdEl.style.fontSize = '14px';
+                mdEl.style.lineHeight = '1.7';
 
             } catch(e) {
 
-                console.error("Marked failed", e);
+                console.error("Markdown preview failed", e);
 
                 mdEl.innerText = file.model.getValue();
 
@@ -580,6 +693,26 @@ function switchToFile(filePath) {
 
         }
 
+    }
+
+    // Wire up PREVIEW / RAW EDITOR toggle
+    const toggleBtn = document.getElementById('btn-toggle-markdown');
+    if (toggleBtn) {
+        // Replace button to remove old listeners
+        const freshBtn = toggleBtn.cloneNode(true);
+        toggleBtn.parentNode.replaceChild(freshBtn, toggleBtn);
+        freshBtn.addEventListener('click', () => {
+            const f = state.openFiles.get(state.activeFile);
+            if (!f) return;
+            // Toggle between code and preview
+            if (f.viewMode === 'preview') {
+                f.viewMode = 'code';
+            } else {
+                f.viewMode = 'preview';
+            }
+            // Re-render by calling openFile again
+            openFile(state.activeFile);
+        });
     }
 
     
@@ -1698,6 +1831,8 @@ async function createNewThread() {
 
         state.chat.messageHistory = [];
 
+        state.chat.pendingAttachments = [];
+
         document.getElementById('chat-messages').textContent = '';
 
         // Re-add welcome message
@@ -1950,7 +2085,9 @@ async function sendChatMessage() {
 
     const text = input.value.trim();
 
-    if (!text || state.chat.sending) return;
+    const attachments = state.chat.pendingAttachments.slice();
+
+    if ((!text && !attachments.length) || state.chat.sending) return;
 
 
 
@@ -1958,11 +2095,17 @@ async function sendChatMessage() {
 
     state.chat.sending = true;
 
+    // Clear draft attachments immediately so they don't reappear
+
+    state.chat.pendingAttachments = [];
+
+    renderPendingAttachments();
+
 
 
     state.chat.messageHistory.push({ role: 'user', content: text });
 
-    addChatMessage('user', text);
+    addChatMessage('user', text, attachments);
 
     // Persist user message to thread
 
@@ -2000,7 +2143,7 @@ async function sendChatMessage() {
 
         localStorage.setItem('omega_active_model', activeModel);
 
-        const result = await window.omega.chat.send(text, state.chat.sessionId, llmModel);
+        const result = await window.omega.chat.send(text, state.chat.sessionId, llmModel, attachments);
 
         destroyThinkingIndicator();
 
@@ -2454,7 +2597,7 @@ function sendRawText(text) {
 
 
 
-function addChatMessage(role, content) {
+function addChatMessage(role, content, attachments = []) {
 
     const container = document.getElementById('chat-messages');
 
@@ -2496,7 +2639,7 @@ function addChatMessage(role, content) {
 
         // Strip raw HTML that leaked through (Flask 404s, error pages, etc.)
 
-        clean = clean.replace(/<!doctype[^>]*>[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
+        clean = clean.replace(/<\!doctype[^>]*>[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
 
         clean = clean.replace(/<html[\s\S]*?<\/html>/gi, '*(raw HTML stripped)*');
 
@@ -2517,6 +2660,72 @@ function addChatMessage(role, content) {
 
 
     msgEl.appendChild(wrapperEl);
+
+    // ── Render attachment thumbnails inside user message ─────────
+
+    if (attachments && attachments.length > 0) {
+
+        const attachWrap = document.createElement('div');
+
+        attachWrap.className = 'msg-attachments';
+
+        for (const att of attachments) {
+
+            const kind = getAttachmentKind(att.file);
+
+            const item = document.createElement('div');
+
+            item.className = 'msg-attachment-item';
+
+            if (kind === 'image' && att.dataUrl) {
+
+                const img = document.createElement('img');
+
+                img.src = att.dataUrl;
+
+                img.alt = att.file.name;
+
+                item.appendChild(img);
+
+            } else if (kind === 'video' && att.dataUrl) {
+
+                const vid = document.createElement('video');
+
+                vid.src = att.dataUrl; vid.controls = true;
+
+                vid.preload = 'metadata'; vid.muted = true;
+
+                item.appendChild(vid);
+
+            } else {
+
+                const gen = document.createElement('div');
+
+                gen.className = 'msg-attachment-generic';
+
+                gen.innerHTML = `&lt;span class="file-icon"&gt;${ATTACH_ICONS[kind] || ATTACH_ICONS.generic}&lt;/span&gt; &lt;span class="file-name"&gt;${att.file.name}&lt;/span&gt;`;
+
+                item.appendChild(gen);
+
+            }
+
+            const label = document.createElement('div');
+
+            label.className = 'msg-attachment-label';
+
+            label.textContent = att.file.name;
+
+            item.appendChild(label);
+
+            attachWrap.appendChild(item);
+
+        }
+
+        msgEl.appendChild(attachWrap);
+
+    }
+
+
 
     container.appendChild(msgEl);
 
@@ -3920,11 +4129,95 @@ function initEventListeners() {
 
         state.chat.messageHistory = [];  // Reset session context
 
+        state.chat.pendingAttachments = []; // Clear any draft attachments
+
+        renderPendingAttachments();
+
         stopAudio();
 
         showToast('Chat cleared', 'info', 1500);
 
     });
+
+    // ── File Attachments (v5.3) ───────────────────────────────
+
+    const attachBtn = document.getElementById('chat-attach-btn');
+
+    const fileInput = document.getElementById('chat-file-input');
+
+    const chatPanel = document.getElementById('omega-chat-panel');
+
+    if (attachBtn && fileInput) {
+
+        attachBtn.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+
+            handleFiles(e.target.files);
+
+            fileInput.value = '';               // reset so same file can be re-selected
+
+        });
+
+    }
+
+    if (chatPanel) {
+
+        // drag-enter / drag-over set highlight
+
+        chatPanel.addEventListener('dragenter', (e) => {
+
+            e.preventDefault(); e.stopPropagation();
+
+            chatPanel.classList.add('drag-over');
+
+        });
+
+        chatPanel.addEventListener('dragover', (e) => {
+
+            e.preventDefault(); e.stopPropagation();
+
+            chatPanel.classList.add('drag-over');
+
+        });
+
+        chatPanel.addEventListener('dragleave', (e) => {
+
+            e.preventDefault(); e.stopPropagation();
+
+            chatPanel.classList.remove('drag-over');
+
+        });
+
+        chatPanel.addEventListener('drop', (e) => {
+
+            e.preventDefault(); e.stopPropagation();
+
+            chatPanel.classList.remove('drag-over');
+
+            if (e.dataTransfer.files && e.dataTransfer.files.length) {
+
+                handleFiles(e.dataTransfer.files);
+
+            }
+
+        });
+
+    }
+
+    // Prevent stray file drops on the whole window from navigating away
+
+    window.addEventListener('dragover', (e) => { e.preventDefault(); });
+
+    window.addEventListener('drop', (e) => {
+
+        const target = e.target.closest ? e.target.closest('#omega-chat-panel') : null;
+
+        if (!target) e.preventDefault();
+
+    });
+
+
 
 
 
@@ -3992,7 +4285,7 @@ function initEventListeners() {
 
         const resultsEl = document.getElementById('vault-search-results');
 
-        resultsEl.textContent = results?.error
+        resultsEl.innerHTML = results?.error
 
             ? `<div class="reports-empty">${results.error}</div>`
 
@@ -4076,7 +4369,7 @@ function initEventListeners() {
 
         try {
 
-            await fetch('http://127.0.0.1:5000/api/evolution/scan', {
+            const resp = await fetch('http://127.0.0.1:5000/api/evolution/scan', {
 
                 method: 'POST',
 
@@ -4085,6 +4378,8 @@ function initEventListeners() {
                 body: JSON.stringify({ trigger: 'manual' })
 
             });
+
+            if (!resp.ok) throw new Error(`Server ${resp.status}: ${resp.statusText}`);
 
             showToast('Evolution scan running... loading proposals in 5s', 'info');
 
@@ -4146,7 +4441,7 @@ function initEventListeners() {
 
         const entriesEl = document.getElementById('ledger-entries');
 
-        entriesEl.textContent = results?.error
+        entriesEl.innerHTML = results?.error
 
             ? `<div class="reports-empty">${results.error}</div>`
 
@@ -4246,7 +4541,7 @@ function initEventListeners() {
 
         }
 
-        document.getElementById('status-bridge').textContent = '<span class="omega-serif">Ω</span> ONLINE';
+        document.getElementById('status-bridge').innerHTML = '<span class="omega-serif">Ω</span> ONLINE';
 
         document.getElementById('status-bridge').style.color = 'var(--green)';
 
@@ -4698,7 +4993,7 @@ window.sentinelRebaseline = async function() {
 
 
 
-    console.log('%c <span class="omega-serif">Ω</span> GRAVITY OMEGA v3.0 %c READY ',
+    console.log('%c Ω GRAVITY OMEGA v3.0 %c READY ',
 
         'background: linear-gradient(90deg, #d4a843, #a0802a); color: #000; font-weight: bold; padding: 4px 12px; border-radius: 4px;',
 

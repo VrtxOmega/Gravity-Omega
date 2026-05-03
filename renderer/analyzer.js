@@ -180,37 +180,8 @@ window.buildHTML = function(d,fname){
 
 function initAnalyzerListeners() {
 
-    document.getElementById('btn-toggle-markdown')?.addEventListener('click', () => {
-
-        if (!window.state || !window.state.openFiles) return;
-
-        const file = window.state.openFiles.get(window.state.activeFile);
-
-        if (!file) return;
-
-        file.viewMode = (file.viewMode === 'preview') ? 'code' : 'preview';
-
-        window.switchToFile(window.state.activeFile);
-
-    });
-
-
-
-    document.getElementById('btn-analyzer')?.addEventListener('click', () => {
-
-        if (!window.state || !window.state.openFiles) return;
-
-        const file = window.state.openFiles.get(window.state.activeFile);
-
-        if (!file) return;
-
-        file.viewMode = (file.viewMode === 'analyze') ? 'code' : 'analyze';
-
-        window.switchToFile(window.state.activeFile);
-
-    });
-
-
+    // v4.3.23: PREVIEW toggle is handled exclusively by app.js openFile() with cloneNode dedup.
+    // btn-analyzer removed from DOM per user request — analyzer is accessible via drop-zone only.
 
     const dropZone = document.getElementById('drop-zone');
 
@@ -344,7 +315,7 @@ async function executeAnalysis(filePath, fileState) {
 
             document.getElementById('report-screen').classList.remove('hidden');
 
-            document.getElementById('report-body').textContent = window.buildHTML(data, fileState.name);
+            document.getElementById('report-body').innerHTML = window.buildHTML(data, fileState.name);
 
         }, 800);
 

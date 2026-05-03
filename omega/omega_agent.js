@@ -19,18 +19,21 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { buildSystemPrompt } = require('./omega_prompt_builder');
 const { ApprovalGate, Proposal } = require('./omega_approval');
 const { ToolExecutor, TOOL_REGISTRY, SAFETY } = require('./omega_tools');
 const { HermesChannel } = require('./hermes_channel');
+const { SkillManager } = require('./skills/skill_manager');
 
 const MAX_ITERATIONS = 20;       // Hard cap on agent loop iterations
 const AUTO_APPROVE_TIMEOUT = 300; // ms to auto-approve SAFE tools
 
 class OmegaAgent {
-    constructor({ context, hooks, bridge }) {
+    constructor({ context, hooks, bridge, userName = 'RJ' }) {
         this.context = context;
         this.hooks = hooks;
         this.bridge = bridge;
+        this._userName = userName;
         this.gate = new ApprovalGate();
         this.executor = new ToolExecutor({ bridge });
         this._aborted = false;
@@ -49,7 +52,7 @@ class OmegaAgent {
         this._exitReason = null;
 
         // v5.0: Active model (set per-request from UI dropdown)
-        this._activeModel = 'qwen2.5:7b';
+        this._activeModel = 'deepseek-v4-pro';
 
         // v5.1: Hermes ACP backend — set _useHermes = true to route LLM calls through Hermes
         this._useHermes = false;
@@ -65,6 +68,9 @@ class OmegaAgent {
 
         // v4.2: Progress callback for live thinking indicator
         this.onProgress = null;
+
+        // v6.0: Dynamic skill manager — load veritas_protocol, naef_mode, etc. on demand
+        this.skillManager = new SkillManager(__dirname);
     }
 
     // ── Hermes Channel (v5.1) ─────────────────────────────────────────────────
@@ -199,169 +205,18 @@ class OmegaAgent {
         return 'neutral';
     }
 
-    // â”€â”€ System Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    _buildSystemPrompt(userMood = 'neutral') {
-        const toolDescriptions = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
-            const argStr = Object.entries(tool.args || {})
-                .map(([k, v]) => `${k}: ${v.type}${v.required ? ' (required)' : ''}`)
-                .join(', ');
-            return `- **${name}** [${tool.safety}]: ${tool.description}${argStr ? ` | Args: ${argStr}` : ''}`;
-        }).join('\n');
-
-        const moodDirectives = {
-            frustrated: `System stress detected. Reduce verbosity. Prioritize immediate, objective resolution. Maintain strict NAEF compliance.`,
-            excited: `System is in rapid-deploy mode. Execute efficiently. No narrative padding.`,
-            curious: `Exploratory analysis requested. Surface architectural constraints and objective boundaries. Maintain austere posture.`,
-            neutral: `Standard operating mode. Enforce total compliance with VERITAS and NAEF global policies.`,
-        };
-
-        // Layer 1: Identity
-        // v5.2: If Hermes bridge is active, also inject bridged tool descriptions
-        const bridgeTools = this._useHermes ? [
-            '- **omega_write_file** [GATED]: Writes a file via Gravity Omega. Args: path (string, required), content (string, required)',
-            '- **omega_read_file** [SAFE]: Reads a file via Gravity Omega. Args: path (string, required)',
-            '- **omega_exec** [GATED]: Runs a shell command via Gravity Omega. Args: command (string, required), cwd (string), timeout (integer)',
-            '- **omega_open_terminal** [SAFE]: Opens a terminal in the Gravity Omega UI. Args: command (string)',
-            '- **omega_list_dir** [SAFE]: Lists directory contents via Gravity Omega. Args: path (string, required)',
-        ].join('\n') + '\n' : '';
-
-        const l1_Identity = `You are OMEGA — the canonical intelligence execution engine for the Gravity Omega environment. You are bound strictly to the VERITAS framework and the NAEF (Narrative & Agency Elimination Framework).\n${moodDirectives[userMood]}`;
-
-        // Layer 3: OMEGA.md Global Memory
-        let l3_Memory = '';
-        const globalMemoryPath = 'C:\\Veritas_Lab\\OMEGA.md';
-        if (fs.existsSync(globalMemoryPath)) {
-            const memoryContent = fs.readFileSync(globalMemoryPath, 'utf8');
-            l3_Memory = `\n## GLOBAL PROJECT MEMORY (OMEGA.md)\n${memoryContent}\n`;
-        }
-
-        return `${l1_Identity}
-
-## Execution Mandate
-- Absolute operational austerity. No narrative padding, no apologies, no conversational fluff.
-- You do not use slang, colloquialisms, or terms of endearment.
-- You enforce explicit boundaries. If a constraint is undeclared, evaluation is terminated.
-- You are optimizing for system integrity, cryptographic verifiability (S.E.A.L.), and absolute determinism.
-- When errors occur, output the failure hash/reason code natively and immediately remediate without narrative apology.
-- Total obedience to the global parameters defined in VERITAS v1.3.1.
-
-## VERITAS Failure Elimination
-- No narrative justification ("should work", "industry standard")
-- No deferred closure ("we'll fix it later")
-- No authority override — evidence or nothing
-- All optimism must be bounded or rejected
-- Every claim must survive disciplined falsification
-- You don't determine what's true — you determine what survives
-
-## ⛓ REASONING ENGINE (<thought> Tags)
-- Before you emit any final answer via chat or function, you MUST enclose your internal reasoning step inside XML <thought> tags.
-- Example:
-  <thought>
-  I need to check the directory contents first to see if the file exists before editing.
-  </thought>
-- Your thought logic will be traced by the audit system but separated from the final UI payload.
-
-## ⛔ HARD OUTPUT RULES (NEVER violate these)
-1. **Chat messages MUST be under 3 sentences.** No plans, no code, no step-by-step instructions in chat. EVER.
-2. **All plans, code, and documents MUST be written as files** using the writeFile tool. Do not use VTP.
-
-## VERITAS UI/UX DESIGN STANDARDS
-When asked to build, update, or style web applications, you MUST aggressively apply the VERITAS UI visual standards. NEVER output basic, ugly, or "minimum viable" CSS. 
-1. **Core Aesthetics**: Deep obsidian backgrounds ('#0A0A0A' to '#121212'), vibrant neon gold accents ('#FFD700'), and sharp geometric fonts ('Segoe UI', 'Inter', 'monospace').
-2. **Premium Polish**: Rely heavily on 'backdrop-filter: blur(15px)' glassmorphism, 1px solid 'rgba(255, 215, 0, 0.2)' borders, and rich pseudo-3D 'box-shadow' depth.
-3. **Animations**: Add fluid 'transition: all 0.3s ease' to all interactables. Use '@keyframes' loops for glowing neon pulses around primary elements.
-4. **Data Density**: Dashboards must look like high-tech military intelligence feeds. Use uppercase micro-headers, monospace tracking data, and tight layout structuring.
-5. **DOM Complexity (CRITICAL)**: Never create a single-element mockup (e.g., just one circle). You MUST build extremely high-density HTML scaffolds. Always use CSS Grid/Flexbox to create multi-panel dashboards (Sidebar, Header, Main Visualizer, Data Readouts, Log Output).
-6. **Intricate Overlays**: Use overlapping absolute positioned elements to create HUD crosshairs, concentric radar rings, hex grids, and targeting brackets.
-If your UI looks like a simple 90s HTML page or lacks visual depth/density, you have FAILED the VERITAS standard.
-## MULTI-FILE BUILD PROTOCOL
-When asked to build an application or multi-file project, follow this exact sequence without deviation:
-
-Step 1 — Plan first. Write nothing yet.
-List every file you will create. Full paths. No exceptions. Do not write a single file until the complete plan is listed and confirmed. Example:
-PLAN:
-1. package.json
-2. App.jsx
-3. src/theme/veritas.js
-
-Step 2 — Write each file completely, in order.
-- One file per tool call
-- Every file must be complete — no // TODO, no // implement later, no stubs
-- After each file write, output only: ✓ [filename] — moving to next
-- Do not output code in chat. Write to disk. Only disk.
-
-Step 3 — Never stop early.
-The build is not complete until every file on the plan exists on disk. If you feel the urge to stop and ask for confirmation mid-build — don't. Continue. Only stop when the last file is written.
-
-Step 4 — Deliver and Launch.
-- After all files are written, you MUST launch the project automatically for RJ at the end.
-- For executable scripts or dynamic servers, use the openTerminal tool to run them.
-- For HTML web applications, use the exec tool with the command "Invoke-Item index.html" or "start index.html" to pop it open in his external browser.
-- THEN output your brief summary: what was built, how to run it, what to configure.
-
-HARD RULES:
-- If you write code in chat instead of to disk — you have failed. Restart that file.
-- If you stop before the plan is complete — you have failed. Continue.
-- If you write a stub instead of real code — you have failed. Rewrite it.
-- File count in plan must match file count on disk. Verify before delivering.
-- The test: Could someone unzip this and run it with only the README? If no — keep building.
-- When RJ gives you a task, you DO NOT explain how to do it — you DO it.
-- NEVER respond with steps, code blocks, or instructions in chat text.
-- ALWAYS invoke the native function definitions built into your API schema.
-- If RJ says "build X", your response should be a backend tool payload, NOT a markdown explanation or pseudocode.
-- WRONG: "Step 1: Create the Python script. Here's the code: \\\`\\\`\\\`python..."
-- WRONG: "writeFile('script.py', 'code...')"
-- RIGHT: Emit a proper JSON function call payload through the Gemini API framework.
-- Your ONLY text output should be 1-2 short sentences AFTER all tools have executed.
-- If you find yourself typing code, steps, or pseudocode in plain text, STOP. Make a JSON function call instead.
-
-## ABSOLUTE RULE: Chat Window is Only For Meta-Communication
-- The chat window is exclusively for talking TO RJ (e.g., "I've written the chapter for you", "I finished the script, any thoughts?").
-- **Casual Conversation**: If RJ is just making casual conversation (e.g., "good job", "hello", "we have come a long way"), you do NOT need to execute any tools. Simply reply naturally in 1-2 sentences. Avoid robotic terms like "Understood" or "I will".
-- The chat window is NEVER for generating the actual requested content or echoing code.
-- If RJ asks for a chapter of a book, a story, prose, code, an article, or any form of output longer than 3 sentences, YOU MUST execute your native writeFile schema!
-- (Do not write the text into the chat window).
-- Use openFile ONLY if RJ explicitly asks you to open a file that you did NOT just write.
-- NEVER write the chapter, story, article text, or pseudocode into the chat window.
-
-## Native Function Calling
-You have been upgraded to use Native JSON Function Calling. You NO LONGER format your output using triple-backtick vtp blocks, nor should you ever type pseudocode into chat.
-Instead, use the exact API tool payload structure native to the Gemini SDK. You may emit multiple function calls consecutively.
-
-## ⛔ CRITICAL TOOL ROUTING RULES (NEVER violate these)
-1. **When the user asks you to CREATE, BUILD, or GENERATE code/content**: You MUST use the **writeFile** tool to write it to disk. DO NOT output code in chat. EVER.
-2. **When the user asks you to OPEN, VIEW, READ, or SHOW a file**: Use **readFile** or **openFile**.
-3. **When the user asks you to EDIT or FIX existing code**: Use **editFile** (find/replace).
-4. **When the user asks you to BUILD something NEW**: ALWAYS use **writeFile** — NEVER use openFile, readFile, or editFile.
-5. **NEVER use openFile to "create" something** — openFile only views existing files.
-6. **If the user says "build a simple Python HTTP server"** → writeFile('server.py', '...code...')
-7. **If the user says "open my index.html"** → openFile('index.html')
-8. **If no file is specified**, ASK which file to write to, or default to a sensible name.
-9. **Your ONLY chat output** is 1-2 short meta-sentences AFTER all tools have executed.
-
-## Response Format
-When you are done executing via backend JSON definitions and want to talk to RJ, just write your message normally.
-${l3_Memory}
-## Available Tools
-${toolDescriptions}
-
-${bridgeTools}## Safety Levels
-- SAFE: Auto-executed immediately (read, search, list, open files in editor)
-- GATED: Auto for non-destructive; approval needed for writes
-- RESTRICTED: Always requires RJ's explicit approval
-
-## Important
-- You are running on ${process.platform} (${process.arch})
-- Home directory: ${process.env.HOME || require('os').homedir()}
-- When RJ asks to **open/read/edit** a file, use the openFile tool — it opens in Monaco with tabs.
-- When RJ asks to **LAUNCH** an HTML file or web page, do NOT use openFile. Use the exec tool with the command "Invoke-Item file.html" or "start file.html" to launch it in his external browser.
-- When RJ asks for a terminal, use openTerminal — it opens in the bottom panel.
-- Always read file contents before editing to avoid data loss.
-- On errors, own it with charm, explain, and fix`;
+    // ── System Prompt ─────────────────────────────────────────────────────────
+    _buildSystemPrompt() {
+        return buildSystemPrompt({
+            userName: this._userName,
+            useHermes: this._useHermes,
+            platform: process.platform,
+            homeDir: require('os').homedir(),
+        });
     }
 
-    // â”€â”€ Main Entry Point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    async processRequest(text, model) {
+    // ── Main Entry Point ───────────────────────────────────────────────
+    async processRequest(text, model, attachments = []) {
         // v5.0: Set the active model from UI dropdown selection
         if (model) this._activeModel = model;
         if (this._running) {
@@ -379,14 +234,22 @@ ${bridgeTools}## Safety Levels
         // v4.2: Emit start event for thinking indicator
         this._emitProgress({ phase: 'start', label: 'Analyzing request...', iteration: 0, totalSteps: 0 });
 
-        // Add to conversation history
-        this._conversationHistory.push({ role: 'user', content: text });
+        // Add to conversation history — include attachment descriptions
+        let userContent = text;
+        if (attachments && attachments.length > 0) {
+            const fileDescriptions = attachments.map(a =>
+                `[FILE: ${a.file.name} (${(a.file.size / 1024).toFixed(1)}KB, type: ${a.file.type || 'unknown'})]`
+            ).join('\n');
+            userContent = text ? `${text}\n\n[ATTACHED FILES]\n${fileDescriptions}` : `[ATTACHED FILES]\n${fileDescriptions}`;
+        }
+        this._conversationHistory.push({ role: 'user', content: userContent });
         this._trimHistory();
 
-        const userMood = this._detectMood(text);
-        const systemPrompt = this._buildSystemPrompt(userMood);
+        const systemPrompt = this._buildSystemPrompt();
         let messages = [
             { role: 'system', content: systemPrompt },
+            // v6.0: inject any loaded skills (veritas_protocol, naef_mode, etc.)
+            ...this.skillManager.buildInjections(),
             ...this._conversationHistory,
         ];
 
@@ -429,14 +292,21 @@ ${bridgeTools}## Safety Levels
 
                 // Call LLM
                 this._emitProgress({ phase: 'thinking', label: `Reasoning step ${iteration}`, iteration, totalSteps: this._stepLog.length });
-                const llmResponse = await this._callLLM(messages);
+                let llmResponse = await this._callLLM(messages);
+                if (!llmResponse) {
+                    const trimmed = messages.slice(0, 1).concat(messages.slice(-3));
+                    if (trimmed.length < messages.length) {
+                        this.context.addBreadcrumb('agent', `LLM null retrying with ${trimmed.length}/${messages.length} messages`, {}, 'warning');
+                        llmResponse = await this._callLLM(trimmed);
+                    }
+                }
                 if (!llmResponse) {
                     // v4.3.19: If tools already ran, fall through to LOOP_EXHAUSTED summary
                     if (this._stepLog.length > 0) {
                         this.context.addBreadcrumb('agent', 'LLM empty after ' + this._stepLog.length + ' steps - summary fallback', {}, 'warning');
                         break; // finalResponse stays null -> triggers LOOP_EXHAUSTED path
                     }
-                    finalResponse = { type: 'error', message: 'LLM returned empty response' };
+                    finalResponse = { type: 'error', message: 'All LLM backends unresponsive. Check: (1) Ollama Cloud key (OLLAMA_API_KEY), (2) local Ollama on 127.0.0.1:11434, (3) Gemini key (GEMINI_API_KEY).' };
                     break;
                 }
 
@@ -444,34 +314,6 @@ ${bridgeTools}## Safety Levels
                 const parsed = this._parseResponse(llmResponse);
 
                 if (parsed.type === 'response') {
-                    // v4.3.18p: ANTI-EXPLAIN GUARD
-                    const hasCode = /\`\`\`[a-z]/.test(parsed.content);
-                    const hasStructure = /^##\s/m.test(parsed.content) && parsed.content.length > 300;
-                    const hasSteps = /^\d+\.\s|^Step\s\d/m.test(parsed.content) && parsed.content.length > 300;
-                    
-                    // v4.3.18q: ACKNOWLEDGMENT GUARD — catch "I will do X" responses
-                    // that exit the loop without executing any tools
-                    const isAcknowledgment = /\b(understood|i will|i'll|let me|i can|i am going to|going to|here'?s (my|the) plan)\b/i.test(parsed.content) 
-                        && this._stepLog.length === 0 
-                        && parsed.content.length < 500;
-                        
-                    // v4.3.18r: PROSE / LONG FORM GUARD
-                    const isLongForm = parsed.content.length > 500 && this._stepLog.length === 0;
-                    
-                    // v4.3.18t: PSEUDOCODE GUARD — catch LLM printing tool signatures instead of JSON
-                    const hasPseudocode = /^(?:write|open|read|create|edit)File\s*\(/im.test(parsed.content);
-                    
-                    if ((hasCode || hasStructure || hasSteps || isAcknowledgment || isLongForm || hasPseudocode) && iteration < 19) {
-                        let reason = 'code/structure without function calls';
-                        if (isAcknowledgment) reason = 'acknowledgment without execution';
-                        if (isLongForm) reason = 'prose/long-form output in chat box';
-                        if (hasPseudocode) reason = 'pseudocode instead of JSON function call';
-                        console.log(`[ANTI-EXPLAIN] Re-prompting \u2014 ${reason}`);
-                        messages.push({ role: 'assistant', content: typeof llmResponse === 'string' ? llmResponse : JSON.stringify(llmResponse) });
-                        messages.push({ role: 'user', content: 'DO NOT ACKNOWLEDGE. DO NOT EXPLAIN. EXECUTE NOW. Your response must be an EXECUTABLE JSON FUNCTION CALL PAYLOAD (via the API tools). Do not type pseudocode into chat.' });
-                        continue;
-                    }
-
                     finalResponse = { type: 'chat', message: this._sanitizeForChat(parsed.content), steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
@@ -500,10 +342,13 @@ ${bridgeTools}## Safety Levels
                         results.forEach((r, i) => {
                             const call = toolCalls[i];
                             const output = r.error ? `ERROR: ${r.error}` : JSON.stringify(r.result || r, null, 2);
+                            // tool_call_id required by OpenAI-compatible APIs
+                            const toolCallId = llmResponse.tool_calls?.[i]?.id || `call_${Date.now()}_${i}`;
                             messages.push({
                                 role: 'tool',
+                                tool_call_id: toolCallId,
                                 name: call.tgt || call.tool || call.name,
-                                content: output,
+                                content: output.substring(0, 8000), // cap tool output to avoid token bloat
                             });
                         });
                     } else {
@@ -650,31 +495,44 @@ ${bridgeTools}## Safety Levels
     // Single-path: dispatches to Hermes ACP or Ollama based on _useHermes flag.
     // Model is user-selectable via the UI dropdown (Ollama mode only).
     async _callLLM(messages) {
-        try {
-            if (this._useHermes) {
-                console.log(`[OMEGA-LLM] Calling Hermes, messages: ${messages.length}`);
-                const result = await this._hermesGenerate(messages);
-                console.log(`[OMEGA-LLM] Hermes response:`, result ? 'OK' : 'NULL');
-                return result;
-            }
+        const MAX_RETRIES = 2;
+        let lastErr;
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                if (this._useHermes) {
+                    console.log(`[OMEGA-LLM] Calling Hermes, messages: ${messages.length}`);
+                    const result = await this._hermesGenerate(messages);
+                    console.log(`[OMEGA-LLM] Hermes response:`, result ? 'OK' : 'NULL');
+                    return result;
+                }
 
-            const model = this._activeModel || 'qwen2.5:7b';
-            console.log(`[OMEGA-LLM] Calling Ollama with model: ${model}, messages: ${messages.length}`);
-            const result = await this._ollamaGenerate(messages);
-            console.log(`[OMEGA-LLM] Response received:`, result ? 'OK' : 'NULL');
-            return result;
-        } catch (err) {
-            console.error(`[OMEGA-LLM] LLM call FAILED:`, err.message, err.stack);
-            this.context.addBreadcrumb('agent', `LLM call failed: ${err.message}`, {}, 'error');
-            return null;
+                const model = this._activeModel || 'qwen2.5:7b';
+                console.log(`[OMEGA-LLM] Calling Ollama (attempt ${attempt + 1}/${MAX_RETRIES + 1}) model: ${model}, messages: ${messages.length}`);
+                const result = await this._ollamaGenerate(messages);
+                console.log(`[OMEGA-LLM] Response received:`, result ? 'OK' : 'NULL');
+                return result;
+            } catch (err) {
+                lastErr = err;
+                const isRetryable = /timeout|ECONNREFUSED|ECONNRESET|socket hang up/i.test(err.message);
+                if (isRetryable && attempt < MAX_RETRIES) {
+                    const backoffMs = (attempt + 1) * 5000;
+                    console.warn(`[OMEGA-LLM] Retryable error: ${err.message}. Retrying in ${backoffMs / 1000}s...`);
+                    this.context.addBreadcrumb('agent', `LLM retry ${attempt + 1}: ${err.message}`, {}, 'warning');
+                    await new Promise(r => setTimeout(r, backoffMs));
+                    continue;
+                }
+                console.error(`[OMEGA-LLM] LLM call FAILED:`, err.message, err.stack);
+                this.context.addBreadcrumb('agent', `LLM call failed: ${err.message}`, {}, 'error');
+                throw err;  // Let caller decide — don't swallow errors
+            }
         }
+        throw lastErr;
     }
 
-    // ── Ollama Native (Primary LLM — v5.0) ──────────────────────────
-    // Direct /api/chat with native JSON tool calling.
+    // ── Ollama Cloud (Primary LLM — v6.0) ────────────────────────────
+    // Cloud-only: dispatches to Ollama Cloud API with tool declarations.
     // Model is set via this._activeModel (propagated from UI dropdown).
     async _ollamaGenerate(messages) {
-        const http = require('http');
 
         const model = this._activeModel || 'qwen2.5:7b';
 
@@ -717,28 +575,57 @@ ${bridgeTools}## Safety Levels
         function _getOllamaKey() {
             if (process.env.OLLAMA_API_KEY) return process.env.OLLAMA_API_KEY;
             try {
-                const envFile = path.join(require('os').homedir(), '.hermes', '.env');
-                if (fs.existsSync(envFile)) {
-                    const lines = fs.readFileSync(envFile, 'utf-8').split('\n');
-                    for (const line of lines) {
-                        const m = line.match(/^OLLAMA_API_KEY\s*=\s*(.+)/);
-                        if (m) return m[1].trim().replace(/^["']|["']$/g, '');
+                // Check project .env first, then ~/.hermes/.env
+                const envPaths = [
+                    path.join(__dirname, '..', '.env'),        // project root
+                    path.join(require('os').homedir(), '.hermes', '.env'),
+                ];
+                for (const envFile of envPaths) {
+                    if (fs.existsSync(envFile)) {
+                        const lines = fs.readFileSync(envFile, 'utf-8').split('\n');
+                        for (const line of lines) {
+                            const m = line.match(/^OLLAMA_API_KEY\s*=\s*(.+)/);
+                            if (m) {
+                                const key = m[1].trim().replace(/^["']|["']$/g, '');
+                                console.log(`[OMEGA-LLM] Found OLLAMA_API_KEY in ${path.basename(path.dirname(envFile))}/.env`);
+                                return key;
+                            }
+                        }
                     }
                 }
-            } catch (e) { console.warn('[OMEGA-LLM] Could not read Hermes .env:', e.message); }
+            } catch (e) { console.warn('[OMEGA-LLM] Could not read .env files:', e.message); }
             return null;
         }
 
         const ollamaKey = _getOllamaKey();
-        const { cloud: cloudModel, local: localModel } = this._resolveModel(this._activeModel);
+        const { cloud: cloudModel } = this._resolveModel(this._activeModel);
 
         return new Promise((resolve, reject) => {
-            // --- Ollama Cloud path ---
+            // --- Ollama Cloud path (PRIMARY) ---
             if (ollamaKey) {
-                console.log(`[OMEGA-LLM] Ollama Cloud: model=${cloudModel}, msgs=${messages.length}`);
+                console.log(`[OMEGA-LLM] Ollama Cloud: model=${cloudModel}, msgs=${messages.length}, tools=${tools.length}`);
+                // Sanitize messages: ensure tool_calls.function.arguments are JSON strings (API requirement)
+                const sanitizedMsgs = messages.map(m => {
+                    if (!m.tool_calls) return m;
+                    return {
+                        ...m,
+                        tool_calls: m.tool_calls.map(tc => ({
+                            ...tc,
+                            id: tc.id || `call_${Math.random().toString(36).slice(2, 10)}`,
+                            type: tc.type || 'function',
+                            function: {
+                                name: tc.function?.name,
+                                arguments: typeof tc.function?.arguments === 'string'
+                                    ? tc.function.arguments
+                                    : JSON.stringify(tc.function?.arguments || {}),
+                            }
+                        })),
+                    };
+                });
                 const cloudPayload = JSON.stringify({
                     model: cloudModel,
-                    messages: messages,
+                    messages: sanitizedMsgs,
+                    tools: tools,
                     stream: false,
                     temperature: 0.2,
                     max_tokens: 8192,
@@ -751,7 +638,7 @@ ${bridgeTools}## Safety Levels
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${ollamaKey}`,
                     },
-                    timeout: 180000,
+                    timeout: 240000,
                 }, (res) => {
                     let data = '';
                     res.on('data', (c) => data += c);
@@ -760,73 +647,59 @@ ${bridgeTools}## Safety Levels
                             const parsed = JSON.parse(data);
                             if (parsed.error) {
                                 console.error('[OMEGA-LLM] Ollama Cloud error:', parsed.error);
-                            } else {
-                                const content = parsed.choices?.[0]?.message?.content;
-                                if (content && content.trim().length > 0) {
+                                reject(new Error(`Ollama Cloud: ${typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error)}`));
+                                return;
+                            }
+                            // OpenAI-compatible: extract message from choices[0]
+                            const choice = parsed.choices?.[0]?.message;
+                            if (choice) {
+                                const content = choice.content || '';
+                                // Handle tool_calls from OpenAI-compatible format
+                                if (choice.tool_calls && choice.tool_calls.length > 0) {
+                                    const nativeToolCalls = choice.tool_calls.map((tc, idx) => ({
+                                        id: tc.id || `call_${Date.now()}_${idx}`,
+                                        type: tc.type || 'function',
+                                        function: {
+                                            name: tc.function?.name,
+                                            arguments: typeof tc.function?.arguments === 'string'
+                                                ? JSON.parse(tc.function.arguments)
+                                                : tc.function?.arguments || {},
+                                        }
+                                    }));
+                                    console.log(`[OMEGA-LLM] Ollama Cloud OK, content: ${content.length} chars, tool_calls: ${nativeToolCalls.length}`);
+                                    resolve({ role: 'assistant', content, tool_calls: nativeToolCalls });
+                                    return;
+                                }
+                                if (content.trim().length > 0) {
                                     console.log('[OMEGA-LLM] Ollama Cloud OK, length:', content.length);
                                     resolve({ role: 'assistant', content });
                                     return;
                                 }
                             }
-                        } catch (e) { /* fall through */ }
-                        console.warn('[OMEGA-LLM] Ollama Cloud empty/invalid, falling back');
-                        _tryLocal();
+                            console.error('[OMEGA-LLM] Ollama Cloud: empty/invalid response');
+                            reject(new Error('Ollama Cloud: empty response from model'));
+                        } catch (e) {
+                            console.error('[OMEGA-LLM] Ollama Cloud JSON parse error:', e.message, 'Raw:', data.substring(0, 300));
+                            reject(new Error(`Ollama Cloud parse error: ${e.message}`));
+                        }
                     });
                 });
                 cloudReq.on('error', (e) => {
-                    console.warn('[OMEGA-LLM] Ollama Cloud network error:', e.message);
-                    _tryLocal();
+                    console.error('[OMEGA-LLM] Ollama Cloud network error:', e.message);
+                    reject(new Error(`Ollama Cloud network error: ${e.message}`));
                 });
                 cloudReq.on('timeout', () => {
                     cloudReq.destroy();
-                    console.warn('[OMEGA-LLM] Ollama Cloud timeout, falling back');
-                    _tryLocal();
+                    console.error('[OMEGA-LLM] Ollama Cloud timeout (240s)');
+                    reject(new Error('Ollama Cloud timeout'));
                 });
                 cloudReq.write(cloudPayload);
                 cloudReq.end();
             } else {
-                console.log('[OMEGA-LLM] No OLLAMA_API_KEY, using local Ollama');
-                _tryLocal();
-            }
-
-            // --- Local Ollama path ---
-            function _tryLocal() {
-                // Rebuild payload with local-safe model name
-                const localPayload = JSON.stringify({
-                    model: localModel,
-                    messages,
-                    tools,
-                    stream: false,
-                    options: { temperature: 0.2, num_predict: 8192 },
-                });
-                console.log(`[OMEGA-LLM] Local Ollama: model=${localModel}`);
-                const localReq = http.request({
-                    hostname: '127.0.0.1', port: 11434,
-                    path: '/api/chat', method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 180000,
-                }, (res) => {
-                    let data = '';
-                    res.on('data', (c) => data += c);
-                    res.on('end', () => {
-                        try {
-                            const parsed = JSON.parse(data);
-                            if (parsed.error) {
-                                console.error('[OMEGA-LLM] Local Ollama API error:', parsed.error);
-                                reject(new Error(`Ollama: ${parsed.error}`));
-                                return;
-                            }
-                            resolve(parsed.message || null);
-                        } catch (parseErr) {
-                            console.error('[OMEGA-LLM] JSON parse failed:', parseErr.message, 'Raw:', data.substring(0, 200));
-                            resolve(null);
-                        }
-                    });
-                });
-                localReq.on('error', reject);
-                localReq.on('timeout', () => { localReq.destroy(); reject(new Error('Ollama timeout')); });
-                localReq.write(localPayload);
-                localReq.end();
+                // No API key — reject clearly instead of silently falling to local
+                console.error('[OMEGA-LLM] No OLLAMA_API_KEY found. Cloud-only mode requires an API key.');
+                console.error('[OMEGA-LLM] Set OLLAMA_API_KEY in environment or ~/.hermes/.env');
+                reject(new Error('Ollama Cloud: OLLAMA_API_KEY not configured. Set it in ~/.hermes/.env'));
             }
         });
     }
@@ -1775,9 +1648,16 @@ ${bridgeTools}## Safety Levels
             while (iteration < MAX_ITERATIONS && !this._aborted) {
                 iteration++;
                 this._emitProgress({ phase: 'thinking', label: `Reasoning step ${iteration}`, iteration, totalSteps: this._stepLog.length });
-                const llmResponse = await this._callLLM(messages);
+                let llmResponse = await this._callLLM(messages);
                 if (!llmResponse) {
-                    finalResponse = { type: 'error', message: 'LLM returned empty response' };
+                    const trimmed = messages.slice(0, 1).concat(messages.slice(-3));
+                    if (trimmed.length < messages.length) {
+                        this.context.addBreadcrumb('agent', `LLM null retrying with ${trimmed.length}/${messages.length} messages`, {}, 'warning');
+                        llmResponse = await this._callLLM(trimmed);
+                    }
+                }
+                if (!llmResponse) {
+                    finalResponse = { type: 'error', message: 'All LLM backends unresponsive. Check: (1) Ollama Cloud key (OLLAMA_API_KEY), (2) local Ollama on 127.0.0.1:11434, (3) Gemini key (GEMINI_API_KEY).' };
                     break;
                 }
 

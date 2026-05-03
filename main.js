@@ -30,14 +30,17 @@ const { OmegaHooks } = require('./omega/omega_hooks');
 const { OmegaAgent } = require('./omega/omega_agent');
 const { OmegaBrowser } = require('./omega/omega_browser');
 const { ConversationStore } = require('./omega/conversation_store');
+const { startServer: startMcpServer } = require('./omega/omega_mcp_server');
+const { OCRHandler } = require('./ocr_module/ocr_handler');
 
 // ── Global Instances ─────────────────────────────────────────
 const bridge = new OmegaBridge();
 const ipc = new OmegaIPC(bridge);
 const context = new OmegaContext();
 const hooks = new OmegaHooks();
-const agent = new OmegaAgent({ context, hooks, bridge });
+const agent = new OmegaAgent({ context, hooks, bridge, userName: process.env.GRAVITY_OMEGA_USER || 'RJ' });
 const browser = new OmegaBrowser({ screenshotDir: path.join(__dirname, 'screenshots') });
+const ocrHandler = new OCRHandler();
 let conversationStore = null; // initialized after app.whenReady()
 
 // v4.2: Forward agent progress events to renderer for live thinking indicator
@@ -591,11 +594,10 @@ function registerIPC() {
     });
 
     // ── Chat (Agentic) ───────────────────────────────────────
-    ipcMain.handle('chat:send', async (_, text, sessionId, model) => {
+    ipcMain.handle('chat:send', async (_, text, sessionId, model, attachments = []) => {
         context.addBreadcrumb('chat', `User: ${text.substring(0, 100)}`);
 
         // v6.0: Hydrate agent memory from persistent conversation store on every request
-        // so the agent retains full context even after renderer reload.
         if (conversationStore && sessionId) {
             try {
                 const thread = conversationStore.loadThread(sessionId);
@@ -610,7 +612,7 @@ function registerIPC() {
 
         let agentErrorStr = null;
         try {
-            const result = await agent.processRequest(text, model);
+            const result = await agent.processRequest(text, model, attachments);
             // v4.3.19e: Auto-open HTML dashboards in browser after successful task completion
             // Uses Electron's shell.openPath — the only reliable way in the main process
             if (result.type !== 'error' && result.steps > 0) {
@@ -989,6 +991,27 @@ function registerIPC() {
         try { return await bridge.post('/api/vault/sweep'); }
         catch (e) { return { error: e.message }; }
     });
+
+    // ── OCR Handlers ─────────────────────────────────────────────
+    ipcMain.handle('ocr:extract-text', async (_, imageData, filename) => {
+        try {
+            const text = await ocrHandler.extractTextFromBuffer(imageData, filename);
+            return { success: true, text };
+        } catch (error) {
+            console.error('[OCR] Extraction failed:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('ocr:terminate', async () => {
+        try {
+            await ocrHandler.terminate();
+            return { success: true };
+        } catch (error) {
+            console.error('[OCR] Termination failed:', error);
+            return { success: false, error: error.message };
+        }
+    });
 }
 
 // ── Direct Ollama Chat (Fallback) ────────────────────────────
@@ -1043,123 +1066,19 @@ function _geminiChat(text) {
                 try {
                     const parsed = JSON.parse(data);
                     const content = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                    const finishReason = parsed.candidates?.[0]?.finishReason;
+                    const blockReason = parsed.promptFeedback?.blockReason;
                     if (content) resolve(content);
+                    else if (blockReason) reject(new Error(`Gemini safety block: ${blockReason}`));
                     else if (parsed.error) reject(new Error(parsed.error.message));
-                    else resolve('(empty response)');
-                } catch { resolve(data); }
+                    else reject(new Error(`Gemini empty response (finishReason=${finishReason || 'unknown'})`));
+                } catch (e) { reject(new Error(`Gemini decode error: ${e.message}`)); }
             });
         });
         req.on('error', reject);
         req.on('timeout', () => { req.destroy(); reject(new Error('Gemini timeout')); });
         req.write(payload);
         req.end();
-    });
-}
-
-function _ollamaChat(text) {
-    return new Promise((resolve, reject) => {
-        const https = require('https');
-        const http = require('http');
-        const fs = require('fs');
-        const path = require('path');
-
-        function _getOllamaKey() {
-            if (process.env.OLLAMA_API_KEY) return process.env.OLLAMA_API_KEY;
-            try {
-                const envFile = path.join(require('os').homedir(), '.hermes', '.env');
-                if (fs.existsSync(envFile)) {
-                    for (const line of fs.readFileSync(envFile, 'utf-8').split('\\n')) {
-                        const m = line.match(/^OLLAMA_API_KEY\\s*=\\s*(.+)/);
-                        if (m) return m[1].trim().replace(/^["']|["']$/g, '');
-                    }
-                }
-            } catch (e) { console.warn('[Main-Chat] Could not read Hermes .env:', e.message); }
-            return null;
-        }
-
-        const ollamaKey = _getOllamaKey();
-        const model = 'deepseek-v3.1:671b';   // Ollama Cloud validated model
-        const localModel = 'qwen3:8b';       // fallback to local if Cloud down
-        const sysPrompt = 'You are Omega, a powerful AI assistant inside the Gravity Omega IDE. Be direct, helpful, and precise.';
-
-        // Try Ollama Cloud first
-        if (ollamaKey) {
-            const cloudPayload = JSON.stringify({
-                model,
-                messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: text }],
-                stream: false,
-                temperature: 0.3,
-                max_tokens: 4096,
-            });
-            const cloudReq = https.request({
-                hostname: 'ollama.com', port: 443,
-                path: '/v1/chat/completions',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${ollamaKey}`,
-                },
-                timeout: 120000,
-            }, (res) => {
-                let data = '';
-                res.on('data', (c) => data += c);
-                res.on('end', () => {
-                    try {
-                        const parsed = JSON.parse(data);
-                        if (parsed.error) {
-                            console.error('[Main-Chat] Ollama Cloud error:', parsed.error);
-                        } else {
-                            const content = parsed.choices?.[0]?.message?.content;
-                            if (content && content.trim().length > 0) {
-                                resolve(content);
-                                return;
-                            }
-                        }
-                    } catch (e) { /* fall through */ }
-                    console.warn('[Main-Chat] Ollama Cloud failed, trying local');
-                    _tryLocal();
-                });
-            });
-            cloudReq.on('error', (e) => {
-                console.warn('[Main-Chat] Ollama Cloud network error:', e.message);
-                _tryLocal();
-            });
-            cloudReq.on('timeout', () => {
-                cloudReq.destroy();
-                console.warn('[Main-Chat] Ollama Cloud timeout, trying local');
-                _tryLocal();
-            });
-            cloudReq.write(cloudPayload);
-            cloudReq.end();
-        } else {
-            console.log('[Main-Chat] No OLLAMA_API_KEY, using local Ollama');
-            _tryLocal();
-        }
-
-        function _tryLocal() {
-            const payload = JSON.stringify({
-                model: localModel,
-                messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: text }],
-                stream: false,
-            });
-            const req = http.request({
-                hostname: '127.0.0.1', port: 11434,
-                path: '/api/chat', method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 120000,
-            }, (res) => {
-                let data = '';
-                res.on('data', (c) => data += c);
-                res.on('end', () => {
-                    try { const parsed = JSON.parse(data); resolve(parsed.message?.content || data); }
-                    catch { resolve(data); }
-                });
-            });
-            req.on('error', reject);
-            req.on('timeout', () => { req.destroy(); reject(new Error('Ollama timeout')); });
-            req.write(payload);
-            req.end();
-        }
     });
 }
 
@@ -1231,6 +1150,24 @@ app.whenReady().then(async () => {
     }
     buildMenu();
     createWindow();
+
+    // ── MCP Server — expose all IDE tools on port 3002 ────────
+    try {
+        let ptyMod = null;
+        try { ptyMod = require('node-pty'); } catch {}
+        startMcpServer({
+            getWindow: () => mainWindow,
+            terminals,
+            browser,
+            bridge,
+            agent,
+            ptyModule: ptyMod,
+            terminalCounter: { value: terminalCounter },
+        });
+        console.log('[Omega] MCP server started — Hermes can connect on port 3002');
+    } catch (mcpErr) {
+        console.error('[Omega] MCP server failed to start:', mcpErr.message);
+    }
 
     // ── Media Player: Global play/pause shortcut ─────────────
     try {

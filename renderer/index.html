@@ -906,9 +906,7 @@
 
                 <div id="editor-actions" style="position:absolute; right:10px; top:5px; z-index:100" class="hidden">
 
-                    <button id="btn-toggle-markdown" class="titlebar-btn" style="border:1px solid var(--gold); border-radius:3px; padding:2px 8px; font-size:11px; margin-right:5px; background:var(--black2); color:var(--gold);">PREVIEW</button>
-
-                    <button id="btn-analyzer" class="titlebar-btn" style="border:1px solid var(--gold); border-radius:3px; padding:2px 8px; font-size:11px; background:var(--gold); color:var(--black);">ANALYZE REPORT</button>
+                    <button id="btn-toggle-markdown" class="titlebar-btn" style="border:1px solid var(--gold); border-radius:3px; padding:2px 8px; font-size:11px; background:var(--black2); color:var(--gold);">PREVIEW</button>
 
                 </div>
 
@@ -1192,23 +1190,33 @@
 
             <div class="chat-input-area">
 
-                <textarea id="chat-input" placeholder="Ask Omega anything — I'll plan and execute autonomously" rows="1"></textarea>
+                <div class="chat-attachments" id="chat-attachments"></div>
 
-                <button id="chat-voice-btn" title="Toggle voice (Omega speaks responses)">🔇</button>
+                <div class="chat-input-row">
 
-                <button id="chat-stop-btn" title="Stop Omega (interrupt speech + generation)">■</button>
+                    <button id="chat-attach-btn" type="button" title="Attach file (or drag & drop)">📎</button>
 
-                <button id="chat-send-btn" title="Send (Enter)">
+                    <input type="file" id="chat-file-input" multiple style="display:none;" accept="image/*,video/*,audio/*,.pdf,.txt,.md,.json,.csv,.js,.py,.html,.css,.sol">
 
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <textarea id="chat-input" placeholder="Ask Omega anything — I'll plan and execute autonomously" rows="1"></textarea>
 
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <button id="chat-voice-btn" title="Toggle voice (Omega speaks responses)">🔇</button>
 
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    <button id="chat-stop-btn" title="Stop Omega (interrupt speech + generation)">■</button>
 
-                    </svg>
+                    <button id="chat-send-btn" title="Send (Enter)">
 
-                </button>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+
+                        </svg>
+
+                    </button>
+
+                </div>
 
             </div>
 
