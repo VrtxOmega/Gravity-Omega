@@ -1,7 +1,7 @@
 {
   "name": "gravity-omega",
-  "version": "4.0.0",
-  "description": "Gravity Omega — VERITAS Command Center v4.0 (Provenance-Sealed)",
+  "version": "5.2.0",
+  "description": "Gravity Omega v2 — VERITAS Command Center v5.2 (Provenance-Sealed, Execution Guards)",
   "main": "main.js",
   "scripts": {
     "start": "node launcher.js",
