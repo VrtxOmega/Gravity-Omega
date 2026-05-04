@@ -330,7 +330,14 @@ class OmegaAgent {
                 }
 
                 // Parse the response for tool calls or final response
-                const parsed = this._parseResponse(llmResponse);
+                let parsed;
+                try {
+                    parsed = this._parseResponse(llmResponse);
+                } catch (parseErr) {
+                    this.context.addBreadcrumb('agent', `_parseResponse threw: ${parseErr.message}`, {}, 'error');
+                    messages.push({ role: 'user', content: `The previous response was malformed and could not be parsed. Please respond again with a valid tool call or a final response block.` });
+                    continue;
+                }
 
                 if (parsed.type === 'response') {
                     // v5.2: Execution mode guard — reject TASK_COMPLETE if zero mutations.
@@ -1689,7 +1696,14 @@ class OmegaAgent {
                     break;
                 }
 
-                const parsed = this._parseResponse(llmResponse);
+                let parsed;
+                try {
+                    parsed = this._parseResponse(llmResponse);
+                } catch (parseErr) {
+                    this.context.addBreadcrumb('agent', `_parseResponse threw: ${parseErr.message}`, {}, 'error');
+                    messages.push({ role: 'user', content: `The previous response was malformed and could not be parsed. Please respond again with a valid tool call or a final response block.` });
+                    continue;
+                }
 
                 if (parsed.type === 'response') {
                     // v5.2: Execution mode guard — reject TASK_COMPLETE if zero mutations.

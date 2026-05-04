@@ -157,8 +157,8 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: false,
-            webviewTag: true,
+            sandbox: true,       // Renderer process in OS sandbox; preload only uses ipcRenderer/contextBridge
+            webviewTag: false,   // Disable <webview> — media uses iframes inside controlled panels instead
         },
     });
 
@@ -222,6 +222,19 @@ function createWindow() {
 // IPC HANDLERS
 // ══════════════════════════════════════════════════════════════
 
+// ── Path Safety ─────────────────────────────────────────────
+// Validates a renderer-supplied path before touching the filesystem.
+// Guards against null-byte injection, excessively long strings, and
+// non-string types. Does NOT restrict which directories are accessible
+// (this is a general-purpose editor) — shell injection is prevented
+// separately by using spawn() with array args instead of execSync.
+function isSafePath(p) {
+    if (typeof p !== 'string') return false;
+    if (p.length === 0 || p.length > 4096) return false;
+    if (p.includes('\0')) return false; // null-byte injection
+    return true;
+}
+
 function registerIPC() {
     // ── Window Controls ──────────────────────────────────────
     ipcMain.on('window:minimize', () => mainWindow?.minimize());
@@ -233,6 +246,7 @@ function registerIPC() {
 
     // ── File Operations ──────────────────────────────────────
     ipcMain.handle('file:read', async (_, filePath) => {
+        if (!isSafePath(filePath)) return { error: 'Invalid path' };
         try {
             const content = fs.readFileSync(filePath, 'utf-8');
             return { path: filePath, name: path.basename(filePath), content };
@@ -240,6 +254,8 @@ function registerIPC() {
     });
 
     ipcMain.handle('file:save', async (_, filePath, content) => {
+        if (!isSafePath(filePath)) return { error: 'Invalid path' };
+        if (typeof content !== 'string') return { error: 'Invalid content' };
         try {
             const dir = path.dirname(filePath);
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -249,6 +265,7 @@ function registerIPC() {
     });
 
     ipcMain.handle('file:listDir', async (_, dirPath) => {
+        if (!isSafePath(dirPath)) return [];
         try {
             const entries = fs.readdirSync(dirPath, { withFileTypes: true });
             return entries.map(e => ({
@@ -324,13 +341,13 @@ function registerIPC() {
 
     // Media: scan a saved folder path (no dialog — for auto-scan on startup)
     ipcMain.handle('media:scanFolder', async (_, folderPath) => {
-        if (!folderPath || !fs.existsSync(folderPath)) return null;
+        if (!isSafePath(folderPath) || !fs.existsSync(folderPath)) return null;
         return await scanAudioFolder(folderPath);
     });
 
     // Media: decrypt AAX → M4B (fast remux, no re-encode)
     ipcMain.handle('media:decryptAAX', async (_, aaxPath) => {
-        if (!aaxPath || !fs.existsSync(aaxPath)) return null;
+        if (!isSafePath(aaxPath) || !fs.existsSync(aaxPath)) return null;
         const ext = path.extname(aaxPath).toLowerCase();
         if (ext !== '.aax') return aaxPath; // Not AAX, return as-is
 
@@ -348,8 +365,11 @@ function registerIPC() {
 
         console.log(`[MEDIA] Decrypting: ${path.basename(aaxPath)}`);
         try {
-            execSync(`ffmpeg -y -activation_bytes ${ab} -i "${aaxPath}" -c copy "${m4bPath}"`, {
-                timeout: 300000, stdio: 'pipe'
+            await new Promise((resolve, reject) => {
+                const proc = spawn('ffmpeg', ['-y', '-activation_bytes', ab, '-i', aaxPath, '-c', 'copy', m4bPath], { stdio: 'pipe' });
+                const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 300000);
+                proc.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error(`ffmpeg exit ${code}`)); });
+                proc.on('error', (e) => { clearTimeout(timer); reject(e); });
             });
             if (fs.existsSync(m4bPath) && fs.statSync(m4bPath).size > 1000) {
                 console.log(`[MEDIA] Decrypted: ${path.basename(m4bPath)}`);
@@ -365,13 +385,16 @@ function registerIPC() {
 
     // Media: extract metadata from audio file via ffprobe
     ipcMain.handle('media:getMetadata', async (_, filePath) => {
-        if (!filePath || !fs.existsSync(filePath)) return null;
+        if (!isSafePath(filePath) || !fs.existsSync(filePath)) return null;
         try {
-            const { execSync } = require('child_process');
-            const raw = execSync(
-                `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`,
-                { encoding: 'utf8', timeout: 15000 }
-            );
+            const raw = await new Promise((resolve, reject) => {
+                let out = '';
+                const proc = spawn('ffprobe', ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', filePath], { stdio: ['ignore', 'pipe', 'pipe'] });
+                const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 15000);
+                proc.stdout.on('data', d => out += d);
+                proc.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`ffprobe exit ${code}`)); });
+                proc.on('error', (e) => { clearTimeout(timer); reject(e); });
+            });
             const data = JSON.parse(raw);
             const fmt = data.format || {};
             const tags = fmt.tags || {};
@@ -393,7 +416,7 @@ function registerIPC() {
     // Media: extract cover art from audio file
     const coverDir = path.join(os.homedir(), '.veritas', 'covers');
     ipcMain.handle('media:getCoverArt', async (_, filePath) => {
-        if (!filePath || !fs.existsSync(filePath)) return null;
+        if (!isSafePath(filePath) || !fs.existsSync(filePath)) return null;
         try {
             if (!fs.existsSync(coverDir)) fs.mkdirSync(coverDir, { recursive: true });
             // Use filename hash as cache key
@@ -403,9 +426,12 @@ function registerIPC() {
             if (fs.existsSync(coverPath)) {
                 return 'file://' + coverPath.replace(/\\/g, '/');
             }
-            // Extract with ffmpeg
-            execSync(`ffmpeg -y -i "${filePath}" -an -vcodec mjpeg -frames:v 1 "${coverPath}"`, {
-                timeout: 15000, stdio: 'pipe'
+            // Extract with ffmpeg — spawn with array args (no shell interpolation)
+            await new Promise((resolve, reject) => {
+                const proc = spawn('ffmpeg', ['-y', '-i', filePath, '-an', '-vcodec', 'mjpeg', '-frames:v', '1', coverPath], { stdio: 'pipe' });
+                const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 15000);
+                proc.on('close', (code) => { clearTimeout(timer); resolve(code); });
+                proc.on('error', (e) => { clearTimeout(timer); reject(e); });
             });
             if (fs.existsSync(coverPath) && fs.statSync(coverPath).size > 100) {
                 return 'file://' + coverPath.replace(/\\/g, '/');
@@ -437,6 +463,7 @@ function registerIPC() {
     });
 
     ipcMain.handle('media:importToLibrary', async (_, srcPath) => {
+        if (!isSafePath(srcPath)) return { error: 'Invalid path' };
         try {
             if (!fs.existsSync(audiobookLibrary)) fs.mkdirSync(audiobookLibrary, { recursive: true });
             const fileName = path.basename(srcPath);
@@ -456,9 +483,13 @@ function registerIPC() {
         return result.canceled ? null : result.filePath;
     });
 
-    ipcMain.handle('file:exists', async (_, filePath) => fs.existsSync(filePath));
+    ipcMain.handle('file:exists', async (_, filePath) => {
+        if (!isSafePath(filePath)) return false;
+        return fs.existsSync(filePath);
+    });
 
     ipcMain.handle('file:mkdir', async (_, dirPath) => {
+        if (!isSafePath(dirPath)) return { error: 'Invalid path' };
         try {
             fs.mkdirSync(dirPath, { recursive: true });
             return { success: true };
@@ -466,6 +497,7 @@ function registerIPC() {
     });
 
     ipcMain.handle('file:delete', async (_, filePath, recursive) => {
+        if (!isSafePath(filePath)) return { error: 'Invalid path' };
         try {
             if (recursive) fs.rmSync(filePath, { recursive: true, force: true });
             else fs.unlinkSync(filePath);
@@ -474,6 +506,7 @@ function registerIPC() {
     });
 
     ipcMain.handle('file:rename', async (_, oldPath, newPath) => {
+        if (!isSafePath(oldPath) || !isSafePath(newPath)) return { error: 'Invalid path' };
         try {
             fs.renameSync(oldPath, newPath);
             return { success: true };
@@ -481,28 +514,47 @@ function registerIPC() {
     });
 
     // ── Terminal (PTY) ───────────────────────────────────────
+    const MAX_TERMINALS = 20;
     ipcMain.handle('terminal:create', async () => {
-        if (!ptyModule) return { error: 'node-pty not available' };
-        const id = `term-${++terminalCounter}`;
+        if (!ptyModule) return { error: 'node-pty not available — terminal support requires a Windows build of node-pty' };
+        if (terminals.size >= MAX_TERMINALS) return { error: `Terminal limit reached (max ${MAX_TERMINALS})` };
+
+        const cwd = (() => {
+            const candidate = process.env.HOME || os.homedir();
+            try { return fs.existsSync(candidate) ? candidate : os.tmpdir(); } catch { return os.tmpdir(); }
+        })();
+
         const shellPath = process.platform === 'win32' ? 'powershell.exe' : (process.env.SHELL || '/bin/bash');
-        const pty = ptyModule.spawn(shellPath, [], {
-            name: 'xterm-256color',
-            cols: 120, rows: 30,
-            cwd: process.env.HOME || os.homedir(),
-            env: { ...process.env, TERM: 'xterm-256color' },
-        });
+        const id = `term-${++terminalCounter}`;
+        let pty;
+        try {
+            pty = ptyModule.spawn(shellPath, [], {
+                name: 'xterm-256color',
+                cols: 120, rows: 30,
+                cwd,
+                env: { ...process.env, TERM: 'xterm-256color' },
+            });
+        } catch (spawnErr) {
+            console.error('[PTY] Spawn failed:', spawnErr.message);
+            return { error: `Shell spawn failed: ${spawnErr.message}` };
+        }
+
         terminals.set(id, pty);
 
         pty.onData((data) => {
-            mainWindow?.webContents.send('terminal:data', id, data);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('terminal:data', id, data);
+            }
         });
         pty.onExit(({ exitCode }) => {
-            mainWindow?.webContents.send('terminal:exit', id, exitCode);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('terminal:exit', id, exitCode);
+            }
             pty.removeAllListeners();
             terminals.delete(id);
         });
 
-        context.addBreadcrumb('lifecycle', `Terminal created: ${id}`);
+        context.addBreadcrumb('lifecycle', `Terminal created: ${id} shell=${shellPath} cwd=${cwd}`);
         return { id, pid: pty.pid };
     });
 
@@ -512,6 +564,8 @@ function registerIPC() {
     });
 
     ipcMain.on('terminal:resize', (_, id, cols, rows) => {
+        if (!Number.isInteger(cols) || !Number.isInteger(rows)) return;
+        if (cols < 10 || cols > 500 || rows < 3 || rows > 200) return;
         const pty = terminals.get(id);
         if (pty) try { pty.resize(cols, rows); } catch { }
     });
@@ -538,6 +592,7 @@ function registerIPC() {
 
     // ── Search ───────────────────────────────────────────────
     ipcMain.handle('search:text', async (_, dirPath, query) => {
+        if (!isSafePath(dirPath) || typeof query !== 'string' || query.length === 0 || query.length > 500) return [];
         const results = [];
         const MAX = 100;
         const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.pyc', 'dist', 'build']);
@@ -838,17 +893,25 @@ function registerIPC() {
             uptime: os.uptime(), hostname: os.hostname(),
         };
 
-        // GPU/VRAM via nvidia-smi (non-blocking best-effort)
+        // GPU/VRAM via nvidia-smi (non-blocking best-effort, spawn so no shell injection)
         try {
-            const nvOut = execSync('nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu --format=csv,noheader,nounits', { timeout: 3000, encoding: 'utf-8' });
+            const nvOut = await new Promise((resolve, reject) => {
+                let out = '';
+                const proc = spawn('nvidia-smi', ['--query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu', '--format=csv,noheader,nounits'], { stdio: ['ignore', 'pipe', 'pipe'] });
+                const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout')); }, 3000);
+                proc.stdout.on('data', d => out += d);
+                proc.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`exit ${code}`)); });
+                proc.on('error', (e) => { clearTimeout(timer); reject(e); });
+            });
             const parts = nvOut.trim().split(',').map(s => s.trim());
             if (parts.length >= 5) {
+                const [vTotal, vUsed, vFree, util] = parts.slice(1, 5).map(n => parseInt(n, 10));
                 info.gpu = {
-                    name: parts[0],
-                    vram_total_mb: parseInt(parts[1]),
-                    vram_used_mb: parseInt(parts[2]),
-                    vram_free_mb: parseInt(parts[3]),
-                    utilization: parseInt(parts[4]),
+                    name: String(parts[0]).substring(0, 100),
+                    vram_total_mb: Number.isFinite(vTotal) ? vTotal : null,
+                    vram_used_mb:  Number.isFinite(vUsed)  ? vUsed  : null,
+                    vram_free_mb:  Number.isFinite(vFree)  ? vFree  : null,
+                    utilization:   Number.isFinite(util)   ? util   : null,
                 };
             }
         } catch { }
