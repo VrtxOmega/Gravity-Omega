@@ -71,6 +71,7 @@ body {
 .titlebar-left { display: flex; align-items: center; gap: 0; -webkit-app-region: no-drag; }
 .titlebar-icon {
     font-size: 16px; font-weight: 700; color: var(--gold); padding: 0 12px;
+    font-family: 'Georgia', 'Times New Roman', serif;
     text-shadow: 0 0 12px var(--gold-glow-strong);
     animation: omegaPulse 3s infinite;
 }
@@ -556,6 +557,7 @@ body {
 .welcome-content { text-align: center; }
 .welcome-icon {
     font-size: 96px; font-weight: 700; color: var(--gold);
+    font-family: 'Georgia', 'Times New Roman', serif;
     text-shadow: 0 0 40px var(--gold-glow-strong), 0 0 80px var(--gold-glow);
     display: block; line-height: 1; margin-bottom: 16px;
     animation: omegaFloat 6s ease-in-out infinite;
@@ -663,6 +665,7 @@ body {
 .chat-welcome { text-align: center; padding: 40px 16px; }
 .chat-welcome-icon {
     font-size: 48px; color: var(--gold); display: block;
+    font-family: 'Georgia', 'Times New Roman', serif;
     text-shadow: 0 0 30px var(--gold-glow-strong);
     margin-bottom: 12px;
 }
@@ -1049,6 +1052,7 @@ body {
 .status-branch { color: var(--gold); }
 .status-omega-badge {
     color: var(--gold-bright); font-weight: 600;
+    font-family: 'Georgia', 'Times New Roman', serif;
     text-shadow: 0 0 8px var(--gold-glow);
 }
 
