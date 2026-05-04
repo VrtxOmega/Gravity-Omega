@@ -51,6 +51,11 @@ class OmegaAgent {
         this._stepChainHash = null;
         this._exitReason = null;
 
+        // v5.2: Execution mode — prevents planning-is-executing failures
+        // When true, the agent MUST mutate source files before TASK_COMPLETE is accepted.
+        this._executionMode = false;
+        this._executionPlanFile = null;
+
         // v5.0: Active model (set per-request from UI dropdown)
         this._activeModel = 'deepseek-v4-pro';
 
@@ -71,6 +76,10 @@ class OmegaAgent {
 
         // v6.0: Dynamic skill manager — load veritas_protocol, naef_mode, etc. on demand
         this.skillManager = new SkillManager(__dirname);
+        // v6.1: Auto-load codegen guards — prevents Python bugs in WSL/Linux
+        // Failure history: HERMES_SHOWCASE crash (2026-05-03) — python vs python3,
+        // CSS braces vs .format(), CSV whitespace vs DictReader
+        this.skillManager.load('python_codegen_guard');
     }
 
     // ── Hermes Channel (v5.1) ─────────────────────────────────────────────────
@@ -231,6 +240,16 @@ class OmegaAgent {
         this._stepChainHash = crypto.createHash('sha256').update(`GENESIS:${Date.now()}`).digest('hex');
         this._exitReason = null;
 
+        // v5.2: Classify task type — prevent planning-is-executing failures.
+        // If user says "execute/implement/apply" and references a plan file,
+        // enter execution mode — requires at least one file mutation before done.
+        this._executionMode = this._detectExecutionMode(text, attachments);
+        this._executionPlanFile = null;
+        if (this._executionMode) {
+            this._executionPlanFile = this._extractPlanFile(text, attachments);
+            this.context.addBreadcrumb('agent', `Execution mode: plan file ${this._executionPlanFile || 'detected'}`, {}, 'info');
+        }
+
         // v4.2: Emit start event for thinking indicator
         this._emitProgress({ phase: 'start', label: 'Analyzing request...', iteration: 0, totalSteps: 0 });
 
@@ -314,6 +333,15 @@ class OmegaAgent {
                 const parsed = this._parseResponse(llmResponse);
 
                 if (parsed.type === 'response') {
+                    // v5.2: Execution mode guard — reject TASK_COMPLETE if zero mutations.
+                    if (this._executionMode && this._countMutations() === 0) {
+                        this.context.addBreadcrumb('agent', 'Execution guard: TASK_COMPLETE rejected (0 mutations). Continuing loop.', {}, 'warning');
+                        messages.push({
+                            role: 'user',
+                            content: `⛔ EXECUTION MODE ACTIVE: You were asked to EXECUTE (not plan). You must mutate source files (writeFile/editFile), not just produce reports. Plan file: ${this._executionPlanFile || 'detected'}. You have made ZERO file mutations so far. Execute the plan — modify actual source files — then report. Do NOT stop until files are changed.`
+                        });
+                        continue;
+                    }
                     finalResponse = { type: 'chat', message: this._sanitizeForChat(parsed.content), steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
@@ -1664,6 +1692,15 @@ class OmegaAgent {
                 const parsed = this._parseResponse(llmResponse);
 
                 if (parsed.type === 'response') {
+                    // v5.2: Execution mode guard — reject TASK_COMPLETE if zero mutations.
+                    if (this._executionMode && this._countMutations() === 0) {
+                        this.context.addBreadcrumb('agent', 'Execution guard: TASK_COMPLETE rejected (0 mutations). Continuing loop.', {}, 'warning');
+                        messages.push({
+                            role: 'user',
+                            content: `⛔ EXECUTION MODE ACTIVE: You were asked to EXECUTE (not plan). You must mutate source files (omega_write_file/omega_exec), not just produce reports. Plan file: ${this._executionPlanFile || 'detected'}. You have made ZERO file mutations so far. Execute the plan — modify actual source files — then report. Do NOT stop until files are changed.`
+                        });
+                        continue;
+                    }
                     finalResponse = { type: 'chat', message: this._sanitizeForChat(parsed.content), steps: this._stepLog.length, stepLog: this._stepLog, exitReason: 'TASK_COMPLETE' };
                     break;
                 }
@@ -1779,6 +1816,62 @@ class OmegaAgent {
             // Keep system context + recent messages
             this._conversationHistory = this._conversationHistory.slice(-this._maxHistory);
         }
+    }
+
+    // ── v5.2: Execution Mode Guards (Claude Code-inspired) ─────────────
+
+    /**
+     * Classify whether the user is asking to EXECUTE a plan vs. plan something new.
+     * Triggers on keywords: execute, implement, apply, carry out, run the plan
+     * AND presence of a plan/report file reference or attachment.
+     */
+    _detectExecutionMode(text, attachments) {
+        const execWords = /\b(execute|implement|apply|carry\s*out|run\s*the\s*plan|fire\s*it\s*up|do\s*it)\b/i;
+        if (!execWords.test(text || '')) return false;
+
+        // Check if text references a plan/audit/optimization file
+        const planRef = /(plan|audit|implementation|optimization).*\.(md|txt|json)/i;
+        if (planRef.test(text || '')) return true;
+
+        // Check attachments for plan files
+        if (attachments && attachments.length > 0) {
+            for (const a of attachments) {
+                const name = (a.file && a.file.name) ? a.file.name : (a.name || '');
+                if (/plan|audit|implementation|optimization/i.test(name)) return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Extract the plan file path from the user's request or attachments.
+     */
+    _extractPlanFile(text, attachments) {
+        const match = (text || '').match(/([\w\/\\-]+(?:plan|audit|implementation|optimization)\.\w+)/i);
+        if (match) return match[1];
+
+        if (attachments && attachments.length > 0) {
+            for (const a of attachments) {
+                const name = (a.file && a.file.name) ? a.file.name : (a.name || '');
+                if (/plan|audit|implementation|optimization/i.test(name)) return name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Count file mutations in the step log (writeFile, editFile, omega_write_file, MUT:AST).
+     * Used by the execution guard to reject TASK_COMPLETE when zero mutations occurred.
+     */
+    _countMutations() {
+        const mutationTools = ['writefile', 'editfile', 'omega_write_file', 'omega_writefile',
+                                'mut:ast', 'sys_write', 'patch', 'file_write', 'filewrite'];
+        return this._stepLog.filter(s => {
+            const tool = (s.tool || s.tgt || '').toLowerCase().replace(/[\s_-]+/g, '');
+            return mutationTools.some(mt => tool.includes(mt));
+        }).length;
     }
 
     // v5.2: Model name resolver — maps UI/friendly names to exact backend names.
