@@ -8,12 +8,13 @@
     const toolbar = document.getElementById('editor-toolbar');
     if (!toolbar) return;
 
-    // Create preview button
+    // Create preview button — hidden until a .md file is active
     const previewBtn = document.createElement('button');
     previewBtn.className = 'editor-toolbar-btn';
     previewBtn.id = 'btn-md-preview';
-    previewBtn.title = 'Preview Markdown (Ctrl+Shift+P)';
-    previewBtn.textContent = '👁 Preview';
+    previewBtn.title = 'Side-by-side Markdown preview (Ctrl+Shift+P)';
+    previewBtn.textContent = '⊞ Split Preview';
+    previewBtn.style.display = 'none';
     toolbar.appendChild(previewBtn);
 
     // Create preview panel
@@ -111,21 +112,30 @@
             .replace(/>/g, '&gt;');
     }
 
-    // Auto-update preview when file changes
-    const origSwitchToFile = switchToFile;
-    if (typeof switchToFile === 'function') {
+    // Auto-update preview button visibility and content when file changes
+    // Use DOMContentLoaded-style defer so we hook after app.js has run
+    function installSwitchHook() {
+        if (typeof switchToFile !== 'function') return; // app.js not ready yet
+        const orig = switchToFile;
         switchToFile = function(filePath) {
-            origSwitchToFile(filePath);
-            if (previewVisible) {
-                const isMd = filePath && filePath.toLowerCase().endsWith('.md');
-                if (isMd) renderMarkdown();
-                else {
-                    previewVisible = false;
-                    previewPanel.classList.remove('visible');
-                    previewBtn.classList.remove('active');
-                }
+            orig(filePath);
+            const isMd = filePath && filePath.toLowerCase().endsWith('.md');
+            previewBtn.style.display = isMd ? '' : 'none';
+            if (!isMd && previewVisible) {
+                previewVisible = false;
+                previewPanel.classList.remove('visible');
+                previewBtn.classList.remove('active');
+                const monacoEl = document.getElementById('monaco-container');
+                if (monacoEl) monacoEl.style.width = '';
             }
+            if (isMd && previewVisible) renderMarkdown();
         };
+    }
+
+    // Try immediately (app.js may have already run), then retry after a tick
+    installSwitchHook();
+    if (typeof switchToFile !== 'function' || !switchToFile._mdHooked) {
+        setTimeout(installSwitchHook, 0);
     }
 
     previewBtn.addEventListener('click', togglePreview);
