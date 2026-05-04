@@ -7,7 +7,7 @@
     <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob: data:; media-src 'self' file: blob: data:; img-src 'self' data: https://api.qrserver.com; connect-src 'self' http://127.0.0.1:* https://generativelanguage.googleapis.com;">
     <title>Gravity Omega</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/omega.css">
     <link rel="stylesheet" href="../node_modules/xterm/css/xterm.css">
 </head>
@@ -550,7 +550,38 @@
                         <div class="chat-thread-list" id="chat-thread-list"></div>
                     </div>
                 </div>
-                <div class="chat-header-actions">
+                <!-- Inline Chat Model Selector -->
+                <div class="chat-model-selector" style="margin-left:8px;">
+                    <select id="chat-model-dropdown" class="chat-header-model" style="border:none; cursor:pointer;">
+                        <optgroup label="☁️ Cloud Models">
+                            <option value="qwen3.5:397b-cloud">qwen3.5 · 397B (Cloud)</option>
+                            <option value="deepseek-v3.1:671b-cloud">deepseek-v3.1 · 671B (Cloud)</option>
+                            <option value="qwen3-coder:480b-cloud">qwen3-coder · 480B (Cloud)</option>
+                            <option value="kimi-k2:1t-cloud">kimi-k2 · 1T (Cloud)</option>
+                            <option value="gpt-oss:120b-cloud">gpt-oss · 120B (Cloud)</option>
+                            <option value="gpt-oss:20b-cloud">gpt-oss · 20B (Cloud)</option>
+                            <option value="qwen3-vl:235b-cloud">qwen3-vl · 235B (Cloud)</option>
+                            <option value="glm-4.6:cloud">glm-4.6 (Cloud)</option>
+                        </optgroup>
+                        <optgroup label="💻 Local Models">
+                            <option value="qwen3:8b">qwen3 · 8B</option>
+                            <option value="qwen2.5:7b">qwen2.5 · 7B</option>
+                            <option value="qwen2.5:3b">qwen2.5 · 3B</option>
+                            <option value="gemma3:4b">gemma3 · 4B</option>
+                            <option value="gemma2:9b">gemma2 · 9B</option>
+                            <option value="deepseek-r1:7b">deepseek-r1 · 7B</option>
+                            <option value="phi4-mini">phi4-mini</option>
+                            <option value="veritas-omni:latest">veritas-omni</option>
+                            <option value="gemma2:sentinel-omega">gemma2 · sentinel-omega</option>
+                        </optgroup>
+                        <optgroup label="🤖 Agent Backends">
+                            <option value="hermes-acp">Hermes ACP · Full Agent</option>
+                        </optgroup>
+                    </select>
+                    <span id="hermes-status-badge" style="display:none; margin-left:6px; font-size:10px; font-weight:700; color:var(--gold-bright); background:var(--gold-glow); padding:1px 6px; border-radius:10px; letter-spacing:0.5px; vertical-align:middle;"></span>
+                </div>
+
+                <div class="chat-header-actions" style="margin-left:auto;">
                     <button class="chat-action-btn" id="btn-new-thread" title="New conversation">+</button>
                     <button class="chat-action-btn" id="btn-clear-chat" title="Clear conversation">⌫</button>
                     <button class="chat-action-btn" id="btn-toggle-chat" title="Close panel">&#10005;</button>
