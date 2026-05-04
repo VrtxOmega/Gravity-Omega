@@ -436,7 +436,13 @@
             <div id="editor-tabs">
                 <div class="tab active" data-tab="welcome"><span class="tab-name">Welcome</span></div>
             </div>
-            <div id="editor-toolbar"></div>
+            <div id="editor-toolbar">
+                <!-- File action buttons — shown when a file is open, hidden on welcome screen -->
+                <div id="editor-actions" class="hidden">
+                    <button id="btn-toggle-markdown" class="editor-toolbar-btn">Preview</button>
+                    <button id="btn-analyzer" class="editor-toolbar-btn editor-toolbar-btn-accent">Analyze</button>
+                </div>
+            </div>
             <div id="editor-container">
                 <div id="welcome-screen">
                     <div class="welcome-content">
@@ -449,10 +455,6 @@
                             <button class="welcome-btn welcome-btn-accent" id="btn-welcome-omega">Command Center</button>
                         </div>
                     </div>
-                </div>
-                <div id="editor-actions" style="position:absolute; right:10px; top:5px; z-index:100" class="hidden">
-                    <button id="btn-toggle-markdown" class="titlebar-btn" style="border:1px solid var(--gold); border-radius:3px; padding:2px 8px; font-size:11px; margin-right:5px; background:var(--black2); color:var(--gold);">PREVIEW</button>
-                    <button id="btn-analyzer" class="titlebar-btn" style="border:1px solid var(--gold); border-radius:3px; padding:2px 8px; font-size:11px; background:var(--gold); color:var(--black);">ANALYZE REPORT</button>
                 </div>
                 <div id="monaco-container" class="hidden"></div>
                 <div id="json-viewer" class="viewer hidden"></div>

@@ -611,12 +611,14 @@ function switchToFile(filePath) {
 
 
     // Hide all viewers
+    const toolbarEl = document.getElementById('editor-toolbar');
 
     [monacoEl, welcomeEl, jsonEl, mdEl, imgEl, analyzerEl, actionsEl].forEach(
 
         el => { if (el) el.classList.add('hidden') }
 
     );
+    if (toolbarEl) toolbarEl.classList.add('toolbar-hidden');
 
 
 
@@ -628,7 +630,8 @@ function switchToFile(filePath) {
 
     } else {
 
-        // Show analyzer actions for standard document formats
+        // Show toolbar + analyzer actions for standard document formats
+        if (toolbarEl) toolbarEl.classList.remove('toolbar-hidden');
 
         if (actionsEl) {
 
@@ -2126,11 +2129,12 @@ async function sendChatMessage() {
 
 
 
-    // Show live thinking indicator
-
+    // Show live thinking indicator — pinned to panel bottom so it's always visible
     const thinkingEl = createThinkingIndicator();
-
-    document.getElementById('chat-messages').appendChild(thinkingEl);
+    const chatInputArea = document.querySelector('#omega-chat-panel .chat-input-area');
+    const chatPanel = document.getElementById('omega-chat-panel');
+    if (chatInputArea && chatPanel) chatPanel.insertBefore(thinkingEl, chatInputArea);
+    else document.getElementById('chat-messages').appendChild(thinkingEl);
 
     scrollChat();
 
@@ -2833,8 +2837,10 @@ async function approveProposal(id) {
 
 
     const thinkingEl = createThinkingIndicator();
-
-    document.getElementById('chat-messages').appendChild(thinkingEl);
+    const _chatInputArea = document.querySelector('#omega-chat-panel .chat-input-area');
+    const _chatPanel = document.getElementById('omega-chat-panel');
+    if (_chatInputArea && _chatPanel) _chatPanel.insertBefore(thinkingEl, _chatInputArea);
+    else document.getElementById('chat-messages').appendChild(thinkingEl);
 
     scrollChat();
 
@@ -2889,8 +2895,10 @@ async function approveProposal(id) {
             showToast('Approved ✅ — continuing...', 'success');
 
             const contThinkingEl = createThinkingIndicator();
-
-            document.getElementById('chat-messages').appendChild(contThinkingEl);
+            const _ca2 = document.querySelector('#omega-chat-panel .chat-input-area');
+            const _cp2 = document.getElementById('omega-chat-panel');
+            if (_ca2 && _cp2) _cp2.insertBefore(contThinkingEl, _ca2);
+            else document.getElementById('chat-messages').appendChild(contThinkingEl);
 
             scrollChat();
 
