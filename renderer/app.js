@@ -1,4 +1,4 @@
-/**
+﻿/**
  * GRAVITY OMEGA v5.2 — Renderer Application
  *
  * Orchestrates the entire UI:
@@ -269,7 +269,7 @@ function switchToFile(filePath) {
             try {
                 const raw = file.model.getValue();
                 const html = window.DOMPurify ? window.DOMPurify.sanitize(window.marked.parse(raw)) : raw;
-                mdEl.textContent = html;
+                mdEl.innerHTML = html;
             } catch(e) {
                 console.error("Marked failed", e);
                 mdEl.innerText = file.model.getValue();
@@ -318,7 +318,7 @@ function addTab(filePath, name) {
     const tab = document.createElement('div');
     tab.className = 'tab';
     tab.dataset.tab = filePath;
-    tab.textContent = `<span class="tab-name">${name}</span><span class="tab-close" title="Close">×</span>`;
+    tab.innerHTML = `<span class="tab-name">${name}</span><span class="tab-close" title="Close">×</span>`;
     tab.addEventListener('click', (e) => {
         if (e.target.classList.contains('tab-close')) {
             closeTab(filePath);
@@ -396,7 +396,7 @@ function createFileEntry(entry, depth) {
     el.style.paddingLeft = `${12 + depth * 16}px`;
 
     const icon = entry.isDirectory ? '📁' : getFileIcon(entry.name);
-    el.textContent = `<span class="file-icon">${icon}</span><span class="file-name">${entry.name}</span>`;
+    el.innerHTML = `<span class="file-icon">${icon}</span><span class="file-name">${entry.name}</span>`;
 
     if (entry.isDirectory) {
         el.dataset.dir = entry.path;
@@ -453,7 +453,10 @@ async function createTerminal() {
     }
     const result = await window.omega.terminal.create();
     if (result.error) {
+        console.error('[Terminal] Create failed:', result.error);
         showToast(`Terminal error: ${result.error}`, 'error');
+        const container = document.getElementById('terminal-container');
+        if (container) container.innerHTML = `<div style="padding:12px;color:#e06060;font-family:monospace;font-size:12px;">Terminal error: ${result.error}<br>Check DevTools console (Ctrl+Shift+I) for details.</div>`;
         return;
     }
 
@@ -517,7 +520,7 @@ function switchTerminal(id) {
 
     // Attach terminal to container
     const container = document.getElementById('terminal-container');
-    container.textContent = '';
+    container.innerHTML = '';
     info.terminal.open(container);
     setTimeout(() => {
         info.fitAddon.fit();
@@ -657,7 +660,7 @@ function createThinkingIndicator() {
 
     const header = document.createElement('div');
     header.className = 'thinking-header';
-    header.textContent = `
+    header.innerHTML = `
         <span class="thinking-icon">Ω</span>
         <span class="thinking-label">Thinking...</span>
         <span class="thinking-timer">0.0s</span>
@@ -712,21 +715,21 @@ function createThinkingIndicator() {
 
         switch (event.phase) {
             case 'start':
-                step.textContent = `<span class="step-icon">🎯</span> Analyzing request...`;
+                step.innerHTML = `<span class="step-icon">🎯</span> Analyzing request...`;
                 labelEl.textContent = 'Analyzing...';
                 break;
             case 'provenance':
-                step.textContent = `<span class="step-icon">📚</span> Loaded ${event.fragments} Vault fragments`;
+                step.innerHTML = `<span class="step-icon">📚</span> Loaded ${event.fragments} Vault fragments`;
                 labelEl.textContent = 'Consulting Vault...';
                 break;
             case 'thinking':
-                step.textContent = `<span class="step-icon">🧠</span> ${event.label || `Reasoning step ${event.iteration}`}`;
+                step.innerHTML = `<span class="step-icon">🧠</span> ${event.label || `Reasoning step ${event.iteration}`}`;
                 labelEl.textContent = event.label || 'Thinking...';
                 break;
             case 'tool': {
                 const label = event.label || event.tool || 'Action';
                 const argsPreview = event.args ? ` — ${event.args}` : '';
-                step.textContent = `<span class="step-icon spinning">⚙️</span> ${label}${argsPreview}`;
+                step.innerHTML = `<span class="step-icon spinning">⚙️</span> ${label}${argsPreview}`;
                 step.classList.add('active');
                 labelEl.textContent = `${label}...`;
                 break;
@@ -791,7 +794,7 @@ async function createNewThread() {
         // Re-add welcome message
         const welcome = document.createElement('div');
         welcome.className = 'chat-welcome';
-        welcome.textContent = '<span class="chat-welcome-icon">Ω</span><p class="chat-welcome-text">I\'m Omega — your brilliant, slightly cheeky AI partner. Ask me anything, love.</p>';
+        welcome.innerHTML = '<span class="chat-welcome-icon"><span class="omega-serif">Ω</span></span><p class="chat-welcome-text">I\'m Omega — your brilliant, slightly cheeky AI partner. Ask me anything, love.</p>';
         document.getElementById('chat-messages').appendChild(welcome);
         updateThreadTitle('New Conversation');
         closeThreadDropdown();
@@ -820,7 +823,7 @@ async function switchThread(threadId) {
         if (thread.messages.length === 0) {
             const welcome = document.createElement('div');
             welcome.className = 'chat-welcome';
-            welcome.textContent = '<span class="chat-welcome-icon">Ω</span><p class="chat-welcome-text">I\'m Omega — your brilliant, slightly cheeky AI partner. Ask me anything, love.</p>';
+            welcome.innerHTML = '<span class="chat-welcome-icon"><span class="omega-serif">Ω</span></span><p class="chat-welcome-text">I\'m Omega — your brilliant, slightly cheeky AI partner. Ask me anything, love.</p>';
             container.appendChild(welcome);
         } else {
             for (const msg of thread.messages) {
@@ -870,10 +873,10 @@ async function refreshThreadList(filter = '') {
             threads = threads.filter(t => t.title.toLowerCase().includes(lower) || (t.preview || '').toLowerCase().includes(lower));
         }
         if (threads.length === 0) {
-            list.textContent = '<div class="chat-thread-empty">No threads found</div>';
+            list.innerHTML = '<div class="chat-thread-empty">No threads found</div>';
             return;
         }
-        list.textContent = threads.map(t => {
+        list.innerHTML = threads.map(t => {
             const isActive = t.id === state.chat.activeThreadId;
             const date = new Date(t.updatedAt);
             const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -886,7 +889,7 @@ async function refreshThreadList(filter = '') {
             </div>`;
         }).join('');
     } catch (err) {
-        list.textContent = '<div class="chat-thread-empty">Error loading threads</div>';
+        list.innerHTML = '<div class="chat-thread-empty">Error loading threads</div>';
     }
 }
 
@@ -980,7 +983,7 @@ async function sendChatMessage() {
 function addClickableStepsBadge(parentEl, steps, stepLog) {
     const badge = document.createElement('div');
     badge.className = 'msg-steps clickable';
-    badge.textContent = `⚡ ${steps} tool steps executed <span class="steps-toggle">▸</span>`;
+    badge.innerHTML = `⚡ ${steps} tool steps executed <span class="steps-toggle">▸</span>`;
 
     const details = document.createElement('div');
     details.className = 'steps-detail collapsed';
@@ -1331,7 +1334,7 @@ async function loadVaultPanel() {
             statusEl.textContent = '✅ Connected';
             statusEl.style.color = 'var(--green)';
         } else {
-            ctxEl.textContent = '<div class="reports-empty">Vault not connected</div>';
+            ctxEl.innerHTML = '<div class="reports-empty">Vault not connected</div>';
             statusEl.textContent = '⚠️ Not connected';
             statusEl.style.color = 'var(--orange)';
         }
@@ -1352,7 +1355,7 @@ async function loadVaultPanel() {
                 </div>`;
             }).join('');
         } else {
-            sessEl.textContent = '<div class="reports-empty">No sessions found</div>';
+            sessEl.innerHTML = '<div class="reports-empty">No sessions found</div>';
         }
     } catch { }
 
@@ -1375,7 +1378,7 @@ async function loadVaultPanel() {
                 }).join('')}
             `;
         } else {
-            healthEl.textContent = '<div class="reports-empty">No KI data</div>';
+            healthEl.innerHTML = '<div class="reports-empty">No KI data</div>';
         }
     } catch { }
 
@@ -1453,7 +1456,7 @@ async function performSearch() {
     const resultsEl = document.getElementById('search-results');
 
     if (!Array.isArray(results) || results.length === 0) {
-        resultsEl.textContent = '<div class="reports-empty">No results found</div>';
+        resultsEl.innerHTML = '<div class="reports-empty">No results found</div>';
         return;
     }
 
@@ -1704,7 +1707,7 @@ function initEventListeners() {
         if (!query) return;
         const results = await window.omega.vault.search(query);
         const resultsEl = document.getElementById('vault-search-results');
-        resultsEl.textContent = results?.error
+        resultsEl.innerHTML = results?.error
             ? `<div class="reports-empty">${results.error}</div>`
             : (Array.isArray(results) ? results.slice(0, 15).map(r => `<div class="search-result"><div class="file-path">${r.timestamp || r.source || ''}</div><div class="match-text">${r.title || r.content || r.summary || ''}</div></div>`).join('') : '<div class="reports-empty">No results</div>');
     });
@@ -1781,7 +1784,7 @@ function initEventListeners() {
         if (!query) return;
         const results = await window.omega.ledger.search(query);
         const entriesEl = document.getElementById('ledger-entries');
-        entriesEl.textContent = results?.error
+        entriesEl.innerHTML = results?.error
             ? `<div class="reports-empty">${results.error}</div>`
             : (Array.isArray(results) ? results.slice(0, 15).map(e => `<div class="search-result"><div class="file-path">${e.timestamp || ''} — ${e.module_id || ''}</div><div class="match-text">${e.action || e.data || ''}</div></div>`).join('') : '<div class="reports-empty">No results</div>');
     });
@@ -1899,14 +1902,14 @@ window.loadEvolutionPanel = async function() {
     const healthEl = document.getElementById('evolution-health-status');
     if (!queueEl || !healthEl) return;
     
-    queueEl.textContent = '<div class="reports-empty">Scanning for harness patches...</div>';
+    queueEl.innerHTML = '<div class="reports-empty">Scanning for harness patches...</div>';
     
     try {
         const resp = await fetch('http://127.0.0.1:5000/api/evolution/proposals', { headers: { 'X-Omega-Auth': 'sentinel' }});
         const proposals = await resp.json();
         
         if (!proposals || proposals.length === 0) {
-            queueEl.textContent = '<div class="reports-empty">No pending manifests.</div>';
+            queueEl.innerHTML = '<div class="reports-empty">No pending manifests.</div>';
             healthEl.textContent = 'Stable';
             healthEl.style.color = 'var(--green)';
             return;
@@ -1931,7 +1934,7 @@ window.loadEvolutionPanel = async function() {
             </div>
         `).join('');
     } catch (e) {
-        queueEl.textContent = `<div class="reports-empty" style="color: var(--red)">Error loading queue: ${e.message}</div>`;
+        queueEl.innerHTML = `<div class="reports-empty" style="color: var(--red)">Error loading queue: ${e.message}</div>`;
         healthEl.textContent = 'Offline';
     }
 }
@@ -2031,7 +2034,7 @@ window.sentinelToggle = async function(action) {
         const bubble = document.createElement('div');
         bubble.id = 'media-bubble';
         bubble.className = 'media-bubble';
-        bubble.textContent = '<div class="media-bubble-collapsed" id="media-bubble-collapsed">'
+        bubble.innerHTML = '<div class="media-bubble-collapsed" id="media-bubble-collapsed">'
             + '<span class="media-bubble-icon">\u{1F3B5}</span>'
             + '<span class="media-bubble-title" id="media-bubble-title">No track</span>'
             + '<button class="media-bubble-btn" id="media-bubble-play">\u25B6</button>'
@@ -2456,7 +2459,7 @@ window.sentinelToggle = async function(action) {
             keys.forEach(function(group) {
                 var header = document.createElement('div');
                 header.className = 'media-group-header';
-                header.textContent = '<span class="media-group-toggle">▼</span> ' + group
+                header.innerHTML = '<span class="media-group-toggle">▼</span> ' + group
                     + ' <span class="media-group-count">(' + groups[group].length + ')</span>';
                 header.style.cssText = 'padding:6px 10px;color:#d4a017;font-size:11px;font-weight:600;cursor:pointer;user-select:none;border-bottom:1px solid rgba(212,160,23,0.15);background:rgba(212,160,23,0.05);';
                 var section = document.createElement('div');
@@ -2496,7 +2499,7 @@ window.sentinelToggle = async function(action) {
                         thumbHtml = '<img class="media-item-thumb" src="' + cover + '" alt="" />';
                     }
 
-                    item.textContent = (thumbHtml || '<span class="media-local-item-icon">' + icon + '</span>')
+                    item.innerHTML = (thumbHtml || '<span class="media-local-item-icon">' + icon + '</span>')
                         + '<div class="media-local-item-info">'
                         + '<span class="media-local-item-name">' + titleText + '</span>'
                         + (subtitle ? '<span class="media-local-item-meta">' + subtitle + '</span>' : '')
