@@ -549,7 +549,9 @@ body {
     border-bottom: 1px solid var(--border);
     flex-shrink: 0; min-height: 0; overflow: hidden;
 }
-#editor-toolbar:empty { display: none; height: 0; padding: 0; border: none; }
+#editor-toolbar.toolbar-hidden { display: none; height: 0; padding: 0; border: none; }
+#editor-actions { display: flex; align-items: center; gap: 6px; }
+#editor-actions.hidden { display: none; }
 .editor-toolbar-btn {
     padding: 3px 10px; font-size: 11px; border-radius: 3px;
     border: 1px solid var(--border); cursor: pointer;
@@ -558,6 +560,10 @@ body {
 }
 .editor-toolbar-btn:hover { border-color: var(--gold); color: var(--gold); }
 .editor-toolbar-btn.active { background: var(--gold-glow); color: var(--gold-bright); border-color: var(--gold); }
+.editor-toolbar-btn-accent {
+    background: rgba(212,168,67,0.15); color: var(--gold); border-color: var(--gold-dim);
+}
+.editor-toolbar-btn-accent:hover { background: rgba(212,168,67,0.25); border-color: var(--gold); }
 /* Side-by-side markdown preview panel */
 #md-preview-panel {
     position: absolute; top: 0; right: 0; bottom: 0;
@@ -771,13 +777,17 @@ body {
 }
 
 /* ── Thinking Indicator (v4.2) ──────────────────────────────── */
+/* Pinned between .chat-messages and .chat-input-area so it's always visible */
 .thinking-indicator {
-    align-self: flex-start; width: 95%;
+    flex-shrink: 0;
+    margin: 0 12px 6px;
     border-radius: var(--radius-lg);
     background: linear-gradient(135deg, rgba(212,168,67,0.08), rgba(17,17,17,0.95));
     border: 1px solid rgba(212,168,67,0.25);
-    overflow: hidden;  /* v4.3.19h: clip horizontal bleed from long step text */
-    animation: msgAppear 0.3s ease-out, thinkingGlow 3s ease-in-out infinite;
+    border-top: 2px solid rgba(212,168,67,0.4);
+    overflow: hidden;
+    animation: thinkingGlow 3s ease-in-out infinite;
+    max-height: 220px;
 }
 @keyframes thinkingGlow {
     0%, 100% { border-color: rgba(212,168,67,0.25); box-shadow: 0 0 0 rgba(212,168,67,0); }
