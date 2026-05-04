@@ -369,7 +369,11 @@ function initMonaco() {
 
 
 
-    state.editor = monaco.editor.create(document.getElementById('monaco-container'), {
+    // Show a loading placeholder until Monaco finishes creating the editor
+    const monacoContainer = document.getElementById('monaco-container');
+    monacoContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary,#666);font-family:var(--font-ui,sans-serif);font-size:13px;gap:8px;"><span style="animation:spinGear 1s linear infinite;display:inline-block;">⟳</span> Initializing editor…</div>';
+
+    state.editor = monaco.editor.create(monacoContainer, {
 
         value: '',
 
@@ -406,6 +410,9 @@ function initMonaco() {
         renderWhitespace: 'selection',
 
     });
+
+    // Clear loading placeholder — Monaco has taken over the container
+    monacoContainer.querySelector('div')?.remove();
 
 
 
