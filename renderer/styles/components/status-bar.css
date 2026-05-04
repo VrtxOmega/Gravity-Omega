@@ -1,0 +1,13 @@
+/* ── Status Bar ─────────────────────────────────────────────── */
+#status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    height: var(--statusbar-height); padding: 0 12px; font-size: 13px;
+    background: var(--bg-secondary); border-top: 1px solid var(--border);
+}
+.status-left, .status-right { display: flex; gap: 12px; align-items: center; }
+.status-item { color: var(--text-tertiary); font-size: 12px; }
+.status-branch { color: var(--gold); }
+.status-omega-badge {
+    color: var(--gold-bright); font-weight: 600;
+    text-shadow: 0 0 8px var(--gold-glow);
+}

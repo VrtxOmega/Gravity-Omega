@@ -1,0 +1,64 @@
+/* ══════════════════════════════════════════════════════════════
+   GRAVITY OMEGA v2.0 — Gold/Black Theme
+   Glassmorphism | Micro-Animations | Ω Glow Effects
+   ══════════════════════════════════════════════════════════════ */
+
+
+/* ── CSS Variables ──────────────────────────────────────────── */
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #111111;
+    --bg-tertiary: #1a1a1a;
+    --bg-elevated: #222222;
+    --bg-hover: #2a2a2a;
+    --bg-active: #333333;
+    --border: #2a2a2a;
+    --border-focused: #d4a843;
+    --text-primary: #e0e0e0;
+    --text-secondary: #999;
+    --text-tertiary: #666;
+    --gold: #d4a843;
+    --gold-bright: #f0c040;
+    --gold-dim: #a0802a;
+    --gold-glow: rgba(212, 168, 67, 0.25);
+    --gold-glow-strong: rgba(212, 168, 67, 0.5);
+    --red: #e06060;
+    --green: #60c060;
+    --blue: #60a0e0;
+    --cyan: #50d0d0;
+    --orange: #e0a040;
+    --purple: #b060d0;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --sidebar-width: 220px;
+    --chat-width: 420px;
+    --activity-bar-width: 48px;
+    --titlebar-height: 32px;
+    --statusbar-height: 24px;
+    --panel-height: 120px;
+    --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --font-ui: 'Inter', -apple-system, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+}
+
+
+/* ── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--gold-glow); color: var(--gold-bright); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--gold-dim); border-radius: 3px;
+    transition: background var(--transition);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }

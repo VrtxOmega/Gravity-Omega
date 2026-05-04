@@ -1,0 +1,54 @@
+/* ── Resize Handles ─────────────────────────────────────────── */
+.resize-handle {
+    width: 4px; cursor: col-resize; background: transparent;
+    transition: background var(--transition); flex-shrink: 0;
+    position: relative;
+}
+.resize-handle:hover, .resize-handle.active { background: var(--gold); }
+.resize-handle.locked {
+    cursor: default; background: rgba(212,168,67,0.15);
+}
+.resize-handle.locked:hover { background: rgba(212,168,67,0.25); }
+.resize-handle-h {
+    height: 4px; cursor: row-resize; background: transparent;
+    transition: background var(--transition); position: relative;
+}
+.resize-handle-h:hover, .resize-handle-h.active { background: var(--gold); }
+.resize-handle-h.locked {
+    cursor: default; background: rgba(212,168,67,0.15);
+}
+.resize-handle-h.locked:hover { background: rgba(212,168,67,0.25); }
+
+/* Lock toggle button on resize handles */
+.resize-lock-btn {
+    position: absolute; z-index: 10;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--bg-primary); border: 1px solid var(--gold-dim);
+    color: var(--gold-dim); font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s, background 0.2s, color 0.2s, border-color 0.2s;
+}
+.resize-handle:hover .resize-lock-btn,
+.resize-handle-h:hover .resize-lock-btn,
+.resize-lock-btn.visible {
+    opacity: 1; pointer-events: auto;
+}
+.resize-lock-btn:hover {
+    background: var(--bg-hover); border-color: var(--gold); color: var(--gold-bright);
+}
+.resize-lock-btn.locked {
+    opacity: 1; pointer-events: auto;
+    background: var(--bg-primary); border-color: var(--gold);
+    color: var(--gold-bright);
+}
+.resize-lock-btn.locked:hover {
+    background: var(--bg-hover); border-color: var(--gold-bright);
+}
+/* Position lock buttons: vertical handles = centered Y, horizontal = centered X */
+.resize-handle .resize-lock-btn {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+.resize-handle-h .resize-lock-btn {
+    left: 50%; top: 50%; transform: translate(-50%, -50%);
+}

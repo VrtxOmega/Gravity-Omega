@@ -1,0 +1,18 @@
+/* ── File Tree ──────────────────────────────────────────────── */
+.panel-section { padding: 0; }
+.panel-section-header {
+    padding: 10px 14px; font-size: 13px; font-weight: 600;
+    color: var(--text-secondary); cursor: pointer; letter-spacing: 0.5px;
+    transition: color var(--transition);
+}
+.panel-section-header:hover { color: var(--gold); }
+.file-tree { font-size: 14px; }
+.file-entry {
+    padding: 3px 12px 3px 0; cursor: pointer; display: flex; align-items: center;
+    gap: 6px; transition: background var(--transition);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.file-entry:hover { background: var(--bg-hover); }
+.file-entry.active { background: var(--gold-glow); color: var(--gold-bright); }
+.file-entry .file-icon { font-size: 16px; flex-shrink: 0; }
+.file-entry .file-name { overflow: hidden; text-overflow: ellipsis; }

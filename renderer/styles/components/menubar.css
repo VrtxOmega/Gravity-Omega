@@ -1,0 +1,25 @@
+/* ── Menubar ────────────────────────────────────────────────── */
+#menubar { display: flex; gap: 0; }
+.menu-item { position: relative; }
+.menu-label {
+    padding: 4px 10px; font-size: 12px; color: var(--text-secondary); cursor: pointer;
+    transition: color var(--transition), background var(--transition);
+}
+.menu-label:hover { color: var(--text-primary); background: var(--bg-hover); }
+.menu-dropdown {
+    display: none; position: absolute; top: 100%; left: 0;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: var(--radius); min-width: 220px; z-index: 200;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    /* backdrop-filter: blur(20px); — removed for perf */
+    animation: menuSlide 0.15s ease-out;
+}
+@keyframes menuSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.menu-item:hover .menu-dropdown { display: block; }
+.menu-entry {
+    padding: 6px 16px; display: flex; justify-content: space-between;
+    cursor: pointer; font-size: 13px; transition: background var(--transition);
+}
+.menu-entry:hover { background: var(--gold-glow); color: var(--gold-bright); }
+.menu-shortcut { color: var(--text-tertiary); font-size: 11px; }
+.menu-separator { height: 1px; background: var(--border); margin: 4px 8px; }

@@ -1,0 +1,49 @@
+/* ── Omega Panel ────────────────────────────────────────────── */
+.omega-status { padding: 12px; border-bottom: 1px solid var(--border); }
+.omega-badge {
+    display: inline-block; padding: 5px 14px; font-size: 13px; font-weight: 600;
+    color: var(--gold-bright); background: linear-gradient(135deg, rgba(212,168,67,0.15), rgba(212,168,67,0.05));
+    border: 1px solid var(--gold-dim); border-radius: 20px;
+    text-shadow: 0 0 8px var(--gold-glow); letter-spacing: 1px;
+}
+.vault-badge {
+    color: var(--cyan);
+    background: linear-gradient(135deg, rgba(80,208,208,0.15), rgba(80,208,208,0.05));
+    border-color: rgba(80,208,208,0.4);
+    text-shadow: 0 0 8px rgba(80,208,208,0.3);
+}
+.omega-health { margin-top: 6px; font-size: 13px; color: var(--text-tertiary); }
+.omega-section { padding: 0; }
+.omega-section-header {
+    padding: 10px 14px; font-size: 13px; font-weight: 600;
+    color: var(--text-secondary); letter-spacing: 0.5px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.omega-count {
+    background: var(--gold-dim); color: var(--bg-primary); font-size: 12px;
+    padding: 2px 8px; border-radius: 10px; font-weight: 700;
+}
+.omega-module-list { padding: 0 8px 8px; }
+.omega-module-card {
+    padding: 8px 10px; margin-bottom: 4px; border-radius: var(--radius);
+    background: var(--bg-tertiary); border: 1px solid var(--border);
+    cursor: pointer; transition: all var(--transition);
+}
+.omega-module-card:hover {
+    border-color: var(--gold-dim); background: var(--bg-hover);
+    transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.omega-module-card .mod-name {
+    font-size: 14px; font-weight: 600; color: var(--gold-bright);
+}
+.omega-module-card .mod-desc {
+    font-size: 13px; color: var(--text-tertiary); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.omega-module-card .mod-status {
+    display: inline-block; font-size: 12px; padding: 2px 8px;
+    border-radius: 8px; margin-top: 4px;
+}
+.mod-status.active { background: rgba(96,192,96,0.15); color: var(--green); }
+.mod-status.frozen { background: rgba(96,160,224,0.15); color: var(--blue); }
+.mod-status.error { background: rgba(224,96,96,0.15); color: var(--red); }
