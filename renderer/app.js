@@ -393,8 +393,8 @@ function initMonaco() {
             padding: { top: 8 },
             renderWhitespace: 'selection',
         });
-        // Clear loading placeholder — Monaco has taken over the container
-        monacoContainer.querySelector('div')?.remove();
+        // Monaco clears the container internally before inserting its DOM,
+        // so the loading placeholder is already gone — no removal needed here.
     } catch (err) {
         console.error('[MONACO] Editor initialization failed:', err);
         monacoContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--error);font-family:var(--font-ui);font-size:13px;flex-direction:column;gap:8px;"><span>⚠️ Editor failed to load</span><span style="font-size:11px;color:var(--text-tertiary);">' + err.message + '</span></div>';

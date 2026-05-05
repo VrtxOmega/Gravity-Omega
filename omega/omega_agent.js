@@ -393,7 +393,9 @@ class OmegaAgent {
 
                 if (parsed.type === 'response') {
                     // v5.2: Execution mode guard — reject TASK_COMPLETE if zero mutations.
-                    if (this._executionMode && this._countMutations() === 0) {
+                    // Skip when Hermes is active: Hermes executes tools natively and never
+                    // writes to _stepLog, so _countMutations() always returns 0 for Hermes runs.
+                    if (this._executionMode && !this._useHermes && this._countMutations() === 0) {
                         this.context.addBreadcrumb('agent', 'Execution guard: TASK_COMPLETE rejected (0 mutations). Continuing loop.', {}, 'warning');
                         messages.push({
                             role: 'user',
@@ -1773,7 +1775,9 @@ class OmegaAgent {
 
                 if (parsed.type === 'response') {
                     // v5.2: Execution mode guard — reject TASK_COMPLETE if zero mutations.
-                    if (this._executionMode && this._countMutations() === 0) {
+                    // Skip when Hermes is active: Hermes executes tools natively and never
+                    // writes to _stepLog, so _countMutations() always returns 0 for Hermes runs.
+                    if (this._executionMode && !this._useHermes && this._countMutations() === 0) {
                         this.context.addBreadcrumb('agent', 'Execution guard: TASK_COMPLETE rejected (0 mutations). Continuing loop.', {}, 'warning');
                         messages.push({
                             role: 'user',
