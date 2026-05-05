@@ -45,6 +45,7 @@ import sqlite3
 import logging
 import ipaddress
 import socket
+import secrets
 from pathlib import Path
 from omega_sentinel import get_sentinel
 
@@ -77,7 +78,19 @@ except ImportError:
 # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 PORT = int(os.environ.get('FLASK_PORT', 5000))
-AUTH_TOKEN = os.environ.get('OMEGA_AUTH_TOKEN', '')
+
+# AUTH_TOKEN must always be non-empty. If the env var is missing (standalone run,
+# debug session), generate a random token and log it. This closes the silent
+# allow-all bypass that occurred when require_auth short-circuited on empty string.
+_AUTH_FROM_ENV = os.environ.get('OMEGA_AUTH_TOKEN', '').strip()
+if _AUTH_FROM_ENV:
+    AUTH_TOKEN = _AUTH_FROM_ENV
+    _AUTH_SOURCE = 'env'
+else:
+    AUTH_TOKEN = secrets.token_urlsafe(32)
+    _AUTH_SOURCE = 'auto-generated'
+    # Logged once at startup so a developer running standalone can read it.
+    print(f'[AUTH] OMEGA_AUTH_TOKEN unset — generated random token: {AUTH_TOKEN}', file=sys.stderr, flush=True)
 PARENT_PID = os.environ.get('OMEGA_PARENT_PID', '')
 BASE_DIR = Path(__file__).parent
 MODULES_DIR = BASE_DIR / 'modules'
@@ -130,10 +143,16 @@ def handle_404(e):
     }), 404
 
 def require_auth(f):
-    """Verify X-Omega-Token header matches the handshake token."""
+    """Verify X-Omega-Token header matches the handshake token.
+
+    Fails closed: if the supplied token does not match AUTH_TOKEN exactly
+    (constant-time compare), the request is rejected. AUTH_TOKEN is
+    guaranteed non-empty at startup — no silent allow-all when env unset.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
-        if AUTH_TOKEN and request.headers.get('X-Omega-Token') != AUTH_TOKEN:
+        supplied = request.headers.get('X-Omega-Token', '')
+        if not secrets.compare_digest(supplied, AUTH_TOKEN):
             abort(401, 'Invalid auth token')
         return f(*args, **kwargs)
     return decorated
