@@ -268,6 +268,10 @@ class OmegaAgent {
 
         this._running = true;
         this._aborted = false;
+        this._watchdog = setTimeout(() => {
+            console.error('[OmegaAgent] Watchdog fired — forcing _running = false after 5 min');
+            this._running = false;
+        }, 5 * 60 * 1000);
         this._stepLog = [];
         this._currentTask = text;
         this._lastProvenanceContext = null;
@@ -555,6 +559,7 @@ class OmegaAgent {
             this.context.addBreadcrumb('agent', `Error: ${err.message}`, {}, 'error');
             return { type: 'error', message: `Agent error: ${err.message}`, steps: this._stepLog.length };
         } finally {
+            if (this._watchdog) { clearTimeout(this._watchdog); this._watchdog = null; }
             this._running = false;
             this._currentTask = null;
         }
