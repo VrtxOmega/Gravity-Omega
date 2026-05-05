@@ -29,12 +29,12 @@ const MAX_ITERATIONS = 20;       // Hard cap on agent loop iterations
 const AUTO_APPROVE_TIMEOUT = 300; // ms to auto-approve SAFE tools
 
 class OmegaAgent {
-    constructor({ context, hooks, bridge, userName = 'RJ' }) {
+    constructor({ context, hooks, bridge, userName = 'RJ', auditLogPath = null, proposalTtlMs }) {
         this.context = context;
         this.hooks = hooks;
         this.bridge = bridge;
         this._userName = userName;
-        this.gate = new ApprovalGate();
+        this.gate = new ApprovalGate({ auditLogPath, proposalTtlMs });
         this.executor = new ToolExecutor({ bridge });
         this._aborted = false;
         this._running = false;
