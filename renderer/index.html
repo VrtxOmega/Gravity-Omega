@@ -700,7 +700,14 @@
                 const perfMon = document.createElement('script');
                 perfMon.src = 'perf_monitor.js';
                 document.body.appendChild(perfMon);
+            }, function (err) {
+                console.error('[MONACO] Failed to load editor.main:', err);
+                document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e06060;font-family:sans-serif;flex-direction:column;gap:12px;"><h2>Monaco Editor Failed to Load</h2><pre style="color:#999;font-size:12px;max-width:600px;white-space:pre-wrap;">' + (err && err.message ? err.message : String(err)) + '</pre><p style="color:#666;font-size:13px;">Try restarting Gravity Omega. If the issue persists, check DevTools console (Ctrl+Shift+I).</p></div>';
             });
+        };
+        loaderScript.onerror = function () {
+            console.error('[MONACO] Failed to load loader.js from:', loaderScript.src);
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e06060;font-family:sans-serif;flex-direction:column;gap:12px;"><h2>Monaco Editor Failed to Load</h2><p style="color:#666;font-size:13px;">Could not load Monaco loader. Try running <code>npm install</code> or restarting the app.</p></div>';
         };
         document.body.appendChild(loaderScript);
     </script>

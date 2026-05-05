@@ -373,46 +373,32 @@ function initMonaco() {
     const monacoContainer = document.getElementById('monaco-container');
     monacoContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-tertiary,#666);font-family:var(--font-ui,sans-serif);font-size:13px;gap:8px;"><span style="animation:spinGear 1s linear infinite;display:inline-block;">⟳</span> Initializing editor…</div>';
 
-    state.editor = monaco.editor.create(monacoContainer, {
-
-        value: '',
-
-        language: 'plaintext',
-
-        theme: 'veritas-dark',
-
-        fontFamily: "'JetBrains Mono', 'Consolas', monospace",
-
-        fontSize: 14,
-
-        lineHeight: 1.6,
-
-        minimap: { enabled: true, maxColumn: 80 },
-
-        scrollBeyondLastLine: false,
-
-        wordWrap: 'on',
-
-        formatOnPaste: true,
-
-        suggestOnTriggerCharacters: true,
-
-        bracketPairColorization: { enabled: true },
-
-        smoothScrolling: true,
-
-        cursorBlinking: 'smooth',
-
-        cursorSmoothCaretAnimation: 'on',
-
-        padding: { top: 8 },
-
-        renderWhitespace: 'selection',
-
-    });
-
-    // Clear loading placeholder — Monaco has taken over the container
-    monacoContainer.querySelector('div')?.remove();
+    try {
+        state.editor = monaco.editor.create(monacoContainer, {
+            value: '',
+            language: 'plaintext',
+            theme: 'veritas-dark',
+            fontFamily: "'JetBrains Mono', 'Consolas', monospace",
+            fontSize: 14,
+            lineHeight: 1.6,
+            minimap: { enabled: true, maxColumn: 80 },
+            scrollBeyondLastLine: false,
+            wordWrap: 'on',
+            formatOnPaste: true,
+            suggestOnTriggerCharacters: true,
+            bracketPairColorization: { enabled: true },
+            smoothScrolling: true,
+            cursorBlinking: 'smooth',
+            cursorSmoothCaretAnimation: 'on',
+            padding: { top: 8 },
+            renderWhitespace: 'selection',
+        });
+        // Clear loading placeholder — Monaco has taken over the container
+        monacoContainer.querySelector('div')?.remove();
+    } catch (err) {
+        console.error('[MONACO] Editor initialization failed:', err);
+        monacoContainer.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--error);font-family:var(--font-ui);font-size:13px;flex-direction:column;gap:8px;"><span>⚠️ Editor failed to load</span><span style="font-size:11px;color:var(--text-tertiary);">' + err.message + '</span></div>';
+    }
 
 
 
@@ -561,10 +547,9 @@ async function openFile(filePath) {
 
 
 function switchToFile(filePath) {
-
-    const file = state.openFiles.get(filePath);
-
-    if (!file) return;
+    try {
+        const file = state.openFiles.get(filePath);
+        if (!file) return;
 
 
 
@@ -752,6 +737,10 @@ function switchToFile(filePath) {
 
     document.getElementById('titlebar-filepath').textContent = filePath;
 
+    } catch (err) {
+        console.error('[MONACO] switchToFile failed:', err);
+        showToast('Editor error: ' + err.message, 'error');
+    }
 }
 
 window.state = state;
@@ -792,15 +781,9 @@ async function saveFile(filePath) {
 
 }
 
-
-
 // ══════════════════════════════════════════════════════════════
-
 // TAB MANAGEMENT
-
 // ══════════════════════════════════════════════════════════════
-
-
 
 function addTab(filePath, name) {
 
