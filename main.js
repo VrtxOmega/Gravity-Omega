@@ -922,28 +922,58 @@ function registerIPC() {
     // health in the UI and at app startup to verify the agent toolset is wired.
     const REQUIRED_MCPS = ['omega-brain', 'sswp', 'omega-stenographer'];
     ipcMain.handle('mcp:status', async () => {
-        // Run `hermes mcp list` in WSL — same way the agent does
-        return new Promise((resolve) => {
-            let stdout = '';
-            const proc = spawn('cmd.exe', ['/c', 'wsl', 'bash', '-lc', 'hermes mcp list 2>&1'], { stdio: ['ignore', 'pipe', 'pipe'] });
-            const timer = setTimeout(() => { proc.kill(); resolve({ error: 'timeout', servers: [] }); }, 8000);
-            proc.stdout.on('data', d => stdout += d.toString());
-            proc.on('close', () => {
-                clearTimeout(timer);
-                // Parse: "<name>  <transport>  <tools>  ✓ enabled" or "✗ disabled"
-                const servers = [];
-                for (const line of stdout.split(/\r?\n/)) {
-                    const m = line.match(/^\s*([a-z][a-z0-9_-]*)\s+\S.*?(✓ enabled|✗ disabled|✗ \w+)/i);
-                    if (m) servers.push({ name: m[1], status: m[2].includes('✓') ? 'enabled' : 'disabled' });
-                }
-                const required = REQUIRED_MCPS.map(name => {
-                    const found = servers.find(s => s.name === name);
-                    return { name, present: !!found, status: found ? found.status : 'missing' };
-                });
-                resolve({ servers, required, allRequiredOk: required.every(r => r.status === 'enabled') });
+        // Try hermes directly first (WSL/Linux), then fall back to Windows cmd.exe path
+        const servers = [];
+        let error = null;
+
+        async function tryHermes(args) {
+            return new Promise((resolve) => {
+                let stdout = '';
+                const proc = spawn(args[0], args.slice(1), { stdio: ['ignore', 'pipe', 'pipe'] });
+                const timer = setTimeout(() => { proc.kill(); resolve({ timeout: true }); }, 6000);
+                proc.stdout.on('data', d => stdout += d.toString());
+                proc.stderr.on('data', d => stdout += d.toString());
+                proc.on('close', () => { clearTimeout(timer); resolve({ stdout }); });
+                proc.on('error', () => { clearTimeout(timer); resolve({ error: true }); });
             });
-            proc.on('error', (e) => { clearTimeout(timer); resolve({ error: e.message, servers: [] }); });
+        }
+
+        // Path 1: hermes available directly (WSL/Linux/Mac)
+        let result = await tryHermes(['hermes', 'mcp', 'list']);
+        // Path 2: via cmd.exe -> wsl (Windows host running Electron)
+        if (!result.stdout || result.error || result.timeout) {
+            result = await tryHermes(['cmd.exe', '/c', 'wsl', 'bash', '-lc', 'hermes mcp list 2>&1']);
+        }
+
+        if (result.stdout) {
+            for (const line of result.stdout.split(/\r?\n/)) {
+                const m = line.match(/^\s*([a-z][a-z0-9_-]*)\s+\S.*?(✓ enabled|✗ disabled|✗ \w+)/i);
+                if (m) servers.push({ name: m[1], status: m[2].includes('✓') ? 'enabled' : 'disabled' });
+            }
+        } else {
+            error = result.timeout ? 'timeout' : 'hermes unavailable';
+        }
+
+        const required = REQUIRED_MCPS.map(name => {
+            const found = servers.find(s => s.name === name);
+            return { name, present: !!found, status: found ? found.status : 'missing' };
         });
+
+        // If hermes list failed but the local MCP server is listening, at least mark the IDE server ok
+        if (error && !servers.length) {
+            try {
+                const http = require('http');
+                await new Promise((res) => {
+                    const req = http.get('http://127.0.0.1:3002/health', (r) => {
+                        if (r.statusCode === 200) servers.push({ name: 'gravity-omega-ide', status: 'enabled' });
+                        res();
+                    }).on('error', () => res());
+                    setTimeout(() => res(), 1000);
+                });
+            } catch { /* ignore */ }
+        }
+
+        return { servers, required, allRequiredOk: required.every(r => r.status === 'enabled'), error };
     });
 
     // ── Hardware ─────────────────────────────────────────────

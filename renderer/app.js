@@ -725,6 +725,19 @@ function switchToFile(filePath) {
         });
     }
 
+    // Wire up ANALYZE button
+    const analyzeBtn = document.getElementById('btn-analyzer');
+    if (analyzeBtn) {
+        const freshAnalyze = analyzeBtn.cloneNode(true);
+        analyzeBtn.parentNode.replaceChild(freshAnalyze, analyzeBtn);
+        freshAnalyze.addEventListener('click', () => {
+            const f = state.openFiles.get(state.activeFile);
+            if (!f) return;
+            f.viewMode = 'analyze';
+            openFile(state.activeFile);
+        });
+    }
+
     
 
     // Monaco needs layout() after its container becomes visible
@@ -1460,6 +1473,121 @@ window.addEventListener('DOMContentLoaded', () => {
     setTimeout(_updateMcpHealthIndicator, 1500);
     setInterval(_updateMcpHealthIndicator, 60000);
 });
+
+function initAnalyzer() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadScreen = document.getElementById('upload-screen');
+    const processingScreen = document.getElementById('processing-screen');
+    const reportScreen = document.getElementById('report-screen');
+    const procTerminal = document.getElementById('proc-terminal');
+    const reportBody = document.getElementById('report-body');
+    const uploadError = document.getElementById('upload-error');
+    const toolbarFile = document.getElementById('toolbar-file');
+    const modelInput = document.getElementById('model-input');
+    const btnReset = document.getElementById('btn-analyzer-reset');
+    const btnDownload = document.getElementById('btn-analyzer-download');
+
+    if (!dropZone || !fileInput) return;
+
+    function showScreen(name) {
+        uploadScreen?.classList.toggle('hidden', name !== 'upload');
+        processingScreen?.classList.toggle('hidden', name !== 'processing');
+        reportScreen?.classList.toggle('hidden', name !== 'report');
+    }
+
+    function logProc(msg) {
+        if (!procTerminal) return;
+        const line = document.createElement('div');
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        line.style.cssText = 'font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);margin-bottom:2px;';
+        procTerminal.appendChild(line);
+        procTerminal.scrollTop = procTerminal.scrollHeight;
+    }
+
+    async function runAnalysis(file) {
+        showScreen('processing');
+        if (procTerminal) procTerminal.innerHTML = '';
+        logProc(`Uploading ${file.name}...`);
+
+        const form = new FormData();
+        form.append('file', file);
+        form.append('model', modelInput?.value || 'qwen3:8b');
+
+        try {
+            logProc('Extracting text...');
+            const resp = await fetch('http://127.0.0.1:5000/api/analyze_document', {
+                method: 'POST',
+                body: form,
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+
+            logProc('Analysis complete.');
+            if (toolbarFile) toolbarFile.textContent = file.name;
+            renderReport(data);
+            showScreen('report');
+        } catch (e) {
+            logProc(`Error: ${e.message}`);
+            setTimeout(() => {
+                if (uploadError) { uploadError.textContent = e.message; uploadError.classList.remove('hidden'); }
+                showScreen('upload');
+            }, 1500);
+        }
+    }
+
+    function renderReport(data) {
+        if (!reportBody) return;
+        const sections = [];
+        if (data.summary) sections.push(`<h2 style="color:var(--gold);margin-top:0;">Summary</h2><p>${__esc(data.summary)}</p>`);
+        if (data.key_findings && Array.isArray(data.key_findings)) {
+            sections.push(`<h3 style="color:var(--gold);">Key Findings</h3><ul>${data.key_findings.map(f => `<li>${__esc(f)}</li>`).join('')}</ul>`);
+        }
+        if (data.recommendations && Array.isArray(data.recommendations)) {
+            sections.push(`<h3 style="color:var(--gold);">Recommendations</h3><ul>${data.recommendations.map(r => `<li>${__esc(r)}</li>`).join('')}</ul>`);
+        }
+        if (data.risks && Array.isArray(data.risks)) {
+            sections.push(`<h3 style="color:var(--gold);">Risks</h3><ul>${data.risks.map(r => `<li>${__esc(r)}</li>`).join('')}</ul>`);
+        }
+        if (data.raw_analysis) sections.push(`<h3 style="color:var(--gold);">Raw Analysis</h3><pre style="white-space:pre-wrap;font-size:11px;">${__esc(data.raw_analysis)}</pre>`);
+
+        const meta = data._meta || {};
+        sections.push(`<div style="margin-top:16px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text-tertiary);">Trace: ${__esc(meta.trace || 'N/A')} · Model: ${__esc(meta.model || 'N/A')}</div>`);
+
+        reportBody.innerHTML = sections.join('');
+    }
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--gold)'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '';
+        const f = e.dataTransfer.files[0];
+        if (f) runAnalysis(f);
+    });
+    fileInput.addEventListener('change', () => {
+        const f = fileInput.files[0];
+        if (f) runAnalysis(f);
+        fileInput.value = '';
+    });
+
+    btnReset?.addEventListener('click', () => {
+        if (uploadError) uploadError.classList.add('hidden');
+        showScreen('upload');
+    });
+
+    btnDownload?.addEventListener('click', () => {
+        if (!reportBody) return;
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Veritas Report</title><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:20px;background:#0a0a0a;color:#e0e0e0;}h2,h3{color:#d4af37;}pre{background:#111;padding:12px;border-radius:4px;}</style></head><body>${reportBody.innerHTML}</body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `veritas-report-${Date.now()}.html`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    });
+}
 
 function initSettings() {
     const SETTINGS_KEY = 'gravityOmega.settings';
@@ -5062,6 +5190,7 @@ window.sentinelRebaseline = async function() {
 
     initEventListeners();
     initSettings();
+    initAnalyzer();
 
 
 
