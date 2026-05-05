@@ -1,0 +1,4 @@
+/* ── App Layout ─────────────────────────────────────────────── */
+#app {
+    display: flex; height: calc(100vh - var(--titlebar-height) - var(--statusbar-height));
+}

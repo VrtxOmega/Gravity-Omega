@@ -52,19 +52,18 @@ class OmegaBridge extends EventEmitter {
         // Kill orphans on our port
         await this._killOrphans();
 
-        // Find web_server.py
-        const serverPath = this._findServer();
-        if (!serverPath) {
-            this._setStatus('ERROR');
-            throw new Error('web_server.py not found');
-        }
+            const serverPath = this._findServer();
+            if (!serverPath) {
+                this._setStatus('ERROR');
+                throw new Error('web_server.py not found');
+            }
 
-        // Find Python
-        const python = this._findPython();
-        if (!python) {
-            this._setStatus('ERROR');
-            throw new Error('Python not found');
-        }
+            // Find Python
+            const python = this._findPython();
+            if (!python) {
+                this._setStatus('ERROR');
+                throw new Error('Python not found');
+            }
 
         return new Promise((resolve, reject) => {
             this._startupResolve = resolve;
@@ -77,12 +76,12 @@ class OmegaBridge extends EventEmitter {
                 PYTHONUNBUFFERED: '1',
             };
 
-            // Find server path dynamically
-            const serverPath = this._findServer() || '~/gravity-omega-v2/backend/web_server.py';
-            const pythonBin = this._findPython() || 'python3';
+            // Use already-resolved paths
+            const resolvedServer = serverPath;
+            const pythonBin = python || 'python3';
             
             // Spawn via WSL — Python backend lives on Linux side
-            const wslCmd = `cd $(dirname ${serverPath}) && ${pythonBin} $(basename ${serverPath})`;
+            const wslCmd = `cd $(dirname ${resolvedServer}) && ${pythonBin} $(basename ${resolvedServer})`;
             this._process = spawn('wsl', ['--', 'bash', '-c', wslCmd], {
                 env,
                 stdio: ['pipe', 'pipe', 'pipe'],

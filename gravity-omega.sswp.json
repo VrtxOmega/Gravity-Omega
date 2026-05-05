@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-05-03T09:22:11.032Z",
+  "timestamp": "2026-05-03T07:20:26.326Z",
   "target": {
     "name": "gravity-omega",
     "repo": "/mnt/c/Veritas_Lab/gravity-omega-v2",
@@ -8,7 +8,7 @@
     "branch": "master"
   },
   "environment": {
-    "nodeVersion": "v22.14.0",
+    "nodeVersion": "v18.20.8",
     "os": "linux",
     "arch": "x64",
     "ci": false
@@ -108,13 +108,13 @@
       "gate": "GIT_INTEGRITY",
       "status": "FAIL",
       "evidence": "Modified files: 30",
-      "durationMs": 607
+      "durationMs": 1658
     },
     {
       "gate": "LOCKFILE",
       "status": "PASS",
       "evidence": "package-lock.json present",
-      "durationMs": 2
+      "durationMs": 1
     },
     {
       "gate": "DETERMINISTIC_BUILD",
@@ -125,14 +125,14 @@
     {
       "gate": "TEST_PASS",
       "status": "FAIL",
-      "evidence": "Tests failed: npm error Missing script: \"test\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: /home/veritas/.npm/_logs/2026-05-03T09_22_",
-      "durationMs": 137
+      "evidence": "Tests failed: npm error Missing script: \"test\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: /home/veritas/.npm/_logs/2026-05-03T07_20_",
+      "durationMs": 154
     },
     {
       "gate": "LINT",
       "status": "PASS",
       "evidence": "npx passed",
-      "durationMs": 3037
+      "durationMs": 3099
     }
   ],
   "adversarial": {
@@ -347,8 +347,8 @@
     "overallRisk": 0
   },
   "seal": {
-    "chainHash": "d5dbfe197bb9aa97ee7e4398aa5500cb36fbdddca498ebc94a6b17fad774560e",
-    "sequence": 331
+    "chainHash": "bee42fa57a582d7246fb5569b3770aaf316e99934ca514bed8582b4fc4a7e656",
+    "sequence": 5
   },
-  "signature": "708d17a5f535f1f6861bb6e8543205db93e1c994e09c18a83bc74a96977eb967"
+  "signature": "aed06ebdf6811f0a0b46224ba1fb6b630d6bfe8d18e5e0f8aa2d72a6efd1a40f"
 }

@@ -13,7 +13,6 @@ build/
 
 # Node
 node_modules/
-package-lock.json
 
 # Logs & Checkpoints
 *.log
@@ -28,3 +27,51 @@ desktop.ini
 # IDE
 .vscode/
 .idea/
+
+# Session artifacts
+.agents/
+.hermes/
+tmp/
+scratch/
+omega_test_dir/
+veritas_lab/
+sys-monitor/
+
+# Backup files
+*.bak
+*.bak.*
+
+# Generated dashboards / JSON dumps / plans at root
+/*.html
+!index.html
+/*.json
+!package.json
+!package-lock.json
+!.sswp.json
+/*_plan.md
+/*_report.md
+/*_audit.md
+
+# Root-level generated scripts
+/test_*.py
+/test_*.js
+/frontend_*.py
+/backend_*.py
+/api_*.py
+/api_*.html
+/api_*.json
+/api_*.md
+/git_*.py
+/git_*.html
+/git_*.json
+/git_*.md
+/security_*.py
+/security_*.json
+/security_*.html
+/fix*.py
+/fix*.js
+/dry_run_*.py
+/run_*.sh
+/run_*.bat
+/run_*.ps1
+/schedule_*.py

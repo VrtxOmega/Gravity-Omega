@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld('omega', {
 
     // ── Chat (Agentic) ───────────────────────────────────────
     chat: {
-        send:  (text, sessionId, model) => ipcRenderer.invoke('chat:send', text, sessionId, model),
+        send:  (text, sessionId, model, attachments = []) => ipcRenderer.invoke('chat:send', text, sessionId, model, attachments),
         abort: (sessionId) => ipcRenderer.invoke('chat:abort', sessionId),
         tts:   (text) => ipcRenderer.invoke('chat:tts', text),
     },

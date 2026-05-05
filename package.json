@@ -1,7 +1,7 @@
 {
   "name": "gravity-omega",
-  "version": "4.0.0",
-  "description": "Gravity Omega — VERITAS Command Center v4.0 (Provenance-Sealed)",
+  "version": "5.2.0",
+  "description": "Gravity Omega v2 — VERITAS Command Center v5.2 (Provenance-Sealed, Execution Guards)",
   "main": "main.js",
   "scripts": {
     "start": "node launcher.js",
@@ -39,11 +39,13 @@
     }
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "4.0.3",
     "dompurify": "3.3.3",
     "monaco-editor": "0.52.2",
     "node-pty": "1.1.0",
     "puppeteer": "^23.9.0",
+    "tesseract.js": "^7.0.0",
     "xterm": "5.3.0",
     "xterm-addon-fit": "^0.8.0"
   },

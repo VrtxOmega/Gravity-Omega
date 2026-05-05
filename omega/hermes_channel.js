@@ -311,10 +311,17 @@ class HermesChannel extends EventEmitter {
         this._toolCalls = [];
         this._completedTools = {};
 
-        const prompt = messages.map((m) => ({
-            type: 'text',
-            text: `${m.role}: ${m.content}`,
-        }));
+        // Flatten messages for ACP — preserve ALL system blocks (including skills)
+        const systemMsgs = messages.filter(m => m.role === 'system');
+        const userMsgs = messages.filter(m => m.role !== 'system');
+        const prompt = [];
+        for (const sm of systemMsgs) {
+            const label = sm.name ? ` [${sm.name}]` : '';
+            prompt.push({ type: 'text', text: `SYSTEM INSTRUCTIONS${label}:\n${sm.content}` });
+        }
+        for (const m of userMsgs) {
+            prompt.push({ type: 'text', text: `${m.role}: ${m.content}` });
+        }
 
         // ACP method name is 'session/prompt' (from AGENT_METHODS["session_prompt"])
         const result = await this._send('session/prompt', {

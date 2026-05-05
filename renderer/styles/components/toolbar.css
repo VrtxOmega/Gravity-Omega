@@ -1,0 +1,10 @@
+/* ── TOOLBAR ──────────────────────────────────────────── */
+#report-screen{min-height:100vh;display:flex;flex-direction:column}
+.report-toolbar{background:var(--black2);border-bottom:1px solid var(--gold-border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:100}
+.toolbar-brand{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:2px}
+.toolbar-file{color:var(--gray);font-size:11px;margin-top:2px}
+.toolbar-actions{display:flex;gap:10px}
+.btn-dl{background:var(--gold);color:var(--black);font-size:11px;padding:8px 20px;letter-spacing:2px;transition:background .2s}
+.btn-dl:hover{background:var(--gold-bright)}
+.btn-rst{background:transparent;color:var(--gold-dim);font-size:11px;padding:8px 16px;letter-spacing:2px;border:1px solid var(--gold-border);transition:all .2s}
+.btn-rst:hover{border-color:var(--gold-dim);color:var(--gold)}

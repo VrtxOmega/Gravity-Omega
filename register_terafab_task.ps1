@@ -1,1 +1,0 @@
-Register-ScheduledTask -TaskName \"TerafabMonitor\" -Xml (Get-Content \"C:\\Veritas_Lab\\gravity-omega-v2\	erafab_monitor_task.xml\" | Out-String) -Force
