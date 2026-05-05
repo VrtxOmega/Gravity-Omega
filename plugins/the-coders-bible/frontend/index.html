@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="The Coder's Bible — 67,000+ curated code fragments across 28 domains. Search, analyze, and explore the definitive developer knowledge engine.">
+    <title>The Coder's Bible — Code Knowledge Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ─── Canvas Particle Background ─── -->
+    <canvas id="particle-canvas" class="particle-canvas"></canvas>
+
+    <!-- ─── Ambient Background ─── -->
+    <div class="ambient-bg">
+        <div class="ambient-orb orb-1"></div>
+        <div class="ambient-orb orb-2"></div>
+        <div class="ambient-orb orb-3"></div>
+    </div>
+
+    <!-- ─── Header ─── -->
+    <header id="app-header">
+        <div class="header-left">
+            <div class="logo-mark" id="logo-mark">
+                <span class="omega-mark">Ω</span>
+                <div class="logo-ring"></div>
+            </div>
+            <div class="header-title">
+                <h1>The Coder's Bible</h1>
+                <span class="header-subtitle">Code Knowledge Engine</span>
+            </div>
+        </div>
+        <div class="header-center">
+            <div class="command-trigger" id="cmd-trigger" title="Quick Search (Ctrl+K)">
+                <span class="cmd-icon">⌘</span>
+                <span class="cmd-text">Search fragments...</span>
+                <kbd class="cmd-kbd">Ctrl+K</kbd>
+            </div>
+        </div>
+        <div class="header-right">
+            <div id="stats-badge" class="stats-badge" title="Knowledge base status">
+                <span class="stats-dot"></span>
+                <span id="stats-count">—</span> fragments
+            </div>
+        </div>
+    </header>
+
+    <!-- ─── Command Palette Modal ─── -->
+    <div id="cmd-palette" class="cmd-palette" style="display:none;">
+        <div class="cmd-overlay"></div>
+        <div class="cmd-dialog">
+            <div class="cmd-search-bar">
+                <span class="cmd-search-icon">🔍</span>
+                <input id="cmd-input" type="text" class="cmd-search-input" placeholder="Search across all domains..." autocomplete="off" spellcheck="false">
+                <kbd class="cmd-esc">ESC</kbd>
+            </div>
+            <div id="cmd-results" class="cmd-results">
+                <div class="cmd-empty">Type to search 67,000+ code fragments</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── Main Content ─── -->
+    <main id="app-main">
+
+        <!-- ─── Hero Section ─── -->
+        <section id="hero-section" class="hero-section">
+            <div class="hero-glow"></div>
+            <h2 class="hero-heading">
+                <span class="hero-line-1">Seek truth in code.</span>
+                <span class="hero-line-2 gold-text">Find it instantly.</span>
+            </h2>
+            <p class="hero-sub">
+                The definitive knowledge engine — <span id="hero-frag-count" class="counter-animated">—</span> curated fragments across <span id="hero-domain-count" class="counter-animated">—</span> domains.
+            </p>
+
+            <!-- ─── Stats Ribbon ─── -->
+            <div class="stats-ribbon" id="stats-ribbon">
+                <div class="stat-cell">
+                    <span class="stat-value" id="stat-total">—</span>
+                    <span class="stat-label">Fragments</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-cell">
+                    <span class="stat-value" id="stat-domains">—</span>
+                    <span class="stat-label">Domains</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-cell">
+                    <span class="stat-value" id="stat-tiers">4</span>
+                    <span class="stat-label">Tiers</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-cell">
+                    <span class="stat-value">FTS5</span>
+                    <span class="stat-label">Engine</span>
+                </div>
+            </div>
+
+            <!-- ─── Tab Switcher ─── -->
+            <div class="tab-switcher" id="tab-switcher">
+                <button class="tab-btn active" data-tab="search" id="tab-search-btn">
+                    <span class="tab-icon">🔍</span> Search
+                </button>
+                <button class="tab-btn" data-tab="analyze" id="tab-analyze-btn">
+                    <span class="tab-icon">⚡</span> Analyze
+                </button>
+                <button class="tab-btn" data-tab="browse" id="tab-browse-btn">
+                    <span class="tab-icon">📚</span> Browse
+                </button>
+                <div class="tab-indicator" id="tab-indicator"></div>
+            </div>
+        </section>
+
+        <!-- ═══════ TAB: SEARCH ═══════ -->
+        <section id="tab-search" class="tab-panel active">
+            <div class="search-container" id="search-container">
+                <div class="search-glow"></div>
+                <div class="search-icon-wrap">🔍</div>
+                <input
+                    id="search-input"
+                    class="search-input"
+                    type="text"
+                    placeholder="Search fragments... (e.g., 'python decorators', 'docker compose')"
+                    autocomplete="off"
+                    spellcheck="false"
+                >
+                <div class="search-meta">
+                    <span id="search-result-count" class="search-count"></span>
+                    <span class="search-hint">Press Enter to search</span>
+                </div>
+            </div>
+
+            <!-- Live Results -->
+            <div id="search-results" class="search-results"></div>
+        </section>
+
+        <!-- ═══════ TAB: ANALYZE ═══════ -->
+        <section id="tab-analyze" class="tab-panel">
+            <div class="input-container" id="input-container">
+                <div class="input-glow"></div>
+                <textarea
+                    id="snippet-input"
+                    class="snippet-input"
+                    placeholder="Paste a command, snippet, or code block..."
+                    spellcheck="false"
+                    autocomplete="off"
+                    rows="5"
+                ></textarea>
+                <div class="input-actions">
+                    <button id="btn-analyze" class="btn-primary" disabled>
+                        <span class="btn-icon">⚡</span>
+                        <span class="btn-text">Analyze</span>
+                    </button>
+                    <button id="btn-clear" class="btn-ghost" style="display:none;">Clear</button>
+                    <div id="char-count" class="char-count">0 / 10,000</div>
+                </div>
+            </div>
+
+            <!-- Quick Examples -->
+            <div class="quick-examples">
+                <span class="examples-label">Try:</span>
+                <button class="example-chip" data-snippet="chmod +x deploy.sh">chmod +x deploy.sh</button>
+                <button class="example-chip" data-snippet="SELECT * FROM users WHERE active = 1 ORDER BY created_at DESC LIMIT 10;">SQL Query</button>
+                <button class="example-chip" data-snippet="docker run -d --name nginx -p 80:80 -v /data:/usr/share/nginx/html nginx:alpine">Docker Run</button>
+                <button class="example-chip" data-snippet="def fibonacci(n):&#10;    if n <= 1:&#10;        return n&#10;    return fibonacci(n-1) + fibonacci(n-2)">Python Func</button>
+                <button class="example-chip" data-snippet="kubectl get pods -n production --sort-by='.status.startTime' -o wide">kubectl</button>
+                <button class="example-chip" data-snippet="git rebase -i HEAD~5">Git Rebase</button>
+            </div>
+
+            <!-- ─── Loading Indicator ─── -->
+            <div id="loading-indicator" class="loading-indicator" style="display:none;">
+                <div class="loading-spinner"></div>
+                <span>Analyzing across <span id="loading-frag-count">—</span> fragments...</span>
+            </div>
+
+            <!-- ─── Results Panel ─── -->
+            <section id="results-section" class="results-section" style="display:none;">
+
+                <!-- Quick Understanding — instant clarity -->
+                <div id="quick-understanding" class="quick-understanding" style="display:none;"></div>
+
+                <!-- Language Detection Card -->
+                <div id="detection-card" class="result-card detection-card">
+                    <div class="card-header">
+                        <div class="card-icon">🔍</div>
+                        <h3>Identification</h3>
+                    </div>
+                    <div class="detection-body">
+                        <div class="lang-badge-large" id="lang-badge">
+                            <span class="lang-name" id="lang-name">—</span>
+                            <span class="lang-confidence" id="lang-confidence">—%</span>
+                        </div>
+                        <div id="lang-reasoning" class="lang-reasoning"></div>
+                        <div class="detection-meta">
+                            <div id="input-preview" class="input-preview"></div>
+                            <div id="alternatives" class="alternatives"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Breakdown Card -->
+                <div id="breakdown-card" class="result-card breakdown-card" style="display: none;">
+                    <div class="card-header">
+                        <div class="card-icon">🧩</div>
+                        <h3>Semantic Decomposition</h3>
+                    </div>
+                    <div id="breakdown-body" class="breakdown-body"></div>
+                </div>
+
+                <!-- Safety Card -->
+                <div id="safety-card" class="result-card safety-card">
+                    <div class="card-header">
+                        <div class="card-icon" id="safety-icon">🛡️</div>
+                        <h3>Safety Assessment</h3>
+                    </div>
+                    <div id="safety-body" class="safety-body"></div>
+                </div>
+
+                <!-- Keywords Card -->
+                <div id="keywords-card" class="result-card keywords-card">
+                    <div class="card-header">
+                        <div class="card-icon">🏷️</div>
+                        <h3>Extracted Keywords</h3>
+                    </div>
+                    <div id="keywords-body" class="keywords-body"></div>
+                </div>
+
+                <!-- Bible Results -->
+                <div id="bible-card" class="result-card bible-card">
+                    <div class="card-header">
+                        <div class="card-icon">📖</div>
+                        <h3>Bible References</h3>
+                        <span id="result-count" class="result-count"></span>
+                    </div>
+                    <div id="bible-results" class="bible-results"></div>
+                </div>
+
+            </section>
+        </section>
+
+        <!-- ═══════ TAB: BROWSE ═══════ -->
+        <section id="tab-browse" class="tab-panel">
+            <div class="browse-header">
+                <h3 class="section-title">Knowledge Domains</h3>
+                <p class="browse-sub">Explore <span id="browse-count">28</span> curated domains of developer knowledge</p>
+            </div>
+            <div id="domains-grid" class="domains-grid"></div>
+        </section>
+
+    </main>
+
+    <!-- ─── Footer ─── -->
+    <footer id="app-footer">
+        <div class="footer-inner">
+            <span class="footer-omega">Ω</span>
+            <span>VERITAS Sovereign Engine — The Coder's Bible v2.0</span>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

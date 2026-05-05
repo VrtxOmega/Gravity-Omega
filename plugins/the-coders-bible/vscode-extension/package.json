@@ -1,0 +1,79 @@
+{
+  "name": "coders-bible",
+  "displayName": "The Coder Bible",
+  "description": "Sovereign offline developer knowledge base — search 60K+ gotchas, recipes, and docs without leaving VS Code",
+  "version": "1.0.0",
+  "publisher": "VrtxOmega",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VrtxOmega/coders-bible"
+  },
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./src/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codersBible",
+          "title": "The Coder Bible",
+          "icon": "media/omega.svg"
+        }
+      ]
+    },
+    "views": {
+      "codersBible": [
+        {
+          "type": "webview",
+          "id": "codersBible.sidebar",
+          "name": "The Coder Bible",
+          "icon": "media/omega.svg",
+          "contextualTitle": "The Coder Bible Search"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codersBible.search",
+        "title": "The Coder Bible: Search",
+        "icon": "$(search)"
+      },
+      {
+        "command": "codersBible.insertSnippet",
+        "title": "The Coder Bible: Insert at Cursor"
+      },
+      {
+        "command": "codersBible.copyToClipboard",
+        "title": "The Coder Bible: Copy Result"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "codersBible.search",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b"
+      }
+    ],
+    "configuration": {
+      "title": "The Coder Bible",
+      "properties": {
+        "codersBible.dbPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to coders_bible.db (auto-detected if blank)"
+        },
+        "codersBible.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python executable to use for cb.py"
+        },
+        "codersBible.defaultDomain": {
+          "type": "string",
+          "default": "",
+          "description": "Filter to a default domain (e.g. python, javascript)"
+        }
+      }
+    }
+  }
+}

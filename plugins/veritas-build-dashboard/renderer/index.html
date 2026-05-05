@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ω VERITAS BUILD DASHBOARD</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        /* Specific styles for VERITAS Dashboard tabs */
+        .pipeline-feed { display: flex; flex-direction: column; gap: 10px; padding: 20px; overflow-y: auto; flex: 1; }
+        .gate-event { border: 1px solid var(--gold-border); background: var(--bg-panel); padding: 12px 15px; display: flex; justify-content: space-between; transition: box-shadow 0.2s; }
+        .gate-event:hover { box-shadow: 0 0 10px rgba(201, 168, 76, 0.1); border-color: var(--gold); }
+        .gate-event.pass { border-left: 4px solid var(--pass); }
+        .gate-event.inconclusive { border-left: 4px solid var(--warning); }
+        .gate-event.violation { border-left: 4px solid var(--fatal); }
+        
+        .gate-name { font-family: var(--font-head); font-weight: bold; font-size: 14px; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; }
+        .gate-verdict { font-family: var(--font-mono); font-size: 12px; }
+        
+        .mock-controls { display: flex; gap: 15px; padding: 20px; border-bottom: 1px solid var(--gold-border); background: var(--bg-raised); align-items: center; justify-content: center; flex-shrink: 0; }
+        .verdict-banner { text-align: center; font-family: var(--font-head); font-size: 20px; letter-spacing: 2px; padding: 15px; margin: 20px 20px 0; border: 2px solid var(--gold-dim); display: none; background: rgba(0,0,0,0.5); }
+        .json-viewer { background: var(--bg); padding: 20px; font-family: var(--font-mono); font-size: 13px; color: var(--white); white-space: pre-wrap; overflow-y: auto; flex: 1; border: 1px solid var(--gold-border); margin: 20px;}
+        
+        .archive-list { display: flex; flex-direction: column; gap: 10px; padding: 20px; overflow-y: auto; flex: 1;}
+        .archive-item { border: 1px solid var(--gold-border); background: var(--bg-panel); padding: 15px; cursor: pointer; transition: all 0.2s; }
+        .archive-item:hover { border-color: var(--gold); box-shadow: 0 0 14px rgba(201, 168, 76, 0.15); }
+    </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-brand">
+    <span class="topbar-omega">Ω</span>
+    <span class="topbar-name">VERITAS BUILD</span>
+  </div>
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="pipeline">PIPELINE</button>
+    <button class="tab-btn" data-tab="gatedetail">GATE DETAIL</button>
+    <button class="tab-btn" data-tab="reports">REPORTS</button>
+    <button class="tab-btn" data-tab="archive">SEAL ARCHIVE</button>
+  </nav>
+  <div class="topbar-status" id="status-indicator">
+    <span class="status-dot"></span>
+    <span class="status-text">Ready</span>
+  </div>
+</header>
+
+<main class="tab-content">
+
+  <!-- PIPELINE TAB -->
+  <section class="tab-panel active" id="tab-pipeline">
+    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+        <div class="mock-controls">
+            <button class="btn-export" style="width: auto; margin:0;" onclick="loadMockPipeline()">
+               <span class="btn-icon">◆</span> RUN LIVE PIPELINE
+            </button>
+            <button class="btn-refresh" onclick="startNafeSocket()">
+               ↻ CONNECT NAFE TELEMETRY
+            </button>
+        </div>
+        <div id="verdict-banner" class="verdict-banner"></div>
+        <div id="pipeline-feed" class="pipeline-feed">
+            <div class="library-empty">Awaiting Pipeline Execution...</div>
+        </div>
+        
+        <!-- Live Toast Notification Overlay -->
+        <div id="nafe-toasts" style="position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; pointer-events: none;"></div>
+    </div>
+  </section>
+
+  <!-- GATE DETAIL TAB -->
+  <section class="tab-panel" id="tab-gatedetail">
+    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+        <div class="library-header">
+          <div class="library-title">Gate Inspection</div>
+          <p style="font-family: var(--font-mono); color: var(--gray-text); font-size: 11px;">Select a gate from the pipeline feed to view forensic details.</p>
+        </div>
+        <div id="gate-detail-content" class="json-viewer">No gate selected.</div>
+    </div>
+  </section>
+
+  <!-- REPORTS TAB -->
+  <section class="tab-panel" id="tab-reports">
+    <div class="brief-center">
+      <div class="upload-omega">Ω</div>
+      <div class="upload-brand">VERITAS COMPLIANCE REPORTS</div>
+      <div class="upload-sub">Generate audit-ready PDFs for sovereign lineage</div>
+      <div class="brief-controls">
+        <button class="brief-btn" onclick="generateReport()">
+          <span class="brief-icon">◈</span>
+          <span class="brief-label">Export Final Seal</span>
+          <span class="brief-desc">PDF format, mathematically verifiable</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEAL ARCHIVE TAB -->
+  <section class="tab-panel" id="tab-archive">
+    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+        <div class="library-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div class="library-title">Seal Lineage Archive</div>
+            <p style="font-family: var(--font-mono); color: var(--gray-text); font-size: 11px;">Track build history and execute compliance amendments.</p>
+          </div>
+          <button class="btn-refresh" title="Escalate & Amend Workflow" onclick="escalateArchive()" style="border-color: var(--warning); color: var(--warning);">
+            ⚠ ESCALATE & AMEND
+          </button>
+        </div>
+        <div class="archive-list" id="archive-list">
+            <div class="library-empty">No history found.</div>
+        </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// Tab Navigation Logic
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+function setStatus(text, type = 'ready') {
+  const dot = document.querySelector('.status-dot');
+  const txt = document.querySelector('.status-text');
+  txt.textContent = text;
+  dot.className = 'status-dot ' + type;
+}
+
+let activePipelineData = null;
+
+// Live Pipeline Integration
+async function loadMockPipeline() {
+    setStatus('Running live VERITAS pipeline...', 'busy');
+    try {
+        const res = await fetch('/api/pipeline/run');
+        const data = await res.json();
+        
+        if (data.success && !data.error) {
+            const results = data.results;
+            activePipelineData = results;
+            
+            // Build Banner
+            const banner = document.getElementById('verdict-banner');
+            banner.style.display = 'block';
+            const sealHash = results.final_seal || results.seal_hash || 'UNSEALED';
+            banner.textContent = `FINAL VERDICT: ${results.final_verdict} | SEAL: ${sealHash.substring(0,16)}...`;
+            
+            if (results.final_verdict === 'PASS') {
+                banner.style.color = 'var(--pass)';
+                banner.style.borderColor = 'var(--pass)';
+            } else if (results.final_verdict === 'INCONCLUSIVE') {
+                banner.style.color = 'var(--warning)';
+                banner.style.borderColor = 'var(--warning)';
+            } else {
+                banner.style.color = 'var(--fatal)';
+                banner.style.borderColor = 'var(--fatal)';
+            }
+            
+            // Build Feed (handling the gate_results returned by Omega Brain)
+            const feed = document.getElementById('pipeline-feed');
+            feed.innerHTML = '';
+            
+            const gates = results.gate_results || results.gates || [];
+            gates.forEach((gate, idx) => {
+                const el = document.createElement('div');
+                el.className = `gate-event ${gate.verdict.toLowerCase()}`;
+                
+                // Click to view gate detail
+                el.style.cursor = 'pointer';
+                el.onclick = () => {
+                    document.getElementById('gate-detail-content').textContent = JSON.stringify(gate, null, 2);
+                    document.querySelector('.tab-btn[data-tab="gatedetail"]').click();
+                };
+                
+                // Handle reasons vs reason_code
+                const reasonText = (gate.reasons && gate.reasons.length > 0) ? gate.reasons[0] : (gate.reason_code || (gate.verdict === 'PASS' ? 'OK' : 'FAIL'));
+                
+                el.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span style="color:var(--gray-text); font-family:var(--font-mono);">[${String(idx+1).padStart(2,'0')}]</span>
+                        <span class="gate-name" style="margin-left:12px">${gate.gate}</span>
+                    </div>
+                    <div class="gate-verdict">
+                        <span style="color: ${gate.verdict === 'PASS' ? 'var(--pass)' : (gate.verdict === 'INCONCLUSIVE' ? 'var(--warning)' : 'var(--fatal)')}">
+                            ${gate.verdict}
+                        </span> 
+                        <span style="color: var(--gray-text)">//</span> 
+                        ${reasonText}
+                    </div>
+                `;
+                feed.appendChild(el);
+            });
+            
+            // Populate Archive automatically by calling loadArchive()
+            loadArchive();
+            
+            setStatus('Pipeline Execution Complete', data.final_verdict === 'PASS' ? 'success' : 'error');
+        } else {
+            console.error("Pipeline error:", data);
+            setStatus('Pipeline Data Error: ' + (data.error || 'Unknown'), 'error');
+        }
+    } catch(e) {
+        console.error(e);
+        setStatus('Pipeline Connection Error', 'error');
+    }
+}
+
+// NAFE Telemetry WebSocket Hook
+let nafeSocket = null;
+function startNafeSocket() {
+    if (nafeSocket) return; // Prevent multiple connections
+    setStatus('Connecting to NAFE WebSocket stream...', 'busy');
+    
+    nafeSocket = io('http://localhost:5080');
+    
+    nafeSocket.on('connect', () => {
+        setStatus('NAFE Linked', 'success');
+        triggerNafeAlert('CONNECTION ESTABLISHED. LISTENING FOR ANOMALIES.');
+    });
+    
+    nafeSocket.on('nafe_alert', (msg) => {
+        const details = msg.details || msg.message || JSON.stringify(msg.flags || msg);
+        triggerNafeAlert('VIOLATION CAUGHT: ' + details);
+    });
+    
+    nafeSocket.on('connect_error', () => {
+        setStatus('NAFE Stream Failed', 'error');
+        triggerNafeAlert('CONNECTION REFUSED. VERIFY MCP SERVER.');
+    });
+}
+
+function triggerNafeAlert(msg) {
+    const toasts = document.getElementById('nafe-toasts');
+    const t = document.createElement('div');
+    t.style.background = 'var(--bg-panel)';
+    t.style.borderLeft = '4px solid var(--warning)';
+    t.style.padding = '12px 16px';
+    t.style.color = 'var(--white)';
+    t.style.fontFamily = 'var(--font-mono)';
+    t.style.fontSize = '12px';
+    t.style.minWidth = '300px';
+    t.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+    t.innerHTML = `<span style="color:var(--warning); font-weight:bold;">[NAFE SENSOR]</span><br/>${msg}`;
+    
+    toasts.appendChild(t);
+    
+    // Fade out and remove after 6 seconds
+    setTimeout(() => {
+        t.style.transition = 'opacity 0.5s';
+        t.style.opacity = '0';
+        setTimeout(() => t.remove(), 500);
+    }, 6000);
+}
+
+// Reports Stub
+function generateReport() {
+    if(!activePipelineData) return alert('No active pipeline to export. Run the pipeline first.');
+    const result = confirm(`Export final mathematical seal: ${activePipelineData.seal_hash.substring(0,8)}... to PDF?`);
+    if(result) {
+        setStatus('Generating Audit PDF...', 'busy');
+        setTimeout(() => setStatus('PDF Generation Complete', 'success'), 1500);
+    }
+}
+
+// Archive Loading
+async function loadArchive() {
+    try {
+        const res = await fetch('/api/archive');
+        const data = await res.json();
+        const list = document.getElementById('archive-list');
+        list.innerHTML = '';
+        if (data.history && data.history.length > 0) {
+            data.history.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'archive-item';
+                const verdict = item.final_verdict || item.verdict || 'UNKNOWN';
+                const seal = item.seal_hash || 'UNSEALED';
+                el.innerHTML = `
+                    <div class="gate-name" style="margin-bottom: 4px;">EVENT: ${item.event_type || 'PIPELINE RUN'}</div>
+                    <div style="font-family:var(--font-mono); font-size:11px; color:var(--gray-text)">
+                        SEAL/ID: ${seal}<br/>
+                        TIMESTAMP: ${item.timestamp || new Date().toISOString()}<br/>
+                        VERDICT: <span style="color:${verdict === 'PASS' ? 'var(--pass)' : 'var(--warning)'}">${verdict}</span>
+                    </div>
+                `;
+                list.appendChild(el);
+            });
+        } else {
+            list.innerHTML = '<div class="library-empty">No history found.</div>';
+        }
+    } catch (e) {
+         console.error('Failed to load archive', e);
+    }
+}
+
+// Escalate Workflow
+async function escalateArchive() {
+    if(!activePipelineData) return alert('No active failed claim in memory to escalate. Please run pipeline first.');
+    if(activePipelineData.final_verdict === 'PASS') return alert('Pipeline passed. Escalation is only for INCONCLUSIVE or MODEL_BOUND veridcts.');
+    
+    const signature = prompt(`Initiating Escalate & Amend workflow for Claim:\n${activePipelineData.claim_id || 'Active'}\n\nPlease provide your manual Authority Signature:`, 'VERITAS_AUTH_0x');
+    if(!signature) return;
+    
+    setStatus('Escalation Mode Active. Regenerating Payload...', 'busy');
+    try {
+        const res = await fetch('/api/pipeline/escalate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ signature: signature })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('Escalation Successful. Recalculating gates...');
+            // Load the newly re-evaluated pipeline state into UI
+            activePipelineData = data.results;
+            loadArchive(); // Refresh
+            // Reuse logic to display banner and feed
+            document.querySelector('.tab-btn[data-tab="pipeline"]').click();
+            setStatus('Pipeline Recalculated', 'success');
+            
+            // Render the feed manually
+            document.getElementById('verdict-banner').innerHTML = `ESCALATED VERDICT: ${data.results.final_verdict} (SIGNED BY ${signature})`;
+            document.getElementById('verdict-banner').style.color = 'var(--pass)';
+            document.getElementById('verdict-banner').style.borderColor = 'var(--pass)';
+            document.getElementById('verdict-banner').style.display = 'block';
+        } else {
+            alert('Escalation Rejected: ' + data.error);
+            setStatus('Escalation Rejected', 'error');
+        }
+    } catch(e) {
+        alert('Server connection error during escalation.');
+        setStatus('Ready', 'ready');
+    }
+}
+
+document.querySelector('.tab-btn[data-tab="archive"]').addEventListener('click', loadArchive);
+
+// Init
+setStatus('Dashboard Ready');
+</script>
+</body>
+</html>

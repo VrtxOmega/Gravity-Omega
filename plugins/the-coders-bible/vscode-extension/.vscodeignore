@@ -1,0 +1,10 @@
+.vscode/**
+.vscode-test/**
+node_modules/**
+src/**/*.map
+src/**/*.ts
+.gitignore
+.yarn/**
+.editorconfig
+vsc-extension-quickstart.md
+**/*.vsix

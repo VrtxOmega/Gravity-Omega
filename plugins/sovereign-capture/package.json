@@ -1,0 +1,18 @@
+{
+  "name": "sovereign-capture",
+  "version": "2.0.0",
+  "description": "SovereignCapture — High-assurance screen capture, convert, and trim",
+  "main": "main.js",
+  "scripts": {
+    "start": "node launcher.js",
+    "dev": "node launcher.js --dev"
+  },
+  "author": "RJ Lopez",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^34.0.0"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.3.0"
+  }
+}

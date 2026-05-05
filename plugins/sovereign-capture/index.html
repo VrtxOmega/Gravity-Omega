@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SovereignCapture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #06060e;
+      --bg-deep: #030308;
+      --surface: rgba(14, 14, 28, 0.88);
+      --surface-hover: rgba(20, 20, 40, 0.92);
+      --border: rgba(212, 175, 55, 0.12);
+      --border-hover: rgba(212, 175, 55, 0.28);
+      --gold: #d4af37;
+      --gold-bright: #e8c94a;
+      --gold-dim: rgba(212, 175, 55, 0.55);
+      --gold-mist: rgba(212, 175, 55, 0.06);
+      --text: #e8e8f4;
+      --text-secondary: rgba(200, 200, 225, 0.72);
+      --text-dim: rgba(160, 160, 195, 0.48);
+      --red: #e8364a;
+      --red-bright: #ff4d5e;
+      --red-glow: rgba(232, 54, 74, 0.35);
+      --green: #3ce888;
+      --green-glow: rgba(60, 232, 136, 0.15);
+      --blue: #4488ff;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      overflow: hidden;
+      user-select: none;
+      position: relative;
+    }
+
+    /* ── Ω Watermark ── */
+    body::before {
+      content: 'Ω';
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -22%);
+      font-size: 360px;
+      font-weight: 700;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      color: rgba(212, 175, 55, 0.045);
+      pointer-events: none;
+      z-index: 0;
+      line-height: 1;
+      letter-spacing: -10px;
+    }
+
+    /* ── Title Bar ── */
+    .title-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 38px; padding: 0 14px;
+      background: rgba(4, 4, 12, 0.95);
+      border-bottom: 1px solid var(--border);
+      -webkit-app-region: drag;
+      position: relative;
+      z-index: 10;
+    }
+    .title-bar::after {
+      content: '';
+      position: absolute;
+      bottom: -1px; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.2), transparent);
+    }
+    .title-text {
+      font-size: 10.5px; letter-spacing: 3px; font-weight: 500;
+      color: var(--gold);
+      text-transform: uppercase;
+      display: flex; align-items: center; gap: 2px;
+    }
+    .title-omega {
+      font-size: 15px; font-weight: 700;
+      font-family: 'Georgia', 'Times New Roman', serif;
+      opacity: 0.85;
+      margin: 0 2px;
+    }
+    .title-controls { display: flex; gap: 6px; -webkit-app-region: no-drag; }
+    .title-btn {
+      background: none; border: 1px solid transparent;
+      color: var(--text-dim);
+      font-size: 13px; cursor: pointer; padding: 3px 8px;
+      border-radius: 4px; transition: all 0.2s;
+    }
+    .title-btn:hover { color: var(--text-secondary); background: rgba(255,255,255,0.04); }
+    .title-btn-close:hover { color: var(--red); background: rgba(232, 54, 74, 0.1); }
+
+    /* ── Main Container ── */
+    .container {
+      padding: 14px 18px; height: calc(100vh - 38px);
+      display: flex; flex-direction: column;
+      position: relative; z-index: 1;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex; gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 14px; flex-shrink: 0;
+      position: relative;
+    }
+    .tab {
+      flex: 1; padding: 10px 0; text-align: center;
+      font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+      font-weight: 500;
+      color: var(--text-dim); cursor: pointer; background: none; border: none;
+      border-bottom: 2px solid transparent; transition: all 0.25s ease;
+      font-family: var(--font);
+    }
+    .tab:hover { color: var(--text-secondary); }
+    .tab.active {
+      color: var(--gold);
+      border-bottom-color: var(--gold);
+      text-shadow: 0 0 20px rgba(212, 175, 55, 0.2);
+    }
+    .tab-icon { font-size: 10px; margin-right: 5px; }
+    .tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .tab-content.active { display: flex; }
+
+    /* ── Section Label ── */
+    .section-label {
+      font-size: 8px; letter-spacing: 2.5px; font-weight: 600;
+      color: var(--gold-dim); text-transform: uppercase; margin-bottom: 8px;
+    }
+
+    /* ── Source Grid ── */
+    .source-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; max-height: 160px; overflow-y: auto; padding-right: 4px;
+    }
+    .source-grid::-webkit-scrollbar { width: 3px; }
+    .source-grid::-webkit-scrollbar-track { background: transparent; }
+    .source-grid::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.15); border-radius: 2px; }
+    .source-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px; cursor: pointer;
+      transition: all 0.25s ease; display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+      backdrop-filter: blur(8px);
+    }
+    .source-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .source-card.selected {
+      border-color: var(--gold);
+      background: rgba(212, 175, 55, 0.06);
+      box-shadow: 0 0 16px rgba(212, 175, 55, 0.08), inset 0 0 20px rgba(212, 175, 55, 0.03);
+    }
+    .source-thumb {
+      width: 100%; height: 55px; object-fit: contain;
+      border-radius: 4px; background: var(--bg-deep);
+    }
+    .source-name {
+      font-size: 9px; color: var(--text-dim); text-align: center;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      width: 100%; letter-spacing: 0.3px;
+    }
+
+    /* ── Settings Row ── */
+    .settings-row {
+      display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap;
+    }
+    .setting-chip {
+      padding: 5px 12px; font-size: 9px; letter-spacing: 0.8px;
+      font-weight: 500; font-family: var(--font);
+      border: 1px solid var(--border); border-radius: 16px;
+      background: none; color: var(--text-dim); cursor: pointer;
+      transition: all 0.25s ease; white-space: nowrap;
+    }
+    .setting-chip:hover { border-color: var(--border-hover); color: var(--gold-dim); }
+    .setting-chip.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(212, 175, 55, 0.08);
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.06);
+    }
+    .setting-chip.toggle-on {
+      border-color: var(--green);
+      color: var(--green);
+      background: rgba(60, 232, 136, 0.06);
+      box-shadow: 0 0 12px var(--green-glow);
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; margin-top: auto; padding-top: 12px;
+    }
+    .timer {
+      font-size: 32px; font-weight: 200; letter-spacing: 6px;
+      color: var(--text); font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 30px rgba(232, 232, 244, 0.05);
+    }
+    .timer.recording {
+      color: var(--red);
+      text-shadow: 0 0 30px rgba(232, 54, 74, 0.15);
+    }
+
+    /* ── Record Button ── */
+    .rec-btn {
+      width: 68px; height: 68px; border-radius: 50%;
+      border: 2px solid rgba(200, 200, 225, 0.2);
+      background: transparent;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    .rec-btn::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 1px solid transparent;
+      transition: all 0.35s ease;
+    }
+    .rec-btn:hover {
+      border-color: var(--red);
+    }
+    .rec-btn:hover::before {
+      border-color: rgba(232, 54, 74, 0.15);
+    }
+    .rec-btn .inner {
+      width: 26px; height: 26px;
+      background: linear-gradient(135deg, var(--red-bright), var(--red));
+      border-radius: 50%;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 12px rgba(232, 54, 74, 0.2);
+    }
+    .rec-btn:active { transform: scale(0.94); }
+    .rec-btn:active .inner { transform: scale(0.88); }
+
+    /* Idle ready state */
+    .rec-btn.ready {
+      animation: ready-breathe 4s ease-in-out infinite;
+    }
+    @keyframes ready-breathe {
+      0%, 100% { box-shadow: 0 0 0px transparent; border-color: rgba(200, 200, 225, 0.2); }
+      50% { box-shadow: 0 0 20px rgba(232, 54, 74, 0.08); border-color: rgba(232, 54, 74, 0.3); }
+    }
+
+    /* Recording state */
+    .rec-btn.recording .inner {
+      border-radius: 5px; width: 20px; height: 20px;
+      box-shadow: 0 0 20px rgba(232, 54, 74, 0.4);
+    }
+    .rec-btn.recording {
+      border-color: var(--red);
+      animation: pulse-ring 2s ease-in-out infinite;
+    }
+    .rec-btn.recording::before {
+      border-color: rgba(232, 54, 74, 0.12);
+      animation: pulse-outer 2s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 16px var(--red-glow); }
+      50% { box-shadow: 0 0 28px var(--red-glow); }
+    }
+    @keyframes pulse-outer {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.5; }
+    }
+
+    .hotkey-hint {
+      font-size: 9px; color: var(--text-dim);
+      letter-spacing: 1.5px; font-weight: 400;
+    }
+    .status {
+      font-size: 10px; color: var(--green); letter-spacing: 0.5px;
+      min-height: 14px; text-align: center; font-weight: 500;
+    }
+    .status.error { color: var(--red); }
+
+    /* ── Buttons ── */
+    .btn-small {
+      background: none; border: 1px solid var(--border);
+      color: var(--text-dim); font-size: 9px; padding: 4px 10px;
+      border-radius: var(--radius-sm); cursor: pointer;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      font-family: var(--font); font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-small:hover { border-color: var(--gold); color: var(--gold); }
+    .btn-full {
+      width: 100%; padding: 10px; margin-top: 8px;
+      background: none; border: 1px solid var(--border);
+      color: var(--text-dim); font-size: 9px; letter-spacing: 1.5px;
+      font-weight: 500; font-family: var(--font);
+      text-transform: uppercase; border-radius: var(--radius);
+      cursor: pointer; transition: all 0.25s ease;
+    }
+    .btn-full:hover {
+      border-color: var(--gold); color: var(--gold);
+      background: var(--gold-mist);
+      box-shadow: 0 0 20px rgba(212, 175, 55, 0.05);
+    }
+
+    /* ── Recordings List ── */
+    .recordings-list { flex: 1; overflow-y: auto; padding-right: 4px; }
+    .recordings-list::-webkit-scrollbar { width: 3px; }
+    .recordings-list::-webkit-scrollbar-track { background: transparent; }
+    .recordings-list::-webkit-scrollbar-thumb { background: rgba(212, 175, 55, 0.12); border-radius: 2px; }
+    .recording-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 6px; cursor: pointer;
+      transition: all 0.25s ease;
+      background: var(--surface);
+      backdrop-filter: blur(6px);
+    }
+    .recording-item:hover {
+      border-color: var(--border-hover);
+      background: var(--surface-hover);
+      transform: translateX(2px);
+    }
+    .recording-icon { font-size: 16px; opacity: 0.6; }
+    .recording-info { flex: 1; min-width: 0; }
+    .recording-name {
+      font-size: 11px; color: var(--text); font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .recording-meta {
+      font-size: 9px; color: var(--text-dim);
+      margin-top: 2px; letter-spacing: 0.2px;
+    }
+    .recording-actions { display: flex; gap: 4px; }
+    .recording-action {
+      background: none; border: none; font-size: 12px;
+      cursor: pointer; padding: 3px; opacity: 0.35;
+      transition: all 0.2s; border-radius: 4px;
+    }
+    .recording-action:hover {
+      opacity: 1;
+      background: rgba(255,255,255,0.04);
+    }
+    .recording-empty {
+      text-align: center; color: var(--text-dim);
+      font-size: 10px; padding: 40px 0; letter-spacing: 0.5px;
+      line-height: 1.8;
+    }
+
+    /* ── Convert Panel ── */
+    .convert-section { padding: 8px 0; }
+    .convert-file-info {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px;
+      margin-bottom: 12px;
+      backdrop-filter: blur(6px);
+    }
+    .format-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 6px; margin: 8px 0;
+    }
+    .format-btn {
+      padding: 9px 4px; text-align: center;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      font-family: var(--font);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: none; color: var(--text-dim); cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .format-btn:hover { border-color: var(--border-hover); color: var(--gold-dim); }
+    .format-btn.active {
+      border-color: var(--gold); color: var(--gold);
+      background: rgba(212, 175, 55, 0.08);
+      box-shadow: 0 0 12px rgba(212, 175, 55, 0.06);
+    }
+    .progress-bar {
+      width: 100%; height: 3px;
+      background: rgba(212, 175, 55, 0.08);
+      border-radius: 2px; overflow: hidden; margin-top: 10px;
+    }
+    .progress-fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, var(--gold), var(--gold-bright));
+      transition: width 0.4s ease; border-radius: 2px;
+      box-shadow: 0 0 8px rgba(212, 175, 55, 0.3);
+    }
+
+    /* ── Trim Panel ── */
+    .trim-controls {
+      display: flex; gap: 8px; align-items: center; margin: 10px 0;
+    }
+    .trim-input {
+      flex: 1; padding: 7px 8px; font-size: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: var(--radius-sm);
+      text-align: center; font-family: 'Inter', monospace;
+      font-weight: 400; letter-spacing: 1px;
+      transition: border-color 0.2s;
+    }
+    .trim-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 12px rgba(212, 175, 55, 0.08); }
+    .trim-arrow {
+      color: var(--gold-dim); font-size: 12px; font-weight: 300;
+    }
+
+    /* ── Countdown Overlay ── */
+    .countdown-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 8px;
+      background: rgba(3, 3, 8, 0.92);
+      backdrop-filter: blur(16px);
+    }
+    .countdown-number {
+      font-size: 140px; font-weight: 200; color: var(--gold);
+      animation: countPulse 0.8s ease-out;
+      text-shadow: 0 0 80px rgba(212, 175, 55, 0.25);
+      letter-spacing: -4px;
+    }
+    .countdown-label {
+      font-size: 10px; letter-spacing: 4px; text-transform: uppercase;
+      color: var(--gold-dim); font-weight: 500;
+    }
+    @keyframes countPulse {
+      0% { transform: scale(1.8); opacity: 0; filter: blur(4px); }
+      60% { opacity: 1; filter: blur(0); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* ── Webcam PiP ── */
+    .webcam-pip {
+      position: fixed; bottom: 14px; right: 14px;
+      width: 120px; height: 90px; border-radius: 14px;
+      overflow: hidden; border: 2px solid var(--gold);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.6), 0 0 12px rgba(212, 175, 55, 0.1);
+      z-index: 8000; display: none;
+    }
+    .webcam-pip video {
+      width: 100%; height: 100%; object-fit: cover;
+      transform: scaleX(-1);
+    }
+
+    .hidden { display: none !important; }
+
+    /* ── Source Bar (collapsed) ── */
+    .source-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; border: 1px solid var(--border);
+      border-radius: var(--radius); background: var(--surface);
+      margin-bottom: 8px; backdrop-filter: blur(6px);
+    }
+    .source-bar-icon {
+      font-size: 11px; margin-right: 8px; opacity: 0.6;
+    }
+    .source-bar-name {
+      font-size: 10px; color: var(--text); flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-weight: 500;
+    }
+    .source-bar-change {
+      background: none; border: none; color: var(--gold-dim);
+      font-size: 9px; cursor: pointer; letter-spacing: 0.8px;
+      padding: 2px 8px; white-space: nowrap;
+      font-family: var(--font); font-weight: 500;
+      transition: color 0.2s;
+    }
+    .source-bar-change:hover { color: var(--gold); }
+    .source-grid-wrapper {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .source-grid-wrapper.expanded { max-height: 200px; margin-bottom: 8px; }
+
+    /* ── Advanced Expander ── */
+    .expander {
+      display: flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 6px 0; cursor: pointer;
+      color: var(--text-dim); font-size: 9px; letter-spacing: 1.5px;
+      font-weight: 500;
+      transition: color 0.25s; margin: 4px 0;
+    }
+    .expander:hover { color: var(--gold-dim); }
+    .expander-content {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .expander-content.expanded { max-height: 100px; }
+
+    /* ── Live Preview ── */
+    .preview-container {
+      position: relative; width: 100%; max-height: 200px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; background: var(--bg-deep); margin-bottom: 10px;
+    }
+    .preview-container video {
+      width: 100%; height: 100%; object-fit: contain;
+      display: block;
+    }
+    .preview-badge {
+      position: absolute; top: 8px; left: 10px;
+      padding: 3px 10px; border-radius: 4px; font-size: 8px;
+      letter-spacing: 2px; font-weight: 600;
+      font-family: var(--font);
+    }
+    .preview-badge.standby {
+      background: rgba(255,255,255,0.06); color: var(--text-dim);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .preview-badge.live {
+      background: rgba(232, 54, 74, 0.85); color: #fff;
+      animation: pulse-ring 2s ease-in-out infinite;
+      border: 1px solid rgba(232, 54, 74, 0.4);
+    }
+    .preview-placeholder {
+      display: flex; align-items: center; justify-content: center;
+      height: 120px; color: var(--text-dim); font-size: 10px;
+      letter-spacing: 1.5px; font-weight: 400;
+    }
+
+    /* ── Entry animation ── */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tab-content.active {
+      animation: fadeSlideUp 0.3s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <!-- Title Bar -->
+  <div class="title-bar">
+    <span class="title-text">
+      Sovereign<span class="title-omega">Ω</span>Capture
+    </span>
+    <div class="title-controls">
+      <button class="title-btn" onclick="window.recorder.minimize()">─</button>
+      <button class="title-btn title-btn-close" onclick="window.recorder.close()">×</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="container">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="record"><span class="tab-icon">◉</span> Record</button>
+      <button class="tab" data-tab="recordings"><span class="tab-icon">◫</span> Library</button>
+      <button class="tab" data-tab="convert"><span class="tab-icon">⟲</span> Convert</button>
+    </div>
+
+    <!-- ═══ RECORD TAB ═══ -->
+    <div class="tab-content active" id="tab-record">
+      <!-- Live Preview -->
+      <div class="preview-container" id="preview-container">
+        <div class="preview-placeholder" id="preview-placeholder">Select a source to preview</div>
+        <video id="preview-video" autoplay muted playsinline style="display:none;"></video>
+        <div class="preview-badge standby" id="preview-badge">STANDBY</div>
+      </div>
+
+      <!-- Hero: Record button -->
+      <div class="controls">
+        <div class="timer" id="timer">00:00</div>
+        <button class="rec-btn" id="rec-btn">
+          <div class="inner"></div>
+        </button>
+        <div class="hotkey-hint">Ctrl+Shift+R</div>
+        <div class="status" id="status"></div>
+      </div>
+
+      <!-- Source: compact bar -->
+      <div style="margin-top:auto;">
+        <div class="source-bar">
+          <span class="source-bar-icon">◻</span>
+          <span class="source-bar-name" id="source-bar-name">Entire Screen</span>
+          <button class="source-bar-change" id="source-bar-change">Change ▾</button>
+          <button class="btn-small" id="refresh-btn" style="margin-left:4px;padding:3px 8px;font-size:8px;">↻</button>
+        </div>
+        <div class="source-grid-wrapper" id="source-grid-wrapper">
+          <div class="source-grid" id="source-grid"></div>
+        </div>
+
+        <!-- Quality -->
+        <div class="settings-row" style="margin:6px 0;justify-content:center;">
+          <button class="setting-chip" data-quality="low">Low</button>
+          <button class="setting-chip" data-quality="med">Med</button>
+          <button class="setting-chip active" data-quality="high">High</button>
+          <button class="setting-chip" data-quality="max">Max</button>
+        </div>
+
+        <!-- Advanced (collapsed) -->
+        <div class="expander" id="advanced-toggle">⚙ Advanced ▾</div>
+        <div class="expander-content" id="advanced-content">
+          <div class="settings-row" style="justify-content:center;">
+            <button class="setting-chip" id="toggle-audio">🔇 Audio</button>
+            <button class="setting-chip" id="toggle-webcam">📷 Webcam</button>
+            <button class="setting-chip" id="toggle-autosave">💾 Auto-save</button>
+            <button class="setting-chip" id="toggle-countdown">⏱ 3-2-1</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LIBRARY TAB ═══ -->
+    <div class="tab-content" id="tab-recordings">
+      <div class="recordings-list" id="recordings-list">
+        <div class="recording-empty">Loading...</div>
+      </div>
+      <button class="btn-full" id="open-folder-btn">📂 Open Recordings Folder</button>
+    </div>
+
+    <!-- ═══ CONVERT TAB ═══ -->
+    <div class="tab-content" id="tab-convert">
+      <div class="convert-section">
+        <div class="section-label">Source File</div>
+        <div class="convert-file-info" id="convert-file-info">
+          <div style="color:var(--text-dim);font-size:10px;letter-spacing:0.3px;">Select a recording from the Library tab, or:</div>
+          <button class="btn-full" id="convert-pick-btn" style="margin-top:8px;">📎 Pick from Library</button>
+        </div>
+
+        <div id="convert-controls" class="hidden">
+          <div class="section-label" style="margin-top:12px;">Output Format</div>
+          <div class="format-grid">
+            <button class="format-btn active" data-format="mp4">MP4</button>
+            <button class="format-btn" data-format="mov">MOV</button>
+            <button class="format-btn" data-format="gif">GIF</button>
+            <button class="format-btn" data-format="avi">AVI</button>
+          </div>
+
+          <div class="section-label" style="margin-top:10px;">Quality</div>
+          <div class="settings-row">
+            <button class="setting-chip" data-cq="low">Low</button>
+            <button class="setting-chip active" data-cq="med">Med</button>
+            <button class="setting-chip" data-cq="high">High</button>
+          </div>
+
+          <div class="section-label" style="margin-top:12px;">Trim (Optional)</div>
+          <div class="trim-controls">
+            <input class="trim-input" id="trim-start" type="text" placeholder="0:00" value="0:00">
+            <span class="trim-arrow">→</span>
+            <input class="trim-input" id="trim-end" type="text" placeholder="end" value="">
+          </div>
+
+          <button class="btn-full" id="convert-btn" style="background:rgba(212,175,55,0.06);color:var(--gold);border-color:rgba(212,175,55,0.25);margin-top:12px;font-weight:600;">
+            ⟲ Convert
+          </button>
+
+          <div class="progress-bar hidden" id="convert-progress-bar">
+            <div class="progress-fill" id="convert-progress-fill"></div>
+          </div>
+          <div class="status" id="convert-status" style="margin-top:8px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Webcam PiP -->
+  <div class="webcam-pip hidden" id="webcam-pip">
+    <video id="webcam-video" autoplay muted playsinline></video>
+  </div>
+
+  <script>
+    // ══════════════════════════════════════════════════
+    // SovereignCapture — Renderer Logic
+    // ══════════════════════════════════════════════════
+
+    const sourceGrid = document.getElementById('source-grid');
+    const recBtn = document.getElementById('rec-btn');
+    const timerEl = document.getElementById('timer');
+    const statusEl = document.getElementById('status');
+    const refreshBtn = document.getElementById('refresh-btn');
+
+    let selectedSourceId = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let recording = false;
+    let startTime = null;
+    let timerInterval = null;
+    let webcamStream = null;
+    let previewStream = null;
+    let currentMetadata = null;
+
+    // ── Settings state ──
+    const settings = {
+      quality: 'high',
+      audio: false,
+      webcam: false,
+      autoSave: false,
+      countdown: false
+    };
+
+    const QUALITY_MAP = { low: 2_000_000, med: 4_000_000, high: 8_000_000, max: 16_000_000 };
+
+    // ══════════════════════════════════════════════════
+    // TAB SWITCHING
+    // ══════════════════════════════════════════════════
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
+        if (tab.dataset.tab === 'recordings') loadRecordings();
+      });
+    });
+
+    // ══════════════════════════════════════════════════
+    // SETTINGS TOGGLES
+    // ══════════════════════════════════════════════════
+    document.querySelectorAll('[data-quality]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-quality]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        settings.quality = chip.dataset.quality;
+      });
+    });
+
+    function setupToggle(id, key) {
+      const el = document.getElementById(id);
+      el.addEventListener('click', () => {
+        settings[key] = !settings[key];
+        el.classList.toggle('toggle-on', settings[key]);
+        if (key === 'webcam') toggleWebcam();
+      });
+    }
+    setupToggle('toggle-audio', 'audio');
+    setupToggle('toggle-webcam', 'webcam');
+    setupToggle('toggle-autosave', 'autoSave');
+    setupToggle('toggle-countdown', 'countdown');
+
+    document.getElementById('source-bar-change').addEventListener('click', () => {
+      document.getElementById('source-grid-wrapper').classList.toggle('expanded');
+    });
+
+    document.getElementById('advanced-toggle').addEventListener('click', () => {
+      document.getElementById('advanced-content').classList.toggle('expanded');
+    });
+
+    // ══════════════════════════════════════════════════
+    // LIVE PREVIEW
+    // ══════════════════════════════════════════════════
+    async function startPreview(sourceId) {
+      stopPreview();
+      try {
+        previewStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId,
+              maxWidth: 960,
+              maxHeight: 540,
+              maxFrameRate: 15
+            }
+          }
+        });
+        const video = document.getElementById('preview-video');
+        video.srcObject = previewStream;
+        video.style.display = 'block';
+        document.getElementById('preview-placeholder').style.display = 'none';
+        const badge = document.getElementById('preview-badge');
+        badge.className = 'preview-badge standby';
+        badge.textContent = 'PREVIEW';
+      } catch (e) {
+        console.warn('[Preview]', e.message);
+      }
+    }
+
+    function stopPreview() {
+      if (previewStream) {
+        previewStream.getTracks().forEach(t => t.stop());
+        previewStream = null;
+      }
+      const video = document.getElementById('preview-video');
+      if (video) { video.srcObject = null; video.style.display = 'none'; }
+      const ph = document.getElementById('preview-placeholder');
+      if (ph) ph.style.display = 'flex';
+    }
+
+    function setPreviewLive(isLive) {
+      const badge = document.getElementById('preview-badge');
+      if (!badge) return;
+      if (isLive) {
+        badge.className = 'preview-badge live';
+        badge.textContent = '● REC';
+      } else {
+        badge.className = 'preview-badge standby';
+        badge.textContent = 'PREVIEW';
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // SOURCE LOADING
+    // ══════════════════════════════════════════════════
+    async function loadSources() {
+      const sources = await window.recorder.getSources();
+      sourceGrid.innerHTML = '';
+
+      const sorted = sources.sort((a, b) => {
+        if (a.isScreen && !b.isScreen) return -1;
+        if (!a.isScreen && b.isScreen) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      for (const source of sorted) {
+        const card = document.createElement('div');
+        card.className = 'source-card';
+        if (source.id === selectedSourceId) card.classList.add('selected');
+
+        const img = document.createElement('img');
+        img.className = 'source-thumb';
+        img.src = source.thumbnail;
+
+        const name = document.createElement('div');
+        name.className = 'source-name';
+        name.textContent = source.isScreen ? `◻ ${source.name}` : source.name;
+
+        card.appendChild(img);
+        card.appendChild(name);
+
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.source-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          selectedSourceId = source.id;
+          document.getElementById('source-bar-name').textContent = `Recording: ${source.name}`;
+          document.getElementById('source-grid-wrapper').classList.remove('expanded');
+          recBtn.classList.add('ready');
+          statusEl.textContent = '';
+          startPreview(source.id);
+        });
+
+        sourceGrid.appendChild(card);
+      }
+
+      if (!selectedSourceId && sorted.length > 0) {
+        const first = sorted.find(s => s.isScreen) || sorted[0];
+        selectedSourceId = first.id;
+        document.getElementById('source-bar-name').textContent = `Recording: ${first.name}`;
+        sourceGrid.children[sorted.indexOf(first)]?.classList.add('selected');
+        recBtn.classList.add('ready');
+        startPreview(first.id);
+
+        const screens = sorted.filter(s => s.isScreen);
+        if (screens.length === 1 && sorted.length <= 2) {
+          document.getElementById('source-bar-change').style.display = 'none';
+        }
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // COUNTDOWN
+    // ══════════════════════════════════════════════════
+    function showCountdown() {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'countdown-overlay';
+        document.body.appendChild(overlay);
+
+        let count = 3;
+        function tick() {
+          if (count <= 0) {
+            overlay.remove();
+            resolve();
+            return;
+          }
+          overlay.innerHTML = `
+            <div class="countdown-number">${count}</div>
+            <div class="countdown-label">Capturing in</div>
+          `;
+          count--;
+          setTimeout(tick, 800);
+        }
+        tick();
+      });
+    }
+
+    // ══════════════════════════════════════════════════
+    // WEBCAM PIP
+    // ══════════════════════════════════════════════════
+    async function toggleWebcam() {
+      const pip = document.getElementById('webcam-pip');
+      const video = document.getElementById('webcam-video');
+
+      if (settings.webcam) {
+        try {
+          webcamStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 320, height: 240, frameRate: 30 },
+            audio: false
+          });
+          video.srcObject = webcamStream;
+          pip.classList.remove('hidden');
+        } catch (e) {
+          statusEl.textContent = 'Webcam unavailable';
+          statusEl.className = 'status error';
+          settings.webcam = false;
+          document.getElementById('toggle-webcam').classList.remove('toggle-on');
+        }
+      } else {
+        pip.classList.add('hidden');
+        if (webcamStream) {
+          webcamStream.getTracks().forEach(t => t.stop());
+          webcamStream = null;
+        }
+        video.srcObject = null;
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // RECORDING
+    // ══════════════════════════════════════════════════
+    async function startRecording() {
+      if (!selectedSourceId) {
+        statusEl.textContent = 'Select a source first';
+        statusEl.className = 'status error';
+        return;
+      }
+
+      if (settings.countdown) {
+        await showCountdown();
+      }
+
+      try {
+        const videoConstraints = {
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: selectedSourceId,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            maxFrameRate: 30
+          }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: settings.audio ? { mandatory: { chromeMediaSource: 'desktop' } } : false,
+          video: videoConstraints
+        });
+
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9'
+          : 'video/webm;codecs=vp8';
+
+        mediaRecorder = new MediaRecorder(stream, {
+          mimeType,
+          videoBitsPerSecond: QUALITY_MAP[settings.quality] || 8_000_000
+        });
+
+        recordedChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(recordedChunks, { type: mimeType });
+          const buffer = await blob.arrayBuffer();
+          const now = new Date();
+          let filename = `capture-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}.webm`;
+
+          if (currentMetadata && currentMetadata.veritasJobId) {
+            filename = `capture_${currentMetadata.veritasJobId}_${currentMetadata.sessionTag || 'no-tag'}_${now.getTime()}.webm`;
+          }
+
+          statusEl.textContent = 'Saving...';
+          statusEl.className = 'status';
+          const result = await window.recorder.saveRecording(buffer, filename, settings.autoSave, currentMetadata);
+          
+          currentMetadata = null;
+
+          if (result.saved) {
+            const name = result.path.split(/[/\\]/).pop();
+            statusEl.textContent = `✓ Saved: ${name}`;
+          } else {
+            statusEl.textContent = 'Save cancelled';
+            statusEl.className = 'status error';
+          }
+
+          stream.getTracks().forEach(track => track.stop());
+          window.recorder.restore();
+          setPreviewLive(false);
+          if (selectedSourceId) startPreview(selectedSourceId);
+        };
+
+        mediaRecorder.start(1000);
+        recording = true;
+        startTime = Date.now();
+        recBtn.classList.remove('ready');
+        recBtn.classList.add('recording');
+        timerEl.classList.add('recording');
+        statusEl.textContent = 'Recording...';
+        statusEl.className = 'status';
+
+        timerInterval = setInterval(updateTimer, 100);
+        setPreviewLive(true);
+
+        if (selectedSourceId && selectedSourceId.startsWith('screen:')) {
+          window.recorder.minimize();
+        }
+        
+        window.recorder.notifyStateChange({ started: true, metadata: currentMetadata });
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = 'status error';
+        console.error(err);
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && recording) {
+        mediaRecorder.stop();
+        recording = false;
+        recBtn.classList.remove('recording');
+        recBtn.classList.add('ready');
+        timerEl.classList.remove('recording');
+        clearInterval(timerInterval);
+        setPreviewLive(false);
+        window.recorder.notifyStateChange({ started: false, metadata: currentMetadata });
+      }
+    }
+
+    function toggleRecording() {
+      if (recording) stopRecording(); else startRecording();
+    }
+
+    function updateTimer() {
+      if (!startTime) return;
+      const elapsed = Date.now() - startTime;
+      const mins = Math.floor(elapsed / 60000);
+      const secs = Math.floor((elapsed % 60000) / 1000);
+      timerEl.textContent = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    }
+
+    // ══════════════════════════════════════════════════
+    // RECORDINGS LIST
+    // ══════════════════════════════════════════════════
+    async function loadRecordings() {
+      const list = document.getElementById('recordings-list');
+      list.innerHTML = '<div class="recording-empty">Loading...</div>';
+
+      const recordings = await window.recorder.listRecordings();
+      if (!recordings.length) {
+        list.innerHTML = '<div class="recording-empty">No captures yet.<br>Record something and it will appear here.</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      for (const rec of recordings) {
+        const item = document.createElement('div');
+        item.className = 'recording-item';
+
+        const sizeMB = (rec.size / (1024 * 1024)).toFixed(1);
+        const date = new Date(rec.date);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        const durationId = `dur-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+        const extBadge = rec.ext.toUpperCase();
+
+        item.innerHTML = `
+          <div class="recording-icon">◉</div>
+          <div class="recording-info">
+            <div class="recording-name">${rec.name}</div>
+            <div class="recording-meta">
+              ${dateStr} · ${timeStr} · ${sizeMB} MB ·
+              <span class="recording-dur" id="${durationId}">...</span>
+              · <span style="color:var(--gold);font-weight:600;">${extBadge}</span>
+            </div>
+          </div>
+          <div class="recording-actions">
+            <button class="recording-action" title="Convert" data-convert="${rec.path}">⟲</button>
+            <button class="recording-action" title="Delete" data-delete="${rec.path}" data-name="${rec.name}">✕</button>
+          </div>
+        `;
+
+        item.addEventListener('click', (e) => {
+          if (e.target.closest('.recording-action')) return;
+          window.recorder.openRecording(rec.path);
+        });
+
+        list.appendChild(item);
+
+        window.recorder.probeDuration(rec.path).then(d => {
+          const el = document.getElementById(durationId);
+          if (el) el.textContent = d.formatted;
+        });
+      }
+
+      list.querySelectorAll('[data-delete]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const name = btn.dataset.name;
+          if (!confirm(`Delete "${name}"?`)) return;
+          const result = await window.recorder.deleteRecording(btn.dataset.delete);
+          if (result.deleted) loadRecordings();
+        });
+      });
+
+      list.querySelectorAll('[data-convert]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openConvertTab(btn.dataset.convert);
+        });
+      });
+    }
+
+    // ══════════════════════════════════════════════════
+    // CONVERT TAB
+    // ══════════════════════════════════════════════════
+    let convertSourcePath = null;
+    let convertFormat = 'mp4';
+    let convertQuality = 'med';
+
+    document.querySelectorAll('[data-format]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-format]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        convertFormat = btn.dataset.format;
+      });
+    });
+
+    document.querySelectorAll('[data-cq]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('[data-cq]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        convertQuality = chip.dataset.cq;
+      });
+    });
+
+    document.getElementById('convert-pick-btn').addEventListener('click', async () => {
+      const recordings = await window.recorder.listRecordings();
+      if (!recordings.length) {
+        document.getElementById('convert-status').textContent = 'No recordings available';
+        return;
+      }
+      openConvertTab(recordings[0].path);
+    });
+
+    function openConvertTab(filePath) {
+      convertSourcePath = filePath;
+      const name = filePath.split(/[/\\]/).pop();
+
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+      document.querySelector('[data-tab="convert"]').classList.add('active');
+      document.getElementById('tab-convert').classList.add('active');
+
+      const info = document.getElementById('convert-file-info');
+      info.innerHTML = `
+        <div style="color:var(--text);font-size:11px;font-weight:500;">📎 ${name}</div>
+        <div style="color:var(--text-dim);font-size:9px;margin-top:3px;letter-spacing:0.2px;">${filePath}</div>
+      `;
+
+      document.getElementById('convert-controls').classList.remove('hidden');
+      document.getElementById('convert-status').textContent = '';
+
+      window.recorder.probeDuration(filePath).then(d => {
+        document.getElementById('trim-end').value = d.formatted !== '--:--' ? d.formatted : '';
+      });
+    }
+
+    document.getElementById('convert-btn').addEventListener('click', async () => {
+      if (!convertSourcePath) return;
+
+      const statusEl = document.getElementById('convert-status');
+      const progressBar = document.getElementById('convert-progress-bar');
+      const progressFill = document.getElementById('convert-progress-fill');
+
+      statusEl.textContent = 'Converting...';
+      statusEl.className = 'status';
+      progressBar.classList.remove('hidden');
+      progressFill.style.width = '10%';
+
+      const startStr = document.getElementById('trim-start').value.trim();
+      const endStr = document.getElementById('trim-end').value.trim();
+      let inputPath = convertSourcePath;
+
+      if (startStr && endStr && startStr !== '0:00') {
+        statusEl.textContent = 'Trimming...';
+        const startSec = parseTimeToSeconds(startStr);
+        const endSec = parseTimeToSeconds(endStr);
+
+        if (startSec < endSec) {
+          const trimResult = await window.recorder.trimVideo(convertSourcePath, startSec, endSec);
+          if (trimResult.success) {
+            inputPath = trimResult.path;
+          } else {
+            statusEl.textContent = `Trim failed: ${trimResult.error}`;
+            statusEl.className = 'status error';
+            progressBar.classList.add('hidden');
+            return;
+          }
+        }
+      }
+
+      progressFill.style.width = '30%';
+      statusEl.textContent = `Converting to ${convertFormat.toUpperCase()}...`;
+
+      const result = await window.recorder.convertVideo(inputPath, convertFormat, convertQuality);
+
+      progressFill.style.width = '100%';
+
+      if (result.success) {
+        const sizeMB = (result.size / (1024 * 1024)).toFixed(1);
+        statusEl.textContent = `✓ ${result.name} (${sizeMB} MB)`;
+        statusEl.className = 'status';
+      } else {
+        statusEl.textContent = `Failed: ${result.error?.slice(0, 100)}`;
+        statusEl.className = 'status error';
+      }
+
+      setTimeout(() => progressBar.classList.add('hidden'), 2000);
+    });
+
+    window.recorder.onConvertProgress((data) => {
+      const fill = document.getElementById('convert-progress-fill');
+      if (fill) {
+        const pct = Math.min(90, 30 + data.seconds * 2);
+        fill.style.width = `${pct}%`;
+      }
+    });
+
+    function parseTimeToSeconds(str) {
+      const parts = str.split(':').map(Number);
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      return parseFloat(str) || 0;
+    }
+
+    // ══════════════════════════════════════════════════
+    // OPEN FOLDER
+    // ══════════════════════════════════════════════════
+    document.getElementById('open-folder-btn').addEventListener('click', () => {
+      window.recorder.openRecordingsFolder();
+    });
+
+    // ══════════════════════════════════════════════════
+    // EVENT LISTENERS
+    // ══════════════════════════════════════════════════
+    recBtn.addEventListener('click', toggleRecording);
+    refreshBtn.addEventListener('click', loadSources);
+    
+    window.recorder.onToggleRecording(() => {
+      if (recording) stopRecording(); 
+      else {
+        currentMetadata = null;
+        startRecording();
+      }
+    });
+
+    if (window.recorder.onControlRecord) {
+      window.recorder.onControlRecord(async ({ action, metadata }) => {
+        if (action === 'start' && !recording) {
+          currentMetadata = metadata || null;
+          await startRecording();
+        } else if (action === 'stop' && recording) {
+          stopRecording();
+        } else if (action === 'toggle') {
+          if (recording) {
+            stopRecording();
+          } else {
+            currentMetadata = metadata || null;
+            await startRecording();
+          }
+        }
+      });
+    }
+
+    // ── Init ──
+    loadSources();
+  </script>
+</body>
+</html>

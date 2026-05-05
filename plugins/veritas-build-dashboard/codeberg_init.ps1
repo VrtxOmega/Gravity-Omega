@@ -1,0 +1,1 @@
+Invoke-RestMethod -Uri 'https://codeberg.org/api/v1/user/repos' -Method Post -Headers @{'accept' = 'application/json'; 'Authorization' = 'token ' + $env:CODEBERG_TOKEN; 'Content-Type' = 'application/json'} -Body '{"name":"sovereign-docs","private":false}'
