@@ -1771,6 +1771,58 @@ function interruptOmega() {
         window._thinkingStepHandler = null;
 
     }
+}
+
+// ── VERITAS Trinity handlers ───────────────────────────────────────
+async function _trinityCall(btnId, server, tool, args, fallback) {
+    const btn = document.getElementById(btnId);
+    if (!btn || btn.disabled) return;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="trinity-icon">⏳</span> ...';
+    try {
+        let res = await window.omega.mcp.call({ server, tool, args });
+        if (!res.ok && fallback) {
+            res = await window.omega.mcp.call({ server, tool: fallback.tool, args: fallback.args });
+        }
+        if (res.ok) {
+            const text = _extractMcpText(res.result);
+            showToast(text.length > 120 ? text.substring(0, 120) + '…' : text, 'success');
+        } else {
+            showToast(res.error || 'MCP call failed', 'error');
+        }
+    } catch (e) {
+        showToast(e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function _extractMcpText(result) {
+    if (!result) return 'Done';
+    if (typeof result === 'string') return result;
+    if (result.content && Array.isArray(result.content)) {
+        return result.content.map(c => c.text || '').join('\n');
+    }
+    if (result.text) return result.text;
+    return JSON.stringify(result).substring(0, 200);
+}
+
+async function handleSeal() {
+    const activeFile = state.activeFile;
+    const args = activeFile ? { context: `File: ${activeFile}` } : {};
+    await _trinityCall('btn-seal', 'omega-brain', 'omega_seal_run', args, { tool: 'omega_brain_status', args: {} });
+}
+
+async function handleWitness() {
+    await _trinityCall('btn-witness', 'omega-stenographer', 'stenographer_compact_guard', {}, { tool: 'stenographer_get_brief', args: {} });
+}
+
+async function handleAttest() {
+    const openDir = state.fileTree?.root;
+    const args = openDir ? { path: openDir } : {};
+    await _trinityCall('btn-attest', 'sswp', 'sswp_check_repo', args, { tool: 'sswp_registry_health', args: {} });
 
     document.getElementById('chat-stop-btn').classList.remove('visible');
 
@@ -4283,6 +4335,11 @@ function initEventListeners() {
     document.getElementById('chat-voice-btn')?.addEventListener('click', toggleVoice);
 
     document.getElementById('chat-stop-btn')?.addEventListener('click', interruptOmega);
+
+    // ── VERITAS Trinity buttons (Seal · Witness · Attest) ──
+    document.getElementById('btn-seal')?.addEventListener('click', handleSeal);
+    document.getElementById('btn-witness')?.addEventListener('click', handleWitness);
+    document.getElementById('btn-attest')?.addEventListener('click', handleAttest);
 
     document.getElementById('chat-input').addEventListener('keydown', (e) => {
 

@@ -92,6 +92,7 @@ contextBridge.exposeInMainWorld('omega', {
     // omega-brain, sswp, and omega-stenographer.
     mcp: {
         status: () => ipcRenderer.invoke('mcp:status'),
+        call: ({ server, tool, args }) => ipcRenderer.invoke('mcp:call', { server, tool, args }),
     },
 
     // ── Hardware ─────────────────────────────────────────────
