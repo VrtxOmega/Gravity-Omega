@@ -98,7 +98,41 @@ class OmegaAgent {
                 if (this.onProgress) this.onProgress({ type: 'step', text });
             };
             this._hermesChannel.onToolProgress = (toolName, input, output) => {
-                if (this.onProgress) this.onProgress({ type: 'tool', toolName, input, output });
+                if (!this.onProgress) return;
+                // Forward original event for the live thinking indicator
+                this.onProgress({ type: 'tool', toolName, input, output });
+
+                // Bridge Hermes tool completions into Omega's tool_done shape so
+                // main.js auto-open logic fires omega:open-file IPC for the renderer.
+                // Without this, files Hermes reads/writes never appear in Monaco.
+                const isCompleted = typeof output === 'string' && !output.startsWith('[running');
+                if (!isCompleted) return;
+
+                const isError = typeof output === 'string' && output.startsWith('❌');
+                let parsedArgs = input;
+                try { parsedArgs = typeof input === 'string' ? JSON.parse(input) : input; } catch {}
+
+                // Map Hermes tool names → Omega tool names recognized by main.js auto-open
+                const HERMES_TO_OMEGA = {
+                    read_file: 'openFile',
+                    write_file: 'writeFile',
+                    patch: 'editFile',
+                    edit_file: 'editFile',
+                };
+                const omegaTool = HERMES_TO_OMEGA[toolName];
+                if (!omegaTool) return; // not a file tool — skip
+
+                // Normalize path field (Hermes uses path, file_path, or filepath)
+                const argsForMain = (parsedArgs && typeof parsedArgs === 'object')
+                    ? { ...parsedArgs, path: parsedArgs.path || parsedArgs.file_path || parsedArgs.filepath || parsedArgs.target_file }
+                    : parsedArgs;
+
+                this.onProgress({
+                    phase: 'tool_done',
+                    tool: omegaTool,
+                    args: argsForMain,
+                    ok: !isError,
+                });
             };
         }
         await this._hermesChannel.start();
