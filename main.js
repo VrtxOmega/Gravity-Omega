@@ -16,6 +16,12 @@ const { spawn, execSync } = require('child_process');
 // ── CRASH DIAGNOSTICS — write to file since stdout may not flush ──
 const CRASH_LOG = path.join(os.tmpdir(), 'gravity_omega_crash.log');
 function crashLog(msg) {
+    try {
+        const stats = fs.statSync(CRASH_LOG);
+        if (stats.size > 1024 * 1024) {
+            fs.renameSync(CRASH_LOG, `${CRASH_LOG}.old`);
+        }
+    } catch {}
     try { fs.appendFileSync(CRASH_LOG, `[${new Date().toISOString()}] ${msg}\n`); } catch {}
 }
 // Clear previous log on fresh start
@@ -297,7 +303,9 @@ function registerIPC() {
         try {
             const dir = path.dirname(filePath);
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-            fs.writeFileSync(filePath, content, 'utf-8');
+            const tmp = `${filePath}.tmp${Date.now()}`;
+            fs.writeFileSync(tmp, content, 'utf-8');
+            fs.renameSync(tmp, filePath);
             return { success: true };
         } catch (e) { return { error: e.message }; }
     });
@@ -611,6 +619,15 @@ function registerIPC() {
     ipcMain.on('terminal:kill', (_, id) => {
         const pty = terminals.get(id);
         if (pty) { pty.kill(); terminals.delete(id); }
+    });
+
+    ipcMain.handle('terminal:list', async () => {
+        return Array.from(terminals.entries()).map(([id, pty]) => ({ id, pid: pty.pid }));
+    });
+
+    ipcMain.handle('watcher:stop', async () => {
+        if (watcher) { await watcher.close(); watcher = null; }
+        return { success: true };
     });
 
     // ── File Watcher ─────────────────────────────────────────

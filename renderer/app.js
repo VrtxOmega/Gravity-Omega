@@ -626,7 +626,7 @@ function switchToFile(filePath) {
 
         imgEl.classList.remove('hidden');
 
-        document.getElementById('image-viewer-img').src = `omega-file://${filePath}`;
+        document.getElementById('image-viewer-img').src = `omega-file://${encodeURI(filePath)}`;
 
     } else {
 
@@ -3926,14 +3926,18 @@ function initResizeLocks() {
 
 
 
-function fitAllTerminals() {
-
-    for (const [_, info] of state.terminal.instances) {
-
+function fitActiveTerminal() {
+    const active = state.terminal?.activeId;
+    if (active) {
+        const info = state.terminal.instances.get(active);
         try { info.fitAddon.fit(); } catch { }
-
     }
+}
 
+function fitAllTerminals() {
+    for (const [_, info] of state.terminal.instances) {
+        try { info.fitAddon.fit(); } catch { }
+    }
 }
 
 
@@ -3990,7 +3994,12 @@ function initKeyboardShortcuts() {
 
         // Escape — Focus editor
 
-        if (e.key === 'Escape') { state.editor?.focus(); }
+        if (e.key === 'Escape') {
+            const tag = e.target?.tagName;
+            if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !e.target?.isContentEditable) {
+                state.editor?.focus();
+            }
+        }
 
         // Ctrl+Shift+R — Reload renderer (dev reload)
 
@@ -4161,6 +4170,9 @@ function initEventListeners() {
     // Slash detection on every keystroke
 
     document.getElementById('chat-input').addEventListener('input', (e) => {
+        const ta = e.target;
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
 
         const val = e.target.value;
 
@@ -4716,12 +4728,13 @@ function initEventListeners() {
 
     // Auto-resize
 
+    let resizeDebounce;
     window.addEventListener('resize', () => {
-
-        state.editor?.layout();
-
-        fitAllTerminals();
-
+        clearTimeout(resizeDebounce);
+        resizeDebounce = setTimeout(() => {
+            state.editor?.layout();
+            fitActiveTerminal();
+        }, 100);
     });
 
 }

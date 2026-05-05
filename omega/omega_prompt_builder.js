@@ -6,13 +6,18 @@
 const fs = require('fs');
 const { TOOL_REGISTRY } = require('./omega_tools');
 
+let _cachedToolDescriptions = null;
+
 function buildSystemPrompt({ userName, useHermes, platform, homeDir }) {
-    const toolDescriptions = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
-        const argStr = Object.entries(tool.args || {})
-            .map(([k, v]) => `${k}: ${v.type}${v.required ? ' (required)' : ''}`)
-            .join(', ');
-        return `- **${name}** [${tool.safety}]: ${tool.description}${argStr ? ` | Args: ${argStr}` : ''}`;
-    }).join('\n');
+    if (!_cachedToolDescriptions) {
+        _cachedToolDescriptions = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
+            const argStr = Object.entries(tool.args || {})
+                .map(([k, v]) => `${k}: ${v.type}${v.required ? ' (required)' : ''}`)
+                .join(', ');
+            return `- **${name}** [${tool.safety}]: ${tool.description}${argStr ? ` | Args: ${argStr}` : ''}`;
+        }).join('\n');
+    }
+    const toolDescriptions = _cachedToolDescriptions;
 
     const bridgeTools = useHermes ? [
         '- **omega_write_file** [GATED]: Writes a file via Gravity Omega. Args: path (string, required), content (string, required)',
