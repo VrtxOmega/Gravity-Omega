@@ -971,26 +971,43 @@ class OmegaAgent {
                                (safety === SAFETY.SAFE && packet.act !== 'MUT');
 
             if (!skipCortex) {
-                // â”€â”€ Tri-Node Intercept (Super-Ego + Ego Baseline Check) â”€â”€
-            try {
-                const bridgeReady = await this.bridge.waitForBridge(1000);
-                if (bridgeReady) {
-                    const intercept = await this.bridge.post('/api/cortex/intercept', {
-                        tool: pseudo_tool_name,
-                        args: packet.prm,
-                        baseline_prompt: this._currentTask || 'Maintain system integrity'
-                    });
-
-                    if (intercept && intercept.approved === false) {
-                        results.push({ error: intercept.reason });
-                        this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
-                        this._logStep(pseudo_tool_name, packet.prm, { error: intercept.reason });
-                        continue;
+                // ── Tri-Node Intercept (Super-Ego + Ego Baseline Check) ──
+                // Fail-closed: if the bridge is unreachable AND this is not a
+                // skipCortex (safe read-only) tool, refuse to execute. The
+                // previous behaviour silently fell through to local handlers,
+                // which let destructive commands run with no approval gate.
+                let bridgeReady = false;
+                let intercept = null;
+                let interceptError = null;
+                try {
+                    bridgeReady = await this.bridge.waitForBridge(1000);
+                    if (bridgeReady) {
+                        intercept = await this.bridge.post('/api/cortex/intercept', {
+                            tool: pseudo_tool_name,
+                            args: packet.prm,
+                            baseline_prompt: this._currentTask || 'Maintain system integrity'
+                        });
                     }
+                } catch (err) {
+                    interceptError = err.message;
+                    console.warn("[Tri-Node] Intercept threw:", err.message);
                 }
-            } catch (err) {
-                console.warn("[Tri-Node] Intercept unreachable (non-fatal)", err.message);
-            }
+
+                if (!bridgeReady || interceptError) {
+                    const reason = `Tri-Node gate unreachable — refusing ${pseudo_tool_name} (act=${packet.act}). ${interceptError || 'bridge offline'}`;
+                    console.error(`[Tri-Node] ${reason}`);
+                    results.push({ error: reason });
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: reason });
+                    continue;
+                }
+
+                if (intercept && intercept.approved === false) {
+                    results.push({ error: intercept.reason });
+                    this._emitProgress({ phase: 'tool', tool: pseudo_tool_name, args: packet.prm });
+                    this._logStep(pseudo_tool_name, packet.prm, { error: intercept.reason });
+                    continue;
+                }
             }
 
             // â”€â”€ v4.3.5: Local URL fetch handler (bypass WSL bridge) â”€â”€
