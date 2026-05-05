@@ -725,6 +725,19 @@ function switchToFile(filePath) {
         });
     }
 
+    // Wire up ANALYZE button
+    const analyzeBtn = document.getElementById('btn-analyzer');
+    if (analyzeBtn) {
+        const freshAnalyze = analyzeBtn.cloneNode(true);
+        analyzeBtn.parentNode.replaceChild(freshAnalyze, analyzeBtn);
+        freshAnalyze.addEventListener('click', () => {
+            const f = state.openFiles.get(state.activeFile);
+            if (!f) return;
+            f.viewMode = 'analyze';
+            openFile(state.activeFile);
+        });
+    }
+
     
 
     // Monaco needs layout() after its container becomes visible
@@ -1461,6 +1474,168 @@ window.addEventListener('DOMContentLoaded', () => {
     setInterval(_updateMcpHealthIndicator, 60000);
 });
 
+function initAnalyzer() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadScreen = document.getElementById('upload-screen');
+    const processingScreen = document.getElementById('processing-screen');
+    const reportScreen = document.getElementById('report-screen');
+    const procTerminal = document.getElementById('proc-terminal');
+    const reportBody = document.getElementById('report-body');
+    const uploadError = document.getElementById('upload-error');
+    const toolbarFile = document.getElementById('toolbar-file');
+    const modelInput = document.getElementById('model-input');
+    const btnReset = document.getElementById('btn-analyzer-reset');
+    const btnDownload = document.getElementById('btn-analyzer-download');
+
+    if (!dropZone || !fileInput) return;
+
+    function showScreen(name) {
+        uploadScreen?.classList.toggle('hidden', name !== 'upload');
+        processingScreen?.classList.toggle('hidden', name !== 'processing');
+        reportScreen?.classList.toggle('hidden', name !== 'report');
+    }
+
+    function logProc(msg) {
+        if (!procTerminal) return;
+        const line = document.createElement('div');
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        line.style.cssText = 'font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);margin-bottom:2px;';
+        procTerminal.appendChild(line);
+        procTerminal.scrollTop = procTerminal.scrollHeight;
+    }
+
+    async function runAnalysis(file) {
+        showScreen('processing');
+        if (procTerminal) procTerminal.innerHTML = '';
+        logProc(`Uploading ${file.name}...`);
+
+        const form = new FormData();
+        form.append('file', file);
+        form.append('model', modelInput?.value || 'qwen3:8b');
+
+        try {
+            logProc('Extracting text...');
+            const resp = await fetch('http://127.0.0.1:5000/api/analyze_document', {
+                method: 'POST',
+                body: form,
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error);
+
+            logProc('Analysis complete.');
+            if (toolbarFile) toolbarFile.textContent = file.name;
+            renderReport(data);
+            showScreen('report');
+        } catch (e) {
+            logProc(`Error: ${e.message}`);
+            setTimeout(() => {
+                if (uploadError) { uploadError.textContent = e.message; uploadError.classList.remove('hidden'); }
+                showScreen('upload');
+            }, 1500);
+        }
+    }
+
+    function renderReport(data) {
+        if (!reportBody) return;
+        const sections = [];
+        if (data.summary) sections.push(`<h2 style="color:var(--gold);margin-top:0;">Summary</h2><p>${__esc(data.summary)}</p>`);
+        if (data.key_findings && Array.isArray(data.key_findings)) {
+            sections.push(`<h3 style="color:var(--gold);">Key Findings</h3><ul>${data.key_findings.map(f => `<li>${__esc(f)}</li>`).join('')}</ul>`);
+        }
+        if (data.recommendations && Array.isArray(data.recommendations)) {
+            sections.push(`<h3 style="color:var(--gold);">Recommendations</h3><ul>${data.recommendations.map(r => `<li>${__esc(r)}</li>`).join('')}</ul>`);
+        }
+        if (data.risks && Array.isArray(data.risks)) {
+            sections.push(`<h3 style="color:var(--gold);">Risks</h3><ul>${data.risks.map(r => `<li>${__esc(r)}</li>`).join('')}</ul>`);
+        }
+        if (data.raw_analysis) sections.push(`<h3 style="color:var(--gold);">Raw Analysis</h3><pre style="white-space:pre-wrap;font-size:11px;">${__esc(data.raw_analysis)}</pre>`);
+
+        const meta = data._meta || {};
+        sections.push(`<div style="margin-top:16px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text-tertiary);">Trace: ${__esc(meta.trace || 'N/A')} · Model: ${__esc(meta.model || 'N/A')}</div>`);
+
+        reportBody.innerHTML = sections.join('');
+    }
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--gold)'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = ''; });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '';
+        const f = e.dataTransfer.files[0];
+        if (f) runAnalysis(f);
+    });
+    fileInput.addEventListener('change', () => {
+        const f = fileInput.files[0];
+        if (f) runAnalysis(f);
+        fileInput.value = '';
+    });
+
+    btnReset?.addEventListener('click', () => {
+        if (uploadError) uploadError.classList.add('hidden');
+        showScreen('upload');
+    });
+
+    btnDownload?.addEventListener('click', () => {
+        if (!reportBody) return;
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Veritas Report</title><style>body{font-family:system-ui,sans-serif;max-width:800px;margin:40px auto;padding:20px;background:#0a0a0a;color:#e0e0e0;}h2,h3{color:#d4af37;}pre{background:#111;padding:12px;border-radius:4px;}</style></head><body>${reportBody.innerHTML}</body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `veritas-report-${Date.now()}.html`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    });
+}
+
+function initSettings() {
+    const SETTINGS_KEY = 'gravityOmega.settings';
+    const defaults = {
+        aiModel: 'qwen3:8b',
+        theme: 'omega-dark',
+        fontSize: 13,
+        wordWrap: 'on',
+        minimap: 'true',
+        autoExec: 'true',
+    };
+    let cfg = { ...defaults };
+    try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (raw) cfg = { ...defaults, ...JSON.parse(raw) };
+    } catch { /* ignore corrupt storage */ }
+
+    const modelSel = document.getElementById('settings-ai-model');
+    const themeSel = document.getElementById('settings-theme');
+    const fontInp = document.getElementById('settings-fontsize');
+    const wrapSel = document.getElementById('settings-wordwrap');
+    const miniSel = document.getElementById('settings-minimap');
+    const execSel = document.getElementById('settings-autoexec');
+
+    function save() {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(cfg)); } catch { }
+    }
+    function apply() {
+        if (state.editor) {
+            state.editor.updateOptions({
+                fontSize: Number(cfg.fontSize) || 13,
+                wordWrap: cfg.wordWrap === 'on' ? 'on' : 'off',
+                minimap: { enabled: cfg.minimap === 'true' },
+            });
+        }
+        document.body.classList.toggle('theme-omega-light', cfg.theme === 'omega-light');
+    }
+
+    if (modelSel) { modelSel.value = cfg.aiModel; modelSel.addEventListener('change', () => { cfg.aiModel = modelSel.value; save(); }); }
+    if (themeSel) { themeSel.value = cfg.theme; themeSel.addEventListener('change', () => { cfg.theme = themeSel.value; save(); apply(); }); }
+    if (fontInp) { fontInp.value = cfg.fontSize; fontInp.addEventListener('change', () => { cfg.fontSize = fontInp.value; save(); apply(); }); }
+    if (wrapSel) { wrapSel.value = cfg.wordWrap; wrapSel.addEventListener('change', () => { cfg.wordWrap = wrapSel.value; save(); apply(); }); }
+    if (miniSel) { miniSel.value = cfg.minimap; miniSel.addEventListener('change', () => { cfg.minimap = miniSel.value; save(); apply(); }); }
+    if (execSel) { execSel.value = cfg.autoExec; execSel.addEventListener('change', () => { cfg.autoExec = execSel.value; save(); }); }
+
+    apply();
+}
+
 function toggleVoice() {
 
     state.chat.voiceEnabled = !state.chat.voiceEnabled;
@@ -1596,6 +1771,58 @@ function interruptOmega() {
         window._thinkingStepHandler = null;
 
     }
+}
+
+// ── VERITAS Trinity handlers ───────────────────────────────────────
+async function _trinityCall(btnId, server, tool, args, fallback) {
+    const btn = document.getElementById(btnId);
+    if (!btn || btn.disabled) return;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="trinity-icon">⏳</span> ...';
+    try {
+        let res = await window.omega.mcp.call({ server, tool, args });
+        if (!res.ok && fallback) {
+            res = await window.omega.mcp.call({ server, tool: fallback.tool, args: fallback.args });
+        }
+        if (res.ok) {
+            const text = _extractMcpText(res.result);
+            showToast(text.length > 120 ? text.substring(0, 120) + '…' : text, 'success');
+        } else {
+            showToast(res.error || 'MCP call failed', 'error');
+        }
+    } catch (e) {
+        showToast(e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function _extractMcpText(result) {
+    if (!result) return 'Done';
+    if (typeof result === 'string') return result;
+    if (result.content && Array.isArray(result.content)) {
+        return result.content.map(c => c.text || '').join('\n');
+    }
+    if (result.text) return result.text;
+    return JSON.stringify(result).substring(0, 200);
+}
+
+async function handleSeal() {
+    const activeFile = state.activeFile;
+    const args = activeFile ? { context: `File: ${activeFile}` } : {};
+    await _trinityCall('btn-seal', 'omega-brain', 'omega_seal_run', args, { tool: 'omega_brain_status', args: {} });
+}
+
+async function handleWitness() {
+    await _trinityCall('btn-witness', 'omega-stenographer', 'stenographer_compact_guard', {}, { tool: 'stenographer_get_brief', args: {} });
+}
+
+async function handleAttest() {
+    const openDir = state.fileTree?.root;
+    const args = openDir ? { path: openDir } : {};
+    await _trinityCall('btn-attest', 'sswp', 'sswp_check_repo', args, { tool: 'sswp_registry_health', args: {} });
 
     document.getElementById('chat-stop-btn').classList.remove('visible');
 
@@ -3094,6 +3321,7 @@ function renderMarkdown(text) {
 
         .replace(/^\d+\. (.+)$/gm, '<span class="md-ol">$1</span>')
 
+        .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (m, code) => `<pre><code>${code.replace(/\n/g, '&#10;')}</code></pre>`)
         .replace(/\n/g, '<br>');
 
 }
@@ -4035,6 +4263,28 @@ function initEventListeners() {
 
     });
 
+    // Evolution queue event delegation (replaces inline onclick XSS vectors)
+
+    document.getElementById('evolution-queue')?.addEventListener('click', (e) => {
+
+        const card = e.target.closest('.evolution-card');
+
+        if (!card) return;
+
+        const manifestId = card.dataset.manifest;
+
+        if (e.target.closest('.evolution-approve')) {
+
+            window.resolveEvolution(manifestId, 'approve');
+
+        } else if (e.target.closest('.evolution-reject')) {
+
+            window.resolveEvolution(manifestId, 'reject');
+
+        }
+
+    });
+
 
 
     // Window controls
@@ -4094,6 +4344,11 @@ function initEventListeners() {
     document.getElementById('chat-voice-btn')?.addEventListener('click', toggleVoice);
 
     document.getElementById('chat-stop-btn')?.addEventListener('click', interruptOmega);
+
+    // ── VERITAS Trinity buttons (Seal · Witness · Attest) ──
+    document.getElementById('btn-seal')?.addEventListener('click', handleSeal);
+    document.getElementById('btn-witness')?.addEventListener('click', handleWitness);
+    document.getElementById('btn-attest')?.addEventListener('click', handleAttest);
 
     document.getElementById('chat-input').addEventListener('keydown', (e) => {
 
@@ -4556,8 +4811,6 @@ function initEventListeners() {
 
     });
 
-    window.omega.on('menu:save', () => saveFile());
-
     window.omega.on('menu:new-terminal', () => createTerminal());
 
     
@@ -4792,33 +5045,19 @@ window.loadEvolutionPanel = async function() {
         
 
         queueEl.innerHTML = proposals.map(p => `
-
-            <div class="search-result" style="cursor: default; padding: 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px;">
-
+            <div class="search-result evolution-card" data-manifest="${__esc(p.manifest_id)}" style="cursor: default; padding: 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px;">
                 <div class="file-path" style="font-size: 14px; font-weight: bold; color: var(--gold)">Evolution Manifest: ${__esc(p.manifest_id).substring(0,8)} ${p.failure_type === 'AGENTIC_FAILURE' ? '<span style="color: var(--orange); font-size: 10px; border: 1px solid var(--orange); padding: 1px 6px; border-radius: 3px;">AGENTIC</span>' : '<span style="color: var(--blue); font-size: 10px; border: 1px solid var(--blue); padding: 1px 6px; border-radius: 3px;">VERITAS</span>'}</div>
-
                 <div class="match-text" style="color: var(--text); margin-bottom: 6px;">Target: <span style="color: var(--blue)">${__esc(p.target_file || p.target_module || 'unknown')}</span></div>
-
                 <div class="match-text" style="color: var(--textSubtitle); font-size: 11px;">Root Cause: ${__esc(p.root_cause_analysis || p.rationale || '')}</div>
-
                 <div class="match-text" style="color: var(--textSubtitle); font-size: 11px; margin-top: 4px;">Fix: ${__esc(p.proposed_optimization || '')}</div>
-
                 <div style="background: var(--bgDarker); padding: 8px; border-radius: 4px; margin-top: 8px; font-family: monospace; font-size: 11px; color: var(--textSubtitle); border: 1px solid var(--borderLighter);">
-
                     Proposed Patch:<br/><span style="color: var(--green)">${__esc(typeof p.exact_patch === 'string' ? p.exact_patch.substring(0, 500) : JSON.stringify(p.exact_patch || p.proposed_patch || ''))}</span>
-
                 </div>
-
                 <div style="margin-top: 12px; display: flex; gap: 8px;">
-
-                    <button class="reports-action-btn" onclick="resolveEvolution('${__esc(p.manifest_id)}', 'approve')" style="color: var(--green); flex: 1; justify-content: center; background: var(--bgDarker)">Accept Re-Write</button>
-
-                    <button class="reports-action-btn" onclick="resolveEvolution('${__esc(p.manifest_id)}', 'reject')" style="color: var(--red); flex: 1; justify-content: center; background: var(--bgDarker)">Reject</button>
-
+                    <button class="reports-action-btn evolution-approve" style="color: var(--green); flex: 1; justify-content: center; background: var(--bgDarker)">Accept Re-Write</button>
+                    <button class="reports-action-btn evolution-reject" style="color: var(--red); flex: 1; justify-content: center; background: var(--bgDarker)">Reject</button>
                 </div>
-
             </div>
-
         `).join('');
 
     } catch (e) {
@@ -5020,6 +5259,8 @@ window.sentinelRebaseline = async function() {
     initKeyboardShortcuts();
 
     initEventListeners();
+    initSettings();
+    initAnalyzer();
 
 
 

@@ -890,6 +890,25 @@ body {
     background: linear-gradient(135deg, var(--gold), var(--gold-bright));
     box-shadow: 0 4px 16px var(--gold-glow); transform: scale(1.05);
 }
+.chat-trinity-row {
+    display: flex; gap: 6px; justify-content: center; align-items: center;
+    padding-top: 2px;
+}
+.trinity-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: var(--radius-md);
+    border: 1px solid var(--border); background: var(--bg-tertiary);
+    color: var(--text-secondary); font-size: 10px; font-weight: 600;
+    font-family: var(--font-ui); letter-spacing: 0.5px; text-transform: uppercase;
+    cursor: pointer; transition: all var(--transition); flex: 1; justify-content: center;
+}
+.trinity-btn:hover { transform: translateY(-1px); }
+.trinity-btn:active { transform: translateY(0); }
+.trinity-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.trinity-seal:hover { border-color: var(--gold); color: var(--gold-bright); box-shadow: 0 0 8px var(--gold-glow); }
+.trinity-witness:hover { border-color: #6dd06d; color: #6dd06d; box-shadow: 0 0 8px rgba(96,192,96,0.2); }
+.trinity-attest:hover { border-color: #60a0ff; color: #60a0ff; box-shadow: 0 0 8px rgba(96,160,255,0.2); }
+.trinity-icon { font-size: 11px; }
 #chat-voice-btn {
     background: var(--bg-tertiary); color: var(--text-tertiary);
     border: 1px solid var(--border); font-size: 16px;
