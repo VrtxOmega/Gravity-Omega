@@ -879,6 +879,35 @@ function registerIPC() {
         }
     });
 
+    // ── MCP Health (omega-brain, sswp, omega-stenographer, etc.) ─────
+    // Polls Hermes for MCP server status. Called by the renderer to surface
+    // health in the UI and at app startup to verify the agent toolset is wired.
+    const REQUIRED_MCPS = ['omega-brain', 'sswp', 'omega-stenographer'];
+    ipcMain.handle('mcp:status', async () => {
+        // Run `hermes mcp list` in WSL — same way the agent does
+        return new Promise((resolve) => {
+            let stdout = '';
+            const proc = spawn('cmd.exe', ['/c', 'wsl', 'bash', '-lc', 'hermes mcp list 2>&1'], { stdio: ['ignore', 'pipe', 'pipe'] });
+            const timer = setTimeout(() => { proc.kill(); resolve({ error: 'timeout', servers: [] }); }, 8000);
+            proc.stdout.on('data', d => stdout += d.toString());
+            proc.on('close', () => {
+                clearTimeout(timer);
+                // Parse: "<name>  <transport>  <tools>  ✓ enabled" or "✗ disabled"
+                const servers = [];
+                for (const line of stdout.split(/\r?\n/)) {
+                    const m = line.match(/^\s*([a-z][a-z0-9_-]*)\s+\S.*?(✓ enabled|✗ disabled|✗ \w+)/i);
+                    if (m) servers.push({ name: m[1], status: m[2].includes('✓') ? 'enabled' : 'disabled' });
+                }
+                const required = REQUIRED_MCPS.map(name => {
+                    const found = servers.find(s => s.name === name);
+                    return { name, present: !!found, status: found ? found.status : 'missing' };
+                });
+                resolve({ servers, required, allRequiredOk: required.every(r => r.status === 'enabled') });
+            });
+            proc.on('error', (e) => { clearTimeout(timer); resolve({ error: e.message, servers: [] }); });
+        });
+    });
+
     // ── Hardware ─────────────────────────────────────────────
     ipcMain.handle('hardware:info', async () => {
         const cpus = os.cpus();
