@@ -1419,6 +1419,48 @@ function _updateHermesBadge(active) {
 
 
 
+// MCP health indicator: poll mcp:status and color the 3 dots (Brain, SSWP, Stenographer)
+async function _updateMcpHealthIndicator() {
+    const indicator = document.getElementById('mcp-health-indicator');
+    if (!indicator || !window.omega?.mcp?.status) return;
+    try {
+        const result = await window.omega.mcp.status();
+        if (!result || result.error) {
+            indicator.querySelectorAll('.mcp-dot').forEach(d => {
+                d.className = 'mcp-dot fail';
+                d.title = `${d.dataset.mcp}: hermes unreachable`;
+            });
+            indicator.title = `MCP: hermes unreachable (${result?.error || 'unknown'})`;
+            return;
+        }
+        const map = new Map(result.required.map(r => [r.name, r]));
+        indicator.querySelectorAll('.mcp-dot').forEach(d => {
+            const r = map.get(d.dataset.mcp);
+            if (!r) { d.className = 'mcp-dot unknown'; return; }
+            if (r.status === 'enabled') {
+                d.className = 'mcp-dot ok';
+                d.title = `${r.name}: ✓ enabled`;
+            } else if (r.status === 'missing') {
+                d.className = 'mcp-dot fail';
+                d.title = `${r.name}: not registered with Hermes`;
+            } else {
+                d.className = 'mcp-dot warn';
+                d.title = `${r.name}: ${r.status}`;
+            }
+        });
+        const okCount = result.required.filter(r => r.status === 'enabled').length;
+        indicator.title = `MCP servers: ${okCount}/${result.required.length} healthy — Brain · SSWP · Stenographer`;
+    } catch (e) {
+        console.warn('[MCP] status check failed:', e.message);
+    }
+}
+
+// Poll on load + every 60s
+window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(_updateMcpHealthIndicator, 1500);
+    setInterval(_updateMcpHealthIndicator, 60000);
+});
+
 function toggleVoice() {
 
     state.chat.voiceEnabled = !state.chat.voiceEnabled;

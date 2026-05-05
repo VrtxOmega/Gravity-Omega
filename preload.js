@@ -87,6 +87,13 @@ contextBridge.exposeInMainWorld('omega', {
         stopHermes:  () => ipcRenderer.invoke('agent:stop-hermes'),
     },
 
+    // ── MCP Health ───────────────────────────────────────────
+    // Returns { servers, required, allRequiredOk } where required tracks
+    // omega-brain, sswp, and omega-stenographer.
+    mcp: {
+        status: () => ipcRenderer.invoke('mcp:status'),
+    },
+
     // ── Hardware ─────────────────────────────────────────────
     hardware: () => ipcRenderer.invoke('hardware:info'),
 
