@@ -726,10 +726,11 @@ function switchToFile(filePath) {
     
 
     // Monaco needs layout() after its container becomes visible
+    // Guard: RAF runs outside the try-catch, so null-check before calling
 
-    requestAnimationFrame(() => state.editor.layout());
+    requestAnimationFrame(() => { if (state.editor) state.editor.layout(); });
 
-    state.editor.focus();
+    if (state.editor) state.editor.focus();
 
     updateActiveTab(filePath);
 
@@ -1315,10 +1316,17 @@ async function initModelDropdown(providers, activeProvider) {
 
     const optValues = Array.from(dd.options).map(o => o.value);
 
-    // v7.0: Default to active provider's first model if saved is invalid or hermes-acp
+    // Restore saved selection. hermes-acp is valid — restore the dropdown and
+    // kick off startHermes() in the background so the user stays in agent mode.
     let selectedModel = null;
-    if (saved && optValues.includes(saved) && saved !== 'hermes-acp') {
+    if (saved && optValues.includes(saved)) {
         selectedModel = saved;
+        if (saved === 'hermes-acp') {
+            // Restore Hermes mode silently — no blocking toast on startup
+            window.omega.agent.startHermes()
+                .then(res => { if (res && res.ok) _updateHermesBadge(true); })
+                .catch(() => {});
+        }
     } else if (activeProvider && activeProvider.models && activeProvider.models.length > 0) {
         selectedModel = activeProvider.models[0];
         localStorage.setItem('omega_active_model', selectedModel);
@@ -1772,6 +1780,10 @@ function initSettings() {
                 wordWrap: cfg.wordWrap === 'on' ? 'on' : 'off',
                 minimap: { enabled: cfg.minimap === 'true' },
             });
+            // Apply Monaco theme — settings panel has omega-dark / omega-light options.
+            // Both defined themes are 'omega-dark' and 'veritas-dark'; light mode is CSS-only.
+            const monacoTheme = cfg.theme === 'omega-light' ? 'omega-dark' : (cfg.theme || 'veritas-dark');
+            monaco.editor.setTheme(monacoTheme);
         }
         document.body.classList.toggle('theme-omega-light', cfg.theme === 'omega-light');
     }
