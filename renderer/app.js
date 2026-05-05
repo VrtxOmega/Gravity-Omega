@@ -1461,6 +1461,53 @@ window.addEventListener('DOMContentLoaded', () => {
     setInterval(_updateMcpHealthIndicator, 60000);
 });
 
+function initSettings() {
+    const SETTINGS_KEY = 'gravityOmega.settings';
+    const defaults = {
+        aiModel: 'qwen3:8b',
+        theme: 'omega-dark',
+        fontSize: 13,
+        wordWrap: 'on',
+        minimap: 'true',
+        autoExec: 'true',
+    };
+    let cfg = { ...defaults };
+    try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (raw) cfg = { ...defaults, ...JSON.parse(raw) };
+    } catch { /* ignore corrupt storage */ }
+
+    const modelSel = document.getElementById('settings-ai-model');
+    const themeSel = document.getElementById('settings-theme');
+    const fontInp = document.getElementById('settings-fontsize');
+    const wrapSel = document.getElementById('settings-wordwrap');
+    const miniSel = document.getElementById('settings-minimap');
+    const execSel = document.getElementById('settings-autoexec');
+
+    function save() {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(cfg)); } catch { }
+    }
+    function apply() {
+        if (state.editor) {
+            state.editor.updateOptions({
+                fontSize: Number(cfg.fontSize) || 13,
+                wordWrap: cfg.wordWrap === 'on' ? 'on' : 'off',
+                minimap: { enabled: cfg.minimap === 'true' },
+            });
+        }
+        document.body.classList.toggle('theme-omega-light', cfg.theme === 'omega-light');
+    }
+
+    if (modelSel) { modelSel.value = cfg.aiModel; modelSel.addEventListener('change', () => { cfg.aiModel = modelSel.value; save(); }); }
+    if (themeSel) { themeSel.value = cfg.theme; themeSel.addEventListener('change', () => { cfg.theme = themeSel.value; save(); apply(); }); }
+    if (fontInp) { fontInp.value = cfg.fontSize; fontInp.addEventListener('change', () => { cfg.fontSize = fontInp.value; save(); apply(); }); }
+    if (wrapSel) { wrapSel.value = cfg.wordWrap; wrapSel.addEventListener('change', () => { cfg.wordWrap = wrapSel.value; save(); apply(); }); }
+    if (miniSel) { miniSel.value = cfg.minimap; miniSel.addEventListener('change', () => { cfg.minimap = miniSel.value; save(); apply(); }); }
+    if (execSel) { execSel.value = cfg.autoExec; execSel.addEventListener('change', () => { cfg.autoExec = execSel.value; save(); }); }
+
+    apply();
+}
+
 function toggleVoice() {
 
     state.chat.voiceEnabled = !state.chat.voiceEnabled;
@@ -3094,6 +3141,7 @@ function renderMarkdown(text) {
 
         .replace(/^\d+\. (.+)$/gm, '<span class="md-ol">$1</span>')
 
+        .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (m, code) => `<pre><code>${code.replace(/\n/g, '&#10;')}</code></pre>`)
         .replace(/\n/g, '<br>');
 
 }
@@ -4026,6 +4074,28 @@ function initEventListeners() {
 
     });
 
+    // Evolution queue event delegation (replaces inline onclick XSS vectors)
+
+    document.getElementById('evolution-queue')?.addEventListener('click', (e) => {
+
+        const card = e.target.closest('.evolution-card');
+
+        if (!card) return;
+
+        const manifestId = card.dataset.manifest;
+
+        if (e.target.closest('.evolution-approve')) {
+
+            window.resolveEvolution(manifestId, 'approve');
+
+        } else if (e.target.closest('.evolution-reject')) {
+
+            window.resolveEvolution(manifestId, 'reject');
+
+        }
+
+    });
+
 
 
     // Window controls
@@ -4544,8 +4614,6 @@ function initEventListeners() {
 
     });
 
-    window.omega.on('menu:save', () => saveFile());
-
     window.omega.on('menu:new-terminal', () => createTerminal());
 
     
@@ -4779,33 +4847,19 @@ window.loadEvolutionPanel = async function() {
         
 
         queueEl.innerHTML = proposals.map(p => `
-
-            <div class="search-result" style="cursor: default; padding: 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px;">
-
+            <div class="search-result evolution-card" data-manifest="${__esc(p.manifest_id)}" style="cursor: default; padding: 12px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px;">
                 <div class="file-path" style="font-size: 14px; font-weight: bold; color: var(--gold)">Evolution Manifest: ${__esc(p.manifest_id).substring(0,8)} ${p.failure_type === 'AGENTIC_FAILURE' ? '<span style="color: var(--orange); font-size: 10px; border: 1px solid var(--orange); padding: 1px 6px; border-radius: 3px;">AGENTIC</span>' : '<span style="color: var(--blue); font-size: 10px; border: 1px solid var(--blue); padding: 1px 6px; border-radius: 3px;">VERITAS</span>'}</div>
-
                 <div class="match-text" style="color: var(--text); margin-bottom: 6px;">Target: <span style="color: var(--blue)">${__esc(p.target_file || p.target_module || 'unknown')}</span></div>
-
                 <div class="match-text" style="color: var(--textSubtitle); font-size: 11px;">Root Cause: ${__esc(p.root_cause_analysis || p.rationale || '')}</div>
-
                 <div class="match-text" style="color: var(--textSubtitle); font-size: 11px; margin-top: 4px;">Fix: ${__esc(p.proposed_optimization || '')}</div>
-
                 <div style="background: var(--bgDarker); padding: 8px; border-radius: 4px; margin-top: 8px; font-family: monospace; font-size: 11px; color: var(--textSubtitle); border: 1px solid var(--borderLighter);">
-
                     Proposed Patch:<br/><span style="color: var(--green)">${__esc(typeof p.exact_patch === 'string' ? p.exact_patch.substring(0, 500) : JSON.stringify(p.exact_patch || p.proposed_patch || ''))}</span>
-
                 </div>
-
                 <div style="margin-top: 12px; display: flex; gap: 8px;">
-
-                    <button class="reports-action-btn" onclick="resolveEvolution('${__esc(p.manifest_id)}', 'approve')" style="color: var(--green); flex: 1; justify-content: center; background: var(--bgDarker)">Accept Re-Write</button>
-
-                    <button class="reports-action-btn" onclick="resolveEvolution('${__esc(p.manifest_id)}', 'reject')" style="color: var(--red); flex: 1; justify-content: center; background: var(--bgDarker)">Reject</button>
-
+                    <button class="reports-action-btn evolution-approve" style="color: var(--green); flex: 1; justify-content: center; background: var(--bgDarker)">Accept Re-Write</button>
+                    <button class="reports-action-btn evolution-reject" style="color: var(--red); flex: 1; justify-content: center; background: var(--bgDarker)">Reject</button>
                 </div>
-
             </div>
-
         `).join('');
 
     } catch (e) {
@@ -5007,6 +5061,7 @@ window.sentinelRebaseline = async function() {
     initKeyboardShortcuts();
 
     initEventListeners();
+    initSettings();
 
 
 
