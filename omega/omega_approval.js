@@ -2,10 +2,17 @@
  * OMEGA APPROVAL v4.1 â€” Two-Phase Commit Gate
  * Immutable proposal records with audit trail.
  * Used by the agent for GATED/RESTRICTED tool approval.
+ *
+ * v5.3 additions:
+ *  - NDJSON audit log persistence with SHA-256 chain hash (tamper-evident).
+ *  - 30-minute proposal TTL: pending proposals are auto-denied if not
+ *    decided in time, preventing stale approval prompts from accumulating.
  */
 'use strict';
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 class Proposal {
     constructor({ tool, args, reason, safety }) {
@@ -54,12 +61,53 @@ class Proposal {
     }
 }
 
+// 30 minutes — pending proposals expire after this and become DENIED.
+const DEFAULT_PROPOSAL_TTL_MS = 30 * 60 * 1000;
+
 class ApprovalGate {
-    constructor(maxAudit = 500) {
+    /**
+     * @param {object|number} opts  Options object, or maxAudit number for back-compat.
+     * @param {number} [opts.maxAudit=500]      Max in-memory audit entries.
+     * @param {string} [opts.auditLogPath]      If set, append each entry to this NDJSON file.
+     * @param {number} [opts.proposalTtlMs]     Pending proposal TTL. Default 30 min.
+     */
+    constructor(opts = {}) {
+        // Back-compat: ApprovalGate(500) → treat as { maxAudit: 500 }
+        if (typeof opts === 'number') opts = { maxAudit: opts };
         this._proposals = new Map();
         this._auditLog = [];
-        this._maxAudit = maxAudit;
+        this._maxAudit = opts.maxAudit ?? 500;
+        this._auditLogPath = opts.auditLogPath || null;
+        this._proposalTtlMs = opts.proposalTtlMs ?? DEFAULT_PROPOSAL_TTL_MS;
         this._permissionCache = new Set();
+        this._lastEntryHash = 'GENESIS'; // chain head for tamper-evident NDJSON
+
+        // If persistence is enabled, ensure the directory exists and recover
+        // the chain head from the last line so subsequent runs continue the
+        // hash chain instead of restarting at GENESIS.
+        if (this._auditLogPath) {
+            try {
+                fs.mkdirSync(path.dirname(this._auditLogPath), { recursive: true });
+                if (fs.existsSync(this._auditLogPath)) {
+                    const tail = fs.readFileSync(this._auditLogPath, 'utf-8').trim().split('\n');
+                    const lastLine = tail[tail.length - 1];
+                    if (lastLine) {
+                        try { this._lastEntryHash = JSON.parse(lastLine).entry_hash || 'GENESIS'; } catch {}
+                    }
+                }
+            } catch (e) {
+                console.error('[ApprovalGate] audit log init failed:', e.message);
+            }
+        }
+
+        // Sweep expired proposals every minute.
+        this._ttlSweepTimer = setInterval(() => this._sweepExpired(), 60_000);
+        if (this._ttlSweepTimer.unref) this._ttlSweepTimer.unref();
+    }
+
+    /** Stop the TTL sweep timer (call on shutdown). */
+    dispose() {
+        if (this._ttlSweepTimer) { clearInterval(this._ttlSweepTimer); this._ttlSweepTimer = null; }
     }
 
     _getCacheKey(tool, args) {
@@ -75,21 +123,23 @@ class ApprovalGate {
     grant_permission(tool, args) {
         const key = this._getCacheKey(tool, args);
         this._permissionCache.add(key);
-        this._auditLog.push({ action: 'CACHE_GRANT', tool: tool, ts: new Date().toISOString() });
+        this._writeAudit({ action: 'CACHE_GRANT', tool, ts: new Date().toISOString() });
     }
 
     clear_permission_cache() {
         this._permissionCache.clear();
-        this._auditLog.push({ action: 'CACHE_CLEAR', ts: new Date().toISOString() });
+        this._writeAudit({ action: 'CACHE_CLEAR', ts: new Date().toISOString() });
     }
 
     propose(proposal) {
+        this._sweepExpired();
         this._proposals.set(proposal.id, proposal);
         this._audit('PROPOSE', proposal);
         return proposal;
     }
 
     approve(proposalId, by) {
+        this._sweepExpired();
         const p = this._proposals.get(proposalId);
         if (!p) throw new Error(`Proposal not found: ${proposalId}`);
         p.approve(by);
@@ -98,6 +148,7 @@ class ApprovalGate {
     }
 
     deny(proposalId, reason) {
+        this._sweepExpired();
         const p = this._proposals.get(proposalId);
         if (!p) throw new Error(`Proposal not found: ${proposalId}`);
         p.deny(reason);
@@ -114,6 +165,7 @@ class ApprovalGate {
     }
 
     getPending() {
+        this._sweepExpired();
         return Array.from(this._proposals.values()).filter(p => p.status === 'PENDING');
     }
 
@@ -121,13 +173,54 @@ class ApprovalGate {
         return this._auditLog.slice(-n);
     }
 
+    /**
+     * Auto-deny pending proposals older than _proposalTtlMs.
+     * Called lazily from propose/approve/deny/getPending and from a 60s timer.
+     */
+    _sweepExpired() {
+        const now = Date.now();
+        for (const p of this._proposals.values()) {
+            if (p.status !== 'PENDING') continue;
+            const ageMs = now - new Date(p.createdAt).getTime();
+            if (ageMs > this._proposalTtlMs) {
+                try {
+                    p.deny('TTL_EXPIRED');
+                    this._audit('TTL_EXPIRE', p);
+                } catch {}
+            }
+        }
+    }
+
     _audit(action, proposal) {
-        this._auditLog.push({
+        this._writeAudit({
             action, proposalId: proposal.id, tool: proposal.tool,
             status: proposal.status, ts: new Date().toISOString(),
         });
+    }
+
+    /**
+     * Append an entry to the in-memory log and (if configured) the NDJSON file.
+     * Each entry carries prev_hash + entry_hash so tampering with any line
+     * breaks the chain from that point forward.
+     */
+    _writeAudit(entry) {
+        const enriched = { ...entry, prev_hash: this._lastEntryHash };
+        const canonical = JSON.stringify(enriched, Object.keys(enriched).sort());
+        const entry_hash = crypto.createHash('sha256').update(canonical).digest('hex');
+        const finalEntry = { ...enriched, entry_hash };
+        this._lastEntryHash = entry_hash;
+
+        this._auditLog.push(finalEntry);
         if (this._auditLog.length > this._maxAudit) {
             this._auditLog = this._auditLog.slice(-this._maxAudit);
+        }
+
+        if (this._auditLogPath) {
+            try {
+                fs.appendFileSync(this._auditLogPath, JSON.stringify(finalEntry) + '\n');
+            } catch (e) {
+                console.error('[ApprovalGate] audit log write failed:', e.message);
+            }
         }
     }
 }

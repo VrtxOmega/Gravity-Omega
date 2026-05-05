@@ -38,7 +38,15 @@ const bridge = new OmegaBridge();
 const ipc = new OmegaIPC(bridge);
 const context = new OmegaContext();
 const hooks = new OmegaHooks();
-const agent = new OmegaAgent({ context, hooks, bridge, userName: process.env.GRAVITY_OMEGA_USER || 'RJ' });
+// NDJSON audit log path — written by ApprovalGate on every audit event.
+// Lives under ~/.veritas/ so it survives across reinstalls and is shared
+// with the rest of the VERITAS toolchain.
+const AUDIT_LOG_PATH = path.join(os.homedir(), '.veritas', 'audit.ndjson');
+const agent = new OmegaAgent({
+    context, hooks, bridge,
+    userName: process.env.GRAVITY_OMEGA_USER || 'RJ',
+    auditLogPath: AUDIT_LOG_PATH,
+});
 const browser = new OmegaBrowser({ screenshotDir: path.join(__dirname, 'screenshots') });
 const ocrHandler = new OCRHandler();
 let conversationStore = null; // initialized after app.whenReady()
@@ -192,17 +200,47 @@ function createWindow() {
 
     context.addBreadcrumb('lifecycle', 'Window created');
 
-    // ── Crash Recovery ──────────────────────────────────────
+    // ── Crash Recovery (with crash-loop protection) ────────
+    // Track renderer crashes within a 60s window. After 3 crashes in that
+    // window, stop auto-reloading and surface a dialog so the user can
+    // pick safe-mode or quit. Without this, a renderer that crashes on
+    // every load gets stuck in an infinite reload loop.
+    const _rendererCrashes = [];
+    const CRASH_WINDOW_MS = 60_000;
+    const CRASH_LIMIT = 3;
     mainWindow.webContents.on('render-process-gone', (_, details) => {
         console.error(`[Omega] Renderer process gone: ${details.reason} (code: ${details.exitCode})`);
-        if (details.reason !== 'clean-exit') {
-            console.log('[Omega] Reloading window after renderer crash...');
-            setTimeout(() => {
-                if (mainWindow && !mainWindow.isDestroyed()) {
-                    mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-                }
-            }, 1000);
+        if (details.reason === 'clean-exit') return;
+
+        const now = Date.now();
+        // Drop crashes older than the window
+        while (_rendererCrashes.length && now - _rendererCrashes[0] > CRASH_WINDOW_MS) _rendererCrashes.shift();
+        _rendererCrashes.push(now);
+
+        if (_rendererCrashes.length >= CRASH_LIMIT) {
+            crashLog(`Crash loop detected: ${_rendererCrashes.length} crashes in ${CRASH_WINDOW_MS}ms — stopping auto-reload`);
+            console.error(`[Omega] Crash loop detected (${_rendererCrashes.length} in ${CRASH_WINDOW_MS / 1000}s) — refusing to auto-reload`);
+            const choice = dialog.showMessageBoxSync(mainWindow, {
+                type: 'error',
+                buttons: ['Open DevTools', 'Reload Anyway', 'Quit'],
+                defaultId: 0,
+                cancelId: 2,
+                title: 'Gravity Omega — renderer crash loop',
+                message: 'The UI has crashed repeatedly.',
+                detail: `${_rendererCrashes.length} renderer crashes in the last ${CRASH_WINDOW_MS / 1000}s. Last reason: ${details.reason}.\n\nOpening DevTools is recommended to inspect the console error before continuing.`,
+            });
+            if (choice === 0) { try { mainWindow.webContents.openDevTools({ mode: 'detach' }); } catch {} }
+            else if (choice === 1) { _rendererCrashes.length = 0; mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html')); }
+            else { app.quit(); }
+            return;
         }
+
+        console.log(`[Omega] Reloading window after renderer crash (${_rendererCrashes.length}/${CRASH_LIMIT})...`);
+        setTimeout(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+            }
+        }, 1000);
     });
 
     mainWindow.on('unresponsive', () => {
@@ -1334,25 +1372,55 @@ app.on('will-quit', () => {
 });
 
 // ── Graceful Shutdown ────────────────────────────────────────
+// Electron does not await async before-quit handlers — the process
+// exits before the work finishes. Pattern below: preventDefault on the
+// first invocation, run all async cleanup with a hard timeout, then
+// re-call app.quit() with _shuttingDown set so we don't loop.
 
-app.on('before-quit', async () => {
-    crashLog('before-quit fired');
-    console.log('[Omega] before-quit fired');
-    context.addBreadcrumb('lifecycle', 'Shutting down');
-    await hooks.fire('on_shutdown');
+let _shuttingDown = false;
 
-    if (watcher) {
-        try { await watcher.close(); watcher = null; } catch { }
+async function gracefulShutdown(reason) {
+    crashLog(`gracefulShutdown(${reason}) starting`);
+    console.log(`[Omega] Graceful shutdown: ${reason}`);
+    context.addBreadcrumb('lifecycle', `Shutting down: ${reason}`);
+
+    // Hard 5s budget for all async cleanup — if any step hangs we still exit.
+    const deadline = setTimeout(() => {
+        crashLog('gracefulShutdown deadline exceeded — forcing exit');
+        console.error('[Omega] Shutdown deadline exceeded — forcing exit');
+        process.exit(1);
+    }, 5000);
+
+    try {
+        await Promise.allSettled([
+            hooks.fire('on_shutdown'),
+            (async () => { if (watcher) { try { await watcher.close(); } catch {} watcher = null; } })(),
+            (async () => {
+                for (const [, term] of terminals) {
+                    try { term.removeAllListeners(); term.kill(); } catch {}
+                }
+                terminals.clear();
+            })(),
+            (async () => { try { await browser.close(); } catch {} })(),
+            (async () => { try { await bridge.stop(); } catch {} })(),
+            (async () => { try { await context.close(); } catch {} })(),
+            (async () => { try { agent.gate.dispose(); } catch {} })(),
+        ]);
+        crashLog('gracefulShutdown cleanup complete');
+    } finally {
+        clearTimeout(deadline);
     }
+}
 
-    for (const [id, term] of terminals) {
-        try { term.kill(); } catch { }
-    }
-    terminals.clear();
-
-    await browser.close();
-    await bridge.stop();
-    await context.close();
+app.on('before-quit', (event) => {
+    if (_shuttingDown) return;             // second pass: let it actually quit
+    _shuttingDown = true;
+    event.preventDefault();
+    crashLog('before-quit fired (deferring for async cleanup)');
+    gracefulShutdown('before-quit').finally(() => {
+        crashLog('cleanup done — calling app.quit()');
+        app.quit();
+    });
 });
 
 process.on('exit', (code) => {
@@ -1365,5 +1433,17 @@ process.on('beforeExit', (code) => {
     console.log(`[Omega] beforeExit with code: ${code}`);
 });
 
-process.on('SIGTERM', () => { crashLog('SIGTERM received'); });
-process.on('SIGINT', () => { crashLog('SIGINT received'); });
+// SIGTERM/SIGINT → trigger graceful shutdown via app.quit() so before-quit fires.
+function _handleSignal(sig) {
+    crashLog(`${sig} received`);
+    console.log(`[Omega] ${sig} received — initiating graceful shutdown`);
+    if (_shuttingDown) return;
+    // app.quit() will fire before-quit which runs gracefulShutdown
+    app.quit();
+}
+process.on('SIGTERM', () => _handleSignal('SIGTERM'));
+process.on('SIGINT',  () => _handleSignal('SIGINT'));
+if (process.platform === 'win32') {
+    // SIGBREAK fires on Ctrl+Break in Windows consoles
+    process.on('SIGBREAK', () => _handleSignal('SIGBREAK'));
+}
