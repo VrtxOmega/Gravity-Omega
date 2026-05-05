@@ -34,6 +34,7 @@ const { OmegaIPC } = require('./omega/omega_ipc');
 const { OmegaContext } = require('./omega/omega_context');
 const { OmegaHooks } = require('./omega/omega_hooks');
 const { OmegaAgent } = require('./omega/omega_agent');
+const { ProviderManager } = require('./omega/providers');
 const { OmegaBrowser } = require('./omega/omega_browser');
 const { ConversationStore } = require('./omega/conversation_store');
 const { startServer: startMcpServer } = require('./omega/omega_mcp_server');
@@ -53,6 +54,14 @@ const agent = new OmegaAgent({
     userName: process.env.GRAVITY_OMEGA_USER || 'RJ',
     auditLogPath: AUDIT_LOG_PATH,
 });
+
+// v7.0: Provider manager for unified LLM backend switching
+// Use app.getPath('userData') to avoid collision with user's .veritas project dir
+const providerManager = new ProviderManager(app.getPath('userData'));
+agent.setProviderManager(providerManager);
+// Auto-detect default provider on first run (prefer local Ollama)
+providerManager.autoDetectDefault().catch(() => {});
+
 const browser = new OmegaBrowser({ screenshotDir: path.join(__dirname, 'screenshots') });
 const ocrHandler = new OCRHandler();
 let conversationStore = null; // initialized after app.whenReady()
@@ -930,6 +939,35 @@ function registerIPC() {
             return { ok: true, mode: 'ollama' };
         } catch (err) {
             console.error('[OMEGA] Failed to stop Hermes:', err);
+            return { ok: false, error: err.message };
+        }
+    });
+
+    // v7.0: Provider management IPC handlers
+    ipcMain.handle('provider:list', async () => {
+        return providerManager.listProviders();
+    });
+    ipcMain.handle('provider:get', async () => {
+        return providerManager.getActiveProvider();
+    });
+    ipcMain.handle('provider:set', async (_, id) => {
+        try {
+            return providerManager.setActiveProvider(id);
+        } catch (err) {
+            return { ok: false, error: err.message };
+        }
+    });
+    ipcMain.handle('provider:config', async (_, id, config) => {
+        try {
+            return providerManager.saveProviderConfig(id, config);
+        } catch (err) {
+            return { ok: false, error: err.message };
+        }
+    });
+    ipcMain.handle('provider:test', async (_, id) => {
+        try {
+            return await providerManager.testProvider(id);
+        } catch (err) {
             return { ok: false, error: err.message };
         }
     });

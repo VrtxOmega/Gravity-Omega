@@ -87,6 +87,15 @@ contextBridge.exposeInMainWorld('omega', {
         stopHermes:  () => ipcRenderer.invoke('agent:stop-hermes'),
     },
 
+    // v7.0: Provider management — unified LLM backend switching
+    provider: {
+        list:   () => ipcRenderer.invoke('provider:list'),
+        get:    () => ipcRenderer.invoke('provider:get'),
+        set:    (id) => ipcRenderer.invoke('provider:set', id),
+        config: (id, cfg) => ipcRenderer.invoke('provider:config', id, cfg),
+        test:   (id) => ipcRenderer.invoke('provider:test', id),
+    },
+
     // ── MCP Health ───────────────────────────────────────────
     // Returns { servers, required, allRequiredOk } where required tracks
     // omega-brain, sswp, and omega-stenographer.

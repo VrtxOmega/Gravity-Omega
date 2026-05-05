@@ -1298,89 +1298,253 @@ state.chat.abortController = null;
 
 
 
-// v5.0: Restore model dropdown from localStorage
+// v7.0: Provider-aware model dropdown — populated dynamically by initProviderSystem()
 
-// v5.1: Intercept "hermes-acp" to start/stop Hermes ACP channel
-
-(function initModelDropdown() {
-
+async function initModelDropdown(providers, activeProvider) {
     const dd = document.getElementById('chat-model-dropdown');
+    if (!dd) return;
 
-    if (dd) {
+    // Clear existing options
+    dd.innerHTML = '';
 
-        const saved = localStorage.getItem('omega_active_model');
-
-        if (saved) {
-
-            const optValues = Array.from(dd.options).map(o => o.value);
-
-            if (optValues.includes(saved)) dd.value = saved;
-
+    // Build optgroups per provider
+    const providerMap = new Map();
+    for (const p of providers) {
+        providerMap.set(p.id, p);
+        const group = document.createElement('optgroup');
+        group.label = p.name;
+        for (const m of p.models) {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            opt.dataset.provider = p.id;
+            group.appendChild(opt);
         }
-
-        dd.addEventListener('change', async () => {
-
-            const model = dd.value;
-
-            // v5.1: Hermes ACP toggle
-
-            if (model === 'hermes-acp') {
-
-                try {
-
-                    showToast('🤖 Connecting to Hermes ACP...', 'info');
-
-                    const res = await window.omega.agent.startHermes();
-
-                    if (res && res.ok) {
-
-                        showToast('🤖 Hermes ACP connected — Full Agent mode active', 'success');
-
-                        _updateHermesBadge(true);
-
-                    } else {
-
-                        showToast('⚠️ Hermes connection failed: ' + (res ? res.error : 'Unknown error'), 'error');
-
-                        // Revert dropdown to previous non-hermes value
-
-                        const prev = localStorage.getItem('omega_active_model') || 'qwen2.5:7b';
-
-                        if (prev === 'hermes-acp') dd.value = 'qwen2.5:7b';
-
-                    }
-
-                } catch (err) {
-
-                    showToast('⚠️ Hermes error: ' + err.message, 'error');
-
-                }
-
-            } else {
-
-                // Switching away from Hermes — stop the channel if it was running
-
-                const wasHermes = localStorage.getItem('omega_active_model') === 'hermes-acp';
-
-                if (wasHermes) {
-
-                    try { await window.omega.agent.stopHermes(); } catch (_) {}
-
-                    _updateHermesBadge(false);
-
-                }
-
-                localStorage.setItem('omega_active_model', model);
-
-            }
-
-            console.log('[MODEL] Switched to:', model);
-
-        });
-
+        dd.appendChild(group);
     }
 
-})();
+    // Restore saved selection (v7.0: strip legacy '-cloud' suffix)
+    let saved = localStorage.getItem('omega_active_model');
+    if (saved && saved.endsWith('-cloud')) {
+        saved = saved.replace(/-cloud$/, '');
+        localStorage.setItem('omega_active_model', saved);
+    }
+
+    const optValues = Array.from(dd.options).map(o => o.value);
+
+    // v7.0: Default to active provider's first model if saved is invalid or hermes-acp
+    let selectedModel = null;
+    if (saved && optValues.includes(saved) && saved !== 'hermes-acp') {
+        selectedModel = saved;
+    } else if (activeProvider && activeProvider.models && activeProvider.models.length > 0) {
+        selectedModel = activeProvider.models[0];
+        localStorage.setItem('omega_active_model', selectedModel);
+    } else if (optValues.length > 0) {
+        selectedModel = optValues[0];
+        localStorage.setItem('omega_active_model', selectedModel);
+    }
+
+    if (selectedModel && optValues.includes(selectedModel)) {
+        dd.value = selectedModel;
+    }
+
+    // v7.0: Sync main process provider on startup to match dropdown
+    const initialOpt = dd.options[dd.selectedIndex];
+    const initialProviderId = initialOpt ? initialOpt.dataset.provider : null;
+    if (initialProviderId && activeProvider && initialProviderId !== activeProvider.id) {
+        try {
+            await window.omega.provider.set(initialProviderId);
+        } catch (err) {
+            console.error('[MODEL] Failed to sync provider on startup:', err);
+        }
+    }
+
+    dd.addEventListener('change', async () => {
+        const model = dd.value;
+        const selectedOpt = dd.options[dd.selectedIndex];
+        const providerId = selectedOpt ? selectedOpt.dataset.provider : null;
+        const provider = providerMap.get(providerId);
+
+        if (!provider) {
+            console.warn('[MODEL] No provider found for model:', model);
+            return;
+        }
+
+        // v7.0: Set active provider via main process
+        try {
+            await window.omega.provider.set(providerId);
+        } catch (err) {
+            console.error('[MODEL] Failed to set provider:', err);
+        }
+
+        // v5.1/v7.0: Hermes ACP toggle
+        if (provider.type === 'agent_backend') {
+            try {
+                showToast('🤖 Connecting to Hermes ACP...', 'info');
+                const res = await window.omega.agent.startHermes();
+                if (res && res.ok) {
+                    showToast('🤖 Hermes ACP connected — Full Agent mode active', 'success');
+                    _updateHermesBadge(true);
+                } else {
+                    showToast('⚠️ Hermes connection failed: ' + (res ? res.error : 'Unknown error'), 'error');
+                    const prev = localStorage.getItem('omega_active_model') || 'qwen2.5:7b';
+                    if (prev === 'hermes-acp') dd.value = 'qwen2.5:7b';
+                }
+            } catch (err) {
+                showToast('⚠️ Hermes error: ' + err.message, 'error');
+            }
+        } else {
+            // Switching away from Hermes — stop the channel if it was running
+            const wasHermes = localStorage.getItem('omega_active_model') === 'hermes-acp';
+            if (wasHermes) {
+                try { await window.omega.agent.stopHermes(); } catch (_) {}
+                _updateHermesBadge(false);
+            }
+            localStorage.setItem('omega_active_model', model);
+            console.log('[MODEL] Switched to:', model, 'provider:', providerId);
+        }
+    });
+}
+
+// v7.0: Provider management system — loads providers, renders UI, handles config
+async function initProviderSystem() {
+    try {
+        const providers = await window.omega.provider.list();
+        const activeProvider = await window.omega.provider.get();
+
+        // 1. Populate chat model dropdown
+        await initModelDropdown(providers, activeProvider);
+
+        // 2. Render provider cards in settings panel
+        const container = document.getElementById('settings-provider-list');
+        if (container) {
+            container.innerHTML = '';
+            for (const p of providers) {
+                const card = document.createElement('div');
+                card.className = 'provider-card' + (activeProvider && activeProvider.id === p.id ? ' active' : '');
+                card.innerHTML = `
+                    <div class="provider-info">
+                        <div class="provider-name">${__esc(p.name)}</div>
+                        <div class="provider-status ${p.configured ? 'ok' : 'missing'}">
+                            <span class="dot"></span>
+                            ${p.configured ? 'Configured' : 'API key required'}
+                        </div>
+                    </div>
+                    <button class="provider-btn" data-provider="${__esc(p.id)}">Configure</button>
+                `;
+                container.appendChild(card);
+            }
+
+            // Wire up configure buttons
+            container.querySelectorAll('.provider-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const pid = btn.dataset.provider;
+                    const provider = providers.find(p => p.id === pid);
+                    if (provider) openProviderModal(provider);
+                });
+            });
+        }
+
+        // 3. Wire up gear icon in chat header
+        const gearBtn = document.getElementById('btn-provider-settings');
+        if (gearBtn) {
+            gearBtn.addEventListener('click', () => {
+                // Open settings panel and scroll to providers
+                state.activePanel = 'settings';
+                document.querySelectorAll('.sidebar-panel').forEach(p => p.classList.add('hidden'));
+                const settingsPanel = document.querySelector('.sidebar-panel[data-panel="settings"]');
+                if (settingsPanel) settingsPanel.classList.remove('hidden');
+                document.querySelectorAll('.activity-btn').forEach(b => b.classList.toggle('active', b.dataset.panel === 'settings'));
+            });
+        }
+
+        console.log('[ProviderSystem] Initialized with', providers.length, 'providers. Active:', activeProvider ? activeProvider.id : 'none');
+    } catch (err) {
+        console.error('[ProviderSystem] Failed to initialize:', err);
+        const container = document.getElementById('settings-provider-list');
+        if (container) {
+            container.innerHTML = '<div class="reports-empty" style="color:var(--red)">Failed to load providers. Restart Gravity Omega.</div>';
+        }
+    }
+}
+
+// v7.0: Provider config modal
+function openProviderModal(provider) {
+    const modal = document.getElementById('provider-modal');
+    document.getElementById('provider-modal-id').value = provider.id;
+    document.getElementById('provider-modal-title').textContent = 'Configure ' + provider.name;
+    document.getElementById('provider-modal-key').value = '';
+    document.getElementById('provider-modal-url').value = provider.baseUrl || '';
+    document.getElementById('provider-modal-models').value = '';
+    document.getElementById('provider-modal-test').textContent = '';
+    document.getElementById('provider-modal-test').className = 'test-result';
+    modal.classList.add('open');
+}
+
+function closeProviderModal() {
+    const modal = document.getElementById('provider-modal');
+    modal.classList.remove('open');
+}
+
+// Wire up modal buttons once at startup
+function initProviderModalHandlers() {
+    const testBtn = document.getElementById('provider-modal-test-btn');
+    const saveBtn = document.getElementById('provider-modal-save-btn');
+
+    if (testBtn) {
+        testBtn.addEventListener('click', async () => {
+            const id = document.getElementById('provider-modal-id').value;
+            const resultEl = document.getElementById('provider-modal-test');
+            resultEl.textContent = 'Testing...';
+            resultEl.className = 'test-result';
+            try {
+                const result = await window.omega.provider.test(id);
+                if (result.ok) {
+                    resultEl.textContent = `✅ OK (${result.latencyMs}ms)`;
+                    resultEl.classList.add('ok');
+                } else {
+                    resultEl.textContent = `❌ ${result.error}`;
+                    resultEl.classList.add('err');
+                }
+            } catch (err) {
+                resultEl.textContent = `❌ ${err.message}`;
+                resultEl.classList.add('err');
+            }
+        });
+    }
+
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            const id = document.getElementById('provider-modal-id').value;
+            const key = document.getElementById('provider-modal-key').value;
+            const url = document.getElementById('provider-modal-url').value;
+            const models = document.getElementById('provider-modal-models').value;
+
+            const config = {};
+            if (key) config.apiKey = key;
+            if (url) config.baseUrl = url;
+            if (models) config.customModels = models.split(',').map(s => s.trim()).filter(Boolean);
+
+            try {
+                await window.omega.provider.config(id, config);
+                showToast(`Provider ${id} saved`, 'success');
+                closeProviderModal();
+                // Refresh provider list
+                await initProviderSystem();
+            } catch (err) {
+                showToast('Failed to save: ' + err.message, 'error');
+            }
+        });
+    }
+
+    // Close on backdrop click
+    const modal = document.getElementById('provider-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeProviderModal();
+        });
+    }
+}
 
 
 
@@ -1592,7 +1756,6 @@ function initAnalyzer() {
 function initSettings() {
     const SETTINGS_KEY = 'gravityOmega.settings';
     const defaults = {
-        aiModel: 'qwen3:8b',
         theme: 'omega-dark',
         fontSize: 13,
         wordWrap: 'on',
@@ -1602,10 +1765,14 @@ function initSettings() {
     let cfg = { ...defaults };
     try {
         const raw = localStorage.getItem(SETTINGS_KEY);
-        if (raw) cfg = { ...defaults, ...JSON.parse(raw) };
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            // v7.0: Migrate away from aiModel in settings (now managed by provider system)
+            delete parsed.aiModel;
+            cfg = { ...defaults, ...parsed };
+        }
     } catch { /* ignore corrupt storage */ }
 
-    const modelSel = document.getElementById('settings-ai-model');
     const themeSel = document.getElementById('settings-theme');
     const fontInp = document.getElementById('settings-fontsize');
     const wrapSel = document.getElementById('settings-wordwrap');
@@ -1626,7 +1793,6 @@ function initSettings() {
         document.body.classList.toggle('theme-omega-light', cfg.theme === 'omega-light');
     }
 
-    if (modelSel) { modelSel.value = cfg.aiModel; modelSel.addEventListener('change', () => { cfg.aiModel = modelSel.value; save(); }); }
     if (themeSel) { themeSel.value = cfg.theme; themeSel.addEventListener('change', () => { cfg.theme = themeSel.value; save(); apply(); }); }
     if (fontInp) { fontInp.value = cfg.fontSize; fontInp.addEventListener('change', () => { cfg.fontSize = fontInp.value; save(); apply(); }); }
     if (wrapSel) { wrapSel.value = cfg.wordWrap; wrapSel.addEventListener('change', () => { cfg.wordWrap = wrapSel.value; save(); apply(); }); }
@@ -5260,6 +5426,8 @@ window.sentinelRebaseline = async function() {
 
     initEventListeners();
     initSettings();
+    initProviderModalHandlers();
+    initProviderSystem();
     initAnalyzer();
 
 

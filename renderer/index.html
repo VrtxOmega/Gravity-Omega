@@ -10,6 +10,55 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles/omega.css">
     <link rel="stylesheet" href="../node_modules/xterm/css/xterm.css">
+    <!-- v7.0: Provider management styles -->
+    <style>
+        .provider-list { display:flex; flex-direction:column; gap:4px; padding:8px 0; }
+        .provider-card {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:10px 12px; background:var(--bg-tertiary);
+            border-radius:var(--radius); border:1px solid var(--border);
+            transition: border-color var(--transition), background var(--transition);
+        }
+        .provider-card:hover { border-color: var(--border-focused); }
+        .provider-card.active {
+            border-color: var(--gold-dim);
+            background: linear-gradient(90deg, rgba(212,168,67,0.06) 0%, transparent 100%);
+            box-shadow: inset 3px 0 0 var(--gold);
+        }
+        .provider-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
+        .provider-name { font-size:12px; font-weight:600; color:var(--text-primary); letter-spacing:0.2px; }
+        .provider-status { font-size:10px; font-weight:500; display:flex; align-items:center; gap:4px; }
+        .provider-status.ok { color:var(--green); }
+        .provider-status.missing { color:var(--red); }
+        .provider-status .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+        .provider-status.ok .dot { background:var(--green); box-shadow:0 0 4px var(--green); }
+        .provider-status.missing .dot { background:var(--red); box-shadow:0 0 4px var(--red); }
+        .provider-btn {
+            font-size:10px; padding:4px 12px; border-radius:var(--radius);
+            border:1px solid var(--border); cursor:pointer;
+            background:var(--bg-elevated); color:var(--text-secondary);
+            font-weight:600; font-family:var(--font-ui);
+            transition: all var(--transition); flex-shrink:0; margin-left:8px;
+        }
+        .provider-btn:hover {
+            background:var(--gold-glow); border-color:var(--gold-dim);
+            color:var(--gold-bright);
+        }
+        .provider-modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:9999; }
+        .provider-modal.open { display:flex; }
+        .provider-modal-box { background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:20px; width:380px; max-width:90vw; }
+        .provider-modal-title { font-size:14px; font-weight:700; color:var(--gold); margin-bottom:12px; }
+        .provider-modal label { display:block; font-size:11px; color:var(--text-secondary); margin:8px 0 3px; }
+        .provider-modal input, .provider-modal textarea { width:100%; padding:6px 8px; border-radius:4px; border:1px solid var(--border); background:var(--bg-tertiary); color:var(--text-primary); font-size:12px; box-sizing:border-box; }
+        .provider-modal .modal-actions { display:flex; gap:8px; margin-top:14px; justify-content:flex-end; }
+        .provider-modal .modal-actions button { padding:6px 14px; border-radius:4px; border:none; cursor:pointer; font-size:11px; font-weight:600; }
+        .provider-modal .btn-test { background:var(--bg-tertiary); color:var(--text-primary); border:1px solid var(--border); }
+        .provider-modal .btn-save { background:var(--gold); color:#000; }
+        .provider-modal .btn-cancel { background:transparent; color:var(--text-secondary); }
+        .provider-modal .test-result { font-size:11px; margin-top:6px; min-height:16px; }
+        .provider-modal .test-result.ok { color:var(--green); }
+        .provider-modal .test-result.err { color:var(--red); }
+    </style>
 </head>
 
 <body>
@@ -267,17 +316,11 @@
 
                 <!-- Settings panel -->
                 <div class="sidebar-panel hidden" data-panel="settings">
+                    <!-- v7.0: Provider Management -->
                     <div class="reports-section">
-                        <div class="reports-section-header"><span>🤖 AI MODEL</span></div>
-                        <div class="tools-form">
-                            <select id="settings-ai-model" class="tool-input">
-                                <option value="qwen3:8b">Ollama — qwen3:8b (local, 44 t/s)</option>
-                                <option value="gemma3:4b">Ollama — gemma3:4b (local, 80 t/s)</option>
-                                <option value="phi4-mini">Ollama — phi4-mini (local, 86 t/s)</option>
-                                <option value="deepseek-r1:7b">Ollama — deepseek-r1:7b (local, 46 t/s)</option>
-                                <option value="gemini-2.5-flash">Vertex AI — gemini-2.5-flash</option>
-                                <option value="gpt-4o">OpenAI — gpt-4o</option>
-                            </select>
+                        <div class="reports-section-header"><span>🤖 AI PROVIDERS</span></div>
+                        <div id="settings-provider-list" class="provider-list">
+                            <div class="reports-empty">Loading providers...</div>
                         </div>
                     </div>
                     <div class="reports-section">
@@ -553,33 +596,11 @@
                     </div>
                 </div>
                 <!-- Inline Chat Model Selector -->
-                <div class="chat-model-selector" style="margin-left:8px;">
+                <div class="chat-model-selector" style="margin-left:8px; display:flex; align-items:center; gap:4px;">
                     <select id="chat-model-dropdown" class="chat-header-model" style="border:none; cursor:pointer;">
-                        <optgroup label="☁️ Cloud Models">
-                            <option value="qwen3.5:397b-cloud">qwen3.5 · 397B (Cloud)</option>
-                            <option value="deepseek-v3.1:671b-cloud">deepseek-v3.1 · 671B (Cloud)</option>
-                            <option value="qwen3-coder:480b-cloud">qwen3-coder · 480B (Cloud)</option>
-                            <option value="kimi-k2:1t-cloud">kimi-k2 · 1T (Cloud)</option>
-                            <option value="gpt-oss:120b-cloud">gpt-oss · 120B (Cloud)</option>
-                            <option value="gpt-oss:20b-cloud">gpt-oss · 20B (Cloud)</option>
-                            <option value="qwen3-vl:235b-cloud">qwen3-vl · 235B (Cloud)</option>
-                            <option value="glm-4.6:cloud">glm-4.6 (Cloud)</option>
-                        </optgroup>
-                        <optgroup label="💻 Local Models">
-                            <option value="qwen3:8b">qwen3 · 8B</option>
-                            <option value="qwen2.5:7b">qwen2.5 · 7B</option>
-                            <option value="qwen2.5:3b">qwen2.5 · 3B</option>
-                            <option value="gemma3:4b">gemma3 · 4B</option>
-                            <option value="gemma2:9b">gemma2 · 9B</option>
-                            <option value="deepseek-r1:7b">deepseek-r1 · 7B</option>
-                            <option value="phi4-mini">phi4-mini</option>
-                            <option value="veritas-omni:latest">veritas-omni</option>
-                            <option value="gemma2:sentinel-omega">gemma2 · sentinel-omega</option>
-                        </optgroup>
-                        <optgroup label="🤖 Agent Backends">
-                            <option value="hermes-acp">Hermes ACP · Full Agent</option>
-                        </optgroup>
+                        <!-- v7.0: Dynamically populated by initProviderSystem() -->
                     </select>
+                    <button id="btn-provider-settings" class="chat-action-btn" title="Provider Settings" style="font-size:12px; padding:2px 4px;">⚙️</button>
                     <span id="hermes-status-badge" style="display:none; margin-left:6px; font-size:10px; font-weight:700; color:var(--gold-bright); background:var(--gold-glow); padding:1px 6px; border-radius:10px; letter-spacing:0.5px; vertical-align:middle;"></span>
                     <!-- MCP health indicator: Brain, SSWP, Stenographer dots -->
                     <span id="mcp-health-indicator" class="mcp-health" title="MCP servers: omega-brain · sswp · stenographer">
@@ -684,6 +705,26 @@
         document.body.appendChild(loaderScript);
     </script>
     <script src="mobile_qr.js"></script>
+
+    <!-- v7.0: Provider Config Modal -->
+    <div id="provider-modal" class="provider-modal">
+        <div class="provider-modal-box">
+            <div class="provider-modal-title" id="provider-modal-title">Configure Provider</div>
+            <input type="hidden" id="provider-modal-id" />
+            <label>API Key</label>
+            <input type="password" id="provider-modal-key" placeholder="sk-..." />
+            <label>Base URL (optional)</label>
+            <input type="text" id="provider-modal-url" placeholder="https://api.example.com/v1" />
+            <label>Custom Models (comma-separated, optional)</label>
+            <input type="text" id="provider-modal-models" placeholder="model-a, model-b" />
+            <div class="test-result" id="provider-modal-test"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeProviderModal()">Cancel</button>
+                <button class="btn-test" id="provider-modal-test-btn">Test</button>
+                <button class="btn-save" id="provider-modal-save-btn">Save</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

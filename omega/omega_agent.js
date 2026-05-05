@@ -57,7 +57,8 @@ class OmegaAgent {
         this._executionPlanFile = null;
 
         // v5.0: Active model (set per-request from UI dropdown)
-        this._activeModel = 'deepseek-v4-pro';
+        // v7.0: Default to null so provider.model is always used when no explicit selection
+        this._activeModel = null;
 
         // v5.1: Hermes ACP backend — set _useHermes = true to route LLM calls through Hermes
         this._useHermes = false;
@@ -80,6 +81,17 @@ class OmegaAgent {
         // Failure history: HERMES_SHOWCASE crash (2026-05-03) — python vs python3,
         // CSS braces vs .format(), CSV whitespace vs DictReader
         this.skillManager.load('python_codegen_guard');
+
+        // v7.0: Provider manager for unified LLM backend switching
+        this._providerManager = null;
+    }
+
+    /**
+     * v7.0: Bind the provider manager for unified backend routing.
+     * Call this once from main.js after construction.
+     */
+    setProviderManager(pm) {
+        this._providerManager = pm;
     }
 
     // ── Hermes Channel (v5.1) ─────────────────────────────────────────────────
@@ -363,7 +375,9 @@ class OmegaAgent {
                         this.context.addBreadcrumb('agent', 'LLM empty after ' + this._stepLog.length + ' steps - summary fallback', {}, 'warning');
                         break; // finalResponse stays null -> triggers LOOP_EXHAUSTED path
                     }
-                    finalResponse = { type: 'error', message: 'All LLM backends unresponsive. Check: (1) Ollama Cloud key (OLLAMA_API_KEY), (2) local Ollama on 127.0.0.1:11434, (3) Gemini key (GEMINI_API_KEY).' };
+                    const activeProvider = this._providerManager ? this._providerManager.getActiveProvider() : null;
+                    const providerName = activeProvider ? activeProvider.name : 'No provider';
+                    finalResponse = { type: 'error', message: `All LLM backends unresponsive. Active provider: ${providerName}. Check your API key in Settings → Providers, or verify the endpoint is reachable.` };
                     break;
                 }
 
@@ -565,14 +579,14 @@ class OmegaAgent {
         }
     }
 
-    // ── LLM Call (v5.1 — Ollama + Hermes) ─────────────────────────
-    // Single-path: dispatches to Hermes ACP or Ollama based on _useHermes flag.
-    // Model is user-selectable via the UI dropdown (Ollama mode only).
+    // ── LLM Call (v7.0 — Unified Provider Dispatch) ─────────────────
+    // Dispatches to Hermes ACP or the active OpenAI-compatible provider.
     async _callLLM(messages) {
         const MAX_RETRIES = 2;
         let lastErr;
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
             try {
+                // v7.0: Hermes ACP (agent backend) takes priority when enabled
                 if (this._useHermes) {
                     console.log(`[OMEGA-LLM] Calling Hermes, messages: ${messages.length}`);
                     const result = await this._hermesGenerate(messages);
@@ -580,9 +594,25 @@ class OmegaAgent {
                     return result;
                 }
 
-                const model = this._activeModel || 'qwen2.5:7b';
-                console.log(`[OMEGA-LLM] Calling Ollama (attempt ${attempt + 1}/${MAX_RETRIES + 1}) model: ${model}, messages: ${messages.length}`);
-                const result = await this._ollamaGenerate(messages);
+                // v7.0: Resolve active provider from ProviderManager
+                const provider = this._providerManager
+                    ? this._providerManager.getActiveProvider()
+                    : null;
+
+                if (!provider) {
+                    throw new Error('No LLM provider configured. Go to Settings → Providers and configure an API key.');
+                }
+
+                if (provider.type === 'agent_backend') {
+                    console.log(`[OMEGA-LLM] Calling Hermes via provider ${provider.id}, messages: ${messages.length}`);
+                    const result = await this._hermesGenerate(messages);
+                    console.log(`[OMEGA-LLM] Hermes response:`, result ? 'OK' : 'NULL');
+                    return result;
+                }
+
+                const model = this._activeModel || provider.model;
+                console.log(`[OMEGA-LLM] Calling ${provider.name} (attempt ${attempt + 1}/${MAX_RETRIES + 1}) model: ${model}, messages: ${messages.length}`);
+                const result = await this._openaiGenerate(messages, provider);
                 console.log(`[OMEGA-LLM] Response received:`, result ? 'OK' : 'NULL');
                 return result;
             } catch (err) {
@@ -603,14 +633,13 @@ class OmegaAgent {
         throw lastErr;
     }
 
-    // ── Ollama Cloud (Primary LLM — v6.0) ────────────────────────────
-    // Cloud-only: dispatches to Ollama Cloud API with tool declarations.
-    // Model is set via this._activeModel (propagated from UI dropdown).
-    async _ollamaGenerate(messages) {
+    // ── OpenAI-Compatible Provider (v7.0) ────────────────────────────
+    // Generic chat-completions dispatcher for any OpenAI-compatible endpoint:
+    // Ollama Cloud, Kimi (Moonshot), OpenAI, local Ollama, Groq, Together, etc.
+    async _openaiGenerate(messages, provider) {
+        const model = this._activeModel || provider.model;
 
-        const model = this._activeModel || 'qwen2.5:7b';
-
-        // Build Ollama tool declarations from TOOL_REGISTRY
+        // Build tool declarations from TOOL_REGISTRY
         const { TOOL_REGISTRY } = require('./omega_tools');
         const tools = Object.entries(TOOL_REGISTRY).map(([name, tool]) => {
             const properties = {};
@@ -633,149 +662,130 @@ class OmegaAgent {
             };
         });
 
-        const payload = JSON.stringify({
-            model,
-            messages,
-            tools,
-            stream: false,
-            options: { temperature: 0.2, num_predict: 8192 },
-        });
-
-        // Ollama Cloud Primary, Local Fallback
-        const https = require('https');
-        const fs = require('fs');
-        const path = require('path');
-
-        function _getOllamaKey() {
-            if (process.env.OLLAMA_API_KEY) return process.env.OLLAMA_API_KEY;
-            try {
-                // Check project .env first, then ~/.hermes/.env
-                const envPaths = [
-                    path.join(__dirname, '..', '.env'),        // project root
-                    path.join(require('os').homedir(), '.hermes', '.env'),
-                ];
-                for (const envFile of envPaths) {
-                    if (fs.existsSync(envFile)) {
-                        const lines = fs.readFileSync(envFile, 'utf-8').split('\n');
-                        for (const line of lines) {
-                            const m = line.match(/^OLLAMA_API_KEY\s*=\s*(.+)/);
-                            if (m) {
-                                const key = m[1].trim().replace(/^["']|["']$/g, '');
-                                console.log(`[OMEGA-LLM] Found OLLAMA_API_KEY in ${path.basename(path.dirname(envFile))}/.env`);
-                                return key;
-                            }
-                        }
-                    }
-                }
-            } catch (e) { console.warn('[OMEGA-LLM] Could not read .env files:', e.message); }
-            return null;
+        // Parse the provider's baseUrl
+        const parsed = new URL(provider.baseUrl);
+        const isHttps = parsed.protocol === 'https:';
+        const client = isHttps ? require('https') : require('http');
+        const port = parsed.port || (isHttps ? 443 : 80);
+        // Ensure path ends with /chat/completions
+        let apiPath = parsed.pathname;
+        if (!apiPath.endsWith('/chat/completions')) {
+            apiPath = apiPath.replace(/\/?$/, '/chat/completions');
         }
 
-        const ollamaKey = _getOllamaKey();
-        const { cloud: cloudModel } = this._resolveModel(this._activeModel);
+        // Sanitize messages: ensure tool_calls.function.arguments are JSON strings
+        const sanitizedMsgs = messages.map(m => {
+            if (!m.tool_calls) return m;
+            return {
+                ...m,
+                tool_calls: m.tool_calls.map(tc => ({
+                    ...tc,
+                    id: tc.id || `call_${Math.random().toString(36).slice(2, 10)}`,
+                    type: tc.type || 'function',
+                    function: {
+                        name: tc.function?.name,
+                        arguments: typeof tc.function?.arguments === 'string'
+                            ? tc.function.arguments
+                            : JSON.stringify(tc.function?.arguments || {}),
+                    }
+                })),
+            };
+        });
+
+        const payload = JSON.stringify({
+            model,
+            messages: sanitizedMsgs,
+            tools,
+            stream: false,
+            temperature: 0.2,
+            max_tokens: 8192,
+        });
+
+        const headers = {
+            'Content-Type': 'application/json',
+        };
+        if (provider.apiKey) {
+            headers['Authorization'] = `Bearer ${provider.apiKey}`;
+        }
 
         return new Promise((resolve, reject) => {
-            // --- Ollama Cloud path (PRIMARY) ---
-            if (ollamaKey) {
-                console.log(`[OMEGA-LLM] Ollama Cloud: model=${cloudModel}, msgs=${messages.length}, tools=${tools.length}`);
-                // Sanitize messages: ensure tool_calls.function.arguments are JSON strings (API requirement)
-                const sanitizedMsgs = messages.map(m => {
-                    if (!m.tool_calls) return m;
-                    return {
-                        ...m,
-                        tool_calls: m.tool_calls.map(tc => ({
-                            ...tc,
-                            id: tc.id || `call_${Math.random().toString(36).slice(2, 10)}`,
-                            type: tc.type || 'function',
-                            function: {
-                                name: tc.function?.name,
-                                arguments: typeof tc.function?.arguments === 'string'
-                                    ? tc.function.arguments
-                                    : JSON.stringify(tc.function?.arguments || {}),
-                            }
-                        })),
-                    };
-                });
-                const cloudPayload = JSON.stringify({
-                    model: cloudModel,
-                    messages: sanitizedMsgs,
-                    tools: tools,
-                    stream: false,
-                    temperature: 0.2,
-                    max_tokens: 8192,
-                });
-                const cloudReq = https.request({
-                    hostname: 'ollama.com', port: 443,
-                    path: '/v1/chat/completions',
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${ollamaKey}`,
-                    },
-                    timeout: 240000,
-                }, (res) => {
-                    let data = '';
-                    res.on('data', (c) => data += c);
-                    res.on('end', () => {
-                        try {
-                            const parsed = JSON.parse(data);
-                            if (parsed.error) {
-                                console.error('[OMEGA-LLM] Ollama Cloud error:', parsed.error);
-                                reject(new Error(`Ollama Cloud: ${typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error)}`));
+            console.log(`[OMEGA-LLM] ${provider.name}: model=${model}, msgs=${messages.length}, tools=${tools.length}, url=${parsed.hostname}${apiPath}`);
+
+            const req = client.request({
+                hostname: parsed.hostname,
+                port,
+                path: apiPath,
+                method: 'POST',
+                headers,
+                timeout: 240000,
+            }, (res) => {
+                let data = '';
+                res.on('data', (c) => data += c);
+                res.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.error) {
+                            console.error(`[OMEGA-LLM] ${provider.name} error:`, parsed.error);
+                            reject(new Error(`${provider.name}: ${typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error)}`));
+                            return;
+                        }
+                        // OpenAI-compatible: extract message from choices[0]
+                        const choice = parsed.choices?.[0]?.message;
+                        if (choice) {
+                            const content = choice.content || '';
+                            // Handle tool_calls from OpenAI-compatible format
+                            if (choice.tool_calls && choice.tool_calls.length > 0) {
+                                const nativeToolCalls = choice.tool_calls.map((tc, idx) => ({
+                                    id: tc.id || `call_${Date.now()}_${idx}`,
+                                    type: tc.type || 'function',
+                                    function: {
+                                        name: tc.function?.name,
+                                        arguments: typeof tc.function?.arguments === 'string'
+                                            ? JSON.parse(tc.function.arguments)
+                                            : tc.function?.arguments || {},
+                                    }
+                                }));
+                                console.log(`[OMEGA-LLM] ${provider.name} OK, content: ${content.length} chars, tool_calls: ${nativeToolCalls.length}`);
+                                resolve({ role: 'assistant', content, tool_calls: nativeToolCalls });
                                 return;
                             }
-                            // OpenAI-compatible: extract message from choices[0]
-                            const choice = parsed.choices?.[0]?.message;
-                            if (choice) {
-                                const content = choice.content || '';
-                                // Handle tool_calls from OpenAI-compatible format
-                                if (choice.tool_calls && choice.tool_calls.length > 0) {
-                                    const nativeToolCalls = choice.tool_calls.map((tc, idx) => ({
-                                        id: tc.id || `call_${Date.now()}_${idx}`,
-                                        type: tc.type || 'function',
-                                        function: {
-                                            name: tc.function?.name,
-                                            arguments: typeof tc.function?.arguments === 'string'
-                                                ? JSON.parse(tc.function.arguments)
-                                                : tc.function?.arguments || {},
-                                        }
-                                    }));
-                                    console.log(`[OMEGA-LLM] Ollama Cloud OK, content: ${content.length} chars, tool_calls: ${nativeToolCalls.length}`);
-                                    resolve({ role: 'assistant', content, tool_calls: nativeToolCalls });
-                                    return;
-                                }
-                                if (content.trim().length > 0) {
-                                    console.log('[OMEGA-LLM] Ollama Cloud OK, length:', content.length);
-                                    resolve({ role: 'assistant', content });
-                                    return;
-                                }
+                            if (content.trim().length > 0) {
+                                console.log(`[OMEGA-LLM] ${provider.name} OK, length:`, content.length);
+                                resolve({ role: 'assistant', content });
+                                return;
                             }
-                            console.error('[OMEGA-LLM] Ollama Cloud: empty/invalid response');
-                            reject(new Error('Ollama Cloud: empty response from model'));
-                        } catch (e) {
-                            console.error('[OMEGA-LLM] Ollama Cloud JSON parse error:', e.message, 'Raw:', data.substring(0, 300));
-                            reject(new Error(`Ollama Cloud parse error: ${e.message}`));
                         }
-                    });
+                        console.error(`[OMEGA-LLM] ${provider.name}: empty/invalid response`);
+                        reject(new Error(`${provider.name}: empty response from model`));
+                    } catch (e) {
+                        console.error(`[OMEGA-LLM] ${provider.name} JSON parse error:`, e.message, 'Raw:', data.substring(0, 300));
+                        reject(new Error(`${provider.name} parse error: ${e.message}`));
+                    }
                 });
-                cloudReq.on('error', (e) => {
-                    console.error('[OMEGA-LLM] Ollama Cloud network error:', e.message);
-                    reject(new Error(`Ollama Cloud network error: ${e.message}`));
-                });
-                cloudReq.on('timeout', () => {
-                    cloudReq.destroy();
-                    console.error('[OMEGA-LLM] Ollama Cloud timeout (240s)');
-                    reject(new Error('Ollama Cloud timeout'));
-                });
-                cloudReq.write(cloudPayload);
-                cloudReq.end();
-            } else {
-                // No API key — reject clearly instead of silently falling to local
-                console.error('[OMEGA-LLM] No OLLAMA_API_KEY found. Cloud-only mode requires an API key.');
-                console.error('[OMEGA-LLM] Set OLLAMA_API_KEY in environment or ~/.hermes/.env');
-                reject(new Error('Ollama Cloud: OLLAMA_API_KEY not configured. Set it in ~/.hermes/.env'));
-            }
+            });
+            req.on('error', (e) => {
+                console.error(`[OMEGA-LLM] ${provider.name} network error:`, e.message);
+                reject(new Error(`${provider.name} network error: ${e.message}`));
+            });
+            req.on('timeout', () => {
+                req.destroy();
+                console.error(`[OMEGA-LLM] ${provider.name} timeout (240s)`);
+                reject(new Error(`${provider.name} timeout`));
+            });
+            req.write(payload);
+            req.end();
         });
+    }
+
+    // v7.0: Backward-compat alias — delegates to unified OpenAI path
+    async _ollamaGenerate(messages) {
+        const provider = this._providerManager
+            ? this._providerManager.getActiveProvider()
+            : null;
+        if (!provider) {
+            throw new Error('No provider configured');
+        }
+        return this._openaiGenerate(messages, provider);
     }
 
     // ── Response Parser (v5.0 Native Ollama) ──────────────────────────────
@@ -1944,32 +1954,35 @@ class OmegaAgent {
         }).length;
     }
 
-    // v5.2: Model name resolver — maps UI/friendly names to exact backend names.
+    // v7.0: Model name resolver -- validates against active provider's model list.
+    // Strips legacy suffixes (e.g., '-cloud') and falls back to provider default.
     _resolveModel(raw) {
         if (!raw) raw = this._activeModel || 'qwen3:8b';
-        const key = raw.toLowerCase().trim().replace(/\s+/g, '-').replace(/-+$/g, '').trim();
-        const CLOUD_MAP = {
-            'qwen3:8b': 'deepseek-v3.1:671b',
-            'qwen2.5:7b': 'deepseek-v3.1:671b',
-            'qwen2.5:14b': 'deepseek-v3.1:671b',
-            'gemini-3-flash-preview': 'gemini-3-flash-preview',
-            'gemini-3-flash': 'gemini-3-flash-preview',
-            'deepseek-v3.1:671b': 'deepseek-v3.1:671b',
-            'deepseek-v3.1': 'deepseek-v3.1:671b',
-        };
-        const LOCAL_MAP = {
-            'qwen3:8b': 'qwen3:8b',
-            'qwen2.5:7b': 'qwen2.5:7b',
-            'qwen2.5:14b': 'qwen2.5:14b',
-            'deepseek-v3.1:671b': 'qwen3:8b',
-            'deepseek-v3.1': 'qwen3:8b',
-            'gemini-3-flash-preview': 'qwen3:8b',
-        };
-        return {
-            raw: raw,
-            cloud: CLOUD_MAP[key] || CLOUD_MAP['qwen3:8b'],
-            local: LOCAL_MAP[key] || LOCAL_MAP['qwen3:8b'],
-        };
+        const key = raw.toLowerCase().trim().replace(/\s+/g, '-').replace(/-+$/, '').trim();
+
+        // Strip legacy '-cloud' suffix
+        const cleanKey = key.replace(/-cloud$/, '');
+
+        // If provider manager is available, validate against provider model list
+        const provider = this._providerManager
+            ? this._providerManager.getActiveProvider()
+            : null;
+
+        if (provider && provider.models) {
+            const models = provider.models.map(m => m.toLowerCase());
+            if (models.includes(cleanKey)) {
+                return { raw, resolved: cleanKey, provider: provider.id };
+            }
+            // Try the raw key too (in case suffix is part of actual model name)
+            if (models.includes(key)) {
+                return { raw, resolved: key, provider: provider.id };
+            }
+            // Fallback to provider's first model
+            return { raw, resolved: provider.models[0], provider: provider.id };
+        }
+
+        // Fallback when no provider manager (shouldn't happen in normal operation)
+        return { raw, resolved: cleanKey, provider: null };
     }
 }
 
