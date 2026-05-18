@@ -1,14 +1,14 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-05-03T07:20:26.326Z",
+  "timestamp": "2026-05-17T09:01:50.609Z",
   "target": {
     "name": "gravity-omega",
-    "repo": "/mnt/c/Veritas_Lab/gravity-omega-v2",
-    "commitHash": "ed6d7e5738fa42ffa65b6464e11f8bac8a0110b6",
-    "branch": "master"
+    "repo": "/home/rage/apps/gravity-omega-v2",
+    "commitHash": "90cb76ac9c8a5e4d1bebe287cf6f910b264db624",
+    "branch": "main"
   },
   "environment": {
-    "nodeVersion": "v18.20.8",
+    "nodeVersion": "v22.22.2",
     "os": "linux",
     "arch": "x64",
     "ci": false
@@ -17,7 +17,7 @@
     {
       "name": "@modelcontextprotocol/sdk",
       "version": "1.29.0",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/@modelcontextprotocol/sdk",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/@modelcontextprotocol/sdk",
       "integrity": "7ab20eba8fee70f3",
       "suspicious": false,
       "riskScore": 0.1
@@ -25,7 +25,7 @@
     {
       "name": "chokidar",
       "version": "4.0.3",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/chokidar",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/chokidar",
       "integrity": "4764fed21a281c69",
       "suspicious": false,
       "riskScore": 0.1
@@ -33,7 +33,7 @@
     {
       "name": "dompurify",
       "version": "3.3.3",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/dompurify",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/dompurify",
       "integrity": "4253c493c64d91ca",
       "suspicious": false,
       "riskScore": 0.1
@@ -41,7 +41,7 @@
     {
       "name": "monaco-editor",
       "version": "0.52.2",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/monaco-editor",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/monaco-editor",
       "integrity": "c793288e0f0c27d5",
       "suspicious": false,
       "riskScore": 0.1
@@ -49,7 +49,7 @@
     {
       "name": "node-pty",
       "version": "1.1.0",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/node-pty",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/node-pty",
       "integrity": "f8b6a14f7022c14f",
       "suspicious": false,
       "riskScore": 0.1
@@ -57,7 +57,7 @@
     {
       "name": "puppeteer",
       "version": "23.9.0",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/puppeteer",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/puppeteer",
       "integrity": "3461ebb63369bea3",
       "suspicious": false,
       "riskScore": 0.1
@@ -65,7 +65,7 @@
     {
       "name": "tesseract.js",
       "version": "7.0.0",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/tesseract.js",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/tesseract.js",
       "integrity": "fa342f37afd66559",
       "suspicious": false,
       "riskScore": 0.1
@@ -73,7 +73,7 @@
     {
       "name": "xterm",
       "version": "5.3.0",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/xterm",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/xterm",
       "integrity": "d324eb57f7134d28",
       "suspicious": false,
       "riskScore": 0.1
@@ -81,7 +81,7 @@
     {
       "name": "xterm-addon-fit",
       "version": "0.8.0",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/xterm-addon-fit",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/xterm-addon-fit",
       "integrity": "6bd47031377f4717",
       "suspicious": false,
       "riskScore": 0.1
@@ -89,7 +89,7 @@
     {
       "name": "electron",
       "version": "33.4.11",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/electron",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/electron",
       "integrity": "aa6b28f3a59fa3a0",
       "suspicious": false,
       "riskScore": 0.1
@@ -97,7 +97,7 @@
     {
       "name": "electron-builder",
       "version": "25.1.8",
-      "resolved": "/mnt/c/Veritas_Lab/gravity-omega-v2/node_modules/electron-builder",
+      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/electron-builder",
       "integrity": "ddc43daa899f742d",
       "suspicious": false,
       "riskScore": 0.1
@@ -107,14 +107,14 @@
     {
       "gate": "GIT_INTEGRITY",
       "status": "FAIL",
-      "evidence": "Modified files: 30",
-      "durationMs": 1658
+      "evidence": "Modified files: 3",
+      "durationMs": 4
     },
     {
       "gate": "LOCKFILE",
       "status": "PASS",
       "evidence": "package-lock.json present",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "gate": "DETERMINISTIC_BUILD",
@@ -125,14 +125,14 @@
     {
       "gate": "TEST_PASS",
       "status": "FAIL",
-      "evidence": "Tests failed: npm error Missing script: \"test\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: /home/veritas/.npm/_logs/2026-05-03T07_20_",
-      "durationMs": 154
+      "evidence": "Tests failed: npm error Missing script: \"test\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: /home/rage/.npm/_logs/2026-05-17T09_01_49_",
+      "durationMs": 61
     },
     {
       "gate": "LINT",
       "status": "PASS",
       "evidence": "npx passed",
-      "durationMs": 3099
+      "durationMs": 1225
     }
   ],
   "adversarial": {
@@ -347,8 +347,8 @@
     "overallRisk": 0
   },
   "seal": {
-    "chainHash": "bee42fa57a582d7246fb5569b3770aaf316e99934ca514bed8582b4fc4a7e656",
+    "chainHash": "06c6792f59f6e4daf45842c72adba2f00a990de08054b364d6e880e88a7cb9b7",
     "sequence": 5
   },
-  "signature": "aed06ebdf6811f0a0b46224ba1fb6b630d6bfe8d18e5e0f8aa2d72a6efd1a40f"
+  "signature": "629b3ebd9bd9965e0f8826718e881720b77a44cc2200e7527aefa39894984185"
 }
