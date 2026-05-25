@@ -20,6 +20,21 @@ Gravity Omega is the sovereign operator's terminal — a desktop AI platform tha
 
 ---
 
+## Native Rust/Tauri Rebuild
+
+A Linux-native Rust/Tauri rebuild is now tracked under [`rebuild/gravity-omega-tauri/`](rebuild/gravity-omega-tauri/). It is the active replacement-app lane for moving Gravity Omega from the current Electron shell into a native workbench with Codex Lead, Hermes/Kimi, MCP, SSWP, Steno, pet companion, terminal/process, evidence, and approval surfaces.
+
+Start with:
+
+- [`docs/GRAVITY_OMEGA_NATIVE_REBUILD_RELEASE_CANDIDATE.md`](docs/GRAVITY_OMEGA_NATIVE_REBUILD_RELEASE_CANDIDATE.md) for the publish manifest and verification evidence.
+- [`docs/GRAVITY_OMEGA_UNIFIED_ACTION_PLAN.md`](docs/GRAVITY_OMEGA_UNIFIED_ACTION_PLAN.md) for the replacement-app plan.
+- [`docs/RUST_TAURI_COMMAND_CONTRACT.md`](docs/RUST_TAURI_COMMAND_CONTRACT.md) for the typed command and safety-gate contract.
+- [`rebuild/FIRST_CLASS_SPECS.md`](rebuild/FIRST_CLASS_SPECS.md) for first-class MCP, SSWP, Steno, pet, desktop, terminal, and workspace behavior specs.
+
+The native rebuild intentionally does not commit local `.sswp` witness state, runtime transcripts, `node_modules`, Tauri `target/` binaries, or operator scratchpads.
+
+---
+
 ## Ecosystem Canon
 
 Gravity Omega is the command surface of the VERITAS & Sovereign Ecosystem — the place where operator intent becomes deterministic action. It hosts the Edge Gallery (skill launcher), the Hermes bridge (external agent tool-call protocol), the Ollama inference router, and the browser automation engine inside a single Electron shell. Other ecosystem nodes — veritas-vault (memory), omega-brain-mcp (governance), Aegis (security), Ollama-Omega (inference transport) — are all accessible from within the Gravity Omega operator interface. The platform enforces a single invariant: no action executes before the operator approves or the agent loop validates it.

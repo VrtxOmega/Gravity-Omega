@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VERITAS Omega</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --black: #030303;
+        --black-soft: #0a0907;
+        --gold: #d4a843;
+        --gold-bright: #ffd66b;
+        --gold-deep: #7c5a17;
+        --cream: #fff2c7;
+        --garnet: #9f2846;
+        --garnet-soft: rgba(159, 40, 70, 0.38);
+        --grid: rgba(212, 168, 67, 0.16);
+        --grid-bright: rgba(255, 214, 107, 0.24);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--black);
+        color: var(--cream);
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .scene {
+        position: relative;
+        display: grid;
+        min-height: 100vh;
+        place-items: center;
+        isolation: isolate;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 44%, rgba(255, 214, 107, 0.2), transparent 23rem),
+          radial-gradient(circle at 20% 72%, var(--garnet-soft), transparent 20rem),
+          linear-gradient(180deg, #080704 0%, var(--black) 62%, #080604 100%);
+      }
+
+      .scene::before,
+      .scene::after {
+        position: absolute;
+        inset: -24vmax;
+        z-index: -3;
+        content: "";
+        pointer-events: none;
+      }
+
+      .scene::before {
+        background:
+          linear-gradient(var(--grid) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+          linear-gradient(var(--grid-bright) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-bright) 1px, transparent 1px);
+        background-position:
+          center center,
+          center center,
+          center center,
+          center center;
+        background-size:
+          48px 48px,
+          48px 48px,
+          192px 192px,
+          192px 192px;
+        mask-image: radial-gradient(circle at center, black 0 54%, transparent 76%);
+        transform: perspective(720px) rotateX(62deg) translateY(12vh);
+        transform-origin: center;
+        animation: grid-drift 11s linear infinite;
+      }
+
+      .scene::after {
+        z-index: -2;
+        background:
+          linear-gradient(110deg, transparent 0 42%, rgba(255, 214, 107, 0.22) 49%, transparent 56%),
+          radial-gradient(circle, rgba(255, 214, 107, 0.12) 0 1px, transparent 2px);
+        background-size:
+          100% 100%,
+          38px 38px;
+        opacity: 0.55;
+        animation: shimmer 7s ease-in-out infinite alternate;
+      }
+
+      .vignette {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(0, 0, 0, 0.88), transparent 22%, transparent 78%, rgba(0, 0, 0, 0.88)),
+          radial-gradient(circle at center, transparent 0 43%, rgba(0, 0, 0, 0.72) 76%);
+      }
+
+      .constellation {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      .star {
+        position: absolute;
+        width: 3px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--gold-bright);
+        box-shadow: 0 0 18px rgba(255, 214, 107, 0.75);
+        opacity: 0.72;
+        animation: star-pulse 3s ease-in-out infinite;
+      }
+
+      .star:nth-child(1) {
+        left: 18%;
+        top: 22%;
+      }
+
+      .star:nth-child(2) {
+        left: 78%;
+        top: 18%;
+        animation-delay: -1.1s;
+      }
+
+      .star:nth-child(3) {
+        left: 69%;
+        top: 74%;
+        animation-delay: -2s;
+      }
+
+      .star:nth-child(4) {
+        left: 28%;
+        top: 79%;
+        animation-delay: -0.6s;
+      }
+
+      .sigil {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        width: min(92vw, 820px);
+        min-height: 560px;
+        place-items: center;
+        padding: clamp(28px, 7vw, 72px);
+        text-align: center;
+      }
+
+      .veritas {
+        position: absolute;
+        top: 30px;
+        left: 50%;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--gold-bright);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.34em;
+        text-transform: uppercase;
+        transform: translateX(-50%);
+      }
+
+      .veritas::before,
+      .veritas::after {
+        width: clamp(40px, 12vw, 96px);
+        height: 1px;
+        content: "";
+        background: linear-gradient(90deg, transparent, var(--gold-bright));
+      }
+
+      .veritas::after {
+        background: linear-gradient(90deg, var(--gold-bright), transparent);
+      }
+
+      .omega-wrap {
+        position: relative;
+        display: grid;
+        width: clamp(220px, 42vw, 390px);
+        aspect-ratio: 1;
+        place-items: center;
+        margin: 18px auto 28px;
+      }
+
+      .omega-wrap::before,
+      .omega-wrap::after {
+        position: absolute;
+        inset: 0;
+        content: "";
+        border: 1px solid rgba(255, 214, 107, 0.28);
+        border-radius: 50%;
+        box-shadow:
+          inset 0 0 34px rgba(212, 168, 67, 0.2),
+          0 0 52px rgba(212, 168, 67, 0.16);
+        animation: halo-turn 18s linear infinite;
+      }
+
+      .omega-wrap::after {
+        inset: 10%;
+        border-style: dashed;
+        opacity: 0.65;
+        animation-duration: 26s;
+        animation-direction: reverse;
+      }
+
+      .omega {
+        position: relative;
+        color: var(--gold-bright);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(9rem, 28vw, 21rem);
+        line-height: 0.78;
+        text-shadow:
+          0 0 10px rgba(255, 214, 107, 0.82),
+          0 0 34px rgba(212, 168, 67, 0.62),
+          0 0 96px rgba(159, 40, 70, 0.46);
+        transform: translateY(-0.03em);
+        animation: omega-breathe 4.8s ease-in-out infinite;
+      }
+
+      .omega::after {
+        position: absolute;
+        inset: 17% 8% 10%;
+        content: "";
+        background: linear-gradient(120deg, transparent 0 32%, rgba(255, 255, 255, 0.46) 48%, transparent 64%);
+        mix-blend-mode: screen;
+        opacity: 0.5;
+        transform: translateX(-46%);
+        animation: gold-sweep 4.2s ease-in-out infinite;
+      }
+
+      .line {
+        max-width: 760px;
+        margin: 0;
+        color: var(--cream);
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(2.3rem, 8vw, 5.8rem);
+        font-weight: 700;
+        line-height: 0.96;
+        text-wrap: balance;
+        text-shadow:
+          0 2px 0 rgba(0, 0, 0, 0.95),
+          0 0 26px rgba(212, 168, 67, 0.36);
+      }
+
+      .line span {
+        color: var(--gold-bright);
+      }
+
+      .undertext {
+        width: min(68vw, 520px);
+        height: 2px;
+        margin: 28px auto 0;
+        background: linear-gradient(90deg, transparent, var(--gold-bright), transparent);
+        box-shadow: 0 0 24px rgba(255, 214, 107, 0.68);
+      }
+
+      .hand-trace {
+        position: absolute;
+        right: clamp(18px, 8vw, 86px);
+        bottom: clamp(70px, 10vh, 120px);
+        width: clamp(130px, 23vw, 230px);
+        height: clamp(78px, 12vw, 132px);
+        border: 2px solid rgba(255, 214, 107, 0.48);
+        border-right: 0;
+        border-bottom: 0;
+        border-radius: 70% 24% 0 0;
+        filter: drop-shadow(0 0 20px rgba(255, 214, 107, 0.28));
+        opacity: 0.74;
+        transform: rotate(-10deg);
+      }
+
+      .hand-trace::before,
+      .hand-trace::after {
+        position: absolute;
+        content: "";
+        background: rgba(255, 214, 107, 0.72);
+        border-radius: 999px;
+        transform-origin: left center;
+      }
+
+      .hand-trace::before {
+        right: -2px;
+        bottom: -2px;
+        width: 72%;
+        height: 2px;
+        transform: rotate(-8deg);
+      }
+
+      .hand-trace::after {
+        right: 9px;
+        bottom: 6px;
+        width: 48%;
+        height: 2px;
+        transform: rotate(18deg);
+      }
+
+      .music-dock {
+        position: fixed;
+        right: max(18px, env(safe-area-inset-right));
+        bottom: max(18px, env(safe-area-inset-bottom));
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 214, 107, 0.42);
+        border-radius: 8px;
+        background: rgba(7, 6, 4, 0.78);
+        box-shadow: 0 0 24px rgba(0, 0, 0, 0.52);
+        backdrop-filter: blur(14px);
+      }
+
+      .music-toggle {
+        display: inline-grid;
+        width: 42px;
+        height: 42px;
+        place-items: center;
+        border: 1px solid rgba(255, 214, 107, 0.56);
+        border-radius: 50%;
+        color: var(--gold-bright);
+        background: radial-gradient(circle, rgba(255, 214, 107, 0.2), rgba(7, 6, 4, 0.85));
+        box-shadow: inset 0 0 18px rgba(212, 168, 67, 0.18);
+        cursor: pointer;
+      }
+
+      .music-toggle:hover,
+      .music-toggle:focus-visible {
+        outline: 2px solid rgba(255, 214, 107, 0.42);
+        outline-offset: 3px;
+      }
+
+      .music-toggle[data-playing="true"] .play-icon {
+        width: 14px;
+        height: 18px;
+        background:
+          linear-gradient(90deg, currentColor 0 35%, transparent 35% 65%, currentColor 65%),
+          transparent;
+        clip-path: none;
+      }
+
+      .play-icon {
+        width: 0;
+        height: 0;
+        border-top: 10px solid transparent;
+        border-bottom: 10px solid transparent;
+        border-left: 16px solid currentColor;
+        transform: translateX(2px);
+      }
+
+      .music-meta {
+        display: grid;
+        gap: 2px;
+        min-width: 132px;
+        text-align: left;
+      }
+
+      .music-label {
+        color: var(--gold-bright);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .music-state {
+        color: rgba(255, 242, 199, 0.82);
+        font-size: 12px;
+      }
+
+      .heart-pop {
+        position: fixed;
+        z-index: 4;
+        width: calc(18px * var(--scale));
+        height: calc(18px * var(--scale));
+        pointer-events: none;
+        background: var(--heart-color, var(--garnet));
+        filter: drop-shadow(0 0 12px rgba(255, 214, 107, 0.5));
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(45deg) scale(0.3);
+        animation: heart-rise 2.5s ease-out forwards;
+      }
+
+      .heart-pop::before,
+      .heart-pop::after {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        content: "";
+        background: inherit;
+        border-radius: 50%;
+      }
+
+      .heart-pop::before {
+        left: -50%;
+      }
+
+      .heart-pop::after {
+        top: -50%;
+      }
+
+      @keyframes grid-drift {
+        from {
+          background-position:
+            center 0,
+            0 center,
+            center 0,
+            0 center;
+        }
+
+        to {
+          background-position:
+            center 48px,
+            48px center,
+            center 192px,
+            192px center;
+        }
+      }
+
+      @keyframes shimmer {
+        from {
+          opacity: 0.25;
+          transform: translateX(-1.6vw);
+        }
+
+        to {
+          opacity: 0.62;
+          transform: translateX(1.6vw);
+        }
+      }
+
+      @keyframes halo-turn {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes omega-breathe {
+        0%,
+        100% {
+          transform: translateY(-0.03em) scale(0.98);
+        }
+
+        50% {
+          transform: translateY(-0.03em) scale(1.02);
+        }
+      }
+
+      @keyframes gold-sweep {
+        0%,
+        18% {
+          transform: translateX(-52%);
+          opacity: 0;
+        }
+
+        42% {
+          opacity: 0.56;
+        }
+
+        68%,
+        100% {
+          transform: translateX(58%);
+          opacity: 0;
+        }
+      }
+
+      @keyframes star-pulse {
+        0%,
+        100% {
+          opacity: 0.38;
+          transform: scale(0.8);
+        }
+
+        50% {
+          opacity: 1;
+          transform: scale(1.45);
+        }
+      }
+
+      @keyframes heart-rise {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) rotate(45deg) scale(0.25);
+        }
+
+        15% {
+          opacity: 0.9;
+        }
+
+        100% {
+          opacity: 0;
+          transform: translate(calc(-50% + var(--drift)), -210px) rotate(45deg) scale(1);
+        }
+      }
+
+      @media (max-width: 720px) {
+        .sigil {
+          min-height: 100vh;
+          padding: 34px 20px 112px;
+        }
+
+        .veritas {
+          top: 22px;
+          font-size: 10px;
+          letter-spacing: 0.24em;
+        }
+
+        .omega-wrap {
+          margin-top: 46px;
+        }
+
+        .line {
+          font-size: clamp(2.4rem, 13vw, 4.8rem);
+        }
+
+        .hand-trace {
+          right: 20px;
+          bottom: 104px;
+          opacity: 0.42;
+        }
+
+        .music-dock {
+          left: 16px;
+          right: 16px;
+          justify-content: center;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          animation-duration: 1ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 1ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="scene" aria-label="VERITAS Omega message">
+      <div class="vignette" aria-hidden="true"></div>
+      <div class="constellation" aria-hidden="true">
+        <i class="star"></i>
+        <i class="star"></i>
+        <i class="star"></i>
+        <i class="star"></i>
+      </div>
+
+      <section class="sigil" aria-labelledby="veritas-message">
+        <div class="veritas">VERITAS</div>
+        <div class="omega-wrap" aria-hidden="true">
+          <div class="omega">&Omega;</div>
+        </div>
+        <h1 id="veritas-message" class="line">Take my hand <span>and we'll make it</span> I swear</h1>
+        <div class="undertext" aria-hidden="true"></div>
+        <div class="hand-trace" aria-hidden="true"></div>
+      </section>
+
+      <div class="music-dock" aria-label="Music controls">
+        <button class="music-toggle" type="button" data-playing="false" aria-label="Play Veritas pulse music">
+          <span class="play-icon" aria-hidden="true"></span>
+        </button>
+        <div class="music-meta">
+          <span class="music-label">Veritas Pulse</span>
+          <span class="music-state">click for music</span>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const scene = document.querySelector(".scene");
+      const musicButton = document.querySelector(".music-toggle");
+      const musicState = document.querySelector(".music-state");
+
+      let audioContext;
+      let masterGain;
+      let musicTimer;
+      let step = 0;
+      let lastPointerHeart = 0;
+
+      const palette = ["#ffd66b", "#d4a843", "#9f2846", "#fff2c7"];
+
+      function createHeart(x, y, scale = 1) {
+        const heart = document.createElement("span");
+        heart.className = "heart-pop";
+        heart.style.left = `${x}px`;
+        heart.style.top = `${y}px`;
+        heart.style.setProperty("--scale", scale.toFixed(2));
+        heart.style.setProperty("--drift", `${Math.round((Math.random() - 0.5) * 140)}px`);
+        heart.style.setProperty("--heart-color", palette[Math.floor(Math.random() * palette.length)]);
+        document.body.append(heart);
+        heart.addEventListener("animationend", () => heart.remove(), { once: true });
+      }
+
+      function scatterHearts(count, originX, originY) {
+        for (let i = 0; i < count; i += 1) {
+          window.setTimeout(() => {
+            createHeart(
+              originX + (Math.random() - 0.5) * 180,
+              originY + (Math.random() - 0.5) * 90,
+              0.6 + Math.random() * 1.2,
+            );
+          }, i * 70);
+        }
+      }
+
+      function ensureAudio() {
+        if (audioContext) {
+          return;
+        }
+
+        audioContext = new AudioContext();
+        masterGain = audioContext.createGain();
+        masterGain.gain.value = 0.18;
+
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = -18;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 5;
+        compressor.attack.value = 0.004;
+        compressor.release.value = 0.18;
+
+        masterGain.connect(compressor);
+        compressor.connect(audioContext.destination);
+      }
+
+      function playTone(frequency, time, duration, type, gainValue) {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        const pan = audioContext.createStereoPanner();
+
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, time);
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.018);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+        pan.pan.setValueAtTime((Math.random() - 0.5) * 0.42, time);
+
+        oscillator.connect(gain);
+        gain.connect(pan);
+        pan.connect(masterGain);
+        oscillator.start(time);
+        oscillator.stop(time + duration + 0.04);
+      }
+
+      function playNoise(time, duration, gainValue) {
+        const buffer = audioContext.createBuffer(1, audioContext.sampleRate * duration, audioContext.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        for (let i = 0; i < data.length; i += 1) {
+          data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+        }
+
+        const source = audioContext.createBufferSource();
+        const filter = audioContext.createBiquadFilter();
+        const gain = audioContext.createGain();
+
+        source.buffer = buffer;
+        filter.type = "highpass";
+        filter.frequency.value = 5200;
+        gain.gain.setValueAtTime(gainValue, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        source.start(time);
+      }
+
+      function playKick(time) {
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(118, time);
+        oscillator.frequency.exponentialRampToValueAtTime(42, time + 0.18);
+        gain.gain.setValueAtTime(0.28, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.2);
+
+        oscillator.connect(gain);
+        gain.connect(masterGain);
+        oscillator.start(time);
+        oscillator.stop(time + 0.22);
+      }
+
+      function tick() {
+        const now = audioContext.currentTime;
+        const beat = step % 16;
+        const bass = [73.42, 87.31, 110, 98];
+        const arp = [293.66, 349.23, 440, 587.33, 523.25, 440, 349.23, 293.66];
+        const chordRoots = [146.83, 174.61, 220, 196];
+
+        if (beat % 4 === 0) {
+          playKick(now);
+          playTone(bass[Math.floor(beat / 4)], now, 0.42, "sawtooth", 0.075);
+        }
+
+        if (beat % 2 === 1) {
+          playNoise(now, 0.055, 0.036);
+        }
+
+        playTone(arp[step % arp.length], now + 0.02, 0.18, "triangle", 0.045);
+
+        if (beat === 0 || beat === 8) {
+          const root = chordRoots[beat === 0 ? 0 : 2];
+          playTone(root, now, 0.92, "sine", 0.032);
+          playTone(root * 1.5, now, 0.92, "sine", 0.026);
+          playTone(root * 2, now, 0.92, "sine", 0.02);
+        }
+
+        step += 1;
+      }
+
+      async function toggleMusic() {
+        ensureAudio();
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        const shouldPlay = !musicTimer;
+        musicButton.dataset.playing = shouldPlay ? "true" : "false";
+        musicButton.setAttribute("aria-label", shouldPlay ? "Pause Veritas pulse music" : "Play Veritas pulse music");
+        musicState.textContent = shouldPlay ? "music live" : "click for music";
+
+        if (shouldPlay) {
+          tick();
+          musicTimer = window.setInterval(tick, 187.5);
+          scatterHearts(10, window.innerWidth - 94, window.innerHeight - 72);
+          return;
+        }
+
+        window.clearInterval(musicTimer);
+        musicTimer = undefined;
+      }
+
+      musicButton.addEventListener("click", toggleMusic);
+
+      scene.addEventListener("pointerdown", (event) => {
+        scatterHearts(8, event.clientX, event.clientY);
+      });
+
+      scene.addEventListener("pointermove", (event) => {
+        const now = performance.now();
+        if (now - lastPointerHeart < 95) {
+          return;
+        }
+        lastPointerHeart = now;
+        createHeart(event.clientX, event.clientY, 0.42 + Math.random() * 0.46);
+      });
+
+      window.setInterval(() => {
+        createHeart(
+          window.innerWidth * (0.18 + Math.random() * 0.64),
+          window.innerHeight * (0.62 + Math.random() * 0.22),
+          0.5 + Math.random() * 0.78,
+        );
+      }, 900);
+    </script>
+  </body>
+</html>

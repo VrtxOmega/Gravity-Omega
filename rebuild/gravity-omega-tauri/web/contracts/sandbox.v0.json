@@ -1,0 +1,173 @@
+{
+  "schema": "gravity-omega.sandbox-policy.v0",
+  "version": 0,
+  "execution_enabled": false,
+  "default_policy": "read_only",
+  "policies": [
+    {
+      "id": "read_only",
+      "title": "Read-only inspection",
+      "filesystem": "workspace-read",
+      "network": "disabled",
+      "process": "dry-run-only",
+      "requires_approval": false,
+      "allowed_prefix_ids": [
+        "git-status",
+        "git-diff",
+        "rg-search",
+        "node-check",
+        "npm-validate",
+        "cargo-check",
+        "cargo-test",
+        "codex-review",
+        "codex-exec-readonly-json",
+        "hermes-mcp-list"
+      ]
+    },
+    {
+      "id": "workspace_write",
+      "title": "Workspace write after approval",
+      "filesystem": "workspace-write",
+      "network": "disabled",
+      "process": "dry-run-only",
+      "requires_approval": true,
+      "allowed_prefix_ids": [
+        "npm-build",
+        "codex-exec-json",
+        "codex-exec-workspace-write-json",
+        "hermes-companion"
+      ]
+    },
+    {
+      "id": "restricted",
+      "title": "Restricted or privileged",
+      "filesystem": "blocked",
+      "network": "blocked",
+      "process": "blocked",
+      "requires_approval": true,
+      "allowed_prefix_ids": []
+    }
+  ],
+  "allowed_prefixes": [
+    {
+      "id": "git-status",
+      "label": "Git status",
+      "prefix": ["git", "status"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "git-diff",
+      "label": "Git diff",
+      "prefix": ["git", "diff"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "rg-search",
+      "label": "Ripgrep search",
+      "prefix": ["rg"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "node-check",
+      "label": "Node syntax check",
+      "prefix": ["node", "--check"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "npm-validate",
+      "label": "Scaffold validation",
+      "prefix": ["npm", "run", "validate"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "cargo-check",
+      "label": "Rust cargo check",
+      "prefix": ["cargo", "check"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "cargo-test",
+      "label": "Rust cargo test",
+      "prefix": ["cargo", "test"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "npm-build",
+      "label": "Tauri release build",
+      "prefix": ["npm", "run", "build"],
+      "capability_tier": "gated",
+      "requires_approval": true
+    },
+    {
+      "id": "codex-review",
+      "label": "Codex review",
+      "prefix": ["codex", "review"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "codex-exec-json",
+      "label": "Codex bounded exec",
+      "prefix": ["codex", "exec", "--json"],
+      "capability_tier": "gated",
+      "requires_approval": true
+    },
+    {
+      "id": "codex-exec-readonly-json",
+      "label": "Codex unlocked read-only exec",
+      "prefix": ["codex", "exec", "--json", "--sandbox", "read-only"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "codex-exec-workspace-write-json",
+      "label": "Codex unlocked workspace-write exec",
+      "prefix": ["codex", "exec", "--json", "--sandbox", "workspace-write"],
+      "capability_tier": "gated",
+      "requires_approval": true
+    },
+    {
+      "id": "hermes-mcp-list",
+      "label": "Hermes MCP list",
+      "prefix": ["hermes", "mcp", "list"],
+      "capability_tier": "safe",
+      "requires_approval": false
+    },
+    {
+      "id": "hermes-companion",
+      "label": "Hermes companion chat",
+      "prefix": ["hermes", "chat", "-Q"],
+      "capability_tier": "gated",
+      "requires_approval": true
+    }
+  ],
+  "blocked_patterns": [
+    "sudo",
+    "su",
+    "rm",
+    "mkfs",
+    "dd",
+    "chmod",
+    "chown",
+    "systemctl",
+    "ssh",
+    "scp",
+    "curl",
+    "wget",
+    "flatpak",
+    "apt",
+    "dnf",
+    "pacman",
+    "gpg",
+    "secret",
+    "token",
+    "password"
+  ]
+}

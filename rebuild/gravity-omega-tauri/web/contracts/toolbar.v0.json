@@ -1,0 +1,429 @@
+{
+  "schema": "gravity-omega.toolbar-registry.v0",
+  "version": 0,
+  "source": {
+    "repo": "/home/rage/apps/gravity-omega-v2",
+    "html": "renderer/index.html",
+    "renderer": "renderer/app.js",
+    "contract_doc": "docs/GRAVITY_OMEGA_CODEX_HERMES_TOOLBAR_CONTRACT.md"
+  },
+  "states": ["live", "backend", "gated", "disabled", "missing"],
+  "titlebar_actions": [
+    "newFile",
+    "newWindow",
+    "openFile",
+    "openFolder",
+    "save",
+    "saveAs",
+    "exit",
+    "undo",
+    "redo",
+    "find",
+    "replace",
+    "commandPalette",
+    "toggleTerminal",
+    "toggleFullScreen",
+    "newTerminal",
+    "showDocs",
+    "toggleDevTools",
+    "about"
+  ],
+  "commands": [
+    {
+      "id": "file.new",
+      "label": "New File",
+      "surface": "titlebar-menu",
+      "current_action": "newFile",
+      "target_command": "file_new",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; editor buffer creation and file writes remain disabled.",
+      "verification": "Create untitled tab and confirm dirty state."
+    },
+    {
+      "id": "window.new",
+      "label": "New Window",
+      "surface": "titlebar-menu",
+      "current_action": "newWindow",
+      "target_command": "window_new",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; native multi-window creation remains disabled.",
+      "verification": "Launch second scoped window without losing current workspace."
+    },
+    {
+      "id": "file.open",
+      "label": "Open File",
+      "surface": "titlebar-menu",
+      "current_action": "openFile",
+      "target_command": "file_pick",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; native file picker and file reads remain disabled.",
+      "verification": "Open file through native dialog and render tab."
+    },
+    {
+      "id": "workspace.open_folder",
+      "label": "Open Folder",
+      "surface": "titlebar-menu",
+      "current_action": "openFolder",
+      "target_command": "workspace_open",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; folder picker, watchers, and filesystem reads remain disabled.",
+      "verification": "Open folder, start watcher, and list files with ignored paths excluded."
+    },
+    {
+      "id": "file.save",
+      "label": "Save",
+      "surface": "titlebar-menu",
+      "current_action": "save",
+      "target_command": "file_write",
+      "capability_tier": "gated",
+      "state": "gated",
+      "unavailable_reason": "Writes require approval ledger and workspace scope.",
+      "verification": "Save edited file and capture diff/audit entry."
+    },
+    {
+      "id": "file.save_as",
+      "label": "Save As",
+      "surface": "titlebar-menu",
+      "current_action": "saveAs",
+      "target_command": "file_save_as",
+      "capability_tier": "gated",
+      "state": "gated",
+      "unavailable_reason": "Writes require approval ledger and native path grant.",
+      "verification": "Save new file through dialog and capture audit entry."
+    },
+    {
+      "id": "app.exit",
+      "label": "Exit",
+      "surface": "titlebar-menu",
+      "current_action": "exit",
+      "target_command": "app_exit",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; app exit and unsaved-change confirmation remain disabled.",
+      "verification": "Exit prompts when dirty tabs or running tasks exist."
+    },
+    {
+      "id": "edit.undo",
+      "label": "Undo",
+      "surface": "titlebar-menu",
+      "current_action": "undo",
+      "target_command": "editor_undo",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; editor undo mutation remains disabled.",
+      "verification": "Undo active editor change."
+    },
+    {
+      "id": "edit.redo",
+      "label": "Redo",
+      "surface": "titlebar-menu",
+      "current_action": "redo",
+      "target_command": "editor_redo",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; editor redo mutation remains disabled.",
+      "verification": "Redo active editor change."
+    },
+    {
+      "id": "search.find",
+      "label": "Find",
+      "surface": "titlebar-menu",
+      "current_action": "find",
+      "target_command": "editor_find",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Read-only in-app Find panel is live; buffer reads, workspace search, focus movement, replacement, and execution remain disabled.",
+      "verification": "Open find box and search current buffer."
+    },
+    {
+      "id": "search.replace",
+      "label": "Replace",
+      "surface": "titlebar-menu",
+      "current_action": "replace",
+      "target_command": "editor_replace",
+      "capability_tier": "gated",
+      "state": "gated",
+      "unavailable_reason": "Buffer mutation requires dirty-state tracking.",
+      "verification": "Replace text, mark dirty, and allow undo."
+    },
+    {
+      "id": "command.palette",
+      "label": "Command Palette",
+      "surface": "titlebar-menu",
+      "current_action": "commandPalette",
+      "target_command": "command_palette_open",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Read-only in-app command palette is live; command execution and mutation remain disabled.",
+      "verification": "Palette lists every command in this registry."
+    },
+    {
+      "id": "terminal.toggle",
+      "label": "Toggle Terminal",
+      "surface": "titlebar-menu",
+      "current_action": "toggleTerminal",
+      "target_command": "terminal_toggle",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Read-only terminal/process panel toggle is live; PTY creation, terminal writes, stream reads, process spawn, and execution remain disabled.",
+      "verification": "Toggle terminal panel without layout shift."
+    },
+    {
+      "id": "window.fullscreen",
+      "label": "Full Screen",
+      "surface": "titlebar-menu",
+      "current_action": "toggleFullScreen",
+      "target_command": "window_toggle_fullscreen",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; fullscreen window mutation remains disabled.",
+      "verification": "Toggle fullscreen and restore previous size."
+    },
+    {
+      "id": "terminal.new",
+      "label": "New Terminal",
+      "surface": "titlebar-menu",
+      "current_action": "newTerminal",
+      "target_command": "terminal_create",
+      "capability_tier": "gated",
+      "state": "gated",
+      "unavailable_reason": "PTY creation requires command allowlist and captured output.",
+      "verification": "Create PTY tab and capture shell path/cwd."
+    },
+    {
+      "id": "help.docs",
+      "label": "Documentation",
+      "surface": "titlebar-menu",
+      "current_action": "showDocs",
+      "target_command": "docs_open",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Bundled in-app docs panel is live; external opener, network, file read, and execution remain disabled.",
+      "verification": "Open bundled docs without network dependency."
+    },
+    {
+      "id": "developer.devtools",
+      "label": "Toggle DevTools",
+      "surface": "titlebar-menu",
+      "current_action": "toggleDevTools",
+      "target_command": "devtools_toggle",
+      "capability_tier": "gated",
+      "state": "gated",
+      "unavailable_reason": "Developer tools should be enabled only in development or approved diagnostic mode.",
+      "verification": "DevTools opens only when diagnostics are enabled."
+    },
+    {
+      "id": "help.about",
+      "label": "About Gravity Omega",
+      "surface": "titlebar-menu",
+      "current_action": "about",
+      "target_command": "about_open",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Bundled in-app About panel is live; external opener, network, file read, and execution remain disabled.",
+      "verification": "Show version, build, runtime, and license information."
+    },
+    {
+      "id": "security.gravity_shield",
+      "label": "Gravity Shield Action",
+      "surface": "security-panel",
+      "current_action": "engage",
+      "target_command": "security_shield_action",
+      "capability_tier": "restricted",
+      "state": "gated",
+      "unavailable_reason": "Security controls require typed confirmation and real Linux-native implementation.",
+      "verification": "Action records approval and returns real shield status."
+    },
+    {
+      "id": "security.gravity_shield_stop",
+      "label": "Gravity Shield Stop",
+      "surface": "security-panel",
+      "current_action": "disengage",
+      "target_command": "security_shield_action",
+      "capability_tier": "restricted",
+      "state": "gated",
+      "unavailable_reason": "Security controls require typed confirmation and real Linux-native implementation.",
+      "verification": "Action records approval and returns real shield status."
+    },
+    {
+      "id": "security.void_start",
+      "label": "Infinite Void Start",
+      "surface": "security-panel",
+      "current_action": "start",
+      "target_command": "security_shield_action",
+      "capability_tier": "restricted",
+      "state": "gated",
+      "unavailable_reason": "Security controls require typed confirmation and real Linux-native implementation.",
+      "verification": "Action records approval and returns real shield status."
+    },
+    {
+      "id": "security.void_stop",
+      "label": "Infinite Void Stop",
+      "surface": "security-panel",
+      "current_action": "stop",
+      "target_command": "security_shield_action",
+      "capability_tier": "restricted",
+      "state": "gated",
+      "unavailable_reason": "Security controls require typed confirmation and real Linux-native implementation.",
+      "verification": "Action records approval and returns real shield status."
+    },
+    {
+      "id": "security.basilisk_activate",
+      "label": "Basilisk Activate",
+      "surface": "security-panel",
+      "current_action": "activate",
+      "target_command": "security_shield_action",
+      "capability_tier": "restricted",
+      "state": "gated",
+      "unavailable_reason": "Security controls require typed confirmation and real Linux-native implementation.",
+      "verification": "Action records approval and returns real shield status."
+    },
+    {
+      "id": "security.basilisk_deactivate",
+      "label": "Basilisk Deactivate",
+      "surface": "security-panel",
+      "current_action": "deactivate",
+      "target_command": "security_shield_action",
+      "capability_tier": "restricted",
+      "state": "gated",
+      "unavailable_reason": "Security controls require typed confirmation and real Linux-native implementation.",
+      "verification": "Action records approval and returns real shield status."
+    },
+    {
+      "id": "security.refresh",
+      "label": "Security Refresh",
+      "surface": "security-panel",
+      "current_dom_id": "security-refresh-btn",
+      "target_command": "security_scan",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; native Sentinel/security scan and host mutation remain disabled.",
+      "verification": "Refresh posture from a read-only Sentinel/security snapshot without starting host mutation or shield actions."
+    },
+    {
+      "id": "mobile.qr",
+      "label": "Generate Pairing QR",
+      "surface": "mobile-panel",
+      "current_dom_id": "btn-generate-qr",
+      "target_command": "mobile_pairing_qr",
+      "capability_tier": "gated",
+      "state": "gated",
+      "unavailable_reason": "Visible current-app control is now accounted for; pairing QR generation requires Tailscale-first pairing policy, token expiry, revocation, and approval evidence before live output.",
+      "verification": "Generate Tailscale-first pairing QR with short-lived token, revocation record, and no external tunnel default."
+    },
+    {
+      "id": "agent.codex_review",
+      "label": "Codex Review",
+      "surface": "ci-review-panel",
+      "target_command": "codex_review",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live read-only intent surface opens in Toolbar Action Readiness; Codex review execution remains disabled until approval/log policy is live.",
+      "verification": "Run codex review and attach findings to evidence log."
+    },
+    {
+      "id": "agent.hermes_companion",
+      "label": "Hermes Companion",
+      "surface": "ci-review-panel",
+      "target_command": "first_class_integration_launchpad",
+      "capability_tier": "gated",
+      "state": "live",
+      "unavailable_reason": "Live read-only launchpad surface is available; Hermes process start, chat/review execution, transcript capture, and writes remain disabled until approval/log policy is live.",
+      "verification": "Run Hermes non-interactive companion review and capture output."
+    },
+    {
+      "id": "agent.joint_ci",
+      "label": "Joint Codex/Hermes CI",
+      "surface": "ci-review-panel",
+      "target_command": "first_class_integration_launchpad",
+      "capability_tier": "gated",
+      "state": "live",
+      "unavailable_reason": "Live read-only launchpad surface is available; Codex/Hermes execution, overlapping-write prevention, arbitration, and evidence reconciliation remain disabled until verified.",
+      "verification": "Run Codex checks, Hermes companion review, and aggregate evidence."
+    },
+    {
+      "id": "agent.omega_computer",
+      "label": "Omega Computer",
+      "surface": "editor-toolbar",
+      "current_dom_id": "omega-product-computer-btn",
+      "target_command": "omega_computer_session",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Live Omega-native Codex Lead + Hermes/Kimi swarm terminal records specialist agent badges, progress rail data, selectable worker views, and observe/plan/delegate/act/verify evidence; screenshot capture, OCR, pointer/keyboard injection, target-window control, terminal/process execution, file writes, patches, exports, live MCP calls, memory writes, and desktop control remain disabled.",
+      "verification": "Click Omega Computer, record the session packet, click specialist agent badges in the output terminal, inspect evidence history, and confirm all live desktop/action gates remain false."
+    },
+    {
+      "id": "mcp.sswp_status",
+      "label": "SSWP Status",
+      "surface": "mcp-panel",
+      "target_command": "sswp_status",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Read-only SSWP status panel is live; live MCP probes, calls, config reads, sockets, capture, export, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled.",
+      "verification": "Show configured/running/failed/not-installed state and last health error."
+    },
+    {
+      "id": "mcp.sswp_call",
+      "label": "SSWP Action",
+      "surface": "mcp-panel",
+      "target_command": "first_class_integration_launchpad",
+      "capability_tier": "gated",
+      "state": "live",
+      "unavailable_reason": "Live read-only launchpad surface is available; SSWP live MCP calls remain disabled until capability manifest, consent, final approval, and audit trail exist.",
+      "verification": "Call an approved SSWP capability and attach request/response evidence."
+    },
+    {
+      "id": "steno.capture",
+      "label": "Steno Capture",
+      "surface": "steno-panel",
+      "target_command": "first_class_integration_launchpad",
+      "capability_tier": "gated",
+      "state": "live",
+      "unavailable_reason": "Live read-only launchpad surface is available; Omega Stenographer capture remains disabled until consent, retention, redaction, citation, and export policy exist.",
+      "verification": "Create a consented transcript capture record with citations and retention policy."
+    },
+    {
+      "id": "steno.search",
+      "label": "Steno Search",
+      "surface": "steno-panel",
+      "target_command": "steno_search",
+      "capability_tier": "safe",
+      "state": "live",
+      "unavailable_reason": "Read-only Steno Search panel is live; transcript reads, live index search, query binding, capture, export, MCP calls, config reads, sockets, writes, and execution remain disabled.",
+      "verification": "Search captured transcript records and return cited snippets."
+    }
+  ],
+  "known_gaps": {
+    "missing_html_ids": [
+      "reports-refresh-btn",
+      "ledger-search-input",
+      "ledger-search-btn",
+      "ledger-refresh-btn",
+      "ledger-entries",
+      "chat-attach-btn",
+      "chat-attachments",
+      "chat-file-input",
+      "media-bubble-*",
+      "media-src-audible",
+      "renderer-reload-btn"
+    ],
+    "direct_renderer_fetches": [
+      "/api/analyze_document",
+      "/api/tts",
+      "/api/evolution/scan",
+      "/api/evolution/proposals",
+      "/api/evolution/resolve",
+      "/api/sentinel/accept",
+      "/api/sentinel/seal"
+    ],
+    "inline_click_handlers": [
+      "window.sentinelToggle(...)",
+      "closeProviderModal()",
+      "generated proposal approve/deny buttons"
+    ]
+  }
+}

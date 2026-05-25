@@ -1,0 +1,334 @@
+{
+  "schema": "gravity-omega.feature-migration.v0",
+  "version": 0,
+  "features": [
+    {
+      "id": "operator-shell",
+      "title": "Omega operator shell",
+      "current_surface": "Electron renderer with activity rail, editor, terminal, and agent chat",
+      "target_behavior": "Tauri web UI keeps the dense command-center layout and Omega branding",
+      "phase": "phase-1",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-files",
+      "title": "Workspace files and search",
+      "current_surface": "file:* IPC, watcher:* IPC, search:text IPC",
+      "target_behavior": "A native read-only workspace files dashboard summarizes scoped list, read, search-contract, watcher, write, and patch readiness while live search, watchers, writes, patches, process, terminal, desktop, MCP, socket, config-read, capture, export, memory, workspace-write, and execution gates remain disabled",
+      "phase": "phase-2",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "terminal",
+      "title": "PTY terminal tabs",
+      "current_surface": "node-pty through terminal:* IPC",
+      "target_behavior": "A read-only terminal/process lane dashboard groups runner readiness, adapter readiness, command plans, stream initialization, lifecycle, process control policy, supervisor preflights, heartbeats, exit summaries, and output-tail evidence while terminal writes, process spawn, stream reads, live tailing, process control, file writes, patches, desktop control, live MCP calls, config reads, capture, export, memory writes, and execution remain disabled",
+      "phase": "phase-2",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-operating-loop",
+      "title": "Codex-grade operating loop",
+      "current_surface": "Agent Operating Doctrine external to app plus Omega approval gate",
+      "target_behavior": "Read-only Codex/Hermes run-view, timeline, selection, diff, reconciliation, attachment, intake, validation, and operator-confirmation dashboards make doctrine, plan tracking, approvals, runner evidence, artifacts, transcripts, export/protection policy, typed events, and parity gaps visible while process, terminal, MCP, file-write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-joint-ci",
+      "title": "Codex and Hermes joint CI",
+      "current_surface": "External Codex CLI, Hermes Agent CLI, and ad hoc review scripts",
+      "target_behavior": "OmegaTaskRun cards coordinate Codex review/exec with Hermes companion review while preserving approvals, logs, and non-overlapping write scopes",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "replacement-app-foundation-scorecard",
+      "title": "Replacement app foundation scorecard",
+      "current_surface": "Long-running rebuild todo and scattered evidence ledgers",
+      "target_behavior": "A native read-only scorecard keeps Codex, Hermes, MCP, SSWP, Steno, pet, workspace, terminal, approval, and desktop lanes visible as one non-redundant replacement-app roadmap",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "replacement-app-work-queue",
+      "title": "Replacement app work queue",
+      "current_surface": "The foundation scorecard identifies lanes but does not yet rank next implementation slices",
+      "target_behavior": "A compact read-only work queue ranks the next safe slices for workspace/editor, Codex/Hermes, MCP, Steno, pet, terminal, approval, and Linux desktop work without enabling live gates",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-view-dashboard",
+      "title": "Codex/Hermes run view dashboard",
+      "current_surface": "Task runs, approvals, runner readiness, joint plans, artifacts, transcript bundles, export/protection policies, and typed event logs are visible as separate ledgers",
+      "target_behavior": "A compact read-only Codex/Hermes run view groups existing evidence ledgers into one operator surface without spawning processes, controlling terminals, calling MCPs, writing files, applying patches, controlling the desktop, capturing, exporting, writing memory, or executing",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-detail-timeline",
+      "title": "Codex/Hermes run detail timeline",
+      "current_surface": "The Codex/Hermes run view summarizes ledgers, but a single active run is not yet inspectable as a per-run evidence timeline",
+      "target_behavior": "A read-only Codex/Hermes run detail timeline binds the active task run to task-run, approval, runner, joint-plan, artifact, event, transcript, export-policy, and protection-policy evidence without spawning processes, controlling terminals, calling MCPs, writing files, applying patches, controlling the desktop, capturing, exporting, writing memory, or executing",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-selection-comparison",
+      "title": "Codex/Hermes run selection comparison",
+      "current_surface": "The active run detail timeline is inspectable, but the operator cannot yet compare Codex, Hermes, and Gravity Omega evidence lanes from one run-selection surface",
+      "target_behavior": "A read-only Codex/Hermes run selection comparison lists run options and compares active-run Codex, Hermes, and Gravity Omega evidence across planned phases, runners, process plans, typed events, transcript bundles, export policies, and protection policies without spawning processes, controlling terminals, calling MCPs, writing files, applying patches, controlling the desktop, capturing, exporting, writing memory, or executing",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-evidence-diff-board",
+      "title": "Codex/Hermes evidence diff board",
+      "current_surface": "The run selection comparison shows runtime lanes, but the operator cannot yet see direct Codex-vs-Hermes parity gaps as first-class diff records",
+      "target_behavior": "A read-only Codex/Hermes evidence diff board compares Codex and Hermes across planned phases, runner readiness, process plans, typed events, transcript bundles, export policies, protection policies, and total ready evidence while all process, terminal, MCP, write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-reconciliation-checklist",
+      "title": "Codex/Hermes reconciliation checklist",
+      "current_surface": "The evidence diff board shows Codex-vs-Hermes parity gaps, but the operator does not yet have a close-gap checklist that includes Gravity Omega reconciliation evidence",
+      "target_behavior": "A read-only Codex/Hermes reconciliation checklist turns evidence diffs into ready/action-required checks and includes Gravity Omega reconciliation evidence while all process, terminal, MCP, write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-reconciliation-action-plan",
+      "title": "Codex/Hermes reconciliation action plan",
+      "current_surface": "The reconciliation checklist shows ready and action-required checks, but the operator does not yet have a prioritized close-gap action plan",
+      "target_behavior": "A read-only Codex/Hermes reconciliation action plan ranks action-required gaps, shows missing evidence counts, and keeps all process, terminal, MCP, write, patch, desktop, capture, export, memory, and execution gates disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-evidence-attachment-preview",
+      "title": "Codex/Hermes evidence attachment preview",
+      "current_surface": "The reconciliation action plan ranks close-gap actions, but the operator cannot yet preview the blocked evidence attachments needed for each gap",
+      "target_behavior": "A read-only Codex/Hermes evidence attachment preview lists target Hermes evidence, attachment kind, missing proof count, and blocked state while all process, terminal, MCP, config-read, socket, write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-evidence-attachment-approval-packet",
+      "title": "Codex/Hermes evidence attachment approval packet",
+      "current_surface": "The evidence attachment preview lists blocked Hermes-side proof needs, but the operator cannot yet see the explicit approval packet required before intake",
+      "target_behavior": "A read-only Codex/Hermes evidence attachment approval packet maps every blocked preview to required operator approval state while all approval mutation, evidence attachment, process, terminal, MCP, config-read, socket, write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-evidence-intake-workbench",
+      "title": "Codex/Hermes evidence intake workbench",
+      "current_surface": "The evidence attachment approval packet names approval requirements, but the operator cannot yet preview the disabled intake forms and required fields for each proof gap",
+      "target_behavior": "A read-only Codex/Hermes evidence intake workbench previews required intake fields, missing proof counts, source packet links, and blocked submit state while all approval mutation, evidence attachment, process, terminal, MCP, config-read, socket, write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-evidence-validation-summary",
+      "title": "Codex/Hermes evidence validation summary",
+      "current_surface": "The evidence intake workbench previews disabled intake forms, but the operator cannot yet see field-value coverage, evidence presence, and blocked validation state for each proof gap",
+      "target_behavior": "A read-only Codex/Hermes evidence validation summary previews missing field values, missing proof counts, approval state, evidence presence, and blocked submit eligibility while all approval mutation, evidence attachment, validation submission, process, terminal, MCP, config-read, socket, write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "codex-hermes-run-evidence-operator-confirmation-dry-runs",
+      "title": "Codex/Hermes evidence operator confirmation dry-runs",
+      "current_surface": "The evidence validation summary explains missing field values and evidence records, but the operator cannot yet preview the blocked confirmation acknowledgements required before intake",
+      "target_behavior": "Read-only Codex/Hermes evidence operator confirmation dry-runs preview required acknowledgements, validation readiness, missing proof totals, and blocked confirmation state while all confirmation submission, approval mutation, evidence attachment, validation submission, process, terminal, MCP, config-read, socket, write, patch, desktop, capture, export, memory, and execution gates remain disabled",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "first-class-mcp-dashboard",
+      "title": "First-class MCP dashboard",
+      "current_surface": "Omega Brain, SSWP, and Omega Stenographer evidence is spread across local MCP contracts, health, discovery, call-gate, approval, audit, recovery, dry-run, typed-command, status-probe, and config-preflight ledgers",
+      "target_behavior": "A compact read-only MCP dashboard groups Omega Brain, SSWP, and Omega Stenographer as first-class native lanes with expected command ids and evidence depth while live MCP calls, config reads, sockets, capture, export, writes, patches, memory writes, and execution remain disabled",
+      "phase": "phase-4",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "steno-pet-companion-dashboard",
+      "title": "Steno pet companion dashboard",
+      "current_surface": "Transcript bundles, export/protection policies, Omega Stenographer MCP evidence, and Codex pet readiness are visible as separate ledgers",
+      "target_behavior": "A compact read-only dashboard groups Steno transcript evidence and Codex pet companion readiness into one native surface while capture, export, pet asset inspection, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
+      "phase": "phase-4",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-editor-navigation-lane",
+      "title": "Workspace editor navigation lane",
+      "current_surface": "Workspace inspection, preview, tree, file preview, editor tab, edit preflight, write policy, approval, buffer draft, and dirty-state records are separate ledgers",
+      "target_behavior": "A compact read-only navigation lane links existing workspace/editor records into one editor-shell surface without enabling file writes, patch apply, terminal/process, desktop control, live MCP, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-editor-shell-layout",
+      "title": "Workspace editor shell layout",
+      "current_surface": "The workspace/editor navigation lane links records but does not yet arrange them into product panels",
+      "target_behavior": "A read-only editor shell layout arranges workspace tree, file preview, tab buffer, and mutation gate panels from persisted record counts without enabling writes, patches, process or terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-editor-shell-bindings",
+      "title": "Workspace editor shell bindings",
+      "current_surface": "The shell layout exposes panels but does not yet point them at existing summary and ledger UI targets",
+      "target_behavior": "Read-only shell bindings connect workspace tree, file preview, tab buffer, and mutation gate panels to existing UI element ids and cross-panel dependencies without enabling writes, patches, process or terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-editor-shell-focus-model",
+      "title": "Workspace editor shell focus model",
+      "current_surface": "The shell bindings identify targets but do not yet choose the current read-only navigation focus",
+      "target_behavior": "A read-only focus model chooses the active editor-shell target from existing bindings, preferring tab buffer, then file preview, workspace tree, and mutation gates, without enabling writes, patches, process or terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-editor-keyboard-navigation-map",
+      "title": "Workspace editor keyboard navigation map",
+      "current_surface": "The focus model identifies the current target but does not yet describe keyboard traversal between editor-shell panels",
+      "target_behavior": "A read-only keyboard navigation map records previous and next panel traversal plus reserved key hints from the focus model without installing listeners or enabling focus movement, writes, patches, process or terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-editor-command-palette-map",
+      "title": "Workspace editor command palette map",
+      "current_surface": "The keyboard navigation map reserves traversal keys but does not yet list panel-scoped command intent or disabled reasons",
+      "target_behavior": "A read-only command palette map lists disabled command intents for workspace tree, file preview, tab buffer, and mutation gates without binding hotkeys, moving focus, editing buffers, saving files, applying patches, process or terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "workspace-editor-command-search-map",
+      "title": "Workspace editor command search map",
+      "current_surface": "The command palette lists command intent but does not yet expose grouped discovery or search terms",
+      "target_behavior": "A read-only command search map groups editor palette commands into workspace, preview, editor-buffer, and safety-gate lanes with static search tokens, without binding query inputs, hotkeys, actions, focus movement, editing buffers, saving files, applying patches, process or terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "terminal-process-lane-dashboard",
+      "title": "Terminal process lane dashboard",
+      "current_surface": "Runner, adapter, process command, stream, lifecycle, supervisor, exit, and output-tail evidence exists across separate ledgers",
+      "target_behavior": "A read-only terminal/process lane dashboard groups runner readiness, adapter readiness, command plans, stream initialization, lifecycle, control policy, supervisor heartbeat, exit summary, and output-tail evidence without enabling terminal writes, process spawn, stream reads, live tailing, process control, file writes, patches, desktop control, live MCP calls, config reads, capture, export, memory writes, or execution",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "approval-evidence-spine-dashboard",
+      "title": "Approval evidence spine dashboard",
+      "current_surface": "Approval records, gate decisions, artifact previews, typed event logs, MCP call audits, consent decisions, transcript policies, and terminal/process evidence exist across separate ledgers",
+      "target_behavior": "A read-only approval/evidence spine dashboard unifies existing safety evidence without enabling mutation, execution, file writes, patch application, process spawning, terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, or memory writes",
+      "phase": "phase-3",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "linux-desktop-control-readiness-dashboard",
+      "title": "Linux desktop control readiness dashboard",
+      "current_surface": "Linux desktop computer-use is represented across the replacement-app foundation scorecard, work queue, capability inventory, approval spine, and browser/computer-use command surface",
+      "target_behavior": "A read-only Linux desktop control readiness dashboard groups desktop lane evidence, approval prerequisites, and command-surface readiness without enabling screenshot capture, OCR, target-window actions, element actions, sockets, process spawning, terminal control, file writes, patches, live MCP calls, config reads, export, memory writes, or execution",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "desktop-capture-action-approval-policy-dashboard",
+      "title": "Desktop capture action approval policy dashboard",
+      "current_surface": "Screenshot, OCR, target-window, and element-action approvals are implied by the Linux desktop readiness lane but not yet shown as one operator policy surface",
+      "target_behavior": "A read-only desktop capture/action policy dashboard groups readiness, approval spine, sandbox restrictions, command surface, policy areas, and operator confirmation gates without enabling screenshot capture, OCR, window targeting, element actions, sockets, process spawning, terminal control, file writes, patches, live MCP calls, config reads, export, memory writes, or execution",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "desktop-capture-action-approval-records",
+      "title": "Desktop capture action approval records",
+      "current_surface": "The desktop capture/action policy dashboard names screenshot, OCR, target-window, and element-action gates but does not yet expose per-capability approval records",
+      "target_behavior": "Read-only desktop capture/action approval records make screenshot, OCR, target-window, and element-action policy artifacts visible with required evidence, confirmation, redaction, and retention fields while capture, OCR, desktop control, sockets, process/terminal control, writes, patches, live MCP calls, config reads, export, memory writes, and execution remain disabled",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "desktop-capture-action-operator-confirmation-dry-runs",
+      "title": "Desktop capture action operator confirmation dry-runs",
+      "current_surface": "Desktop capture/action approval records require operator confirmation but do not yet show the dry-run confirmation prompts for screenshot, OCR, target-window, and element-action policies",
+      "target_behavior": "Read-only operator-confirmation dry-runs expose the prompt, evidence requirement, redaction profile, and retention tier for each desktop policy before any screenshot capture, OCR, window targeting, element action, desktop control, sockets, process/terminal control, writes, patches, live MCP calls, config reads, export, memory writes, or execution can happen",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "desktop-capture-action-final-preaction-dry-runs",
+      "title": "Desktop capture action final pre-action dry-runs",
+      "current_surface": "Operator-confirmation dry-runs show the required prompts but do not yet expose the final confirmed-evidence blocker before live desktop capability consideration",
+      "target_behavior": "Read-only final pre-action dry-runs make confirmed operator evidence the explicit blocker for screenshot, OCR, target-window, and element-action capabilities while capture, OCR, desktop control, sockets, process/terminal control, writes, patches, live MCP calls, config reads, export, memory writes, and execution remain disabled",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "desktop-action-safety-summary",
+      "title": "Desktop action safety summary",
+      "current_surface": "Desktop policy, approval records, operator-confirmation dry-runs, and final pre-action dry-runs are visible as separate panels",
+      "target_behavior": "A compact read-only desktop action safety summary ties the policy dashboard, approval records, confirmation dry-runs, final pre-action dry-runs, and per-capability blockers into one operator view while capture, OCR, desktop control, sockets, process/terminal control, writes, patches, live MCP calls, config reads, export, memory writes, and execution remain disabled",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "linux-desktop-readiness-release-checklist",
+      "title": "Linux desktop readiness release checklist",
+      "current_surface": "Linux desktop readiness, desktop action safety, approval evidence, operator-confirmation evidence, sandbox restrictions, and release decision state are visible across separate surfaces",
+      "target_behavior": "A read-only Linux desktop readiness release checklist ties the readiness dashboard, desktop action safety summary, approval evidence spine, operator-confirmation evidence requirement, sandbox restricted policy, and final release decision into one operator view while capture, OCR, desktop control, sockets, process/terminal control, writes, patches, live MCP calls, config reads, export, memory writes, and execution remain disabled",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "mcp-and-plugins",
+      "title": "MCP and plugin system",
+      "current_surface": "omega_mcp_server.js plus Hermes status checks",
+      "target_behavior": "A first-class MCP dashboard plus local MCP contracts, health preflights, discovery policy, gated-call policy, call approval/audit, consent decisions, audit outcomes, recovery guards, final approvals, live-call dry-runs, typed contracts, status probe preflights, config lookup/read policy, and sealed config-content dry-runs make MCP/plugin readiness visible while live MCP calls, probes, sockets, config reads, captures, exports, file writes, patches, process/terminal control, desktop control, memory writes, and execution remain disabled",
+      "phase": "phase-4",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "sswp",
+      "title": "SSWP first-class MCP lane",
+      "current_surface": "User-created local SSWP MCP wired into Codex, Hermes, and Claude tooling",
+      "target_behavior": "The first-class MCP dashboard treats SSWP as a named subsystem with capability contracts, expected command ids, health, discovery, call-policy, audit, consent, recovery, final-approval, and disabled live-call evidence while live calls, sockets, config reads, captures, exports, file writes, patches, process/terminal control, desktop control, memory writes, and execution remain disabled",
+      "phase": "phase-4",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "omega-stenographer",
+      "title": "Omega Stenographer first-class lane",
+      "current_surface": "User-created omega-stenographer MCP and external transcript/capture workflows",
+      "target_behavior": "The Steno/pet companion dashboard and first-class MCP dashboard expose Omega Stenographer as a native lane for transcript evidence, export/protection policy, capture-readiness evidence, and subsystem health while Steno capture, transcript export, live MCP calls, config reads, sockets, file writes, patches, process/terminal control, desktop control, memory writes, and execution remain disabled",
+      "phase": "phase-4",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "veritas-modules",
+      "title": "VERITAS module migration",
+      "current_surface": "Flask module registry and Python module scripts",
+      "target_behavior": "The VERITAS modules dashboard maps Flask/Python registry, describe, run, document analyzer, vault context, security sentinel, provenance/evolution, and media/tool surfaces into Rust-port, sandboxed-sidecar, or archive-review candidates while route mismatches and all module execution, Python bridge, sidecar spawn, MCP execute, config read, socket, file-write, patch, terminal/process, capture, export, memory-write, workspace-write, and execution gates remain disabled",
+      "phase": "phase-5",
+      "target_status": "workbench-visible"
+    },
+    {
+      "id": "security-and-approvals",
+      "title": "Security and approvals",
+      "current_surface": "approval gate, restricted tools, sentinel, SSRF shield, provenance stack",
+      "target_behavior": "Approval/evidence spine, sandbox policy, execution gate decisions, desktop action approval policy, approval records, operator-confirmation dry-runs, final pre-action dry-runs, action safety summary, and Linux desktop release checklist make approval and safety evidence native while mutation, file writes, patches, process spawn, terminal control, desktop control, live MCP calls, sockets, config reads, capture, export, memory writes, workspace writes, and execution remain disabled",
+      "phase": "phase-6",
+      "target_status": "workbench-visible"
+    }
+  ]
+}

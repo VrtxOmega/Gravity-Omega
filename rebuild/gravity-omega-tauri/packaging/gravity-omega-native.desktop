@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Gravity Omega
+Comment=Rust/Tauri replacement workbench for Gravity Omega
+Exec=/usr/bin/env bash /home/rage/apps/gravity-omega-rust-rebuild/rebuild/gravity-omega-tauri/packaging/launch-gravity-omega-native.sh
+Icon=/home/rage/apps/gravity-omega-rust-rebuild/rebuild/gravity-omega-tauri/src-tauri/icons/icon.png
+Terminal=false
+Categories=Development;
+StartupNotify=true
+StartupWMClass=gravity-omega-native
