@@ -1,0 +1,3100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gravity Omega</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <link rel="stylesheet" href="./vendor/xterm/xterm.css" />
+  </head>
+  <body>
+    <div id="omega-product-shell" aria-label="Gravity Omega workbench">
+      <header id="omega-titlebar">
+        <div class="omega-titlebar-left">
+          <span class="omega-titlebar-mark" aria-hidden="true" data-tauri-drag-region>&Omega;</span>
+          <nav class="omega-menubar" aria-label="Application menu">
+            <button type="button" data-product-command="menu-file">File</button>
+            <button type="button" data-product-command="menu-edit">Edit</button>
+            <button type="button" data-product-command="menu-view">View</button>
+            <button type="button" data-product-command="menu-terminal">Terminal</button>
+            <button type="button" data-product-command="menu-help">Help</button>
+          </nav>
+        </div>
+        <div class="omega-titlebar-center" data-tauri-drag-region>Gravity Omega Workbench</div>
+        <div class="omega-titlebar-controls" aria-label="Window controls">
+          <button type="button" title="Minimize" aria-label="Minimize" data-window-command="minimize"></button>
+          <button type="button" title="Maximize" aria-label="Maximize" data-window-command="maximize"></button>
+          <button type="button" title="Close" aria-label="Close" data-window-command="close"></button>
+        </div>
+      </header>
+
+      <div id="omega-product-main">
+        <nav id="omega-activity-bar" aria-label="Primary panels">
+          <button class="omega-activity-btn active" type="button" title="Explorer" aria-label="Explorer" data-activity-label="Explorer" data-product-panel="explorer">
+            <span class="omega-activity-icon omega-icon-files" aria-hidden="true"></span>
+          </button>
+          <button class="omega-activity-btn" type="button" title="Search" aria-label="Search" data-activity-label="Search" data-product-panel="search">
+            <span class="omega-activity-icon omega-icon-search" aria-hidden="true"></span>
+          </button>
+          <button class="omega-activity-btn" type="button" title="Omega" aria-label="Omega" data-activity-label="Omega" data-product-panel="omega">
+            <span class="omega-activity-icon omega-icon-omega" aria-hidden="true">&Omega;</span>
+          </button>
+          <button class="omega-activity-btn" type="button" title="Vault" aria-label="Vault" data-activity-label="Vault" data-product-panel="vault">
+            <span class="omega-activity-icon omega-icon-vault" aria-hidden="true"></span>
+          </button>
+          <button class="omega-activity-btn" type="button" title="Security" aria-label="Security" data-activity-label="Security" data-product-panel="security">
+            <span class="omega-activity-icon omega-icon-shield" aria-hidden="true"></span>
+          </button>
+          <button class="omega-activity-btn" type="button" title="Tools" aria-label="Tools" data-activity-label="Tools" data-product-panel="tools">
+            <span class="omega-activity-icon omega-icon-tools" aria-hidden="true"></span>
+          </button>
+          <button class="omega-activity-btn" type="button" title="Media" aria-label="Media" data-activity-label="Media" data-product-panel="media">
+            <span class="omega-activity-icon omega-icon-media" aria-hidden="true"></span>
+          </button>
+          <span class="omega-activity-spacer"></span>
+          <button class="omega-activity-btn" type="button" title="Settings" aria-label="Settings" data-activity-label="Settings" data-product-panel="settings">
+            <span class="omega-activity-icon omega-icon-settings" aria-hidden="true"></span>
+          </button>
+        </nav>
+
+        <aside id="omega-sidebar" data-active-panel="explorer">
+          <div class="omega-sidebar-header">
+            <span id="omega-sidebar-title">EXPLORER</span>
+            <button id="omega-refresh-explorer-btn" type="button" title="Refresh explorer" aria-label="Refresh explorer"></button>
+          </div>
+          <section class="omega-side-panel active" data-panel-content="explorer" aria-label="Explorer panel">
+            <div class="omega-file-tree" aria-label="Workspace files">
+              <button class="omega-tree-row root active" type="button" data-path="Omega Scratch.md" data-kind="draft"><span class="omega-folder-icon"></span>Omega Workspace</button>
+              <button class="omega-tree-row" type="button" data-path="Omega Scratch.md" data-kind="draft"><span class="omega-file-icon"></span>Omega Scratch.md</button>
+              <button class="omega-tree-row directory" type="button" data-kind="directory"><span class="omega-folder-icon"></span>Open or refresh a workspace</button>
+            </div>
+
+            <section class="omega-sidebar-card" aria-label="Omega runtime">
+              <div class="omega-sidebar-card-title">OMEGA RUNTIME</div>
+              <div class="omega-health-row"><span class="omega-dot ok"></span>Codex Write unlocked</div>
+              <div class="omega-health-row"><span class="omega-dot ok"></span>Hermes chat unlocked</div>
+              <div class="omega-health-row"><span class="omega-dot warn"></span>MCP live calls staged</div>
+              <div class="omega-health-row"><span class="omega-dot ok"></span>SSWP / Steno first-class lanes</div>
+            </section>
+          </section>
+
+          <section class="omega-side-panel" data-panel-content="search" aria-label="Search panel">
+            <input id="omega-editor-search-input" type="search" placeholder="Find in current editor..." autocomplete="off" />
+            <div class="omega-search-mode-row" aria-label="Search mode">
+              <button class="active" type="button" data-search-mode="current">Current File</button>
+              <button type="button" data-search-mode="workspace">Workspace</button>
+              <button id="omega-workspace-search-run" type="button">Search</button>
+            </div>
+            <div id="omega-workspace-search-status" class="omega-workspace-search-status">Current file search ready.</div>
+            <div class="omega-replace-row">
+              <input id="omega-editor-replace-input" type="text" placeholder="Replace with..." autocomplete="off" />
+              <button type="button" data-product-command="replace-current">Replace</button>
+              <button type="button" data-product-command="replace-all">All</button>
+            </div>
+            <div id="omega-editor-search-results" class="omega-search-results">Type to search the active Monaco buffer.</div>
+          </section>
+
+          <section class="omega-side-panel" data-panel-content="omega" aria-label="Omega panel">
+            <div class="omega-integration-grid" id="omega-first-class-status-grid">
+              <button type="button" data-panel-action="codex" data-action-glyph="Cx"><strong>Codex</strong><span>write runtime unlocked</span></button>
+              <button type="button" data-panel-action="hermes" data-action-glyph="HK"><strong>Hermes</strong><span>companion runtime unlocked</span></button>
+              <button type="button" data-panel-action="mcp" data-action-glyph="M"><strong>MCP</strong><span id="omega-mcp-status-line">loading readiness</span></button>
+              <button type="button" data-panel-action="joint-ci" data-action-glyph="CI"><strong>Joint CI</strong><span>plan, delegate, compare, reconcile</span></button>
+            </div>
+            <div class="omega-first-class-dashboard" id="omega-mcp-dashboard-product">
+              <div class="omega-dashboard-header">
+                <strong>MCP Lanes</strong>
+                <span id="omega-mcp-dashboard-status">loading lanes</span>
+              </div>
+              <div id="omega-mcp-dashboard-list" class="omega-first-class-dashboard-list"></div>
+            </div>
+            <div class="omega-first-class-dashboard" id="omega-steno-pet-dashboard-product">
+              <div class="omega-dashboard-header">
+                <strong>Steno + Pet</strong>
+                <span id="omega-steno-pet-dashboard-status">loading companion</span>
+              </div>
+              <div id="omega-steno-pet-dashboard-list" class="omega-first-class-dashboard-list"></div>
+            </div>
+          </section>
+
+          <section class="omega-side-panel" data-panel-content="vault" aria-label="Vault panel">
+            <div class="omega-integration-grid">
+              <button type="button" data-panel-action="evidence" data-action-glyph="EV"><strong>Evidence</strong><span id="omega-evidence-status-line">approval spine ready to inspect</span></button>
+              <button type="button" data-panel-action="sswp" data-action-glyph="SS"><strong>SSWP</strong><span id="omega-sswp-status-line">loading SSWP lane</span></button>
+            </div>
+            <div class="omega-first-class-dashboard" id="omega-sswp-dashboard-product">
+              <div class="omega-dashboard-header">
+                <strong>SSWP Lane</strong>
+                <span id="omega-sswp-dashboard-status">loading lane</span>
+              </div>
+              <div id="omega-sswp-dashboard-list" class="omega-first-class-dashboard-list"></div>
+            </div>
+          </section>
+
+          <section class="omega-side-panel" data-panel-content="security" aria-label="Security panel">
+            <div class="omega-integration-grid">
+              <button type="button" data-panel-action="desktop" data-action-glyph="DT"><strong>Desktop</strong><span id="omega-desktop-status-line">loading Linux control readiness</span></button>
+              <button type="button" data-panel-action="omega-computer" data-action-glyph="&Omega;"><strong>Omega Computer</strong><span id="omega-computer-status-line">operator surface not recorded yet</span></button>
+              <button type="button" data-panel-action="shield" data-action-glyph="SH"><strong>Shield</strong><span>restricted actions remain explicit</span></button>
+            </div>
+          </section>
+
+          <section class="omega-side-panel" data-panel-content="tools" aria-label="Tools panel">
+            <button type="button" data-product-command="terminal-validate">Run Validate</button>
+            <button type="button" data-product-command="terminal-cargo-check">Cargo Check</button>
+            <button type="button" data-product-command="workbench-smoke">Run Workbench Smoke</button>
+            <button type="button" data-product-command="ui-smoke">Run UI Smoke</button>
+            <button type="button" data-product-command="codex">Codex Write</button>
+            <button type="button" data-product-command="hermes">Hermes</button>
+            <div class="omega-sidebar-card">
+              <div class="omega-sidebar-card-title">TOOLBAR PARITY</div>
+              <div id="omega-toolbar-parity-status">Loading toolbar command registry...</div>
+              <button id="omega-toolbar-proof-run" type="button">Run Toolbar Proof</button>
+              <div id="omega-toolbar-proof-status">Toolbar proof has not run yet.</div>
+              <div id="omega-toolbar-proof-list" class="omega-toolbar-parity-list"></div>
+              <div id="omega-toolbar-parity-list" class="omega-toolbar-parity-list"></div>
+            </div>
+          </section>
+
+          <section class="omega-side-panel" data-panel-content="media" aria-label="Media panel">
+            <div class="omega-integration-grid">
+              <button type="button" data-panel-action="browser" data-action-glyph="BR"><strong>Browser</strong><span id="omega-browser-status-line">loading browser sidecar readiness</span></button>
+              <button type="button" data-panel-action="media" data-action-glyph="ME"><strong>Media</strong><span id="omega-media-status-line">loading media runtime readiness</span></button>
+              <button type="button" data-panel-action="ocr" data-action-glyph="OR"><strong>OCR</strong><span id="omega-ocr-status-line">loading capture/OCR blocker state</span></button>
+              <button type="button" data-panel-action="modules" data-action-glyph="MD"><strong>Modules</strong><span id="omega-modules-status-line">loading VERITAS module readiness</span></button>
+            </div>
+            <div class="omega-sidebar-card omega-sidecar-console">
+              <div class="omega-sidebar-card-title">SIDECAR LAUNCH PACKETS</div>
+              <div id="omega-sidecar-packet-status">Loading launch packet ledger...</div>
+              <div class="omega-sidecar-packet-actions">
+                <button id="omega-sidecar-packet-all" type="button" data-sidecar-packet-target="all">All</button>
+                <button id="omega-sidecar-packet-browser" type="button" data-sidecar-packet-target="browser">Browser</button>
+                <button id="omega-sidecar-packet-media" type="button" data-sidecar-packet-target="media">Media</button>
+                <button id="omega-sidecar-packet-python" type="button" data-sidecar-packet-target="python">Python</button>
+              </div>
+              <div id="omega-sidecar-packet-list" class="omega-sidecar-packet-list"></div>
+            </div>
+            <div class="omega-sidebar-card omega-sidecar-lifecycle">
+              <div class="omega-sidebar-card-title">SIDECAR LIFECYCLE</div>
+              <div id="omega-sidecar-lifecycle-status">Runtime probes not refreshed yet.</div>
+              <div class="omega-sidecar-packet-actions">
+                <button id="omega-sidecar-lifecycle-refresh" type="button">Refresh</button>
+                <button id="omega-sidecar-lifecycle-probe" type="button">Run Probes</button>
+              </div>
+              <div id="omega-sidecar-lifecycle-list" class="omega-sidecar-packet-list"></div>
+            </div>
+          </section>
+
+          <section class="omega-side-panel" data-panel-content="settings" aria-label="Settings panel">
+            <div class="omega-integration-grid">
+              <button type="button" data-panel-action="providers" data-action-glyph="PV"><strong>Providers</strong><span id="omega-provider-status-line">loading provider settings</span></button>
+              <button type="button" data-panel-action="ship-readiness" data-action-glyph="SR"><strong>Ship Readiness</strong><span id="omega-ship-status-line">loading final blocker board</span></button>
+            </div>
+            <button type="button" data-product-command="docs">Open README</button>
+            <button type="button" data-product-command="about">About Gravity Omega</button>
+            <button type="button" data-product-command="palette">Command Palette</button>
+            <button id="omega-layout-reset-product" type="button" data-product-command="layout-reset">Reset Layout</button>
+          </section>
+        </aside>
+
+        <main id="omega-editor-workbench">
+          <div id="omega-editor-tabs" role="tablist" aria-label="Editor tabs">
+            <button class="omega-editor-tab active" type="button" data-tab-path="Omega Scratch.md">
+              <span class="omega-editor-tab-label">Omega Scratch.md</span>
+              <span class="omega-editor-tab-dirty" aria-hidden="true"></span>
+              <span class="omega-editor-tab-close" aria-hidden="true">x</span>
+            </button>
+          </div>
+          <div id="omega-editor-toolbar" aria-label="Editor toolbar">
+            <button id="omega-product-new-btn" type="button" title="New file" aria-label="New file" data-product-command="new-file">
+              <span class="omega-tool-icon omega-tool-new" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-open-btn" type="button" title="Open file" aria-label="Open file" data-product-command="open-file">
+              <span class="omega-tool-icon omega-tool-open" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-save-btn" type="button" title="Save draft" aria-label="Save draft" data-product-command="save">
+              <span class="omega-tool-icon omega-tool-save" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-save-as-btn" type="button" title="Save as" aria-label="Save as" data-product-command="save-as">
+              <span class="omega-tool-icon omega-tool-save-as" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-undo-btn" type="button" title="Undo" aria-label="Undo" data-product-command="undo">
+              <span class="omega-tool-icon omega-tool-undo" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-redo-btn" type="button" title="Redo" aria-label="Redo" data-product-command="redo">
+              <span class="omega-tool-icon omega-tool-redo" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-search-btn" type="button" title="Search" aria-label="Search" data-product-command="search">
+              <span class="omega-tool-icon omega-tool-search" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-split-btn" type="button" title="Split editor" aria-label="Split editor" data-product-command="split">
+              <span class="omega-tool-icon omega-tool-split" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-artifact-preview-btn" type="button" title="Preview artifact" aria-label="Preview artifact" data-product-command="artifact-preview">
+              <span class="omega-tool-icon omega-tool-preview" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-sovereign-docs-btn" type="button" title="Sovereign Docs live preview" aria-label="Sovereign Docs live preview" data-product-command="sovereign-docs-preview">
+              <span class="omega-tool-icon omega-tool-docs" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-computer-btn" type="button" title="Omega Computer" aria-label="Omega Computer" data-product-command="omega-computer">
+              <span class="omega-tool-icon omega-tool-computer" aria-hidden="true"></span>
+            </button>
+            <button id="omega-product-terminal-btn" type="button" title="Terminal" aria-label="Terminal" data-product-command="terminal-focus">
+              <span class="omega-tool-icon omega-tool-terminal" aria-hidden="true"></span>
+            </button>
+            <span class="omega-editor-toolbar-status">Omega Scratch.md ready</span>
+          </div>
+          <section id="omega-monaco-frame" aria-label="Writable editor">
+            <div class="omega-editor-gutter" aria-hidden="true">1<br />2<br />3<br />4<br />5<br />6<br />7<br />8<br />9<br />10<br />11<br />12<br />13<br />14<br />15<br />16</div>
+            <div id="omega-monaco-container" aria-label="Gravity Omega Monaco editor"></div>
+            <div id="omega-home-surface" aria-label="Gravity Omega home surface" hidden>
+              <div class="omega-home-grid" aria-hidden="true"></div>
+              <div class="omega-home-mark" aria-hidden="true">&Omega;</div>
+              <div class="omega-home-title">Gravity Omega</div>
+            </div>
+            <div id="omega-computer-main-surface" aria-label="Omega Computer control surface" hidden></div>
+            <div id="omega-panel-main-surface" aria-label="Omega sidebar control surface" hidden></div>
+            <textarea id="omega-editor-input" class="omega-editor-fallback" spellcheck="false" aria-label="Gravity Omega editor fallback"># Gravity Omega
+
+</textarea>
+          </section>
+
+          <section id="omega-bottom-panel" aria-label="Bottom panel">
+            <div id="omega-bottom-resizer-product" class="omega-product-resizer horizontal" role="separator" aria-orientation="horizontal" tabindex="0"></div>
+            <div class="omega-panel-tabs">
+              <button class="omega-panel-tab active" type="button" data-bottom-view="terminal">Terminal</button>
+              <button class="omega-panel-tab" type="button" data-bottom-view="output">Output</button>
+              <button class="omega-panel-tab" type="button" data-bottom-view="artifact">Artifact</button>
+              <button class="omega-panel-tab" type="button" data-bottom-view="problems">Problems</button>
+              <button class="omega-panel-tab" type="button" data-bottom-view="evidence">Evidence</button>
+            </div>
+            <div class="omega-terminal-surface" aria-label="Terminal transcript" data-active-bottom-view="terminal">
+              <div class="omega-bottom-view active" data-bottom-content="terminal">
+              <div id="omega-terminal-session-bar" class="omega-terminal-session-bar" aria-label="Terminal session metadata">
+                <span id="omega-terminal-session-status" data-state="idle">idle</span>
+                <span id="omega-terminal-session-id">session: none</span>
+                <span id="omega-terminal-session-cwd">cwd: rebuild workspace</span>
+                <span id="omega-terminal-session-exit">exit: none</span>
+                <span id="omega-terminal-session-duration">duration: 0ms</span>
+                <span id="omega-terminal-session-record">record: none</span>
+                <button id="omega-terminal-clear" type="button">Clear</button>
+                <button id="omega-terminal-show-evidence" type="button">Evidence</button>
+              </div>
+              <div id="omega-xterm-surface"></div>
+              <div id="omega-terminal-fallback">
+                <div><span class="omega-prompt">omega</span>:<span class="omega-path">~</span>$ ready</div>
+                <div>Gravity Omega ready.</div>
+              </div>
+              <div id="omega-terminal-quickbar" class="omega-terminal-quickbar" aria-label="Terminal quick commands">
+                <button type="button" data-terminal-command="npm run validate">Validate</button>
+                <button type="button" data-terminal-command="cargo check --manifest-path src-tauri/Cargo.toml">Cargo</button>
+                <button type="button" data-terminal-command="node --check web/src/main.js">JS</button>
+                <button type="button" data-terminal-command="git status --short">Git</button>
+                <button type="button" data-terminal-command="git diff --stat">Diff</button>
+              </div>
+              <form id="omega-terminal-command-form" class="omega-terminal-command-row">
+                <label class="sr-only" for="omega-terminal-command-input">Terminal command</label>
+                <span class="omega-prompt">rage@raider</span>
+                <input id="omega-terminal-command-input" type="text" placeholder="npm run validate" autocomplete="off" spellcheck="false" />
+                <button id="omega-terminal-run" type="submit">Run</button>
+              </form>
+              </div>
+            <div class="omega-bottom-view" data-bottom-content="output" id="omega-output-view">Workbench ready. Ask Omega, Codex, or Hermes from the right rail.</div>
+              <div class="omega-bottom-view" data-bottom-content="artifact" id="omega-artifact-preview-view-product">
+                <div class="omega-artifact-preview-product">
+                  <div class="omega-artifact-preview-meta">
+                    <div class="omega-artifact-preview-heading">
+                      <strong id="omega-artifact-preview-title-product">No artifact selected.</strong>
+                      <span id="omega-artifact-preview-status-product">Open an artifact tab, then click Preview Artifact.</span>
+                    </div>
+                    <div class="omega-artifact-preview-actions" aria-label="Artifact preview controls">
+                      <button id="omega-artifact-preview-fit-product" type="button">Fit</button>
+                      <button id="omega-artifact-preview-tall-product" type="button">Tall</button>
+                      <button id="omega-artifact-preview-expand-product" type="button">Expand</button>
+                    </div>
+                  </div>
+                  <iframe id="omega-artifact-preview-frame-product" title="Artifact preview" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
+                  <pre id="omega-artifact-preview-text-product">No artifact preview loaded.</pre>
+                </div>
+              </div>
+              <div class="omega-bottom-view" data-bottom-content="problems" id="omega-problems-view">No problems reported by the current product smoke.</div>
+              <div class="omega-bottom-view" data-bottom-content="evidence" id="omega-evidence-view">
+                <div class="omega-evidence-history-toolbar">
+                  <span id="omega-evidence-history-status">Evidence paths will appear after saves and terminal runs.</span>
+                  <button id="omega-evidence-history-refresh" type="button">Refresh Evidence</button>
+                </div>
+                <div id="omega-evidence-history-list" class="omega-evidence-history-list"></div>
+              </div>
+              <div id="omega-product-status-detail">Ready for prompt input.</div>
+            </div>
+          </section>
+        </main>
+
+        <aside id="omega-chat-panel-product" aria-label="Omega chat">
+          <div id="omega-chat-resizer-product" class="omega-product-resizer vertical" role="separator" aria-orientation="vertical" tabindex="0"></div>
+          <header class="omega-chat-header">
+            <div>
+              <div class="omega-chat-title">&Omega; OMEGA AGENT</div>
+              <div class="omega-chat-subtitle">Codex Lead + Hermes/Kimi</div>
+            </div>
+            <div class="omega-mcp-dots" aria-label="MCP health">
+              <span class="omega-mcp-dot ok">B</span>
+              <span class="omega-mcp-dot warn">S</span>
+              <span class="omega-mcp-dot ok">T</span>
+            </div>
+          </header>
+
+          <details class="omega-agent-run-center" id="omega-agent-run-center-details" aria-label="Codex Hermes Joint CI run center">
+            <summary class="omega-agent-run-center-summary">
+              <span>
+                <strong>Codex / Hermes Run Center</strong>
+                <small id="omega-product-agent-run-compact">0 sessions / 0 plans / 0 packets</small>
+              </span>
+              <span class="omega-agent-run-center-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="omega-agent-run-center-body">
+              <div class="omega-agent-run-center-header">
+                <span>Runtime ledgers</span>
+                <button id="omega-product-agent-run-refresh" type="button">Refresh</button>
+              </div>
+              <div id="omega-product-agent-run-summary" class="omega-agent-run-summary">Loading agent ledgers...</div>
+              <div class="omega-agent-run-stats">
+                <span><strong id="omega-product-unlocked-session-count">0</strong> sessions</span>
+                <span><strong id="omega-product-joint-plan-count">0</strong> plans</span>
+                <span><strong id="omega-product-joint-packet-count">0</strong> packets</span>
+              </div>
+              <div id="omega-product-agent-run-list" class="omega-agent-run-list">No agent sessions loaded yet.</div>
+              <button id="omega-product-joint-packet" type="button">Record Joint Packet</button>
+            </div>
+          </details>
+
+          <div id="omega-parity-chat-messages" class="omega-chat-messages" aria-live="polite"></div>
+
+          <div class="omega-chat-composer">
+            <div class="omega-context-row" aria-label="Prompt context">
+              <button class="omega-context-toggle active" type="button" data-context-key="file" aria-pressed="true">File</button>
+              <button class="omega-context-toggle active" type="button" data-context-key="selection" aria-pressed="true">Selection</button>
+              <button class="omega-context-toggle active" type="button" data-context-key="output" aria-pressed="true">Output</button>
+              <button class="omega-context-toggle active" type="button" data-context-key="problems" aria-pressed="true">Problems</button>
+              <button class="omega-context-toggle" type="button" data-context-key="terminal" aria-pressed="false">Terminal</button>
+            </div>
+            <div class="omega-agent-mode-row" aria-label="Dual agent mode">
+              <button class="active" type="button" data-agent-run-mode="codex-lead" aria-pressed="true">Dual Main</button>
+              <button type="button" data-agent-run-mode="evidence-compare" aria-pressed="false">Evidence Compare</button>
+            </div>
+            <textarea id="omega-chat-input-parity" rows="4" placeholder="Describe the work. Ctrl+Enter runs Codex Lead + Hermes/Kimi." aria-label="Omega chat input"></textarea>
+            <div class="omega-chat-actions">
+              <button id="omega-parity-send" type="button">Run Main</button>
+              <button id="omega-parity-codex-write" type="button">Codex Only</button>
+              <button id="omega-parity-hermes" type="button">Hermes Only</button>
+              <button id="omega-parity-compare" type="button">Run Dual</button>
+            </div>
+            <div id="omega-parity-composer-status">Ready.</div>
+          </div>
+        </aside>
+      </div>
+
+      <footer id="omega-status-bar">
+        <span>Gravity Omega</span>
+        <span>Ready</span>
+        <span>Ln 1, Col 1</span>
+      </footer>
+
+      <div id="omega-command-palette-product" role="dialog" aria-modal="true" aria-label="Gravity Omega command palette" hidden>
+        <div class="omega-command-palette-panel">
+          <input id="omega-command-palette-input" type="search" placeholder="Run command..." autocomplete="off" />
+          <div id="omega-command-palette-list" class="omega-command-palette-list">
+            <button type="button" data-product-command="save">Save active file</button>
+            <button type="button" data-product-command="search">Find in editor</button>
+            <button type="button" data-product-command="workspace-search">Search workspace</button>
+            <button type="button" data-product-command="terminal-validate">Run validator</button>
+            <button type="button" data-product-command="terminal-cargo-check">Cargo check</button>
+            <button type="button" data-product-command="artifact-preview-expand">Expand artifact preview</button>
+            <button type="button" data-product-command="sovereign-docs-preview">Sovereign Docs preview</button>
+            <button type="button" data-product-command="omega-computer">Omega Computer</button>
+            <button type="button" data-product-command="workbench-smoke">Run workbench smoke</button>
+            <button type="button" data-product-command="ui-smoke">Run UI smoke</button>
+            <button type="button" data-product-command="layout-reset">Reset layout</button>
+            <button type="button" data-product-command="codex">Codex Write</button>
+            <button type="button" data-product-command="hermes">Hermes</button>
+            <button type="button" data-product-command="docs">Open README</button>
+            <button type="button" data-product-command="about">About Gravity Omega</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="omega-artifact-preview-overlay" role="dialog" aria-modal="true" aria-label="Expanded artifact preview" hidden>
+        <div class="omega-artifact-preview-overlay-bar">
+          <div class="omega-artifact-preview-overlay-title">
+            <strong id="omega-artifact-preview-overlay-title">No artifact selected.</strong>
+            <span id="omega-artifact-preview-overlay-status">Expanded artifact preview.</span>
+          </div>
+          <button id="omega-artifact-preview-overlay-close" type="button">Close</button>
+        </div>
+        <iframe id="omega-artifact-preview-overlay-frame" title="Expanded artifact preview frame" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
+        <pre id="omega-artifact-preview-overlay-text" hidden></pre>
+      </div>
+    </div>
+
+    <div id="app-shell">
+      <aside class="activity-rail" aria-label="Primary areas">
+        <div class="omega-mark" aria-label="Omega">&Omega;</div>
+        <button class="rail-btn active" data-panel="command" title="Command" aria-label="Command" aria-pressed="true">
+          <span class="rail-icon icon-command" aria-hidden="true"></span>
+          <span class="sr-only">Command</span>
+        </button>
+        <button class="rail-btn" data-panel="workspace" title="Workspace" aria-label="Workspace" aria-pressed="false">
+          <span class="rail-icon icon-workspace" aria-hidden="true"></span>
+          <span class="sr-only">Workspace</span>
+        </button>
+        <button class="rail-btn" data-panel="vault" title="Vault" aria-label="Vault" aria-pressed="false">
+          <span class="rail-icon icon-vault" aria-hidden="true"></span>
+          <span class="sr-only">Vault</span>
+        </button>
+        <button class="rail-btn" data-panel="security" title="Security" aria-label="Security" aria-pressed="false">
+          <span class="rail-icon icon-security" aria-hidden="true"></span>
+          <span class="sr-only">Security</span>
+        </button>
+        <button class="rail-btn" data-panel="plugins" title="Plugins" aria-label="Plugins" aria-pressed="false">
+          <span class="rail-icon icon-plugins" aria-hidden="true"></span>
+          <span class="sr-only">Plugins</span>
+        </button>
+        <button class="rail-btn" data-panel="ci" title="Codex/Hermes CI" aria-label="Codex/Hermes CI" aria-pressed="false">
+          <span class="rail-icon icon-ci" aria-hidden="true"></span>
+          <span class="sr-only">Codex/Hermes CI</span>
+        </button>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">Linux-native workbench</div>
+            <h1>Gravity Omega</h1>
+          </div>
+          <div class="status-pill" id="contract-status">Contract loading</div>
+        </header>
+
+        <section class="hero-grid">
+          <article class="mission-panel">
+            <div class="panel-label">Prime Surface</div>
+            <h2>Gravity Omega</h2>
+            <p>
+              Gravity Omega opens as the Rust/Tauri operator workbench while parity work continues:
+              files, terminal, agent approvals, MCP, audit logs, and Linux packaging.
+            </p>
+          </article>
+
+          <article class="runtime-panel">
+            <div class="panel-label">Runtime Target</div>
+            <dl>
+              <div><dt>Status</dt><dd id="runtime-status">pending</dd></div>
+              <div><dt>Shell</dt><dd id="runtime-shell">Tauri 2</dd></div>
+              <div><dt>Core</dt><dd id="runtime-core">Rust commands</dd></div>
+              <div><dt>Paths</dt><dd id="runtime-paths">XDG native</dd></div>
+              <div><dt>Destructive</dt><dd id="runtime-safety">disabled</dd></div>
+            </dl>
+          </article>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Codex + Hermes</div>
+            <strong id="agent-runtime">runtime pending</strong>
+          </div>
+          <p id="agent-runtime-detail">Waiting for runtime probe.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Codex Hermes Run View</div>
+            <strong>operator evidence dashboard</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-view-btn" class="panel-mini-btn">Refresh</button>
+          <p id="codex-hermes-run-view-summary" class="mono-line">Codex/Hermes run view pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Run Detail</div>
+            <strong>active run evidence timeline</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-detail-timeline-btn" class="panel-mini-btn">Refresh Detail</button>
+          <p id="codex-hermes-run-detail-timeline-summary" class="mono-line">Codex/Hermes run detail timeline pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Run Compare</div>
+            <strong>Codex Hermes evidence lanes</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-selection-comparison-btn" class="panel-mini-btn">Compare Runs</button>
+          <p id="codex-hermes-run-selection-comparison-summary" class="mono-line">Codex/Hermes run selection comparison pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Evidence Diff</div>
+            <strong>Codex vs Hermes gaps</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-evidence-diff-board-btn" class="panel-mini-btn">Refresh Diff</button>
+          <p id="codex-hermes-run-evidence-diff-board-summary" class="mono-line">Codex/Hermes evidence diff board pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Reconcile</div>
+            <strong>operator close-gap checklist</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-reconciliation-checklist-btn" class="panel-mini-btn">Refresh Checklist</button>
+          <p id="codex-hermes-run-reconciliation-checklist-summary" class="mono-line">Codex/Hermes reconciliation checklist pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Action Plan</div>
+            <strong>prioritized close-gap actions</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-reconciliation-action-plan-btn" class="panel-mini-btn">Refresh Actions</button>
+          <p id="codex-hermes-run-reconciliation-action-plan-summary" class="mono-line">Codex/Hermes reconciliation action plan pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Attachment Preview</div>
+            <strong>blocked evidence intake</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-evidence-attachment-preview-btn" class="panel-mini-btn">Refresh Preview</button>
+          <p id="codex-hermes-run-evidence-attachment-preview-summary" class="mono-line">Codex/Hermes evidence attachment preview pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Approval Packet</div>
+            <strong>blocked evidence approvals</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-evidence-attachment-approval-packet-btn" class="panel-mini-btn">Refresh Packet</button>
+          <p id="codex-hermes-run-evidence-attachment-approval-packet-summary" class="mono-line">Codex/Hermes evidence attachment approval packet pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Intake Workbench</div>
+            <strong>disabled evidence forms</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-evidence-intake-workbench-btn" class="panel-mini-btn">Refresh Forms</button>
+          <p id="codex-hermes-run-evidence-intake-workbench-summary" class="mono-line">Codex/Hermes evidence intake workbench pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Validation Summary</div>
+            <strong>blocked intake checks</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-evidence-validation-summary-btn" class="panel-mini-btn">Refresh Validation</button>
+          <p id="codex-hermes-run-evidence-validation-summary-summary" class="mono-line">Codex/Hermes evidence validation summary pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Operator Confirmations</div>
+            <strong>blocked dry-runs</strong>
+          </div>
+          <button id="refresh-codex-hermes-run-evidence-operator-confirmation-dry-runs-btn" class="panel-mini-btn">Refresh Confirmations</button>
+          <p id="codex-hermes-run-evidence-operator-confirmation-dry-runs-summary" class="mono-line">Codex/Hermes evidence operator confirmation dry-runs pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Foundation Scorecard</div>
+            <strong>replacement-app lanes</strong>
+          </div>
+          <button id="refresh-foundation-scorecard-btn" class="panel-mini-btn">Refresh</button>
+          <p id="foundation-scorecard-summary" class="mono-line">Foundation scorecard pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Foundation Work Queue</div>
+            <strong>next verified slices</strong>
+          </div>
+          <button id="refresh-foundation-work-queue-btn" class="panel-mini-btn">Refresh</button>
+          <p id="foundation-work-queue-summary" class="mono-line">Foundation work queue pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Command Collapse</div>
+            <strong>20 command families</strong>
+          </div>
+          <button id="refresh-command-surface-collapse-board-btn" class="panel-mini-btn">Refresh Collapse</button>
+          <p id="command-surface-collapse-board-summary" class="mono-line">Command surface collapse board pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">UI/UX Matrix</div>
+            <strong>product quality gates</strong>
+          </div>
+          <button id="refresh-ui-ux-test-matrix-btn" class="panel-mini-btn">Refresh Matrix</button>
+          <p id="ui-ux-test-matrix-summary" class="mono-line">UI/UX test matrix pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Ship Readiness</div>
+            <strong>finish-line blocker map</strong>
+          </div>
+          <button id="refresh-ship-readiness-btn" class="panel-mini-btn">Refresh Ship</button>
+          <p id="ship-readiness-summary" class="mono-line">Ship readiness pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Sidecar Readiness</div>
+            <strong>Python browser media PTY</strong>
+          </div>
+          <button id="refresh-sidecar-readiness-btn" class="panel-mini-btn">Refresh Sidecars</button>
+          <p id="sidecar-readiness-summary" class="mono-line">Sidecar readiness pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Launch Policies</div>
+            <strong>sidecar gates manifest</strong>
+          </div>
+          <button id="refresh-sidecar-launch-policy-btn" class="panel-mini-btn">Refresh Policies</button>
+          <p id="sidecar-launch-policy-summary" class="mono-line">Sidecar launch policy pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Health Packets</div>
+            <strong>sidecar probe console</strong>
+          </div>
+          <button id="refresh-sidecar-health-packet-btn" class="panel-mini-btn">Refresh Health</button>
+          <p id="sidecar-health-packet-summary" class="mono-line">Sidecar health packets pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Runtime Probes</div>
+            <strong>bounded local runtime checks</strong>
+          </div>
+          <button id="run-runtime-probes-btn" class="panel-mini-btn">Run Probes</button>
+          <button id="record-runtime-launch-packets-btn" class="panel-mini-btn">Record Packets</button>
+          <p id="runtime-probe-summary" class="mono-line">Runtime probes not run yet.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Files</div>
+            <strong>scoped file ops</strong>
+          </div>
+          <button id="refresh-workspace-files-dashboard-btn" class="panel-mini-btn">Refresh Files</button>
+          <p id="workspace-files-dashboard-summary" class="mono-line">Workspace files dashboard pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Explorer</div>
+            <strong>live read-only tree</strong>
+          </div>
+          <button id="refresh-workspace-explorer-btn" class="panel-mini-btn">Load Explorer</button>
+          <p id="workspace-explorer-summary" class="mono-line">Workspace explorer pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Edit</div>
+            <strong>save preview family</strong>
+          </div>
+          <button id="refresh-workspace-edit-family-btn" class="panel-mini-btn">Preview Save</button>
+          <p id="workspace-edit-family-summary" class="mono-line">Workspace edit preview pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">VERITAS Modules</div>
+            <strong>migration map</strong>
+          </div>
+          <button id="refresh-veritas-modules-dashboard-btn" class="panel-mini-btn">Refresh Modules</button>
+          <p id="veritas-modules-dashboard-summary" class="mono-line">VERITAS modules dashboard pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Docs</div>
+            <strong>bundled in-app help</strong>
+          </div>
+          <button id="refresh-bundled-docs-panel-btn" class="panel-mini-btn">Open Docs</button>
+          <p id="bundled-docs-panel-summary" class="mono-line">Bundled docs panel pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">About</div>
+            <strong>runtime identity</strong>
+          </div>
+          <button id="refresh-about-panel-btn" class="panel-mini-btn">Open About</button>
+          <p id="about-panel-summary" class="mono-line">About panel pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Command Palette</div>
+            <strong>read-only registry</strong>
+          </div>
+          <button id="refresh-command-palette-panel-btn" class="panel-mini-btn">Open Palette</button>
+          <button id="refresh-gated-action-release-board-btn" class="panel-mini-btn">Release Board</button>
+          <button id="refresh-gated-adapter-release-queue-btn" class="panel-mini-btn">Adapter Queue</button>
+          <button id="record-gated-adapter-release-packet-btn" class="panel-mini-btn">Record Packet</button>
+          <button id="refresh-workspace-mutation-workbench-btn" class="panel-mini-btn">Mutation Workbench</button>
+          <p id="command-palette-panel-summary" class="mono-line">Command palette pending.</p>
+          <p id="gated-action-release-board-summary" class="mono-line">Gated action release board pending.</p>
+          <p id="gated-adapter-release-queue-summary" class="mono-line">Gated adapter release queue pending.</p>
+          <p id="workspace-mutation-workbench-summary" class="mono-line">Workspace mutation workbench pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Security Shield</div>
+            <strong>restricted controls sealed</strong>
+          </div>
+          <button id="refresh-security-shield-workbench-btn" class="panel-mini-btn">Shield Workbench</button>
+          <p id="security-shield-workbench-summary" class="mono-line">Security shield workbench pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Shell + Pairing</div>
+            <strong>native surfaces sealed</strong>
+          </div>
+          <button id="refresh-native-shell-pairing-workbench-btn" class="panel-mini-btn">Pairing Workbench</button>
+          <p id="native-shell-pairing-workbench-summary" class="mono-line">Native shell pairing workbench pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Editor Nav</div>
+            <strong>read-only record lane</strong>
+          </div>
+          <button id="refresh-workspace-editor-navigation-btn" class="panel-mini-btn">Refresh</button>
+          <p id="workspace-editor-navigation-summary" class="mono-line">Workspace editor navigation pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Editor Shell</div>
+            <strong>read-only panel layout</strong>
+          </div>
+          <button id="refresh-workspace-editor-shell-btn" class="panel-mini-btn">Refresh</button>
+          <p id="workspace-editor-shell-summary" class="mono-line">Workspace editor shell pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Editor Bindings</div>
+            <strong>summary and ledger targets</strong>
+          </div>
+          <button id="refresh-workspace-editor-bindings-btn" class="panel-mini-btn">Refresh</button>
+          <p id="workspace-editor-bindings-summary" class="mono-line">Workspace editor bindings pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Editor Focus</div>
+            <strong>read-only navigation target</strong>
+          </div>
+          <button id="refresh-workspace-editor-focus-btn" class="panel-mini-btn">Refresh</button>
+          <p id="workspace-editor-focus-summary" class="mono-line">Workspace editor focus pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Editor Keys</div>
+            <strong>reserved traversal map</strong>
+          </div>
+          <button id="refresh-workspace-editor-keys-btn" class="panel-mini-btn">Refresh</button>
+          <p id="workspace-editor-keys-summary" class="mono-line">Workspace editor keys pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Editor Palette</div>
+            <strong>disabled command intents</strong>
+          </div>
+          <button id="refresh-workspace-editor-palette-btn" class="panel-mini-btn">Refresh</button>
+          <p id="workspace-editor-palette-summary" class="mono-line">Workspace editor palette pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Workspace Editor Search</div>
+            <strong>grouped command discovery</strong>
+          </div>
+          <button id="refresh-workspace-editor-search-btn" class="panel-mini-btn">Refresh</button>
+          <button id="refresh-find-panel-btn" class="panel-mini-btn">Open Find</button>
+          <p id="find-panel-summary" class="mono-line">Find panel pending.</p>
+          <p id="workspace-editor-search-summary" class="mono-line">Workspace editor search pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Terminal Process</div>
+            <strong>read-only lane visibility</strong>
+          </div>
+          <button id="refresh-terminal-toggle-panel-btn" class="panel-mini-btn">Toggle Panel</button>
+          <button id="refresh-terminal-process-workbench-btn" class="panel-mini-btn">Process Workbench</button>
+          <button id="refresh-terminal-process-lane-dashboard-btn" class="panel-mini-btn">Refresh Lane</button>
+          <p id="terminal-toggle-panel-summary" class="mono-line">Terminal toggle panel pending.</p>
+          <p id="terminal-process-workbench-summary" class="mono-line">Terminal process workbench pending.</p>
+          <p id="terminal-process-lane-dashboard-summary" class="mono-line">Terminal process lane dashboard pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Approval Evidence</div>
+            <strong>read-only safety spine</strong>
+          </div>
+          <button id="refresh-approval-evidence-spine-dashboard-btn" class="panel-mini-btn">Refresh Spine</button>
+          <p id="approval-evidence-spine-dashboard-summary" class="mono-line">Approval evidence spine dashboard pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Linux Desktop</div>
+            <strong>control readiness sealed</strong>
+          </div>
+          <button id="refresh-linux-desktop-control-readiness-dashboard-btn" class="panel-mini-btn">Refresh Desktop</button>
+          <p id="linux-desktop-control-readiness-dashboard-summary" class="mono-line">Linux desktop control readiness pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Desktop Capture</div>
+            <strong>approval policy sealed</strong>
+          </div>
+          <button id="refresh-desktop-capture-action-approval-policy-dashboard-btn" class="panel-mini-btn">Refresh Policy</button>
+          <p id="desktop-capture-action-approval-policy-dashboard-summary" class="mono-line">Desktop capture/action policy pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Capture Records</div>
+            <strong>per-capability approvals sealed</strong>
+          </div>
+          <button id="refresh-desktop-capture-action-approval-records-btn" class="panel-mini-btn">Refresh Records</button>
+          <p id="desktop-capture-action-approval-records-summary" class="mono-line">Desktop capture/action records pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Desktop Confirmation</div>
+            <strong>operator dry-runs sealed</strong>
+          </div>
+          <button id="refresh-desktop-capture-action-operator-confirmation-dry-runs-btn" class="panel-mini-btn">Refresh Dry-Runs</button>
+          <p id="desktop-capture-action-operator-confirmation-dry-runs-summary" class="mono-line">Desktop confirmation dry-runs pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Pre-Action</div>
+            <strong>confirmed evidence required</strong>
+          </div>
+          <button id="refresh-desktop-capture-action-final-preaction-dry-runs-btn" class="panel-mini-btn">Refresh Pre-Action</button>
+          <p id="desktop-capture-action-final-preaction-dry-runs-summary" class="mono-line">Desktop final pre-action dry-runs pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Desktop Safety</div>
+            <strong>action gates summarized</strong>
+          </div>
+          <button id="refresh-desktop-action-safety-summary-btn" class="panel-mini-btn">Refresh Safety</button>
+          <p id="desktop-action-safety-summary-summary" class="mono-line">Desktop action safety summary pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">Desktop Release</div>
+            <strong>readiness checklist sealed</strong>
+          </div>
+          <button id="refresh-linux-desktop-readiness-release-checklist-btn" class="panel-mini-btn">Refresh Checklist</button>
+          <p id="linux-desktop-readiness-release-checklist-summary" class="mono-line">Linux desktop release checklist pending.</p>
+        </section>
+
+        <section class="agent-status-panel">
+          <div>
+            <div class="panel-label">SSWP + Steno</div>
+            <strong>first-class local MCP lanes</strong>
+          </div>
+          <button id="refresh-first-class-integration-launchpad-btn" class="panel-mini-btn">Launchpad</button>
+          <button id="refresh-steno-pet-companion-dashboard-btn" class="panel-mini-btn">Refresh Steno + Pet</button>
+          <button id="refresh-steno-search-panel-btn" class="panel-mini-btn">Steno Search</button>
+          <button id="refresh-sswp-status-panel-btn" class="panel-mini-btn">SSWP Status</button>
+          <button id="refresh-first-class-mcp-dashboard-btn" class="panel-mini-btn">Refresh Dashboard</button>
+          <button id="create-local-mcp-contract-btn" class="panel-mini-btn">Contract</button>
+          <button id="create-local-mcp-preflight-btn" class="panel-mini-btn">Preflight</button>
+          <button id="create-local-mcp-health-btn" class="panel-mini-btn">Record Health</button>
+          <button id="create-local-mcp-discovery-policy-btn" class="panel-mini-btn">Discover</button>
+          <button id="create-local-mcp-gated-call-policy-btn" class="panel-mini-btn">Call Gate</button>
+          <button id="create-local-mcp-call-approval-audit-btn" class="panel-mini-btn">Call Audit</button>
+          <button id="create-local-mcp-consent-approval-btn" class="panel-mini-btn">Consent</button>
+          <button id="create-local-mcp-audit-outcome-btn" class="panel-mini-btn">Audit Outcome</button>
+          <button id="create-local-mcp-recovery-precall-guard-btn" class="panel-mini-btn">Pre-Call Guard</button>
+          <button id="create-local-mcp-final-call-approval-btn" class="panel-mini-btn">Final Approval</button>
+          <button id="create-local-mcp-live-call-dry-run-btn" class="panel-mini-btn">Call Dry Run</button>
+          <button id="create-local-mcp-typed-command-contract-btn" class="panel-mini-btn">Typed Contract</button>
+          <button id="create-local-mcp-status-probe-preflight-btn" class="panel-mini-btn">Status Preflight</button>
+          <button id="create-local-mcp-config-lookup-preflight-btn" class="panel-mini-btn">Config Preflight</button>
+          <button id="create-local-mcp-config-read-policy-btn" class="panel-mini-btn">Config Policy</button>
+          <button id="create-local-mcp-config-path-allowlist-btn" class="panel-mini-btn">Path Scope</button>
+          <button id="create-local-mcp-config-path-resolution-request-btn" class="panel-mini-btn">Path Request</button>
+          <button id="create-local-mcp-config-path-resolution-approval-btn" class="panel-mini-btn">Path Approval</button>
+          <button id="create-local-mcp-config-path-resolution-dry-run-btn" class="panel-mini-btn">Path Dry Run</button>
+          <button id="create-local-mcp-config-path-materialization-request-btn" class="panel-mini-btn">Path Material</button>
+          <button id="create-local-mcp-config-path-materialization-approval-btn" class="panel-mini-btn">Material Approval</button>
+          <button id="create-local-mcp-config-path-materialization-final-dry-run-btn" class="panel-mini-btn">Material Dry Run</button>
+          <button id="create-local-mcp-config-path-read-preflight-request-btn" class="panel-mini-btn">Read Preflight</button>
+          <button id="create-local-mcp-config-path-read-preflight-approval-btn" class="panel-mini-btn">Read Approval</button>
+          <button id="create-local-mcp-config-path-read-preflight-final-dry-run-btn" class="panel-mini-btn">Read Dry Run</button>
+          <button id="create-local-mcp-config-path-controlled-read-request-btn" class="panel-mini-btn">Read Request</button>
+          <button id="create-local-mcp-config-path-controlled-read-approval-btn" class="panel-mini-btn">Read Approve</button>
+          <button id="create-local-mcp-config-path-controlled-read-final-dry-run-btn" class="panel-mini-btn">Read Final Dry</button>
+          <button id="create-local-mcp-config-path-sealed-read-request-btn" class="panel-mini-btn">Sealed Read</button>
+          <button id="create-local-mcp-config-path-sealed-read-approval-btn" class="panel-mini-btn">Sealed Approve</button>
+          <button id="create-local-mcp-config-path-sealed-read-final-dry-run-btn" class="panel-mini-btn">Sealed Dry</button>
+          <button id="create-local-mcp-config-path-sealed-content-preflight-btn" class="panel-mini-btn">Content Preflight</button>
+          <button id="create-local-mcp-config-path-sealed-content-final-dry-run-btn" class="panel-mini-btn">Content Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-approval-btn" class="panel-mini-btn">Content Approve</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-final-dry-run-btn" class="panel-mini-btn">Content Read Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-execution-preflight-btn" class="panel-mini-btn">Content Exec Preflight</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-audit-recovery-preexecution-btn" class="panel-mini-btn">Content Audit Guard</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-final-approval-btn" class="panel-mini-btn">Content Final Approve</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-final-execution-dry-run-btn" class="panel-mini-btn">Content Final Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-redaction-schema-dry-run-btn" class="panel-mini-btn">Content Schema Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-parse-hash-dry-run-btn" class="panel-mini-btn">Content Parse Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-content-shape-policy-dry-run-btn" class="panel-mini-btn">Content Shape Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-structural-intent-dry-run-btn" class="panel-mini-btn">Content Intent Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-field-inventory-dry-run-btn" class="panel-mini-btn">Content Fields Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-key-presence-dry-run-btn" class="panel-mini-btn">Content Keys Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-key-requirement-dry-run-btn" class="panel-mini-btn">Content Requirements Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-key-value-shape-dry-run-btn" class="panel-mini-btn">Content Value Shapes Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-value-contract-dry-run-btn" class="panel-mini-btn">Content Value Contract Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-value-redaction-map-dry-run-btn" class="panel-mini-btn">Content Redaction Map Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-key-map-dry-run-btn" class="panel-mini-btn">Content Schema Keys Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-binding-dry-run-btn" class="panel-mini-btn">Content Schema Binding Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-plan-dry-run-btn" class="panel-mini-btn">Content Schema Validation Plan Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Coverage Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-report-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Coverage Report Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-report-archive-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Report Archive Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-archive-retention-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Archive Retention Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-review-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Review Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Signoff Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-finalization-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Signoff Finalization Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-gate-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Gate Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-approval-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Approval Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-gate-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Gate Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-approval-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Approval Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-finalization-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Finalization Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-gate-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Gate Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-approval-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Approval Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-finalization-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Finalization Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-completion-review-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Completion Review Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-review-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Review Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-approval-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Approval Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-finalization-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Finalization Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-completion-review-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Completion Review Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-readiness-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Readiness Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-approval-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Approval Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-finalization-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Finalization Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-completion-review-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Completion Review Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-readiness-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Release Readiness Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-approval-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Release Approval Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-finalization-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Release Finalization Dry</button>
+          <button id="create-local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-completion-review-dry-run-btn" class="panel-mini-btn">Content Schema Validation Fixture Retention Release Publication Release Closure Release Release Completion Review Dry</button>
+          <p id="steno-pet-companion-dashboard-summary" class="mono-line">Steno pet companion dashboard pending.</p>
+          <p id="steno-search-panel-summary" class="mono-line">Steno search panel pending.</p>
+          <p id="sswp-status-panel-summary" class="mono-line">SSWP status panel pending.</p>
+          <p id="first-class-mcp-dashboard-summary" class="mono-line">First-class MCP dashboard pending.</p>
+          <p id="local-mcp-contract-summary" class="mono-line">No local MCP lane capability contract recorded.</p>
+          <p id="local-mcp-preflight-summary" class="mono-line">No local MCP health preflight recorded.</p>
+          <p id="local-mcp-health-summary" class="mono-line">No local MCP health record.</p>
+          <p id="local-mcp-discovery-policy-summary" class="mono-line">No local MCP capability discovery policy recorded.</p>
+          <p id="local-mcp-gated-call-policy-summary" class="mono-line">No local MCP gated-call policy recorded.</p>
+          <p id="local-mcp-call-approval-audit-summary" class="mono-line">No local MCP call approval/audit request recorded.</p>
+          <p id="local-mcp-consent-approval-summary" class="mono-line">No local MCP consent/approval decision recorded.</p>
+          <p id="local-mcp-audit-outcome-summary" class="mono-line">No local MCP audit outcome recorded.</p>
+          <p id="local-mcp-recovery-precall-guard-summary" class="mono-line">No local MCP recovery/pre-call guard recorded.</p>
+          <p id="local-mcp-final-call-approval-summary" class="mono-line">No final local MCP call approval recorded.</p>
+          <p id="local-mcp-live-call-dry-run-summary" class="mono-line">No local MCP live-call dry run recorded.</p>
+          <p id="local-mcp-typed-command-contract-summary" class="mono-line">No local MCP typed command contract recorded.</p>
+          <p id="local-mcp-status-probe-preflight-summary" class="mono-line">No local MCP status probe preflight recorded.</p>
+          <p id="local-mcp-config-lookup-preflight-summary" class="mono-line">No local MCP config lookup preflight recorded.</p>
+          <p id="local-mcp-config-read-policy-summary" class="mono-line">No local MCP config read policy recorded.</p>
+          <p id="local-mcp-config-path-allowlist-summary" class="mono-line">No local MCP config path allowlist recorded.</p>
+          <p id="local-mcp-config-path-resolution-request-summary" class="mono-line">No local MCP config path resolution request recorded.</p>
+          <p id="local-mcp-config-path-resolution-approval-summary" class="mono-line">No local MCP config path resolution approval recorded.</p>
+          <p id="local-mcp-config-path-resolution-dry-run-summary" class="mono-line">No local MCP config path resolution dry run recorded.</p>
+          <p id="local-mcp-config-path-materialization-request-summary" class="mono-line">No local MCP config path materialization request recorded.</p>
+          <p id="local-mcp-config-path-materialization-approval-summary" class="mono-line">No local MCP config path materialization approval recorded.</p>
+          <p id="local-mcp-config-path-materialization-final-dry-run-summary" class="mono-line">No local MCP config path materialization final dry run recorded.</p>
+          <p id="local-mcp-config-path-read-preflight-request-summary" class="mono-line">No local MCP config path read preflight request recorded.</p>
+          <p id="local-mcp-config-path-read-preflight-approval-summary" class="mono-line">No local MCP config path read preflight approval recorded.</p>
+          <p id="local-mcp-config-path-read-preflight-final-dry-run-summary" class="mono-line">No local MCP config path read preflight final dry run recorded.</p>
+          <p id="local-mcp-config-path-controlled-read-request-summary" class="mono-line">No local MCP config path controlled read request recorded.</p>
+          <p id="local-mcp-config-path-controlled-read-approval-summary" class="mono-line">No local MCP config path controlled read approval recorded.</p>
+          <p id="local-mcp-config-path-controlled-read-final-dry-run-summary" class="mono-line">No local MCP config path controlled read final dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-read-request-summary" class="mono-line">No local MCP config path sealed read request recorded.</p>
+          <p id="local-mcp-config-path-sealed-read-approval-summary" class="mono-line">No local MCP config path sealed read approval recorded.</p>
+          <p id="local-mcp-config-path-sealed-read-final-dry-run-summary" class="mono-line">No local MCP config path sealed read final dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-content-preflight-summary" class="mono-line">No local MCP config path sealed content preflight recorded.</p>
+          <p id="local-mcp-config-path-sealed-content-final-dry-run-summary" class="mono-line">No local MCP config path sealed content final dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-approval-summary" class="mono-line">No local MCP config path sealed config content read approval recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-final-dry-run-summary" class="mono-line">No local MCP sealed config content read final dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-execution-preflight-summary" class="mono-line">No local MCP sealed config content read execution preflight recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-audit-recovery-preexecution-summary" class="mono-line">No local MCP sealed config content read audit/recovery pre-execution recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-final-approval-summary" class="mono-line">No local MCP sealed config content read final approval recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-final-execution-dry-run-summary" class="mono-line">No local MCP sealed config content read final execution dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-redaction-schema-dry-run-summary" class="mono-line">No local MCP sealed config content read redaction/schema dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-parse-hash-dry-run-summary" class="mono-line">No local MCP sealed config content read parse/hash dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-content-shape-policy-dry-run-summary" class="mono-line">No local MCP sealed config content read content-shape policy dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-structural-intent-dry-run-summary" class="mono-line">No local MCP sealed config content read structural-intent dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-field-inventory-dry-run-summary" class="mono-line">No local MCP sealed config content read field-inventory dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-key-presence-dry-run-summary" class="mono-line">No local MCP sealed config content read key-presence dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-key-requirement-dry-run-summary" class="mono-line">No local MCP sealed config content read key-requirement dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-key-value-shape-dry-run-summary" class="mono-line">No local MCP sealed config content read key-value-shape dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-value-contract-dry-run-summary" class="mono-line">No local MCP sealed config content read value-contract dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-value-redaction-map-dry-run-summary" class="mono-line">No local MCP sealed config content read value-redaction-map dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-key-map-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-key-map dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-binding-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-binding dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-plan-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-plan dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-coverage dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-report-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-coverage-report dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-report-archive-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-report-archive dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-archive-retention-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-archive-retention dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-review-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-review dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-signoff dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-finalization-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-signoff-finalization dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-gate-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-gate dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-approval-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-approval dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-gate-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-gate dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-approval-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-approval dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-finalization-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-finalization dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-gate-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-gate dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-approval-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-approval dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-finalization-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-finalization dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-completion-review-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-completion-review dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-review-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-review dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-approval-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-approval dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-finalization-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-finalization dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-completion-review-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-completion-review dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-readiness-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-readiness dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-approval-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-approval dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-finalization-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-finalization dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-completion-review-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-completion-review dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-readiness-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-release-readiness dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-approval-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-release-approval dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-finalization-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-release-finalization dry run recorded.</p>
+          <p id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-completion-review-dry-run-summary" class="mono-line">No local MCP sealed config content read schema-validation-fixture-retention-release-publication-release-closure-release-release-completion-review dry run recorded.</p>
+          <p id="first-class-integration-launchpad-summary" class="mono-line">First-class integration launchpad pending.</p>
+        </section>
+
+        <section class="surface-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Feature Migration</span>
+              <span id="feature-count">0</span>
+            </div>
+            <div id="feature-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Command Groups</span>
+              <span id="command-count">0</span>
+            </div>
+            <div id="command-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Foundation Scorecard</span>
+              <span><span id="foundation-scorecard-count">0</span> lanes</span>
+            </div>
+            <div id="foundation-scorecard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Foundation Work Queue</span>
+              <span><span id="foundation-work-queue-count">0</span> slices</span>
+            </div>
+            <div id="foundation-work-queue-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Command Surface Collapse</span>
+              <span><span id="command-surface-collapse-board-count">0</span> families</span>
+            </div>
+            <div id="command-surface-collapse-board-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>UI/UX Test Matrix</span>
+              <span><span id="ui-ux-test-matrix-count">0</span> gates</span>
+            </div>
+            <div id="ui-ux-test-matrix-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Ship Readiness</span>
+              <span><span id="ship-readiness-count">0</span> families</span>
+            </div>
+            <div id="ship-readiness-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Sidecar Readiness</span>
+              <span><span id="sidecar-readiness-count">0</span> sidecars</span>
+            </div>
+            <div id="sidecar-readiness-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Sidecar Launch Policies</span>
+              <span><span id="sidecar-launch-policy-count">0</span> policies</span>
+            </div>
+            <div id="sidecar-launch-policy-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Sidecar Health Packets</span>
+              <span><span id="sidecar-health-packet-count">0</span> packets</span>
+            </div>
+            <div id="sidecar-health-packet-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runtime Probes</span>
+              <span><span id="runtime-probe-count">0</span> probes</span>
+            </div>
+            <div id="runtime-probe-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runtime Launch Packets</span>
+              <span><span id="runtime-launch-packet-count">0</span> packets</span>
+            </div>
+            <div id="runtime-launch-packet-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Files Dashboard</span>
+              <span><span id="workspace-files-dashboard-count">0</span> ops</span>
+            </div>
+            <div id="workspace-files-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Explorer Tree</span>
+              <span><span id="workspace-explorer-count">0</span> entries</span>
+            </div>
+            <div id="workspace-explorer-tree" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Explorer Preview</span>
+              <span id="workspace-explorer-preview-meta">No file</span>
+            </div>
+            <pre id="workspace-explorer-preview" class="artifact-preview">No live workspace preview loaded.</pre>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Edit Preview</span>
+              <span><span id="workspace-edit-family-count">0</span> stages</span>
+            </div>
+            <div id="workspace-edit-family-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>VERITAS Modules Dashboard</span>
+              <span><span id="veritas-modules-dashboard-count">0</span> modules</span>
+            </div>
+            <div id="veritas-modules-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Bundled Docs</span>
+              <span><span id="bundled-docs-panel-count">0</span> sections</span>
+            </div>
+            <div id="bundled-docs-panel-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>About Gravity Omega</span>
+              <span><span id="about-panel-count">0</span> details</span>
+            </div>
+            <div id="about-panel-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Command Palette</span>
+              <span><span id="command-palette-panel-count">0</span> commands</span>
+            </div>
+            <div id="command-palette-panel-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Editor Navigation</span>
+              <span><span id="workspace-editor-navigation-count">0</span> items</span>
+            </div>
+            <div id="workspace-editor-navigation-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Editor Shell</span>
+              <span><span id="workspace-editor-shell-count">0</span> panels</span>
+            </div>
+            <div id="workspace-editor-shell-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Editor Bindings</span>
+              <span><span id="workspace-editor-bindings-count">0</span> bindings</span>
+            </div>
+            <div id="workspace-editor-bindings-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Editor Focus</span>
+              <span><span id="workspace-editor-focus-count">0</span> targets</span>
+            </div>
+            <div id="workspace-editor-focus-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Editor Keys</span>
+              <span><span id="workspace-editor-keys-count">0</span> stops</span>
+            </div>
+            <div id="workspace-editor-keys-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Editor Palette</span>
+              <span><span id="workspace-editor-palette-count">0</span> commands</span>
+            </div>
+            <div id="workspace-editor-palette-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Editor Search</span>
+              <span><span id="workspace-editor-search-count">0</span> groups</span>
+            </div>
+            <div id="workspace-editor-search-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Find Panel</span>
+              <span><span id="find-panel-count">0</span> scopes</span>
+            </div>
+            <div id="find-panel-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Toolbar Registry</span>
+              <span><span id="toolbar-count">0</span> / <span id="toolbar-issue-count">0</span> missing</span>
+            </div>
+            <div class="toolbar-search-row">
+              <label class="sr-only" for="toolbar-search-input">Search toolbar registry</label>
+              <input
+                id="toolbar-search-input"
+                class="toolbar-search-input"
+                type="search"
+                placeholder="Search command, label, target, state, tier..."
+                autocomplete="off"
+              />
+              <span id="toolbar-search-summary" class="toolbar-search-summary">All toolbar commands shown.</span>
+            </div>
+            <div id="toolbar-list" class="list list-scroll"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Gated Release Board</span>
+              <span><span id="gated-action-release-board-count">0</span> actions</span>
+            </div>
+            <div id="gated-action-release-board-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Gated Adapter Release Queue</span>
+              <span><span id="gated-adapter-release-queue-count">0</span> adapters</span>
+            </div>
+            <div id="gated-adapter-release-queue-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Mutation Workbench</span>
+              <span><span id="workspace-mutation-workbench-count">0</span> actions</span>
+            </div>
+            <div id="workspace-mutation-workbench-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Security Shield Workbench</span>
+              <span><span id="security-shield-workbench-count">0</span> actions</span>
+            </div>
+            <div id="security-shield-workbench-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Native Shell Pairing Workbench</span>
+              <span><span id="native-shell-pairing-workbench-count">0</span> actions</span>
+            </div>
+            <div id="native-shell-pairing-workbench-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>First-Class MCP Dashboard</span>
+              <span><span id="first-class-mcp-dashboard-count">0</span> lanes</span>
+            </div>
+            <div id="first-class-mcp-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Integration Launchpad</span>
+              <span><span id="first-class-integration-launchpad-count">0</span> lanes</span>
+            </div>
+            <div id="first-class-integration-launchpad-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>SSWP Status</span>
+              <span><span id="sswp-status-panel-count">0</span> records</span>
+            </div>
+            <div id="sswp-status-panel-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Steno Pet Companion</span>
+              <span><span id="steno-pet-companion-dashboard-count">0</span> sections</span>
+            </div>
+            <div id="steno-pet-companion-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Steno Search</span>
+              <span><span id="steno-search-panel-count">0</span> sections</span>
+            </div>
+            <div id="steno-search-panel-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Terminal Process Lane</span>
+              <span><span id="terminal-process-lane-dashboard-count">0</span> sections</span>
+            </div>
+            <div id="terminal-process-lane-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Terminal Process Workbench</span>
+              <span><span id="terminal-process-workbench-count">0</span> actions</span>
+            </div>
+            <div id="terminal-process-workbench-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Terminal Toggle</span>
+              <span><span id="terminal-toggle-panel-count">0</span> reasons</span>
+            </div>
+            <div id="terminal-toggle-panel-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Approval Evidence Spine</span>
+              <span><span id="approval-evidence-spine-dashboard-count">0</span> sections</span>
+            </div>
+            <div id="approval-evidence-spine-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Linux Desktop Readiness</span>
+              <span><span id="linux-desktop-control-readiness-dashboard-count">0</span> sections</span>
+            </div>
+            <div id="linux-desktop-control-readiness-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Desktop Capture Policy</span>
+              <span><span id="desktop-capture-action-approval-policy-dashboard-count">0</span> sections</span>
+            </div>
+            <div id="desktop-capture-action-approval-policy-dashboard-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Desktop Capture Records</span>
+              <span><span id="desktop-capture-action-approval-records-count">0</span> records</span>
+            </div>
+            <div id="desktop-capture-action-approval-records-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Desktop Confirmation Dry-Runs</span>
+              <span><span id="desktop-capture-action-operator-confirmation-dry-runs-count">0</span> dry-runs</span>
+            </div>
+            <div id="desktop-capture-action-operator-confirmation-dry-runs-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Desktop Final Pre-Action</span>
+              <span><span id="desktop-capture-action-final-preaction-dry-runs-count">0</span> dry-runs</span>
+            </div>
+            <div id="desktop-capture-action-final-preaction-dry-runs-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Desktop Action Safety</span>
+              <span><span id="desktop-action-safety-summary-count">0</span> sections</span>
+            </div>
+            <div id="desktop-action-safety-summary-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Linux Desktop Release Checklist</span>
+              <span><span id="linux-desktop-readiness-release-checklist-count">0</span> checks</span>
+            </div>
+            <div id="linux-desktop-readiness-release-checklist-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Health</span>
+              <span><span id="local-mcp-health-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-health-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Contracts</span>
+              <span><span id="local-mcp-contract-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-contract-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Preflights</span>
+              <span><span id="local-mcp-preflight-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Discovery</span>
+              <span><span id="local-mcp-discovery-policy-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-discovery-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Call Gates</span>
+              <span><span id="local-mcp-gated-call-policy-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-gated-call-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Call Audits</span>
+              <span><span id="local-mcp-call-approval-audit-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-call-approval-audit-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Consent</span>
+              <span><span id="local-mcp-consent-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-consent-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Audit</span>
+              <span><span id="local-mcp-audit-outcome-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-audit-outcome-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Pre-Call</span>
+              <span><span id="local-mcp-recovery-precall-guard-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-recovery-precall-guard-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Final Approval</span>
+              <span><span id="local-mcp-final-call-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-final-call-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Dry Run</span>
+              <span><span id="local-mcp-live-call-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-live-call-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Typed Commands</span>
+              <span><span id="local-mcp-typed-command-contract-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-typed-command-contract-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Status Preflights</span>
+              <span><span id="local-mcp-status-probe-preflight-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-status-probe-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Config Preflights</span>
+              <span><span id="local-mcp-config-lookup-preflight-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-lookup-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Config Policies</span>
+              <span><span id="local-mcp-config-read-policy-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-read-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Scopes</span>
+              <span><span id="local-mcp-config-path-allowlist-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-allowlist-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Requests</span>
+              <span><span id="local-mcp-config-path-resolution-request-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-resolution-request-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Approvals</span>
+              <span><span id="local-mcp-config-path-resolution-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-resolution-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Dry Runs</span>
+              <span><span id="local-mcp-config-path-resolution-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-resolution-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Material Requests</span>
+              <span><span id="local-mcp-config-path-materialization-request-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-materialization-request-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Material Approvals</span>
+              <span><span id="local-mcp-config-path-materialization-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-materialization-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Final Dry Runs</span>
+              <span><span id="local-mcp-config-path-materialization-final-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-materialization-final-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Read Preflights</span>
+              <span><span id="local-mcp-config-path-read-preflight-request-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-read-preflight-request-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Read Approvals</span>
+              <span><span id="local-mcp-config-path-read-preflight-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-read-preflight-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Read Dry Runs</span>
+              <span><span id="local-mcp-config-path-read-preflight-final-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-read-preflight-final-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Read Requests</span>
+              <span><span id="local-mcp-config-path-controlled-read-request-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-controlled-read-request-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Read Approvals</span>
+              <span><span id="local-mcp-config-path-controlled-read-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-controlled-read-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Read Final Dry Runs</span>
+              <span><span id="local-mcp-config-path-controlled-read-final-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-controlled-read-final-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Sealed Read Requests</span>
+              <span><span id="local-mcp-config-path-sealed-read-request-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-read-request-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Sealed Read Approvals</span>
+              <span><span id="local-mcp-config-path-sealed-read-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-read-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Sealed Read Final Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-read-final-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-read-final-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Sealed Content Preflights</span>
+              <span><span id="local-mcp-config-path-sealed-content-preflight-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-content-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Sealed Content Final Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-content-final-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-content-final-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Path Sealed Config Content Read Approvals</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Final Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-final-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-final-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Execution Preflights</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-execution-preflight-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-execution-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Audit Guards</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-audit-recovery-preexecution-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-audit-recovery-preexecution-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Final Approvals</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-final-approval-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-final-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Final Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-final-execution-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-final-execution-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Redaction/Schema Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-redaction-schema-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-redaction-schema-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Parse/Hash Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-parse-hash-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-parse-hash-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Content-Shape Policy Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-content-shape-policy-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-content-shape-policy-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Structural Intent Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-structural-intent-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-structural-intent-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Field Inventory Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-field-inventory-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-field-inventory-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Key Presence Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-key-presence-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-key-presence-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Key Requirement Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-key-requirement-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-key-requirement-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Key Value Shape Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-key-value-shape-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-key-value-shape-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Value Contract Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-value-contract-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-value-contract-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Value Redaction Map Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-value-redaction-map-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-value-redaction-map-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Key Map Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-key-map-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-key-map-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Binding Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-binding-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-binding-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Plan Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-plan-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-plan-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Coverage Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Coverage Report Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-report-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-coverage-report-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Report Archive Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-report-archive-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-report-archive-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Archive Retention Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-archive-retention-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-archive-retention-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Review Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-review-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-review-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Signoff Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Signoff Finalization Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-finalization-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-signoff-finalization-dry-run-ledger" class="list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Gate Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-gate-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-gate-dry-run-ledger" class="list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Approval Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-approval-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-approval-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Gate Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-gate-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-gate-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Approval Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-approval-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-approval-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Finalization Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-finalization-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-finalization-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Gate Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-gate-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-gate-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Approval Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-approval-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-approval-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Finalization Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-finalization-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-finalization-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Completion Review Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-completion-review-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-completion-review-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Review Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-review-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-review-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Approval Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-approval-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-approval-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Finalization Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-finalization-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-finalization-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Completion Review Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-completion-review-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-completion-review-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Run View</span>
+              <span><span id="codex-hermes-run-view-count">0</span> sections</span>
+            </div>
+            <div id="codex-hermes-run-view-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Run Detail Timeline</span>
+              <span><span id="codex-hermes-run-detail-timeline-count">0</span> items</span>
+            </div>
+            <div id="codex-hermes-run-detail-timeline-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Run Selection Comparison</span>
+              <span><span id="codex-hermes-run-selection-comparison-count">0</span> records</span>
+            </div>
+            <div id="codex-hermes-run-selection-comparison-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Evidence Diff Board</span>
+              <span><span id="codex-hermes-run-evidence-diff-board-count">0</span> diffs</span>
+            </div>
+            <div id="codex-hermes-run-evidence-diff-board-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Reconciliation Checklist</span>
+              <span><span id="codex-hermes-run-reconciliation-checklist-count">0</span> checks</span>
+            </div>
+            <div id="codex-hermes-run-reconciliation-checklist-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Reconciliation Action Plan</span>
+              <span><span id="codex-hermes-run-reconciliation-action-plan-count">0</span> actions</span>
+            </div>
+            <div id="codex-hermes-run-reconciliation-action-plan-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Evidence Attachment Preview</span>
+              <span><span id="codex-hermes-run-evidence-attachment-preview-count">0</span> previews</span>
+            </div>
+            <div id="codex-hermes-run-evidence-attachment-preview-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Evidence Attachment Approval Packet</span>
+              <span><span id="codex-hermes-run-evidence-attachment-approval-packet-count">0</span> packets</span>
+            </div>
+            <div id="codex-hermes-run-evidence-attachment-approval-packet-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Evidence Intake Workbench</span>
+              <span><span id="codex-hermes-run-evidence-intake-workbench-count">0</span> forms</span>
+            </div>
+            <div id="codex-hermes-run-evidence-intake-workbench-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Evidence Validation Summary</span>
+              <span><span id="codex-hermes-run-evidence-validation-summary-count">0</span> summaries</span>
+            </div>
+            <div id="codex-hermes-run-evidence-validation-summary-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex Hermes Evidence Operator Confirmation Dry-Runs</span>
+              <span><span id="codex-hermes-run-evidence-operator-confirmation-dry-runs-count">0</span> dry-runs</span>
+            </div>
+            <div id="codex-hermes-run-evidence-operator-confirmation-dry-runs-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Codex/Hermes Runs</span>
+              <span>workbench</span>
+            </div>
+            <div id="task-run-list" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Readiness Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-readiness-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-readiness-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Approval Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-approval-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-approval-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Finalization Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-finalization-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-finalization-dry-run-ledger" class="list"></div>
+          </article>
+
+<article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Completion Review Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-completion-review-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-completion-review-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Release Readiness Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-readiness-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-readiness-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Release Approval Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-approval-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-approval-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Release Finalization Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-finalization-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-finalization-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Local MCP Sealed Config Content Read Schema Validation Fixture Retention Release Publication Release Closure Release Release Completion Review Dry Runs</span>
+              <span><span id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-completion-review-dry-run-count">0</span> records</span>
+            </div>
+            <div id="local-mcp-config-path-sealed-config-content-read-schema-validation-fixture-retention-release-publication-release-closure-release-release-completion-review-dry-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Command Dry Run</span>
+              <span>blocked</span>
+            </div>
+            <p id="command-resolution" class="mono-line">pending</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Toolbar Action Readiness</span>
+              <span><span id="toolbar-action-readiness-count">0</span> checks</span>
+            </div>
+            <p id="toolbar-action-readiness-summary" class="mono-line">Toolbar action readiness pending.</p>
+            <div id="toolbar-action-readiness-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Sandbox Policy</span>
+              <span><span id="sandbox-policy-count">0</span> policies / <span id="sandbox-prefix-count">0</span> prefixes</span>
+            </div>
+            <div id="sandbox-policy-list" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Allowlist Gate</span>
+              <span>dry run</span>
+            </div>
+            <p id="sandbox-gate-decision" class="mono-line">pending</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Run Ledger</span>
+              <button id="create-task-run-btn" class="panel-mini-btn">Record Stub</button>
+            </div>
+            <div class="panel-subcount"><span id="task-run-count">0</span> records</div>
+            <div id="task-run-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Approval Ledger</span>
+              <span class="panel-actions">
+                <button id="create-approval-btn" class="panel-mini-btn">Request</button>
+                <button id="resolve-approval-btn" class="panel-mini-btn">Resolve</button>
+              </span>
+            </div>
+            <div class="panel-subcount"><span id="approval-count">0</span> records</div>
+            <div id="approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runner Gate</span>
+              <button id="prepare-runner-btn" class="panel-mini-btn">Prepare</button>
+            </div>
+            <p id="runner-readiness" class="mono-line">No runner invocation prepared.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runner Evidence Spine</span>
+              <button id="record-runner-evidence-spine-btn" class="panel-mini-btn">Record Spine</button>
+            </div>
+            <p id="runner-evidence-spine-summary" class="mono-line">No runner evidence spine recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Supervised Runtime Smoke</span>
+              <button id="run-supervised-runtime-smoke-btn" class="panel-mini-btn">Run Smoke</button>
+            </div>
+            <p id="supervised-runtime-smoke-summary" class="mono-line">No supervised runtime smoke captured.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Agent Transcript Sessions</span>
+              <button id="run-agent-transcript-session-btn" class="panel-mini-btn">Run Sessions</button>
+            </div>
+            <p id="agent-transcript-session-summary" class="mono-line">No Codex/Hermes transcript sessions captured.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Unlocked Agent Run</span>
+              <span class="panel-actions">
+                <button id="run-unlocked-codex-agent-btn" class="panel-mini-btn">Codex Write</button>
+                <button id="run-unlocked-hermes-agent-btn" class="panel-mini-btn">Hermes</button>
+              </span>
+            </div>
+            <p id="unlocked-agent-prompt-summary" class="mono-line">No unlocked agent prompt run captured.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runner Ledger</span>
+              <span><span id="runner-count">0</span> records</span>
+            </div>
+            <div id="runner-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runner Spine Ledger</span>
+              <span><span id="runner-evidence-spine-count">0</span> records</span>
+            </div>
+            <div id="runner-evidence-spine-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runtime Smoke Ledger</span>
+              <span><span id="supervised-runtime-smoke-count">0</span> records</span>
+            </div>
+            <div id="supervised-runtime-smoke-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Agent Session Ledger</span>
+              <span><span id="agent-transcript-session-count">0</span> records</span>
+            </div>
+            <div id="agent-transcript-session-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Unlocked Agent Ledger</span>
+              <span><span id="unlocked-agent-prompt-count">0</span> records</span>
+            </div>
+            <div id="unlocked-agent-prompt-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Joint Coordinator</span>
+              <span class="panel-actions">
+                <button id="create-joint-plan-btn" class="panel-mini-btn">Plan</button>
+                <button id="create-joint-runtime-run-packet-btn" class="panel-mini-btn">Run Packet</button>
+              </span>
+            </div>
+            <p id="joint-plan-summary" class="mono-line">No joint Codex/Hermes plan recorded.</p>
+            <p id="joint-runtime-run-packet-summary" class="mono-line">No joint runtime run packet recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Joint Plan Ledger</span>
+              <span><span id="joint-plan-count">0</span> records</span>
+            </div>
+            <div id="joint-plan-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Joint Run Packet Ledger</span>
+              <span><span id="joint-runtime-run-packet-count">0</span> records</span>
+            </div>
+            <div id="joint-runtime-run-packet-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Agent Capability Inventory</span>
+              <button id="create-agent-inventory-btn" class="panel-mini-btn">Inventory</button>
+            </div>
+            <p id="agent-inventory-summary" class="mono-line">No agent capability inventory recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Capability Inventory Ledger</span>
+              <span><span id="agent-inventory-count">0</span> records</span>
+            </div>
+            <div id="agent-inventory-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Integration Readiness</span>
+              <button id="create-integration-readiness-btn" class="panel-mini-btn">Ready</button>
+            </div>
+            <p id="integration-readiness-summary" class="mono-line">No first-class integration readiness recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Integration Readiness Ledger</span>
+              <span><span id="integration-readiness-count">0</span> records</span>
+            </div>
+            <div id="integration-readiness-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Agent Event Stream</span>
+              <button id="record-agent-event-btn" class="panel-mini-btn">Record</button>
+            </div>
+            <div class="panel-subcount"><span id="agent-event-count">0</span> typed events</div>
+            <pre id="agent-event-preview" class="artifact-preview">No event log loaded.</pre>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Lease</span>
+              <button id="create-workspace-lease-btn" class="panel-mini-btn">Lease</button>
+            </div>
+            <p id="workspace-lease-summary" class="mono-line">No workspace lease recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Lease Ledger</span>
+              <span><span id="workspace-lease-count">0</span> records</span>
+            </div>
+            <div id="workspace-lease-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Inspection</span>
+              <button id="create-workspace-inspection-btn" class="panel-mini-btn">Inspect</button>
+            </div>
+            <p id="workspace-inspection-summary" class="mono-line">No workspace inspection recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Inspection Ledger</span>
+              <span><span id="workspace-inspection-count">0</span> records</span>
+            </div>
+            <div id="workspace-inspection-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Workspace Preview</span>
+              <button id="create-workspace-preview-btn" class="panel-mini-btn">Preview</button>
+            </div>
+            <p id="workspace-preview-summary" class="mono-line">No workspace preview recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Preview Ledger</span>
+              <span><span id="workspace-preview-count">0</span> records</span>
+            </div>
+            <div id="workspace-preview-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Tree Metadata</span>
+              <button id="create-tree-metadata-btn" class="panel-mini-btn">Map</button>
+            </div>
+            <p id="tree-metadata-summary" class="mono-line">No workspace tree metadata recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Tree Ledger</span>
+              <span><span id="tree-metadata-count">0</span> records</span>
+            </div>
+            <div id="tree-metadata-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>File Preview</span>
+              <button id="create-file-preview-btn" class="panel-mini-btn">Read</button>
+            </div>
+            <p id="file-preview-summary" class="mono-line">No file content preview recorded.</p>
+            <pre id="file-preview-text" class="artifact-preview">No file preview loaded.</pre>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>File Preview Ledger</span>
+              <span><span id="file-preview-count">0</span> records</span>
+            </div>
+            <div id="file-preview-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Editor Tab</span>
+              <button id="create-editor-tab-btn" class="panel-mini-btn">Open</button>
+            </div>
+            <p id="editor-tab-summary" class="mono-line">No editor tab state recorded.</p>
+            <pre id="editor-tab-buffer" class="artifact-preview">No editor buffer attached.</pre>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Tab Ledger</span>
+              <span><span id="editor-tab-count">0</span> records</span>
+            </div>
+            <div id="editor-tab-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Edit / Save Gate</span>
+              <span class="panel-actions">
+                <button id="create-edit-intent-btn" class="panel-mini-btn">Edit</button>
+                <button id="create-save-gate-btn" class="panel-mini-btn">Save</button>
+              </span>
+            </div>
+            <p id="edit-preflight-summary" class="mono-line">No edit/save preflight recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Preflight Ledger</span>
+              <span><span id="edit-preflight-count">0</span> records</span>
+            </div>
+            <div id="edit-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Write Policy</span>
+              <span class="panel-actions">
+                <button id="create-buffer-policy-btn" class="panel-mini-btn">Buffer</button>
+                <button id="create-save-policy-btn" class="panel-mini-btn">Save</button>
+              </span>
+            </div>
+            <p id="write-policy-summary" class="mono-line">No write approval policy recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Policy Ledger</span>
+              <span><span id="write-policy-count">0</span> records</span>
+            </div>
+            <div id="write-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Write Approval</span>
+              <button id="create-write-approval-btn" class="panel-mini-btn">Attach</button>
+            </div>
+            <p id="write-approval-summary" class="mono-line">No write approval evidence recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Approval Evidence</span>
+              <span><span id="write-approval-count">0</span> records</span>
+            </div>
+            <div id="write-approval-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Buffer Draft</span>
+              <button id="create-buffer-draft-btn" class="panel-mini-btn">Draft</button>
+            </div>
+            <p id="buffer-draft-summary" class="mono-line">No writable buffer draft recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Draft Ledger</span>
+              <span><span id="buffer-draft-count">0</span> records</span>
+            </div>
+            <div id="buffer-draft-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Dirty Preflight</span>
+              <button id="create-dirty-preflight-btn" class="panel-mini-btn">Gate</button>
+            </div>
+            <p id="dirty-preflight-summary" class="mono-line">No dirty transition preflight recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Dirty Ledger</span>
+              <span><span id="dirty-preflight-count">0</span> records</span>
+            </div>
+            <div id="dirty-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Mutable Buffer</span>
+              <button id="create-mutable-transaction-btn" class="panel-mini-btn">Stage</button>
+            </div>
+            <p id="mutable-transaction-summary" class="mono-line">No mutable buffer transaction recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Transaction Ledger</span>
+              <span><span id="mutable-transaction-count">0</span> records</span>
+            </div>
+            <div id="mutable-transaction-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Materialization Policy</span>
+              <button id="create-materialization-policy-btn" class="panel-mini-btn">Policy</button>
+            </div>
+            <p id="materialization-policy-summary" class="mono-line">No editor buffer materialization policy recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Materialization Ledger</span>
+              <span><span id="materialization-policy-count">0</span> records</span>
+            </div>
+            <div id="materialization-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Buffer Attachment</span>
+              <button id="create-buffer-attachment-btn" class="panel-mini-btn">Attach</button>
+            </div>
+            <p id="buffer-attachment-summary" class="mono-line">No editor buffer attachment recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Attachment Ledger</span>
+              <span><span id="buffer-attachment-count">0</span> records</span>
+            </div>
+            <div id="buffer-attachment-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Editable Preflight</span>
+              <button id="create-editable-state-preflight-btn" class="panel-mini-btn">Gate</button>
+            </div>
+            <p id="editable-state-preflight-summary" class="mono-line">No editor buffer editable-state preflight recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Editable Ledger</span>
+              <span><span id="editable-state-preflight-count">0</span> records</span>
+            </div>
+            <div id="editable-state-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>View Binding</span>
+              <button id="create-view-binding-btn" class="panel-mini-btn">Bind</button>
+            </div>
+            <p id="view-binding-summary" class="mono-line">No editable-buffer view binding recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Binding Ledger</span>
+              <span><span id="view-binding-count">0</span> records</span>
+            </div>
+            <div id="view-binding-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Text Viewport</span>
+              <button id="create-text-viewport-btn" class="panel-mini-btn">Render</button>
+            </div>
+            <p id="text-viewport-summary" class="mono-line">No editable-text viewport materialization recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Viewport Ledger</span>
+              <span><span id="text-viewport-count">0</span> records</span>
+            </div>
+            <div id="text-viewport-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Text Attachment</span>
+              <button id="create-text-attachment-btn" class="panel-mini-btn">Verify</button>
+            </div>
+            <p id="text-attachment-summary" class="mono-line">No editable-text attachment verification recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Attachment Check Ledger</span>
+              <span><span id="text-attachment-count">0</span> records</span>
+            </div>
+            <div id="text-attachment-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Text Model Handle</span>
+              <button id="create-text-model-handle-btn" class="panel-mini-btn">Handle</button>
+            </div>
+            <p id="text-model-handle-summary" class="mono-line">No editable-text model handle recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Model Handle Ledger</span>
+              <span><span id="text-model-handle-count">0</span> records</span>
+            </div>
+            <div id="text-model-handle-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Model Storage</span>
+              <button id="create-text-model-storage-btn" class="panel-mini-btn">Preflight</button>
+            </div>
+            <p id="text-model-storage-summary" class="mono-line">No editable-text model storage preflight recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Storage Preflight Ledger</span>
+              <span><span id="text-model-storage-count">0</span> records</span>
+            </div>
+            <div id="text-model-storage-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Model Snapshot</span>
+              <button id="create-text-model-snapshot-btn" class="panel-mini-btn">Snapshot</button>
+            </div>
+            <p id="text-model-snapshot-summary" class="mono-line">No editable-text model text snapshot recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Model Snapshot Ledger</span>
+              <span><span id="text-model-snapshot-count">0</span> records</span>
+            </div>
+            <div id="text-model-snapshot-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Runner Adapter</span>
+              <button id="prepare-runner-adapter-btn" class="panel-mini-btn">Ready</button>
+            </div>
+            <p id="runner-adapter-summary" class="mono-line">No runner adapter readiness record prepared.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Adapter Ledger</span>
+              <span><span id="runner-adapter-count">0</span> records</span>
+            </div>
+            <div id="runner-adapter-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Process Commands</span>
+              <button id="build-process-plan-btn" class="panel-mini-btn">Build</button>
+            </div>
+            <p id="process-plan-summary" class="mono-line">No process command plan built.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Command Plan Ledger</span>
+              <span><span id="process-plan-count">0</span> records</span>
+            </div>
+            <div id="process-plan-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Stream Files</span>
+              <button id="init-streams-btn" class="panel-mini-btn">Init</button>
+            </div>
+            <p id="stream-init-summary" class="mono-line">No stream files initialized.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Stream Init Ledger</span>
+              <span><span id="stream-init-count">0</span> records</span>
+            </div>
+            <div id="stream-init-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Process Lifecycle</span>
+              <button id="create-lifecycle-btn" class="panel-mini-btn">Stage</button>
+            </div>
+            <p id="lifecycle-summary" class="mono-line">No process lifecycle recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Lifecycle Ledger</span>
+              <span><span id="lifecycle-count">0</span> records</span>
+            </div>
+            <div id="lifecycle-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Control Policy</span>
+              <button id="create-control-policy-btn" class="panel-mini-btn">Record</button>
+            </div>
+            <p id="control-policy-summary" class="mono-line">No control policy recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Control Policy Ledger</span>
+              <span><span id="control-policy-count">0</span> records</span>
+            </div>
+            <div id="control-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Supervisor Preflight</span>
+              <button id="create-supervisor-preflight-btn" class="panel-mini-btn">Check</button>
+            </div>
+            <p id="supervisor-preflight-summary" class="mono-line">No supervisor preflight recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Supervisor Preflight Ledger</span>
+              <span><span id="supervisor-preflight-count">0</span> records</span>
+            </div>
+            <div id="supervisor-preflight-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Supervisor Heartbeat</span>
+              <button id="create-supervisor-heartbeat-btn" class="panel-mini-btn">Record</button>
+            </div>
+            <p id="supervisor-heartbeat-summary" class="mono-line">No supervisor heartbeat recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Supervisor Heartbeat Ledger</span>
+              <span><span id="supervisor-heartbeat-count">0</span> records</span>
+            </div>
+            <div id="supervisor-heartbeat-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Exit Summary</span>
+              <button id="create-supervisor-exit-summary-btn" class="panel-mini-btn">Summarize</button>
+            </div>
+            <p id="supervisor-exit-summary" class="mono-line">No supervisor exit summary recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Exit Summary Ledger</span>
+              <span><span id="supervisor-exit-summary-count">0</span> records</span>
+            </div>
+            <div id="supervisor-exit-summary-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Output Tail</span>
+              <button id="create-output-tail-summary-btn" class="panel-mini-btn">Preview</button>
+            </div>
+            <p id="output-tail-summary" class="mono-line">No output tail summary recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Output Tail Ledger</span>
+              <span><span id="output-tail-summary-count">0</span> records</span>
+            </div>
+            <div id="output-tail-summary-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Transcript Bundle</span>
+              <button id="create-transcript-bundle-btn" class="panel-mini-btn">Bundle</button>
+            </div>
+            <p id="transcript-bundle-summary" class="mono-line">No transcript bundle recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Transcript Bundle Ledger</span>
+              <span><span id="transcript-bundle-count">0</span> records</span>
+            </div>
+            <div id="transcript-bundle-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Transcript Export Policy</span>
+              <button id="create-export-policy-btn" class="panel-mini-btn">Policy</button>
+            </div>
+            <p id="export-policy-summary" class="mono-line">No transcript export policy recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Transcript Export Policy Ledger</span>
+              <span><span id="export-policy-count">0</span> records</span>
+            </div>
+            <div id="export-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Transcript Protection Policy</span>
+              <button id="create-protection-policy-btn" class="panel-mini-btn">Protect</button>
+            </div>
+            <p id="protection-policy-summary" class="mono-line">No transcript protection policy recorded.</p>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Transcript Protection Policy Ledger</span>
+              <span><span id="protection-policy-count">0</span> records</span>
+            </div>
+            <div id="protection-policy-ledger" class="list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-heading">
+              <span>Artifact Preview</span>
+              <span id="artifact-preview-title">pending</span>
+            </div>
+            <pre id="artifact-preview" class="artifact-preview">No artifact loaded.</pre>
+          </article>
+        </section>
+
+        <section id="bottom-evidence-dock" class="bottom-evidence-dock" aria-label="Resizable bottom evidence dock">
+          <div
+            id="bottom-dock-resizer"
+            class="bottom-dock-resizer"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize bottom evidence dock"
+            aria-valuemin="100"
+            aria-valuemax="400"
+            aria-valuenow="180"
+            tabindex="0"
+          ></div>
+          <div class="bottom-dock-header">
+            <div>
+              <div class="panel-label">Evidence Dock</div>
+              <strong>OmegaTaskRun + artifact tail</strong>
+            </div>
+            <button id="bottom-dock-sync-btn" class="panel-mini-btn" type="button">Sync</button>
+          </div>
+          <p id="bottom-dock-status" class="mono-line">Waiting for task-run evidence.</p>
+          <div class="bottom-dock-grid">
+            <article class="bottom-dock-pane">
+              <div class="panel-heading">
+                <span>Task Runs</span>
+                <span><span id="bottom-dock-task-run-count">0</span> records</span>
+              </div>
+              <div id="bottom-dock-task-runs" class="list bottom-dock-list"></div>
+            </article>
+            <article class="bottom-dock-pane">
+              <div class="panel-heading">
+                <span>Artifact Tail</span>
+                <span id="bottom-dock-artifact-title">none</span>
+              </div>
+              <pre id="bottom-dock-artifact-tail" class="bottom-dock-artifact">No artifact selected.</pre>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <aside class="agent-rail">
+        <div
+          id="agent-rail-resizer"
+          class="agent-rail-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize agent rail"
+          aria-valuemin="240"
+          aria-valuemax="480"
+          aria-valuenow="320"
+          tabindex="0"
+        ></div>
+        <div class="agent-header">
+          <span class="omega-small">&Omega;</span>
+          <div>
+            <strong>Omega Agent</strong>
+            <span>Codex-grade operating loop</span>
+          </div>
+        </div>
+
+        <ol class="loop-list">
+          <li>Read doctrine</li>
+          <li>Plan before edits</li>
+          <li>Patch smallest safe change</li>
+          <li>Inspect diff shape</li>
+          <li>Run tests and logs</li>
+          <li>Report evidence</li>
+        </ol>
+
+        <div class="composer">
+          <label class="composer-label" for="agent-composer-input">Draft Codex/Hermes run</label>
+          <textarea
+            id="agent-composer-input"
+            placeholder="Describe the next Gravity Omega task..."
+            maxlength="1200"
+            aria-describedby="agent-composer-status"
+          ></textarea>
+          <button id="agent-composer-draft-btn" type="button">Draft Run</button>
+          <p id="agent-composer-status" class="composer-status" data-state="blocked" aria-live="polite">
+            Draft creates an OmegaTaskRun record. Codex Write and Hermes now run real bounded prompts from this text.
+          </p>
+        </div>
+      </aside>
+    </div>
+
+    <script src="./vendor/xterm/xterm.js"></script>
+    <script src="./vendor/xterm/xterm-addon-fit.js"></script>
+    <script src="./vendor/monaco/vs/loader.js"></script>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

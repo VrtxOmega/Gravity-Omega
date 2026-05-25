@@ -1,0 +1,4 @@
+# Vendored browser runtime bundles are committed byte-for-byte for the offline
+# Tauri webview. Keep GitHub diffs focused on first-party rebuild code.
+rebuild/gravity-omega-tauri/web/vendor/** linguist-vendored
+rebuild/gravity-omega-tauri/web/vendor/** -whitespace

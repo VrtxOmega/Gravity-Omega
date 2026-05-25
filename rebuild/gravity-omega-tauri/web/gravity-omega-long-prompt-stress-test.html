@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Gravity Omega Prompt Intake Stress Test</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --black: #030303;
+      --ink: #090806;
+      --panel: rgba(14, 13, 11, 0.86);
+      --panel-strong: rgba(22, 19, 14, 0.92);
+      --gold: #f2c45a;
+      --gold-soft: #b9892b;
+      --gold-dim: rgba(242, 196, 90, 0.14);
+      --line: rgba(242, 196, 90, 0.18);
+      --text: #f5ecd8;
+      --muted: #b9aa83;
+      --green: #80d8a4;
+      --blue: #8db7ff;
+      --red: #ff8d8d;
+      --shadow: rgba(0, 0, 0, 0.48);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--black);
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at top left, rgba(242, 196, 90, 0.15), transparent 24rem),
+        radial-gradient(circle at 78% 8%, rgba(141, 183, 255, 0.08), transparent 20rem),
+        linear-gradient(145deg, #000 0%, var(--ink) 52%, #050300 100%);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    body::before,
+    body::after {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      content: "";
+    }
+
+    body::before {
+      background:
+        linear-gradient(rgba(242, 196, 90, 0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(242, 196, 90, 0.055) 1px, transparent 1px);
+      background-size: 4.5rem 4.5rem;
+      mask-image: radial-gradient(circle at center, black 0%, transparent 74%);
+      opacity: 0.42;
+    }
+
+    body::after {
+      background:
+        repeating-linear-gradient(0deg, rgba(255, 225, 150, 0.045) 0 1px, transparent 1px 5px),
+        linear-gradient(108deg, transparent 0%, transparent 42%, rgba(242, 196, 90, 0.14) 49%, transparent 58%, transparent 100%);
+      background-size: auto, 260% 100%;
+      mix-blend-mode: screen;
+      opacity: 0.5;
+      animation: omega-sweep 8s ease-in-out infinite;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: min(100%, 76rem);
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 1.5rem;
+      align-items: center;
+      padding: 1.25rem 0 1.5rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .omega-mark {
+      display: grid;
+      width: 8rem;
+      aspect-ratio: 1;
+      place-items: center;
+      border: 1px solid rgba(242, 196, 90, 0.32);
+      background:
+        radial-gradient(circle, rgba(242, 196, 90, 0.16), transparent 62%),
+        rgba(3, 3, 3, 0.68);
+      color: var(--gold);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 5.4rem;
+      line-height: 1;
+      text-shadow:
+        0 0 18px rgba(242, 196, 90, 0.65),
+        0 0 72px rgba(242, 196, 90, 0.28);
+      box-shadow:
+        0 1.5rem 4rem var(--shadow),
+        inset 0 0 3rem rgba(242, 196, 90, 0.07);
+      user-select: none;
+    }
+
+    .hero-copy {
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    .kicker {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      line-height: 1.3;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 0;
+      color: var(--gold);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 3.2rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1.02;
+      text-shadow: 0 0 26px rgba(242, 196, 90, 0.26);
+    }
+
+    .hero-note {
+      max-width: 58rem;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .badge-row,
+    .chip-row,
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      align-items: center;
+    }
+
+    .badge,
+    .chip {
+      display: inline-flex;
+      min-height: 2rem;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      background: rgba(242, 196, 90, 0.08);
+      color: var(--text);
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge {
+      padding: 0.5rem 0.72rem;
+    }
+
+    .chip {
+      padding: 0.45rem 0.56rem;
+    }
+
+    .chip.pass {
+      border-color: rgba(128, 216, 164, 0.36);
+      background: rgba(128, 216, 164, 0.1);
+      color: var(--green);
+    }
+
+    .chip.ready {
+      border-color: rgba(242, 196, 90, 0.38);
+      color: var(--gold);
+    }
+
+    .chip.verify {
+      border-color: rgba(141, 183, 255, 0.38);
+      background: rgba(141, 183, 255, 0.1);
+      color: var(--blue);
+    }
+
+    .chip.watch {
+      border-color: rgba(242, 196, 90, 0.34);
+      color: #ffd98d;
+    }
+
+    .chip.blocked {
+      border-color: rgba(255, 141, 141, 0.36);
+      background: rgba(255, 141, 141, 0.09);
+      color: var(--red);
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+      margin-top: 1.35rem;
+    }
+
+    .panel,
+    .simulator,
+    .checklist,
+    .validation-panel {
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(242, 196, 90, 0.055), transparent 7rem),
+        var(--panel);
+      box-shadow:
+        0 1rem 3rem var(--shadow),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .panel {
+      display: grid;
+      gap: 0.65rem;
+      min-height: 10rem;
+      padding: 1rem;
+    }
+
+    .panel-header {
+      display: flex;
+      gap: 0.75rem;
+      align-items: start;
+      justify-content: space-between;
+    }
+
+    .panel h2,
+    .simulator h2,
+    .checklist h2,
+    .validation-panel h2 {
+      margin-bottom: 0;
+      color: var(--text);
+      font-size: 1rem;
+      letter-spacing: 0;
+      line-height: 1.2;
+    }
+
+    .panel p,
+    .simulator p,
+    .validation-panel p {
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .detail-list {
+      display: grid;
+      gap: 0.45rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .detail-list li {
+      display: grid;
+      grid-template-columns: 0.55rem minmax(0, 1fr);
+      gap: 0.55rem;
+      align-items: baseline;
+    }
+
+    .detail-list li::before {
+      width: 0.42rem;
+      aspect-ratio: 1;
+      border: 1px solid var(--gold-soft);
+      background: rgba(242, 196, 90, 0.12);
+      content: "";
+    }
+
+    .wide-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(18rem, 0.95fr);
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .simulator,
+    .checklist,
+    .validation-panel {
+      padding: 1rem;
+    }
+
+    .sample-box {
+      margin: 0.85rem 0;
+      padding: 0.9rem;
+      border: 1px solid rgba(242, 196, 90, 0.14);
+      background: rgba(0, 0, 0, 0.24);
+      color: #e4d7b8;
+      font-size: 0.92rem;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+
+    .metric {
+      padding: 0.85rem;
+      border: 1px solid rgba(242, 196, 90, 0.16);
+      background: var(--panel-strong);
+    }
+
+    .metric strong {
+      display: block;
+      color: var(--gold);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .checklist ol {
+      display: grid;
+      gap: 0.58rem;
+      margin: 0.85rem 0 0;
+      padding-left: 1.25rem;
+      color: #e7dbc0;
+      font-size: 0.92rem;
+    }
+
+    .checklist li::marker {
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    .validation-panel {
+      display: grid;
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+
+    button {
+      min-height: 2.55rem;
+      border: 1px solid rgba(242, 196, 90, 0.38);
+      background: rgba(242, 196, 90, 0.12);
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      padding: 0.65rem 0.9rem;
+    }
+
+    button:hover {
+      background: rgba(242, 196, 90, 0.18);
+    }
+
+    button:focus-visible {
+      outline: 3px solid var(--gold);
+      outline-offset: 3px;
+    }
+
+    .results {
+      min-height: 5.5rem;
+      padding: 0.85rem;
+      border: 1px solid rgba(242, 196, 90, 0.14);
+      background: rgba(0, 0, 0, 0.26);
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.86rem;
+      white-space: pre-wrap;
+    }
+
+    .footer-note {
+      margin: 1rem 0 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    @keyframes omega-sweep {
+      0%,
+      100% {
+        background-position: 0 0, 140% 0;
+      }
+
+      50% {
+        background-position: 0 0, 0% 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.001ms;
+        animation-iteration-count: 1;
+        scroll-behavior: auto;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        padding: 1rem;
+      }
+
+      .hero,
+      .dashboard,
+      .wide-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero {
+        gap: 1rem;
+      }
+
+      .omega-mark {
+        width: 6.5rem;
+        font-size: 4.4rem;
+      }
+
+      h1 {
+        font-size: 2.25rem;
+      }
+
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .shell {
+        padding: 0.75rem;
+      }
+
+      .panel,
+      .simulator,
+      .checklist,
+      .validation-panel {
+        padding: 0.85rem;
+      }
+
+      h1 {
+        font-size: 1.9rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero" aria-labelledby="stress-title">
+      <div class="omega-mark" aria-label="Omega mark">Ω</div>
+      <div class="hero-copy">
+        <p class="kicker">Gravity Omega diagnostics surface</p>
+        <h1 id="stress-title">Gravity Omega Prompt Intake Stress Test</h1>
+        <p class="hero-note">A local-only artifact for checking long dictated prompt intake, readable work separation, preview behavior, and validation signals. This page does not claim that the live app workflow has passed.</p>
+        <div class="badge-row" aria-label="Artifact guarantees">
+          <span class="badge">No Network Calls</span>
+          <span class="chip ready">READY</span>
+          <span class="chip verify">VERIFY</span>
+          <span class="chip watch">WATCH</span>
+          <span class="chip blocked">BLOCKED</span>
+          <span class="chip pass">PASS</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="dashboard" aria-label="Diagnostics dashboard">
+      <article class="panel" data-section="Prompt Intake">
+        <div class="panel-header">
+          <h2>Prompt Intake</h2>
+          <span class="chip verify">VERIFY</span>
+        </div>
+        <p>Tracks whether a long request stays readable, bounded, and separated from heavyweight chat rendering.</p>
+        <ul class="detail-list">
+          <li>Use clipped previews for chat rail summaries.</li>
+          <li>Keep complete evidence in work artifacts.</li>
+          <li>Avoid blaming dictation or operator input.</li>
+        </ul>
+      </article>
+
+      <article class="panel" data-section="Codex Lead">
+        <div class="panel-header">
+          <h2>Codex Lead</h2>
+          <span class="chip ready">READY</span>
+        </div>
+        <p>Represents the primary planner, executor, verifier, and final evidence owner for this diagnostic pass.</p>
+        <ul class="detail-list">
+          <li>Plan before edits.</li>
+          <li>Make one scoped artifact.</li>
+          <li>Report only verified evidence.</li>
+        </ul>
+      </article>
+
+      <article class="panel" data-section="Hermes/Kimi Assist">
+        <div class="panel-header">
+          <h2>Hermes/Kimi Assist</h2>
+          <span class="chip watch">WATCH</span>
+        </div>
+        <p>Secondary lane for compact risk review. Suggestions outside this page stay as future improvements.</p>
+        <ul class="detail-list">
+          <li>Reviewer, not executor, for this slice.</li>
+          <li>Keep assist prompts compact.</li>
+          <li>Do not expand scope to runtime rewrites.</li>
+        </ul>
+      </article>
+
+      <article class="panel" data-section="Monaco Work Artifact">
+        <div class="panel-header">
+          <h2>Monaco Work Artifact</h2>
+          <span class="chip verify">VERIFY</span>
+        </div>
+        <p>Expected place for plan, file paths, command evidence, warnings, and validation results during real runs.</p>
+        <ul class="detail-list">
+          <li>Keep hidden reasoning out of visible output.</li>
+          <li>Show readable decisions and evidence.</li>
+          <li>Bound long prompt excerpts.</li>
+        </ul>
+      </article>
+
+      <article class="panel" data-section="Chat Rail Preview">
+        <div class="panel-header">
+          <h2>Chat Rail Preview</h2>
+          <span class="chip ready">READY</span>
+        </div>
+        <p>Chat should stay concise and responsive while pointing to the work artifact for complete run details.</p>
+        <ul class="detail-list">
+          <li>Prefer short status updates.</li>
+          <li>Do not render huge raw prompts repeatedly.</li>
+          <li>Separate narrative from command evidence.</li>
+        </ul>
+      </article>
+
+      <article class="panel" data-section="Artifact Preview">
+        <div class="panel-header">
+          <h2>Artifact Preview</h2>
+          <span class="chip watch">WATCH</span>
+        </div>
+        <p>This page is designed to open cleanly in a docked or expanded artifact viewer for manual inspection.</p>
+        <ul class="detail-list">
+          <li>Responsive layout for desktop and narrow panes.</li>
+          <li>No outside media or style references.</li>
+          <li>Readable dashboard sections.</li>
+        </ul>
+      </article>
+
+      <article class="panel" data-section="Validation">
+        <div class="panel-header">
+          <h2>Validation</h2>
+          <span class="chip verify">VERIFY</span>
+        </div>
+        <p>The local button below checks this page structure only. It is not a live product workflow result.</p>
+        <ul class="detail-list">
+          <li>Required sections present.</li>
+          <li>No anchor links present.</li>
+          <li>Responsive metadata present.</li>
+        </ul>
+      </article>
+
+      <article class="panel" data-section="Remaining Risk">
+        <div class="panel-header">
+          <h2>Remaining Risk</h2>
+          <span class="chip blocked">BLOCKED</span>
+        </div>
+        <p>End-to-end runtime proof still requires opening this artifact through the app and checking the real preview flow.</p>
+        <ul class="detail-list">
+          <li>Manual artifact preview still matters.</li>
+          <li>Live Codex stdin transport is outside this static page.</li>
+          <li>Renderer responsiveness needs app-level observation.</li>
+        </ul>
+      </article>
+    </section>
+
+    <div class="wide-grid">
+      <section class="simulator" aria-labelledby="simulator-title">
+        <h2 id="simulator-title">Prompt Length Simulator</h2>
+        <p>The sample below is embedded in this file. Counts are calculated locally in the browser.</p>
+        <p id="sample-prompt" class="sample-box">Run a Gravity Omega product reliability pass with Codex as lead, Hermes and Kimi as compact secondary reviewers, a bounded chat rail, a readable Monaco work artifact, a local artifact preview, and validation that reports only evidence gathered in this run. Preserve prompt separation, avoid hidden heavy stages, keep the renderer responsive, and report remaining risk without claiming the whole product is complete.</p>
+        <div class="metric-grid" aria-label="Sample prompt metrics">
+          <div class="metric">
+            <strong id="char-count">0</strong>
+            <span>Characters</span>
+          </div>
+          <div class="metric">
+            <strong id="word-count">0</strong>
+            <span>Words</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="checklist" aria-labelledby="checklist-title">
+        <h2 id="checklist-title">Internal Test Checklist</h2>
+        <ol>
+          <li>Long prompt is accepted as product reliability input.</li>
+          <li>Codex Lead owns final implementation and verification.</li>
+          <li>Hermes/Kimi stays a compact assist lane.</li>
+          <li>Chat rail remains concise and readable.</li>
+          <li>Monaco work artifact carries plan and evidence.</li>
+          <li>Artifact preview has a static file to open.</li>
+          <li>Prompt length metrics are visible.</li>
+          <li>Local visual check button updates results.</li>
+          <li>Reset Check clears results.</li>
+          <li>No Network Calls badge is visible.</li>
+          <li>Reduced motion preference is honored.</li>
+          <li>Required diagnostic sections are present.</li>
+          <li>Keyboard focus is visible on controls.</li>
+          <li>Remaining risk is stated without fake completion claims.</li>
+        </ol>
+      </section>
+    </div>
+
+    <section class="validation-panel" aria-labelledby="local-check-title">
+      <div>
+        <h2 id="local-check-title">Local Visual Check</h2>
+        <p>Runs client-side checks against this page only: required sections, absence of anchor links, and responsive metadata.</p>
+      </div>
+      <div class="action-row">
+        <button type="button" id="run-check">Run Local Visual Check</button>
+        <button type="button" id="reset-check">Reset Check</button>
+      </div>
+      <output id="check-results" class="results" aria-live="polite">No local check has run yet.</output>
+    </section>
+
+    <p class="footer-note">Status note: this artifact can help inspect the page surface, but app-level streaming, stdin transport, and artifact preview behavior still need Gravity Omega runtime evidence.</p>
+  </main>
+
+  <script>
+    const requiredSections = [
+      "Prompt Intake",
+      "Codex Lead",
+      "Hermes/Kimi Assist",
+      "Monaco Work Artifact",
+      "Chat Rail Preview",
+      "Artifact Preview",
+      "Validation",
+      "Remaining Risk"
+    ];
+
+    const samplePrompt = document.getElementById("sample-prompt");
+    const charCount = document.getElementById("char-count");
+    const wordCount = document.getElementById("word-count");
+    const results = document.getElementById("check-results");
+    const runCheck = document.getElementById("run-check");
+    const resetCheck = document.getElementById("reset-check");
+
+    function updatePromptMetrics() {
+      const text = samplePrompt.textContent.trim();
+      charCount.textContent = String(text.length);
+      wordCount.textContent = String(text.split(/\s+/).filter(Boolean).length);
+    }
+
+    function writeResults(lines) {
+      results.textContent = lines.join("\n");
+    }
+
+    function runLocalVisualCheck() {
+      const sectionNames = Array.from(document.querySelectorAll("[data-section]"), (section) => section.dataset.section);
+      const missingSections = requiredSections.filter((sectionName) => !sectionNames.includes(sectionName));
+      const anchorCount = document.links.length;
+      const viewportMeta = document.querySelector('meta[name="viewport"]');
+      const styleText = Array.from(document.querySelectorAll("style"), (style) => style.textContent).join("\n");
+      const hasReducedMotion = styleText.includes("prefers-reduced-motion");
+      const hasNetworkStyleReference = styleText.includes("ur" + "l(");
+      const passes = [
+        missingSections.length === 0,
+        anchorCount === 0,
+        Boolean(viewportMeta),
+        hasReducedMotion,
+        !hasNetworkStyleReference
+      ];
+      const allPass = passes.every(Boolean);
+
+      writeResults([
+        `${allPass ? "PASS" : "WATCH"} Local page structure check`,
+        `${missingSections.length === 0 ? "PASS" : "BLOCKED"} Required sections: ${missingSections.length === 0 ? "all present" : missingSections.join(", ")}`,
+        `${anchorCount === 0 ? "PASS" : "BLOCKED"} Anchor links present: ${anchorCount}`,
+        `${viewportMeta ? "PASS" : "BLOCKED"} Responsive metadata: ${viewportMeta ? viewportMeta.getAttribute("content") : "missing"}`,
+        `${hasReducedMotion ? "PASS" : "WATCH"} Reduced motion rule: ${hasReducedMotion ? "present" : "missing"}`,
+        `${!hasNetworkStyleReference ? "PASS" : "BLOCKED"} Style media references: ${hasNetworkStyleReference ? "present" : "none found"}`,
+        "VERIFY Manual app preview still required for runtime evidence"
+      ]);
+    }
+
+    function resetLocalVisualCheck() {
+      results.textContent = "No local check has run yet.";
+    }
+
+    runCheck.addEventListener("click", runLocalVisualCheck);
+    resetCheck.addEventListener("click", resetLocalVisualCheck);
+    updatePromptMetrics();
+  </script>
+</body>
+</html>
