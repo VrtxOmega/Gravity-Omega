@@ -642,6 +642,10 @@ for (const productBridgeNeedle of [
   "sswp",
   "recent_pet_runtime_signals",
   "Pet signal:",
+  "recent_terminal_sessions",
+  "recent_terminal_replays",
+  "Terminal session:",
+  "Terminal replay:",
 ]) {
   if (!frontendSource.includes(productBridgeNeedle)) {
     throw new Error(`Visible workbench prompt bridge missing ${productBridgeNeedle}.`);
@@ -1527,6 +1531,9 @@ for (const stateNeedle of [
   "AgentTranscriptSessionRecord",
   "agent-transcript-sessions",
   "recent_pet_runtime_signals",
+  "ProductTerminalSessionSummary",
+  "recent_terminal_sessions",
+  "recent_terminal_replays",
   "LocalMcpLaneCapabilityContractRecord",
   "local-mcp-lane-capability-contracts",
   "LocalMcpHealthPreflightRecord",

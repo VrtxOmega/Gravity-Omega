@@ -2733,6 +2733,43 @@ pub struct ProductTerminalTranscriptReplayRecord {
     pub next_step: String,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct ProductTerminalSessionSummary {
+    pub session_id: String,
+    pub status: String,
+    pub command: String,
+    pub cwd: String,
+    pub exit_code: Option<i32>,
+    pub timed_out: bool,
+    pub duration_ms: u64,
+    pub stdout_transcript_path: String,
+    pub stderr_transcript_path: String,
+    pub stdout_size_bytes: u64,
+    pub stderr_size_bytes: u64,
+    pub source_stream_enabled: bool,
+    pub source_process_spawn_enabled: bool,
+    pub source_transcript_capture_enabled: bool,
+    pub source_command_runner_enabled: bool,
+    pub source_writes_allowed: bool,
+    pub source_execution_enabled: bool,
+    pub terminal_write_enabled: bool,
+    pub live_tail_enabled: bool,
+    pub process_control_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SovereignDocsPreviewRequest {
     pub source_path: String,
@@ -5472,6 +5509,8 @@ pub struct TerminalProcessLaneDashboard {
     pub process_supervisor_exit_summary_ready_count: usize,
     pub process_output_tail_summary_count: usize,
     pub process_output_tail_summary_ready_count: usize,
+    pub recent_terminal_session_count: usize,
+    pub recent_terminal_replay_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
     pub terminal_process_visible: bool,
@@ -5491,6 +5530,8 @@ pub struct TerminalProcessLaneDashboard {
     pub memory_write_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub recent_terminal_sessions: Vec<ProductTerminalSessionSummary>,
+    pub recent_terminal_replays: Vec<ProductTerminalTranscriptReplayRecord>,
     pub sections: Vec<TerminalProcessLaneDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -42633,6 +42674,127 @@ fn terminal_record_created_at(value: &serde_json::Value) -> u64 {
         .get("created_at_ms")
         .and_then(|inner| inner.as_u64())
         .unwrap_or(0)
+}
+
+fn terminal_record_string(value: &serde_json::Value, key: &str, fallback: &str) -> String {
+    value
+        .get(key)
+        .and_then(|inner| inner.as_str())
+        .map(|inner| inner.to_string())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn terminal_record_bool(value: &serde_json::Value, key: &str) -> bool {
+    value
+        .get(key)
+        .and_then(|inner| inner.as_bool())
+        .unwrap_or(false)
+}
+
+fn terminal_record_u64(value: &serde_json::Value, key: &str) -> u64 {
+    value.get(key).and_then(|inner| inner.as_u64()).unwrap_or(0)
+}
+
+fn terminal_record_i32(value: &serde_json::Value, key: &str) -> Option<i32> {
+    value
+        .get(key)
+        .and_then(|inner| inner.as_i64())
+        .map(|inner| inner as i32)
+}
+
+fn terminal_transcript_size(path: &str) -> u64 {
+    if path.trim().is_empty() || path == "none" {
+        return 0;
+    }
+    fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0)
+}
+
+fn terminal_session_summary_from_record(
+    path: PathBuf,
+    value: serde_json::Value,
+) -> ProductTerminalSessionSummary {
+    let created_at_ms = terminal_record_created_at(&value);
+    let session_id = terminal_record_string(&value, "session_id", "").trim().to_string();
+    let session_id = if session_id.is_empty() {
+        path.file_stem()
+            .and_then(|inner| inner.to_str())
+            .unwrap_or("unknown-terminal-session")
+            .to_string()
+    } else {
+        session_id
+    };
+    let log_path = path.with_extension("jsonl").display().to_string();
+    let stdout_transcript_path = terminal_record_string(&value, "stdout_transcript_path", "none");
+    let stderr_transcript_path = terminal_record_string(&value, "stderr_transcript_path", "none");
+
+    ProductTerminalSessionSummary {
+        session_id,
+        status: terminal_record_string(&value, "status", "unknown"),
+        command: terminal_record_string(&value, "command", "none"),
+        cwd: terminal_record_string(&value, "cwd", "none"),
+        exit_code: terminal_record_i32(&value, "exit_code"),
+        timed_out: terminal_record_bool(&value, "timed_out"),
+        duration_ms: terminal_record_u64(&value, "duration_ms"),
+        stdout_size_bytes: terminal_transcript_size(&stdout_transcript_path),
+        stderr_size_bytes: terminal_transcript_size(&stderr_transcript_path),
+        stdout_transcript_path,
+        stderr_transcript_path,
+        source_stream_enabled: terminal_record_bool(&value, "stream_enabled"),
+        source_process_spawn_enabled: terminal_record_bool(&value, "process_spawn_enabled"),
+        source_transcript_capture_enabled: terminal_record_bool(&value, "transcript_capture_enabled"),
+        source_command_runner_enabled: terminal_record_bool(&value, "command_runner_enabled"),
+        source_writes_allowed: terminal_record_bool(&value, "writes_allowed"),
+        source_execution_enabled: terminal_record_bool(&value, "execution_enabled"),
+        terminal_write_enabled: false,
+        live_tail_enabled: false,
+        process_control_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms,
+        record_path: path.display().to_string(),
+        log_path,
+    }
+}
+
+fn list_recent_product_terminal_session_summaries(
+    limit: usize,
+) -> Result<Vec<ProductTerminalSessionSummary>, String> {
+    let dir = product_terminal_sessions_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir)
+        .map_err(|error| format!("failed to read terminal session directory: {error}"))?
+    {
+        let entry = entry.map_err(|error| format!("failed to read terminal session entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let value = match serde_json::from_str::<serde_json::Value>(&content) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        records.push(terminal_session_summary_from_record(path, value));
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(limit);
+    Ok(records)
 }
 
 fn latest_product_terminal_session_record() -> Result<Option<(PathBuf, serde_json::Value)>, String> {
@@ -99408,6 +99570,9 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
     let process_supervisor_heartbeats = list_process_supervisor_heartbeats()?;
     let process_supervisor_exit_summaries = list_process_supervisor_exit_summaries()?;
     let process_output_tail_summaries = list_process_output_tail_summaries()?;
+    let recent_terminal_sessions = list_recent_product_terminal_session_summaries(6)?;
+    let mut recent_terminal_replays = list_product_terminal_transcript_replays()?;
+    recent_terminal_replays.truncate(6);
 
     let runner_invocation_ready_count = runner_invocations
         .iter()
@@ -99720,7 +99885,9 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         || process_supervisor_preflight_ready_count > 0
         || process_supervisor_heartbeat_ready_count > 0
         || process_supervisor_exit_summary_ready_count > 0
-        || process_output_tail_summary_ready_count > 0;
+        || process_output_tail_summary_ready_count > 0
+        || !recent_terminal_sessions.is_empty()
+        || !recent_terminal_replays.is_empty();
 
     Ok(TerminalProcessLaneDashboard {
         status: "terminal_process_lane_dashboard_read_only",
@@ -99745,6 +99912,8 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         process_supervisor_exit_summary_ready_count,
         process_output_tail_summary_count: process_output_tail_summaries.len(),
         process_output_tail_summary_ready_count,
+        recent_terminal_session_count: recent_terminal_sessions.len(),
+        recent_terminal_replay_count: recent_terminal_replays.len(),
         disabled_gate_count,
         read_only: true,
         terminal_process_visible,
@@ -99764,10 +99933,12 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         memory_write_enabled: false,
         writes_allowed: false,
         execution_enabled: false,
+        recent_terminal_sessions,
+        recent_terminal_replays,
         sections,
         reasons: vec![
             "dashboard groups runner, adapter, command plan, stream, lifecycle, supervisor, exit, and output-tail evidence into one terminal/process lane",
-            "dashboard reads existing runner and process ledgers only and creates no records",
+            "dashboard reads existing runner, process, terminal session, and transcript replay ledgers only and creates no records",
             "terminal writes, process spawn, stream reads, live tailing, process control, live MCP calls, config reads, captures, exports, writes, patches, memory writes, and execution remain disabled",
         ],
         next_slice: "Use this terminal/process lane to add approval and evidence spine views before any process, terminal, stream, or control gate is opened.",
@@ -110947,6 +111118,42 @@ mod tests {
         let listed = list_product_terminal_transcript_replays()
             .expect("terminal transcript replay list loads");
         assert!(listed.iter().any(|record| record.id == replay.id));
+        let terminal_process_dashboard =
+            terminal_process_lane_dashboard().expect("terminal/process dashboard loads");
+        assert!(
+            terminal_process_dashboard
+                .recent_terminal_sessions
+                .iter()
+                .any(|record| {
+                    record.command == "pwd"
+                        && record.status == "product_terminal_command_succeeded"
+                        && record.source_process_spawn_enabled
+                        && record.source_transcript_capture_enabled
+                        && record.source_command_runner_enabled
+                        && record.source_execution_enabled
+                        && !record.source_writes_allowed
+                        && !record.terminal_write_enabled
+                        && !record.live_tail_enabled
+                        && !record.process_control_enabled
+                        && !record.writes_allowed
+                        && !record.execution_enabled
+                })
+        );
+        assert!(
+            terminal_process_dashboard
+                .recent_terminal_replays
+                .iter()
+                .any(|record| record.id == replay.id && record.transcript_read_enabled)
+        );
+        assert!(terminal_process_dashboard.recent_terminal_session_count >= 1);
+        assert!(terminal_process_dashboard.recent_terminal_replay_count >= 1);
+        assert!(terminal_process_dashboard.terminal_process_visible);
+        assert!(terminal_process_dashboard.read_only);
+        assert!(!terminal_process_dashboard.terminal_write_enabled);
+        assert!(!terminal_process_dashboard.live_tail_enabled);
+        assert!(!terminal_process_dashboard.process_control_enabled);
+        assert!(!terminal_process_dashboard.writes_allowed);
+        assert!(!terminal_process_dashboard.execution_enabled);
         assert!(
             record_product_terminal_transcript_replay(ProductTerminalTranscriptReplayRequest {
                 session_record_path: Some("/etc/passwd".to_string()),

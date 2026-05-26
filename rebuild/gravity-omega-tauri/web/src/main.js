@@ -5902,6 +5902,37 @@ async function refreshStenoSearchPanel(query = stenoSearchQueryInput?.value ?? "
   }
 }
 
+function describeTerminalSessionSummary(record) {
+  const status = record.status ?? "terminal_session_unknown";
+  const command = record.command ?? "none";
+  const exit = record.exit_code ?? "none";
+  const duration = record.duration_ms ?? 0;
+  const stdoutBytes = record.stdout_size_bytes ?? 0;
+  const stderrBytes = record.stderr_size_bytes ?? 0;
+  return {
+    title: `Terminal session: ${command}`,
+    meta: `${status} / exit=${exit} / ${duration}ms`,
+    text: `stdout=${stdoutBytes}b; stderr=${stderrBytes}b; stream=${record.source_stream_enabled ?? false}; sourceExec=${record.source_execution_enabled ?? false}; dashboardExec=${record.execution_enabled ?? false}; record=${record.record_path ?? "none"}`,
+    state: record.timed_out ? "warning" : exit === 0 ? "ok" : status.includes("failed") ? "error" : "ready",
+  };
+}
+
+function describeTerminalReplaySummary(record) {
+  const status = record.status ?? "terminal_replay_unknown";
+  const command = record.command ?? "none";
+  const exit = record.exit_code ?? "none";
+  const duration = record.duration_ms ?? 0;
+  const stdoutLines = record.stdout_line_count ?? 0;
+  const stderrLines = record.stderr_line_count ?? 0;
+  const blockers = (record.blockers ?? []).length ? ` blockers=${record.blockers.join("; ")}` : "";
+  return {
+    title: `Terminal replay: ${command}`,
+    meta: `${status} / exit=${exit} / ${duration}ms`,
+    text: `stdoutLines=${stdoutLines}; stderrLines=${stderrLines}; transcriptRead=${record.transcript_read_enabled ?? false}; liveTail=${record.live_tail_enabled ?? false}; record=${record.record_path ?? "none"}${blockers}`,
+    state: (record.blockers ?? []).length ? "warning" : "ready",
+  };
+}
+
 function renderTerminalProcessLaneDashboard(dashboard) {
   if (!dashboard) {
     terminalProcessLaneDashboardSummary.textContent = "Terminal process lane dashboard unavailable.";
@@ -5918,6 +5949,8 @@ function renderTerminalProcessLaneDashboard(dashboard) {
     `streams=${dashboard.process_stream_init_ready_count}/${dashboard.process_stream_init_count}`,
     `supervisor=${dashboard.process_supervisor_preflight_ready_count}/${dashboard.process_supervisor_preflight_count}`,
     `tails=${dashboard.process_output_tail_summary_ready_count}/${dashboard.process_output_tail_summary_count}`,
+    `sessions=${dashboard.recent_terminal_session_count ?? 0}`,
+    `replays=${dashboard.recent_terminal_replay_count ?? 0}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `terminal=${dashboard.terminal_enabled}`,
     `spawn=${dashboard.process_spawn_enabled}`,
@@ -5926,10 +5959,26 @@ function renderTerminalProcessLaneDashboard(dashboard) {
 
   clearList(terminalProcessLaneDashboardList);
   const sections = dashboard.sections ?? [];
-  terminalProcessLaneDashboardCount.textContent = String(sections.length);
+  const recentSessions = dashboard.recent_terminal_sessions ?? [];
+  const recentReplays = dashboard.recent_terminal_replays ?? [];
+  terminalProcessLaneDashboardCount.textContent = String(sections.length + recentSessions.length + recentReplays.length);
 
-  if (sections.length === 0) {
-    terminalProcessLaneDashboardList.append(item("No terminal/process lane sections", "empty", "Refresh the read-only terminal/process dashboard."));
+  for (const record of recentSessions.slice(0, 6)) {
+    const view = describeTerminalSessionSummary(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  for (const record of recentReplays.slice(0, 6)) {
+    const view = describeTerminalReplaySummary(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  if (sections.length === 0 && recentSessions.length === 0 && recentReplays.length === 0) {
+    terminalProcessLaneDashboardList.append(item("No terminal/process lane records", "empty", "Run an allowed terminal command, then refresh the read-only terminal/process dashboard."));
     return;
   }
 
@@ -8007,6 +8056,8 @@ async function loadTerminalProcessLaneDashboard() {
     process_supervisor_exit_summary_ready_count: 0,
     process_output_tail_summary_count: 0,
     process_output_tail_summary_ready_count: 0,
+    recent_terminal_session_count: 0,
+    recent_terminal_replay_count: 0,
     disabled_gate_count: sections.length,
     read_only: true,
     terminal_process_visible: false,
@@ -8026,6 +8077,8 @@ async function loadTerminalProcessLaneDashboard() {
     memory_write_enabled: false,
     writes_allowed: false,
     execution_enabled: false,
+    recent_terminal_sessions: [],
+    recent_terminal_replays: [],
     sections,
     reasons: [
       "Static preview groups terminal and process evidence while terminal writes, process spawn, stream readers, and execution remain disabled.",
