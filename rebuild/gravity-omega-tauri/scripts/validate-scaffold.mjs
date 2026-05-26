@@ -261,6 +261,28 @@ for (const sswpProbeNeedle of [
   }
 }
 
+const agentTranscriptRunnerStart = rustCommandsSource.indexOf("fn run_agent_transcript_target_with_binary");
+const agentTranscriptRunnerEnd = rustCommandsSource.indexOf("#[allow(clippy::too_many_arguments)]", agentTranscriptRunnerStart);
+if (agentTranscriptRunnerStart < 0 || agentTranscriptRunnerEnd < agentTranscriptRunnerStart) {
+  throw new Error("Agent transcript runner body is missing.");
+}
+const agentTranscriptRunnerBody = rustCommandsSource.slice(agentTranscriptRunnerStart, agentTranscriptRunnerEnd);
+if (agentTranscriptRunnerBody.includes("wait_with_output")) {
+  throw new Error("Agent transcript runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+}
+for (const agentTranscriptNeedle of [
+  "spawn_agent_transcript_pipe_reader",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+]) {
+  if (!agentTranscriptRunnerBody.includes(agentTranscriptNeedle)) {
+    throw new Error(`Agent transcript runner missing pipe-drain evidence field ${agentTranscriptNeedle}.`);
+  }
+}
+
 for (const unlockedUiNeedle of [
   "run-unlocked-codex-agent-btn",
   "run-unlocked-hermes-agent-btn",
@@ -2720,6 +2742,9 @@ for (const frontendNeedle of [
   "loadAgentTranscriptSessions",
   "renderAgentTranscriptSessionLedger",
   "recordAgentTranscriptSession",
+  "Agent transcript:",
+  "agent_transcript_pipe_reader_ready_count",
+  "recent_agent_transcript_sessions",
   "run_agent_transcript_session",
   "list_agent_transcript_sessions",
   "loadWorkspaceExplorerSnapshot",

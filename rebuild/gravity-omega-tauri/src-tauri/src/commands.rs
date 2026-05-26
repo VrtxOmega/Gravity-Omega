@@ -1551,6 +1551,16 @@ pub struct AgentTranscriptSessionRecord {
     pub exit_code: Option<i32>,
     pub timed_out: bool,
     pub duration_ms: u64,
+    #[serde(default)]
+    pub stdout_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub stderr_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub timeout_kill_sent: bool,
+    #[serde(default)]
+    pub wait_after_kill_ms: u64,
+    #[serde(default)]
+    pub partial_output_captured: bool,
     pub stdout: String,
     pub stderr: String,
     pub stdout_size_bytes: u64,
@@ -5452,6 +5462,12 @@ pub struct StenoPetCompanionDashboard {
     pub transcript_export_policy_ready_count: usize,
     pub transcript_protection_policy_count: usize,
     pub transcript_protection_policy_ready_count: usize,
+    pub agent_transcript_session_count: usize,
+    pub agent_transcript_ready_count: usize,
+    pub agent_transcript_pipe_reader_ready_count: usize,
+    pub agent_transcript_timed_out_count: usize,
+    pub agent_transcript_partial_output_count: usize,
+    pub recent_agent_transcript_sessions: Vec<AgentTranscriptSessionRecord>,
     pub steno_mcp_evidence_count: usize,
     pub steno_mcp_ready_count: usize,
     pub pet_inventory_count: usize,
@@ -38086,8 +38102,19 @@ fn agent_transcript_targets() -> Vec<AgentTranscriptTarget> {
     ]
 }
 
-fn run_agent_transcript_target(
+fn spawn_agent_transcript_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_agent_transcript_target_with_binary(
     target: &AgentTranscriptTarget,
+    binary: &str,
     requested_by: &str,
     timeout_ms: u64,
     timestamp: u64,
@@ -38126,7 +38153,13 @@ fn run_agent_transcript_target(
     let stderr_bytes: Vec<u8>;
     let status: String;
 
-    match Command::new(target.binary)
+    let mut stdout_pipe_reader_enabled = false;
+    let mut stderr_pipe_reader_enabled = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let partial_output_captured: bool;
+
+    match Command::new(binary)
         .args(&target.args)
         .current_dir(dir)
         .stdin(Stdio::null())
@@ -38136,20 +38169,53 @@ fn run_agent_transcript_target(
     {
         Ok(mut child) => {
             pid = Some(child.id());
+            let stdout_reader = child
+                .stdout
+                .take()
+                .map(spawn_agent_transcript_pipe_reader);
+            let stderr_reader = child
+                .stderr
+                .take()
+                .map(spawn_agent_transcript_pipe_reader);
+            stdout_pipe_reader_enabled = stdout_reader.is_some();
+            stderr_pipe_reader_enabled = stderr_reader.is_some();
+
             loop {
                 match child.try_wait() {
-                    Ok(Some(_status)) => break,
+                    Ok(Some(status_value)) => {
+                        exit_code = status_value.code();
+                        break;
+                    }
                     Ok(None) => {
                         if started.elapsed() >= Duration::from_millis(timeout_ms) {
                             timed_out = true;
-                            let _ = child.kill();
+                            let kill_started = Instant::now();
+                            timeout_kill_sent = child.kill().is_ok();
+                            exit_code = child.wait().ok().and_then(|status_value| status_value.code());
+                            wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                             break;
                         }
                         std::thread::sleep(Duration::from_millis(20));
                     }
                     Err(error) => {
-                        stdout_bytes = Vec::new();
-                        stderr_bytes = error.to_string().into_bytes();
+                        let kill_started = Instant::now();
+                        timeout_kill_sent = child.kill().is_ok();
+                        exit_code = child.wait().ok().and_then(|status_value| status_value.code());
+                        wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                        let mut stderr_existing = error.to_string().into_bytes();
+                        if let Some(handle) = stderr_reader {
+                            if let Ok(mut existing) = handle.join() {
+                                existing.extend_from_slice(b"\n");
+                                existing.extend(stderr_existing);
+                                stderr_existing = existing;
+                            }
+                        }
+                        stdout_bytes = stdout_reader
+                            .and_then(|handle| handle.join().ok())
+                            .unwrap_or_default();
+                        stderr_bytes = stderr_existing;
+                        partial_output_captured =
+                            !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
                         status = "agent_transcript_session_wait_failed".to_string();
                         return write_agent_transcript_session_record(
                             target,
@@ -38157,8 +38223,13 @@ fn run_agent_transcript_target(
                             timestamp,
                             started.elapsed().as_millis() as u64,
                             pid,
-                            None,
+                            exit_code,
                             false,
+                            stdout_pipe_reader_enabled,
+                            stderr_pipe_reader_enabled,
+                            timeout_kill_sent,
+                            wait_after_kill_ms,
+                            partial_output_captured,
                             stdout_bytes,
                             stderr_bytes,
                             status,
@@ -38171,18 +38242,16 @@ fn run_agent_transcript_target(
                 }
             }
 
-            let output = child.wait_with_output().map_err(|error| {
-                format!(
-                    "failed to collect agent transcript session output for {}: {error}",
-                    target.target
-                )
-            })?;
-            exit_code = output.status.code();
-            stdout_bytes = output.stdout;
-            stderr_bytes = output.stderr;
+            stdout_bytes = stdout_reader
+                .and_then(|handle| handle.join().ok())
+                .unwrap_or_default();
+            stderr_bytes = stderr_reader
+                .and_then(|handle| handle.join().ok())
+                .unwrap_or_default();
+            partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
             status = if timed_out {
                 "agent_transcript_session_timed_out"
-            } else if output.status.success() {
+            } else if exit_code == Some(0) {
                 "agent_transcript_session_succeeded"
             } else {
                 "agent_transcript_session_failed"
@@ -38193,6 +38262,7 @@ fn run_agent_transcript_target(
             stdout_bytes = Vec::new();
             stderr_bytes = error.to_string().into_bytes();
             status = "agent_transcript_session_spawn_failed".to_string();
+            partial_output_captured = !stderr_bytes.is_empty();
         }
     }
 
@@ -38204,6 +38274,11 @@ fn run_agent_transcript_target(
         pid,
         exit_code,
         timed_out,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
         stdout_bytes,
         stderr_bytes,
         status,
@@ -38211,6 +38286,23 @@ fn run_agent_transcript_target(
         log_path,
         stdout_transcript_path,
         stderr_transcript_path,
+    )
+}
+
+fn run_agent_transcript_target(
+    target: &AgentTranscriptTarget,
+    requested_by: &str,
+    timeout_ms: u64,
+    timestamp: u64,
+    dir: &Path,
+) -> Result<AgentTranscriptSessionRecord, String> {
+    run_agent_transcript_target_with_binary(
+        target,
+        target.binary,
+        requested_by,
+        timeout_ms,
+        timestamp,
+        dir,
     )
 }
 
@@ -38223,6 +38315,11 @@ fn write_agent_transcript_session_record(
     pid: Option<u32>,
     exit_code: Option<i32>,
     timed_out: bool,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
     stdout_bytes: Vec<u8>,
     stderr_bytes: Vec<u8>,
     status: String,
@@ -38270,6 +38367,11 @@ fn write_agent_transcript_session_record(
         exit_code,
         timed_out,
         duration_ms,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
         stdout: trim_probe_text(&stdout_bytes),
         stderr: trim_probe_text(&stderr_bytes),
         stdout_size_bytes: stdout_bytes.len() as u64,
@@ -38323,6 +38425,11 @@ fn write_agent_transcript_session_record(
             "exit_code": exit_code,
             "timed_out": timed_out,
             "duration_ms": duration_ms,
+            "stdout_pipe_reader_enabled": record.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": record.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": record.timeout_kill_sent,
+            "wait_after_kill_ms": record.wait_after_kill_ms,
+            "partial_output_captured": record.partial_output_captured,
             "stdout_size_bytes": record.stdout_size_bytes,
             "stderr_size_bytes": record.stderr_size_bytes,
             "process_spawn_enabled": true,
@@ -100343,6 +100450,7 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
     let transcript_bundles = list_run_transcript_bundles()?;
     let transcript_export_policies = list_transcript_export_policies()?;
     let transcript_protection_policies = list_transcript_protection_policies()?;
+    let agent_transcript_sessions = list_agent_transcript_sessions().unwrap_or_default();
     let mcp_dashboard = first_class_mcp_dashboard()?;
     let agent_inventories = list_agent_capability_inventories()?;
     let readiness_records = list_first_class_integration_readiness()?;
@@ -100410,6 +100518,45 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
                 && !record.execution_enabled
         })
         .count();
+    let agent_transcript_ready_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| {
+            record.status == "agent_transcript_session_succeeded"
+                && record.process_spawn_enabled
+                && record.transcript_capture_enabled
+                && record.stdout_pipe_reader_enabled
+                && record.stderr_pipe_reader_enabled
+                && !record.agent_task_execution_enabled
+                && !record.sidecar_launch_enabled
+                && !record.terminal_enabled
+                && !record.workspace_read_enabled
+                && !record.workspace_write_enabled
+                && !record.patch_apply_enabled
+                && !record.live_mcp_call_enabled
+                && !record.config_read_enabled
+                && !record.export_enabled
+                && !record.memory_write_enabled
+                && !record.writes_allowed
+                && !record.execution_enabled
+        })
+        .count();
+    let agent_transcript_pipe_reader_ready_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| record.stdout_pipe_reader_enabled && record.stderr_pipe_reader_enabled)
+        .count();
+    let agent_transcript_timed_out_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| record.timed_out)
+        .count();
+    let agent_transcript_partial_output_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| record.partial_output_captured)
+        .count();
+    let recent_agent_transcript_sessions = agent_transcript_sessions
+        .iter()
+        .take(6)
+        .cloned()
+        .collect::<Vec<_>>();
     let steno_lane = mcp_dashboard
         .lanes
         .iter()
@@ -100468,9 +100615,22 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
         .collect::<Vec<_>>();
     let transcript_evidence = transcript_bundle_ready_count > 0
         || transcript_export_policy_ready_count > 0
-        || transcript_protection_policy_ready_count > 0;
+        || transcript_protection_policy_ready_count > 0
+        || agent_transcript_ready_count > 0;
 
     let sections = vec![
+        steno_pet_companion_dashboard_section(
+            "agent-transcript-sessions",
+            "Codex/Hermes agent transcript sessions",
+            "agent-transcript-session-ledger",
+            agent_transcript_sessions.len(),
+            agent_transcript_ready_count,
+            "agent_transcript_sessions_visible_read_only",
+            "Keep fixed Codex/Hermes transcript probes searchable as evidence; prompt execution remains disabled.",
+            steno_first_class,
+            pet_first_class,
+            agent_transcript_ready_count > 0,
+        ),
         steno_pet_companion_dashboard_section(
             "steno-transcript-evidence",
             "Steno transcript evidence",
@@ -100563,6 +100723,12 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
         transcript_export_policy_ready_count,
         transcript_protection_policy_count: transcript_protection_policies.len(),
         transcript_protection_policy_ready_count,
+        agent_transcript_session_count: agent_transcript_sessions.len(),
+        agent_transcript_ready_count,
+        agent_transcript_pipe_reader_ready_count,
+        agent_transcript_timed_out_count,
+        agent_transcript_partial_output_count,
+        recent_agent_transcript_sessions,
         steno_mcp_evidence_count,
         steno_mcp_ready_count,
         pet_inventory_count,
@@ -112826,6 +112992,146 @@ sleep 2
         assert!(String::from_utf8_lossy(&output.stdout_bytes).contains("ready stdout"));
         assert!(String::from_utf8_lossy(&output.stderr_bytes).contains("ready stderr"));
         assert_eq!(output.bounded_execution_performed, true);
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_transcript_session_drains_pipes_and_captures_timeout_partial_output() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-agent-transcript-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake agent transcript dir");
+        let fake_agent = test_root.join("codex");
+        fs::write(
+            &fake_agent,
+            r#"#!/bin/sh
+printf 'agent transcript stdout ready\n'
+printf 'agent transcript stderr ready\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'agent transcript stdout chunk %s\n' "$i"
+  printf 'agent transcript stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake agent binary");
+        let mut permissions = fs::metadata(&fake_agent)
+            .expect("fake agent metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_agent, permissions).expect("chmod fake agent");
+
+        let target = AgentTranscriptTarget {
+            runtime: "codex",
+            target: "codex-pipe-test",
+            session_kind: "help",
+            title: "Codex pipe transcript test",
+            binary: "codex",
+            args: vec!["--help"],
+            required_for: "Rust pipe-drain regression coverage.",
+        };
+        let record = run_agent_transcript_target_with_binary(
+            &target,
+            fake_agent.to_str().expect("fake agent path"),
+            "rust-test-agent-transcript-pipe",
+            100,
+            now_ms().expect("clock"),
+            &test_root,
+        )
+        .expect("agent transcript target records");
+        assert_eq!(record.status, "agent_transcript_session_timed_out");
+        assert!(record.timed_out);
+        assert!(record.timeout_kill_sent);
+        assert!(record.stdout_pipe_reader_enabled);
+        assert!(record.stderr_pipe_reader_enabled);
+        assert!(record.partial_output_captured);
+        assert!(record.stdout.contains("agent transcript stdout ready"));
+        assert!(record.stderr.contains("agent transcript stderr ready"));
+        assert!(fs::metadata(&record.stdout_transcript_path).is_ok());
+        assert!(fs::metadata(&record.stderr_transcript_path).is_ok());
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn steno_pet_dashboard_surfaces_agent_transcript_pipe_evidence() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-agent-transcript-dashboard-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake dashboard agent dir");
+        let fake_agent = test_root.join("codex");
+        fs::write(
+            &fake_agent,
+            r#"#!/bin/sh
+printf 'agent transcript dashboard stdout ready\n'
+printf 'agent transcript dashboard stderr ready\n' >&2
+"#,
+        )
+        .expect("write fake dashboard agent binary");
+        let mut permissions = fs::metadata(&fake_agent)
+            .expect("fake dashboard agent metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_agent, permissions).expect("chmod fake dashboard agent");
+
+        let target = AgentTranscriptTarget {
+            runtime: "codex",
+            target: "codex-dashboard-transcript-test",
+            session_kind: "version",
+            title: "Codex dashboard transcript test",
+            binary: "codex",
+            args: vec!["--version"],
+            required_for: "Steno dashboard pipe evidence coverage.",
+        };
+        let dir = agent_transcript_sessions_dir().expect("agent transcript sessions dir");
+        fs::create_dir_all(&dir).expect("create agent transcript sessions dir");
+        let record = run_agent_transcript_target_with_binary(
+            &target,
+            fake_agent.to_str().expect("fake dashboard agent path"),
+            "rust-test-agent-transcript-dashboard",
+            2_000,
+            now_ms().expect("clock"),
+            &dir,
+        )
+        .expect("agent transcript dashboard record writes");
+        assert_eq!(record.status, "agent_transcript_session_succeeded");
+        assert!(record.stdout_pipe_reader_enabled);
+        assert!(record.stderr_pipe_reader_enabled);
+        assert!(record.partial_output_captured);
+
+        let dashboard = steno_pet_companion_dashboard()
+            .expect("Steno pet dashboard includes agent transcript sessions");
+        assert!(dashboard.agent_transcript_session_count >= 1);
+        assert!(dashboard.agent_transcript_ready_count >= 1);
+        assert!(dashboard.agent_transcript_pipe_reader_ready_count >= 1);
+        assert!(dashboard.agent_transcript_partial_output_count >= 1);
+        assert!(dashboard
+            .recent_agent_transcript_sessions
+            .iter()
+            .any(|session| {
+                session.id == record.id
+                    && session.stdout_pipe_reader_enabled
+                    && session.stderr_pipe_reader_enabled
+                    && session.partial_output_captured
+            }));
+        assert!(dashboard.sections.iter().any(|section| {
+            section.section_id == "agent-transcript-sessions"
+                && section.record_count >= 1
+                && section.ready_count >= 1
+                && section.read_only
+                && !section.execution_enabled
+        }));
         let _ = fs::remove_dir_all(&test_root);
     }
 

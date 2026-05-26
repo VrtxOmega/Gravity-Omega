@@ -5801,6 +5801,9 @@ function renderStenoPetCompanionDashboard(dashboard) {
 
   stenoPetCompanionDashboardSummary.textContent = [
     dashboard.status,
+    `agentTranscripts=${dashboard.agent_transcript_ready_count ?? 0}/${dashboard.agent_transcript_session_count ?? 0}`,
+    `transcriptPipes=${dashboard.agent_transcript_pipe_reader_ready_count ?? 0}`,
+    `transcriptPartial=${dashboard.agent_transcript_partial_output_count ?? 0}`,
     `transcripts=${dashboard.transcript_bundle_ready_count}/${dashboard.transcript_bundle_count}`,
     `exports=${dashboard.transcript_export_policy_ready_count}/${dashboard.transcript_export_policy_count}`,
     `protection=${dashboard.transcript_protection_policy_ready_count}/${dashboard.transcript_protection_policy_count}`,
@@ -5820,10 +5823,11 @@ function renderStenoPetCompanionDashboard(dashboard) {
 
   clearList(stenoPetCompanionDashboardList);
   const sections = dashboard.sections ?? [];
+  const recentAgentTranscripts = dashboard.recent_agent_transcript_sessions ?? [];
   const petAttentionItems = dashboard.recent_pet_attention_items ?? [];
   const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
   stenoPetCompanionDashboardCount.textContent = String(
-    sections.length + petAttentionItems.length + recentPetSignals.length + 1,
+    sections.length + recentAgentTranscripts.length + petAttentionItems.length + recentPetSignals.length + 1,
   );
 
   const runtimeNode = item(
@@ -5833,6 +5837,24 @@ function renderStenoPetCompanionDashboard(dashboard) {
   );
   runtimeNode.dataset.state = (dashboard.running_runtime_target_count ?? 0) > 0 ? "ok" : "warning";
   stenoPetCompanionDashboardList.append(runtimeNode);
+
+  for (const record of recentAgentTranscripts.slice(0, 6)) {
+    const transcriptNode = item(
+      `Agent transcript: ${record.title ?? record.target ?? "Codex/Hermes"}`,
+      `${record.status ?? "read-only"} / ${record.runtime ?? "agent"} / ${record.session_kind ?? "session"}`,
+      [
+        `pipes=${Boolean(record.stdout_pipe_reader_enabled)}/${Boolean(record.stderr_pipe_reader_enabled)}`,
+        `partial=${Boolean(record.partial_output_captured)}`,
+        `timeout=${Boolean(record.timed_out)} kill=${Boolean(record.timeout_kill_sent)} wait=${record.wait_after_kill_ms ?? 0}ms`,
+        `stdout=${record.stdout_size_bytes ?? 0}b stderr=${record.stderr_size_bytes ?? 0}b`,
+        record.record_path ?? "",
+      ].join("; "),
+    );
+    transcriptNode.dataset.state = record.status === "agent_transcript_session_succeeded"
+      ? "ok"
+      : record.timed_out ? "warning" : "ready";
+    stenoPetCompanionDashboardList.append(transcriptNode);
+  }
 
   for (const attention of petAttentionItems.slice(0, 8)) {
     const attentionNode = item(
@@ -8124,6 +8146,12 @@ async function loadStenoPetCompanionDashboard() {
     transcript_export_policy_ready_count: 0,
     transcript_protection_policy_count: 0,
     transcript_protection_policy_ready_count: 0,
+    agent_transcript_session_count: 0,
+    agent_transcript_ready_count: 0,
+    agent_transcript_pipe_reader_ready_count: 0,
+    agent_transcript_timed_out_count: 0,
+    agent_transcript_partial_output_count: 0,
+    recent_agent_transcript_sessions: [],
     steno_mcp_evidence_count: 0,
     steno_mcp_ready_count: 0,
     pet_inventory_count: 0,
@@ -16934,6 +16962,9 @@ function renderAgentTranscriptSessionSummary(value) {
     `kind=${value.session_kind}`,
     `exit=${value.exit_code ?? "n/a"}`,
     `pid=${value.pid ?? "n/a"}`,
+    `pipes=${Boolean(value.stdout_pipe_reader_enabled)}/${Boolean(value.stderr_pipe_reader_enabled)}`,
+    `partial=${Boolean(value.partial_output_captured)}`,
+    `timeoutKill=${Boolean(value.timeout_kill_sent)}`,
     `stdout=${value.stdout_size_bytes}b`,
     `stderr=${value.stderr_size_bytes}b`,
     `task_exec=${value.agent_task_execution_enabled}`,
@@ -16954,6 +16985,7 @@ function renderAgentTranscriptSessionLedger(records) {
       `${record.title}: ${record.status}`,
       `runtime=${record.runtime} | kind=${record.session_kind} | exit=${record.exit_code ?? "n/a"} | ${record.duration_ms}ms`,
       [
+        `pipes=${Boolean(record.stdout_pipe_reader_enabled)}/${Boolean(record.stderr_pipe_reader_enabled)}; partial=${Boolean(record.partial_output_captured)}; timeout_kill=${Boolean(record.timeout_kill_sent)}; wait_after_kill=${record.wait_after_kill_ms ?? 0}ms`,
         `stdout=${record.stdout_size_bytes}b ${record.stdout_transcript_path}`,
         `stderr=${record.stderr_size_bytes}b ${record.stderr_transcript_path}`,
         `spawn=${record.process_spawn_enabled}; transcripts=${record.transcript_capture_enabled}; sidecar=${record.sidecar_launch_enabled}; terminal=${record.terminal_enabled}; workspace_read=${record.workspace_read_enabled}; writes=${record.writes_allowed}; task_exec=${record.agent_task_execution_enabled}`,
