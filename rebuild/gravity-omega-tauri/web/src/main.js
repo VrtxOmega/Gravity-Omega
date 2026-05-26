@@ -6034,7 +6034,9 @@ function renderTerminalProcessLaneDashboard(dashboard) {
     `adapters=${dashboard.runner_adapter_ready_count}/${dashboard.runner_adapter_count}`,
     `plans=${dashboard.process_command_plan_ready_count}/${dashboard.process_command_plan_count}`,
     `streams=${dashboard.process_stream_init_ready_count}/${dashboard.process_stream_init_count}`,
+    `control=${dashboard.process_control_policy_ready_count}/${dashboard.process_control_policy_count}`,
     `supervisor=${dashboard.process_supervisor_preflight_ready_count}/${dashboard.process_supervisor_preflight_count}`,
+    `exits=${dashboard.process_supervisor_exit_summary_ready_count}/${dashboard.process_supervisor_exit_summary_count}`,
     `tails=${dashboard.process_output_tail_summary_ready_count}/${dashboard.process_output_tail_summary_count}`,
     `sessions=${dashboard.recent_terminal_session_count ?? 0}`,
     `replays=${dashboard.recent_terminal_replay_count ?? 0}`,
@@ -6050,7 +6052,9 @@ function renderTerminalProcessLaneDashboard(dashboard) {
   const recentSessions = dashboard.recent_terminal_sessions ?? [];
   const recentReplays = dashboard.recent_terminal_replays ?? [];
   const recentBlockedCommands = dashboard.recent_blocked_terminal_commands ?? [];
-  terminalProcessLaneDashboardCount.textContent = String(sections.length + recentSessions.length + recentReplays.length + recentBlockedCommands.length);
+  const recentControlPolicies = dashboard.recent_process_control_policies ?? [];
+  const recentExitSummaries = dashboard.recent_process_exit_summaries ?? [];
+  terminalProcessLaneDashboardCount.textContent = String(sections.length + recentSessions.length + recentReplays.length + recentBlockedCommands.length + recentControlPolicies.length + recentExitSummaries.length);
 
   for (const record of recentSessions.slice(0, 6)) {
     const view = describeTerminalSessionSummary(record);
@@ -6066,6 +6070,20 @@ function renderTerminalProcessLaneDashboard(dashboard) {
     terminalProcessLaneDashboardList.append(node);
   }
 
+  for (const record of recentControlPolicies.slice(0, 6)) {
+    const view = describeControlPolicy(record);
+    const node = item(`Process control: ${view.title}`, view.meta, view.text);
+    node.dataset.state = "warning";
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  for (const record of recentExitSummaries.slice(0, 6)) {
+    const view = describeSupervisorExitSummary(record);
+    const node = item(`Process exit: ${view.title}`, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
   for (const record of recentBlockedCommands.slice(0, 6)) {
     const view = describeTerminalBlockedCommand(record);
     const node = item(view.title, view.meta, view.text);
@@ -6073,7 +6091,7 @@ function renderTerminalProcessLaneDashboard(dashboard) {
     terminalProcessLaneDashboardList.append(node);
   }
 
-  if (sections.length === 0 && recentSessions.length === 0 && recentReplays.length === 0 && recentBlockedCommands.length === 0) {
+  if (sections.length === 0 && recentSessions.length === 0 && recentReplays.length === 0 && recentBlockedCommands.length === 0 && recentControlPolicies.length === 0 && recentExitSummaries.length === 0) {
     terminalProcessLaneDashboardList.append(item("No terminal/process lane records", "empty", "Run an allowed terminal command, then refresh the read-only terminal/process dashboard."));
     return;
   }
@@ -8253,6 +8271,8 @@ async function loadTerminalProcessLaneDashboard() {
     recent_terminal_session_count: 0,
     recent_terminal_replay_count: 0,
     blocked_terminal_command_count: 0,
+    recent_process_control_policy_count: 0,
+    recent_process_exit_summary_count: 0,
     disabled_gate_count: sections.length,
     read_only: true,
     terminal_process_visible: false,
@@ -8275,6 +8295,8 @@ async function loadTerminalProcessLaneDashboard() {
     recent_terminal_sessions: [],
     recent_terminal_replays: [],
     recent_blocked_terminal_commands: [],
+    recent_process_control_policies: [],
+    recent_process_exit_summaries: [],
     sections,
     reasons: [
       "Static preview groups terminal and process evidence while terminal writes, process spawn, stream readers, and execution remain disabled.",

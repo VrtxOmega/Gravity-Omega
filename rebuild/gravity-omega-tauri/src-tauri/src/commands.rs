@@ -5592,6 +5592,8 @@ pub struct TerminalProcessLaneDashboard {
     pub recent_terminal_session_count: usize,
     pub recent_terminal_replay_count: usize,
     pub blocked_terminal_command_count: usize,
+    pub recent_process_control_policy_count: usize,
+    pub recent_process_exit_summary_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
     pub terminal_process_visible: bool,
@@ -5614,6 +5616,8 @@ pub struct TerminalProcessLaneDashboard {
     pub recent_terminal_sessions: Vec<ProductTerminalSessionSummary>,
     pub recent_terminal_replays: Vec<ProductTerminalTranscriptReplayRecord>,
     pub recent_blocked_terminal_commands: Vec<ProductTerminalBlockedCommandRecord>,
+    pub recent_process_control_policies: Vec<ProcessControlPolicyRecord>,
+    pub recent_process_exit_summaries: Vec<ProcessSupervisorExitSummaryRecord>,
     pub sections: Vec<TerminalProcessLaneDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -100310,6 +100314,10 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
     let recent_blocked_terminal_commands = list_product_terminal_blocked_commands(6)?;
     let mut recent_terminal_replays = list_product_terminal_transcript_replays()?;
     recent_terminal_replays.truncate(6);
+    let mut recent_process_control_policies = process_control_policies.clone();
+    recent_process_control_policies.truncate(6);
+    let mut recent_process_exit_summaries = process_supervisor_exit_summaries.clone();
+    recent_process_exit_summaries.truncate(6);
 
     let runner_invocation_ready_count = runner_invocations
         .iter()
@@ -100624,6 +100632,8 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         || process_supervisor_exit_summary_ready_count > 0
         || process_output_tail_summary_ready_count > 0
         || !recent_terminal_sessions.is_empty()
+        || !recent_process_control_policies.is_empty()
+        || !recent_process_exit_summaries.is_empty()
         || !recent_blocked_terminal_commands.is_empty()
         || !recent_terminal_replays.is_empty();
 
@@ -100653,6 +100663,8 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         recent_terminal_session_count: recent_terminal_sessions.len(),
         recent_terminal_replay_count: recent_terminal_replays.len(),
         blocked_terminal_command_count: recent_blocked_terminal_commands.len(),
+        recent_process_control_policy_count: recent_process_control_policies.len(),
+        recent_process_exit_summary_count: recent_process_exit_summaries.len(),
         disabled_gate_count,
         read_only: true,
         terminal_process_visible,
@@ -100675,10 +100687,12 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         recent_terminal_sessions,
         recent_terminal_replays,
         recent_blocked_terminal_commands,
+        recent_process_control_policies,
+        recent_process_exit_summaries,
         sections,
         reasons: vec![
             "dashboard groups runner, adapter, command plan, stream, lifecycle, supervisor, exit, and output-tail evidence into one terminal/process lane",
-            "dashboard reads existing runner, process, terminal session, blocked terminal command, and transcript replay ledgers only and creates no records",
+            "dashboard reads existing runner, process, control policy, exit summary, terminal session, blocked terminal command, and transcript replay ledgers only and creates no records",
             "terminal writes, process spawn, stream reads, live tailing, process control, live MCP calls, config reads, captures, exports, writes, patches, memory writes, and execution remain disabled",
         ],
         next_slice: "Use this terminal/process lane to add approval and evidence spine views before any process, terminal, stream, or control gate is opened.",
@@ -115492,6 +115506,37 @@ mod tests {
         assert_eq!(terminal_process_dashboard.process_lifecycle_ready_count, 1);
         assert_eq!(terminal_process_dashboard.process_control_policy_count, 2);
         assert_eq!(terminal_process_dashboard.process_control_policy_ready_count, 2);
+        assert_eq!(terminal_process_dashboard.recent_process_control_policy_count, 2);
+        assert_eq!(
+            terminal_process_dashboard
+                .recent_process_control_policies
+                .len(),
+            2
+        );
+        assert!(terminal_process_dashboard
+            .recent_process_control_policies
+            .iter()
+            .any(|policy| {
+                policy.id == retry_policy.policy.id
+                    && policy.requested_action == "retry"
+                    && policy.status == "retry_recorded_spawn_disabled"
+                    && !policy.signal_enabled
+                    && !policy.retry_spawn_enabled
+                    && !policy.process_spawn_enabled
+                    && !policy.execution_enabled
+            }));
+        assert!(terminal_process_dashboard
+            .recent_process_control_policies
+            .iter()
+            .any(|policy| {
+                policy.id == cancel_policy.policy.id
+                    && policy.requested_action == "cancel"
+                    && policy.status == "cancel_recorded_signal_disabled"
+                    && !policy.signal_enabled
+                    && !policy.retry_spawn_enabled
+                    && !policy.process_spawn_enabled
+                    && !policy.execution_enabled
+            }));
         assert_eq!(
             terminal_process_dashboard.process_supervisor_preflight_count,
             1
@@ -115516,6 +115561,31 @@ mod tests {
             terminal_process_dashboard.process_supervisor_exit_summary_ready_count,
             1
         );
+        assert_eq!(terminal_process_dashboard.recent_process_exit_summary_count, 1);
+        assert_eq!(
+            terminal_process_dashboard
+                .recent_process_exit_summaries
+                .len(),
+            1
+        );
+        assert_eq!(
+            terminal_process_dashboard.recent_process_exit_summaries[0].id,
+            exit_summary.summary.id
+        );
+        assert_eq!(
+            terminal_process_dashboard.recent_process_exit_summaries[0].status,
+            "exit_summary_recorded_no_process"
+        );
+        assert!(!terminal_process_dashboard.recent_process_exit_summaries[0].signal_enabled);
+        assert!(
+            !terminal_process_dashboard.recent_process_exit_summaries[0]
+                .retry_spawn_enabled
+        );
+        assert!(
+            !terminal_process_dashboard.recent_process_exit_summaries[0]
+                .process_spawn_enabled
+        );
+        assert!(!terminal_process_dashboard.recent_process_exit_summaries[0].execution_enabled);
         assert_eq!(
             terminal_process_dashboard.process_output_tail_summary_count,
             1

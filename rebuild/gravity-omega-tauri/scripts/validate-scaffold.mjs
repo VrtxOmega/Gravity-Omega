@@ -668,9 +668,13 @@ for (const productBridgeNeedle of [
   "recent_terminal_replays",
   "recent_blocked_terminal_commands",
   "blocked_terminal_command_count",
+  "recent_process_control_policies",
+  "recent_process_exit_summaries",
   "Terminal session:",
   "Terminal replay:",
   "Blocked terminal command:",
+  "Process control:",
+  "Process exit:",
 ]) {
   if (!frontendSource.includes(productBridgeNeedle)) {
     throw new Error(`Visible workbench prompt bridge missing ${productBridgeNeedle}.`);
@@ -1561,6 +1565,8 @@ for (const stateNeedle of [
   "recent_terminal_sessions",
   "recent_terminal_replays",
   "recent_blocked_terminal_commands",
+  "recent_process_control_policies",
+  "recent_process_exit_summaries",
   "LocalMcpLaneCapabilityContractRecord",
   "local-mcp-lane-capability-contracts",
   "LocalMcpHealthPreflightRecord",
@@ -2699,6 +2705,8 @@ for (const runtimeDepthNeedle of [
   "list_product_terminal_transcript_replays",
   "product-terminal-transcript-replays",
   "product_terminal_transcript_replay_recorded",
+  "recent_process_control_policies",
+  "recent_process_exit_summaries",
   "\"terminal-blocked\"",
   "process_spawn_enabled: false",
   "terminal_write_enabled: false",
