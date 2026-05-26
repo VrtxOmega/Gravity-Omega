@@ -83,6 +83,28 @@ for (const deadVisibleNeedle of [
   }
 }
 
+for (const runtimeEvidenceSpineNeedle of [
+  "omega-runtime-evidence-spine",
+  "omega-runtime-evidence-spine-status",
+  "omega-runtime-evidence-spine-gates",
+  "omega-runtime-evidence-spine-list",
+  "Runtime Evidence Spine",
+]) {
+  if (!visibleProductShell.includes(runtimeEvidenceSpineNeedle)) {
+    throw new Error(`Visible product shell missing runtime evidence spine element: ${runtimeEvidenceSpineNeedle}.`);
+  }
+}
+
+for (const runtimeEvidenceStyleNeedle of [
+  ".omega-runtime-evidence-spine",
+  ".omega-runtime-evidence-spine-list",
+  ".omega-runtime-evidence-card",
+]) {
+  if (!styleSource.includes(runtimeEvidenceStyleNeedle)) {
+    throw new Error(`Runtime evidence spine missing style hook: ${runtimeEvidenceStyleNeedle}.`);
+  }
+}
+
 if (frontendSource.includes("/home/rage/apps/gravity-omega-v2")) {
   throw new Error("Visible workbench runtime must target the Rust/Tauri rebuild, not the old Electron app.");
 }
@@ -553,6 +575,14 @@ for (const productBridgeNeedle of [
   "recordUnlockedAgentPromptSession(runtime)",
   "codex-workspace-write",
   "hermes-chat",
+  "omega-runtime-evidence-spine-status",
+  "renderRuntimeEvidenceSpine",
+  "refreshRuntimeEvidenceSpine",
+  "loadProductEvidenceHistory",
+  "loadTerminalTranscriptReplays",
+  "loadAgentTranscriptSessions",
+  "loadUnlockedAgentPromptSessions",
+  "bounded_process_capture",
   "agentRunModeStorageKey",
   "restoreAgentRunMode",
   "activeAgentRun",
@@ -2466,6 +2496,8 @@ for (const frontendNeedle of [
   "restoreBottomDockHeight",
   "renderBottomEvidenceDock",
   "refreshBottomEvidenceDock",
+  "omega-runtime-evidence-spine-list",
+  "omega-runtime-evidence-card",
   "toolbar-search-input",
   "toolbar-search-summary",
   "filterToolbarCommands",

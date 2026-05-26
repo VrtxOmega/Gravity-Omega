@@ -3343,6 +3343,94 @@ textarea:focus-visible,
   font-weight: 700;
 }
 
+.omega-runtime-evidence-spine {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid rgba(212, 168, 67, 0.22);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(242, 201, 92, 0.08), transparent 42%),
+    #0c0b09;
+}
+
+.omega-runtime-evidence-spine-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.omega-runtime-evidence-spine-header div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.omega-runtime-evidence-spine-header strong {
+  color: var(--accent-gold);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.omega-runtime-evidence-spine-header span,
+.omega-runtime-evidence-spine-gates {
+  color: var(--text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+  font-size: 10px;
+}
+
+.omega-runtime-evidence-spine-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 7px;
+}
+
+.omega-runtime-evidence-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(212, 168, 67, 0.16);
+  border-radius: 5px;
+  background: rgba(12, 12, 15, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 225, 139, 0.04);
+}
+
+.omega-runtime-evidence-card[data-state="ready"] {
+  border-color: rgba(93, 223, 139, 0.34);
+}
+
+.omega-runtime-evidence-card[data-state="warning"] {
+  border-color: rgba(242, 201, 92, 0.42);
+}
+
+.omega-runtime-evidence-card[data-state="blocked"] {
+  border-color: rgba(233, 88, 88, 0.32);
+}
+
+.omega-runtime-evidence-card strong {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.omega-runtime-evidence-card span,
+.omega-runtime-evidence-card code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omega-runtime-evidence-card code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+}
+
 .omega-evidence-history-list {
   display: grid;
   gap: 5px;

@@ -239,6 +239,10 @@ const runAgentTranscriptSessionBtn = document.querySelector("#run-agent-transcri
 const agentTranscriptSessionSummary = document.querySelector("#agent-transcript-session-summary");
 const agentTranscriptSessionLedger = document.querySelector("#agent-transcript-session-ledger");
 const agentTranscriptSessionCount = document.querySelector("#agent-transcript-session-count");
+const runtimeEvidenceSpineStatus = document.querySelector("#omega-runtime-evidence-spine-status");
+const runtimeEvidenceSpineCount = document.querySelector("#omega-runtime-evidence-spine-count");
+const runtimeEvidenceSpineGates = document.querySelector("#omega-runtime-evidence-spine-gates");
+const runtimeEvidenceSpineList = document.querySelector("#omega-runtime-evidence-spine-list");
 const runUnlockedCodexAgentBtn = document.querySelector("#run-unlocked-codex-agent-btn");
 const runUnlockedHermesAgentBtn = document.querySelector("#run-unlocked-hermes-agent-btn");
 const unlockedAgentPromptSummary = document.querySelector("#unlocked-agent-prompt-summary");
@@ -16480,6 +16484,7 @@ async function recordAgentTranscriptSession() {
     const records = await loadAgentTranscriptSessions();
     renderAgentTranscriptSessionSummary(result);
     renderAgentTranscriptSessionLedger(records);
+    await refreshRuntimeEvidenceSpine();
     await refreshTerminalProcessLaneDashboard();
     statusEl.textContent = `Agent transcript sessions captured: ${result.succeeded_count}/${result.session_count} passed, task execution disabled`;
     statusEl.classList.remove("error");
@@ -16563,6 +16568,7 @@ async function recordUnlockedAgentPromptSession(runtime) {
     const records = await loadUnlockedAgentPromptSessions();
     renderUnlockedAgentPromptSummary(result);
     renderUnlockedAgentPromptLedger(records);
+    await refreshRuntimeEvidenceSpine();
     await refreshTerminalProcessLaneDashboard();
     statusEl.textContent = `Unlocked agent prompt run: ${result.succeeded_count}/${result.session_count} passed, writes=${result.writes_allowed}`;
     statusEl.classList.toggle("error", result.succeeded_count !== result.session_count);
@@ -28958,6 +28964,199 @@ footer {
     evidenceView.append(node);
   };
 
+  const emptyProductEvidenceHistory = () => ({
+    status: invoke ? "product_evidence_history_empty" : "product_evidence_history_static_preview",
+    item_count: 0,
+    category_count: 0,
+    categories: [],
+    items: [],
+    history_enabled: Boolean(invoke),
+    evidence_read_enabled: Boolean(invoke),
+    file_write_enabled: false,
+    process_spawn_enabled: false,
+    live_mcp_call_enabled: false,
+    writes_allowed: false,
+    execution_enabled: false,
+  });
+
+  const loadProductEvidenceHistory = async () => {
+    if (!invoke) return emptyProductEvidenceHistory();
+    return invoke("product_evidence_history");
+  };
+
+  const runtimeEvidenceState = (ready, warning = false) => {
+    if (ready) return "ready";
+    return warning ? "warning" : "blocked";
+  };
+
+  const runtimeEvidenceCard = ({ title, meta, detail, path = "", state = "blocked" }) => {
+    const node = document.createElement("article");
+    node.className = "omega-runtime-evidence-card";
+    node.dataset.state = state;
+    const heading = document.createElement("strong");
+    heading.textContent = title;
+    const metaNode = document.createElement("span");
+    metaNode.textContent = meta || "waiting";
+    const detailNode = document.createElement("span");
+    detailNode.textContent = detail || "No runtime evidence recorded yet.";
+    const pathNode = document.createElement("code");
+    pathNode.textContent = compactPath(path || "none");
+    pathNode.title = path || "";
+    node.append(heading, metaNode, detailNode, pathNode);
+    return node;
+  };
+
+  const renderRuntimeEvidenceSpine = ({ history, agentSessions, terminalReplays, unlockedRuns, errors }) => {
+    if (!runtimeEvidenceSpineList) return;
+
+    const productHistory = history ?? emptyProductEvidenceHistory();
+    const transcriptRows = agentSessions ?? [];
+    const terminalRows = terminalReplays ?? [];
+    const unlockedRows = unlockedRuns ?? [];
+    const latestTranscript = transcriptRows[0] ?? null;
+    const latestTerminalReplay = terminalRows[0] ?? null;
+    const latestUnlockedRun = unlockedRows[0] ?? null;
+    const historyItems = productHistory.items ?? [];
+    const destructiveWriteEnabled = Boolean(
+      productHistory.writes_allowed
+      || latestTranscript?.writes_allowed
+      || latestTerminalReplay?.writes_allowed
+      || latestUnlockedRun?.writes_allowed
+      || latestTerminalReplay?.terminal_write_enabled
+      || latestTerminalReplay?.file_write_enabled
+      || latestTerminalReplay?.patch_apply_enabled
+    );
+    const destructiveExecutionEnabled = Boolean(
+      productHistory.execution_enabled
+      || latestTranscript?.execution_enabled
+      || latestTerminalReplay?.execution_enabled
+      || latestUnlockedRun?.execution_enabled
+      || latestTerminalReplay?.process_control_enabled
+    );
+    const exportEnabled = Boolean(
+      latestTranscript?.export_enabled
+      || latestTerminalReplay?.export_enabled
+      || latestUnlockedRun?.export_enabled
+    );
+    const liveMcpEnabled = Boolean(latestTranscript?.live_mcp_call_enabled || latestUnlockedRun?.live_mcp_call_enabled);
+    const boundedProcessCapture = Boolean(
+      latestTranscript?.process_spawn_enabled
+      || latestUnlockedRun?.process_spawn_enabled
+      || productHistory.process_spawn_enabled
+    );
+    const laneCount = 5;
+
+    if (runtimeEvidenceSpineStatus) {
+      const errorText = errors?.length ? `; ${errors.length} refresh issue(s)` : "";
+      runtimeEvidenceSpineStatus.textContent = [
+        `${productHistory.item_count ?? historyItems.length} product record(s)`,
+        `${transcriptRows.length} Codex/Hermes transcript(s)`,
+        `${terminalRows.length} terminal replay(s)`,
+        `${unlockedRows.length} unlocked run(s)${errorText}`,
+      ].join(" / ");
+    }
+    if (runtimeEvidenceSpineCount) {
+      runtimeEvidenceSpineCount.textContent = String(laneCount);
+    }
+    if (runtimeEvidenceSpineGates) {
+      runtimeEvidenceSpineGates.textContent = [
+        `bounded_process_capture=${boundedProcessCapture}`,
+        `terminal_write=${Boolean(latestTerminalReplay?.terminal_write_enabled)}`,
+        `writes=${destructiveWriteEnabled}`,
+        `process_control=${Boolean(latestTerminalReplay?.process_control_enabled)}`,
+        `export=${exportEnabled}`,
+        `live_mcp=${liveMcpEnabled}`,
+        `execution=${destructiveExecutionEnabled}`,
+      ].join(" / ");
+    }
+
+    clearList(runtimeEvidenceSpineList);
+    runtimeEvidenceSpineList.append(
+      runtimeEvidenceCard({
+        title: "Product Evidence",
+        meta: `${productHistory.status}; categories=${productHistory.category_count ?? 0}`,
+        detail: historyItems[0]
+          ? `${historyItems[0].category}: ${historyItems[0].title}`
+          : "No product evidence files found yet.",
+        path: historyItems[0]?.record_path,
+        state: runtimeEvidenceState((productHistory.item_count ?? 0) > 0),
+      }),
+      runtimeEvidenceCard({
+        title: "Codex/Hermes Discovery",
+        meta: latestTranscript
+          ? `${latestTranscript.runtime}/${latestTranscript.session_kind}; ${latestTranscript.status}`
+          : "no transcript session",
+        detail: latestTranscript
+          ? `stdout=${latestTranscript.stdout_size_bytes ?? 0}b; stderr=${latestTranscript.stderr_size_bytes ?? 0}b; task_exec=${latestTranscript.agent_task_execution_enabled}`
+          : "Run fixed version/help sessions to prove CLI capability before task execution.",
+        path: latestTranscript?.record_path,
+        state: runtimeEvidenceState(
+          latestTranscript?.status === "agent_transcript_session_succeeded",
+          transcriptRows.length > 0,
+        ),
+      }),
+      runtimeEvidenceCard({
+        title: "Terminal Replay",
+        meta: latestTerminalReplay
+          ? `${latestTerminalReplay.source_session_id}; ${latestTerminalReplay.status}`
+          : "no terminal replay",
+        detail: latestTerminalReplay
+          ? `stdout=${latestTerminalReplay.stdout_line_count ?? 0} lines; stderr=${latestTerminalReplay.stderr_line_count ?? 0} lines; blockers=${latestTerminalReplay.blockers?.length ?? 0}`
+          : "Use Terminal Evidence to capture a read-only replay tail from the latest terminal session.",
+        path: latestTerminalReplay?.record_path,
+        state: runtimeEvidenceState(
+          latestTerminalReplay?.status === "product_terminal_transcript_replay_recorded",
+          terminalRows.length > 0,
+        ),
+      }),
+      runtimeEvidenceCard({
+        title: "Unlocked Agent Run",
+        meta: latestUnlockedRun
+          ? `${latestUnlockedRun.runtime}; ${latestUnlockedRun.status}`
+          : "no unlocked run",
+        detail: latestUnlockedRun
+          ? `exit=${latestUnlockedRun.exit_code ?? "n/a"}; stdout=${latestUnlockedRun.stdout_size_bytes ?? 0}b; writes=${latestUnlockedRun.writes_allowed}`
+          : "Run Main, Codex Only, or Hermes Only to create an inspectable agent run record.",
+        path: latestUnlockedRun?.record_path,
+        state: runtimeEvidenceState(
+          latestUnlockedRun?.status === "unlocked_agent_prompt_session_succeeded",
+          unlockedRows.length > 0,
+        ),
+      }),
+      runtimeEvidenceCard({
+        title: "Safety Gates",
+        meta: destructiveExecutionEnabled || destructiveWriteEnabled ? "attention required" : "destructive gates disabled",
+        detail: `bounded_agent=${Boolean(latestUnlockedRun?.agent_prompt_execution_enabled)}; process_capture=${boundedProcessCapture}; export=${exportEnabled}; live_mcp=${liveMcpEnabled}`,
+        path: errors?.join(" / ") || "no refresh errors",
+        state: destructiveExecutionEnabled || destructiveWriteEnabled || exportEnabled || liveMcpEnabled ? "warning" : "ready",
+      }),
+    );
+  };
+
+  const refreshRuntimeEvidenceSpine = async (seedHistory = null) => {
+    const errors = [];
+    const capture = (label, fallback) => (result) => {
+      if (result.status === "fulfilled") return result.value;
+      errors.push(`${label}: ${result.reason?.message ?? result.reason ?? "failed"}`);
+      return fallback;
+    };
+    const [historyResult, agentResult, terminalResult, unlockedResult] = await Promise.allSettled([
+      seedHistory ? Promise.resolve(seedHistory) : loadProductEvidenceHistory(),
+      loadAgentTranscriptSessions(),
+      loadTerminalTranscriptReplays(),
+      loadUnlockedAgentPromptSessions(),
+    ]);
+    const spine = {
+      history: capture("product evidence", emptyProductEvidenceHistory())(historyResult),
+      agentSessions: capture("agent transcripts", [])(agentResult),
+      terminalReplays: capture("terminal replays", [])(terminalResult),
+      unlockedRuns: capture("unlocked runs", [])(unlockedResult),
+      errors,
+    };
+    renderRuntimeEvidenceSpine(spine);
+    return spine;
+  };
+
   const renderProductEvidenceHistory = (history) => {
     if (evidenceHistoryStatus) {
       evidenceHistoryStatus.textContent = `${history.status}; ${history.item_count ?? 0} records across ${history.category_count ?? 0} categories`;
@@ -28984,10 +29183,11 @@ footer {
   };
 
   const refreshProductEvidenceHistory = async () => {
-    if (!invoke || (!evidenceHistoryStatus && !evidenceHistoryList)) return;
+    if (!evidenceHistoryStatus && !evidenceHistoryList && !runtimeEvidenceSpineList) return;
     try {
-      const history = await invoke("product_evidence_history");
+      const history = await loadProductEvidenceHistory();
       renderProductEvidenceHistory(history);
+      await refreshRuntimeEvidenceSpine(history);
     } catch (error) {
       if (evidenceHistoryStatus) {
         evidenceHistoryStatus.textContent = `Evidence history failed: ${error.message}`;
