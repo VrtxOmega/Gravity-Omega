@@ -5499,6 +5499,7 @@ pub struct StenoSearchPanel {
     pub result_count: usize,
     pub searched_file_count: usize,
     pub matched_file_count: usize,
+    pub postmortem_result_count: usize,
     pub max_results: usize,
     pub max_file_bytes: u64,
     pub transcript_bundle_count: usize,
@@ -5527,6 +5528,7 @@ pub struct StenoSearchPanel {
     pub writes_allowed: bool,
     pub execution_enabled: bool,
     pub results: Vec<StenoSearchResult>,
+    pub recent_postmortem_results: Vec<StenoSearchResult>,
     pub sections: Vec<StenoPetCompanionDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -100091,6 +100093,87 @@ fn run_steno_search(
     Ok((results, searched_file_count, matched_file_count))
 }
 
+fn steno_postmortem_result_from_agent(
+    record: &UnlockedAgentPromptSessionRecord,
+) -> StenoSearchResult {
+    let exit = record
+        .exit_code
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "none".to_string());
+    let snippet = prompt_preview(
+        &format!(
+            "{}; exit={exit}; timeout={}; duration={}ms; prompt={}; next={}",
+            record.status,
+            record.timed_out,
+            record.duration_ms,
+            record.prompt_preview,
+            record.next_step
+        ),
+        420,
+    );
+
+    StenoSearchResult {
+        title: format!("Codex agent postmortem: {}", record.runtime),
+        category: "agent-postmortem".to_string(),
+        record_path: record.record_path.clone(),
+        snippet,
+        line_number: 1,
+        created_at_ms: record.created_at_ms,
+        status: "steno_recent_postmortem_read_only".to_string(),
+    }
+}
+
+fn steno_postmortem_result_from_hermes(
+    record: &HermesKimiAssistBriefRecord,
+) -> StenoSearchResult {
+    let exit = record
+        .exit_code
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "none".to_string());
+    let blocker = record
+        .blockers
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "no blocker recorded".to_string());
+    let snippet = prompt_preview(
+        &format!(
+            "{}; exit={exit}; timeout={}; duration={}ms; blocker={}; prompt={}",
+            record.status, record.timed_out, record.duration_ms, blocker, record.prompt_preview
+        ),
+        420,
+    );
+
+    StenoSearchResult {
+        title: "Hermes/Kimi assist postmortem".to_string(),
+        category: "hermes-assist-postmortem".to_string(),
+        record_path: record.record_path.clone(),
+        snippet,
+        line_number: 1,
+        created_at_ms: record.created_at_ms,
+        status: "steno_recent_postmortem_read_only".to_string(),
+    }
+}
+
+fn steno_recent_postmortem_results(max_results: usize) -> Result<Vec<StenoSearchResult>, String> {
+    let mut results = Vec::new();
+
+    for record in list_unlocked_agent_prompt_sessions()? {
+        if unlocked_agent_session_is_postmortem(&record) {
+            results.push(steno_postmortem_result_from_agent(&record));
+        }
+    }
+
+    for record in list_hermes_kimi_assist_briefs()? {
+        if hermes_assist_is_postmortem(&record) {
+            results.push(steno_postmortem_result_from_hermes(&record));
+        }
+    }
+
+    results.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    results.truncate(max_results);
+    Ok(results)
+}
+
 #[tauri::command]
 pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPanel, String> {
     let dashboard = steno_pet_companion_dashboard()?;
@@ -100117,6 +100200,8 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         run_steno_search(&query, max_results, max_file_bytes)?
     };
     let search_ran = !query.is_empty();
+    let recent_postmortem_results = steno_recent_postmortem_results(max_results.min(8))?;
+    let postmortem_result_count = recent_postmortem_results.len();
 
     Ok(StenoSearchPanel {
         status: "steno_search_panel_read_only",
@@ -100126,6 +100211,7 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         result_count: results.len(),
         searched_file_count,
         matched_file_count,
+        postmortem_result_count,
         max_results,
         max_file_bytes,
         transcript_bundle_count: dashboard.transcript_bundle_count,
@@ -100154,9 +100240,11 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         writes_allowed: dashboard.writes_allowed,
         execution_enabled: dashboard.execution_enabled,
         results,
+        recent_postmortem_results,
         sections: dashboard.sections,
         reasons: vec![
             "panel searches only approved Gravity Omega evidence and transcript record directories",
+            "panel surfaces recent Codex agent and Hermes/Kimi assist postmortems before query results without launching either runtime",
             "panel creates no records and never reads old Electron .sswp files",
             "capture, export, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
         ],
@@ -113535,6 +113623,10 @@ mod tests {
         assert_eq!(panel.result_count, 0);
         assert_eq!(panel.searched_file_count, 0);
         assert_eq!(panel.matched_file_count, 0);
+        assert_eq!(
+            panel.postmortem_result_count,
+            panel.recent_postmortem_results.len()
+        );
         assert!(panel.results.is_empty());
         assert!(panel.section_count >= 5);
         assert!(panel.read_only);
@@ -113585,6 +113677,10 @@ mod tests {
         assert!(panel.result_count >= 1);
         assert!(panel.searched_file_count >= 1);
         assert!(panel.matched_file_count >= 1);
+        assert_eq!(
+            panel.postmortem_result_count,
+            panel.recent_postmortem_results.len()
+        );
         assert!(panel.transcript_read_enabled);
         assert!(panel.transcript_index_enabled);
         assert!(panel.query_binding_enabled);
@@ -116039,6 +116135,45 @@ mod tests {
             run_view.latest_agent_postmortem_record_path.as_deref(),
             Some(agent_session_record.record_path.as_str())
         );
+
+        let steno_panel = steno_search(None).expect("Steno search recent postmortems");
+        assert_eq!(steno_panel.status, "steno_search_panel_read_only");
+        assert_eq!(steno_panel.query, "");
+        assert_eq!(steno_panel.result_count, 0);
+        assert!(steno_panel.results.is_empty());
+        assert!(steno_panel.postmortem_result_count >= 2);
+        assert!(steno_panel
+            .recent_postmortem_results
+            .iter()
+            .any(|result| {
+                result.category == "agent-postmortem"
+                    && result.record_path == agent_session_record.record_path
+                    && result.snippet.contains("timed_out")
+                    && result.status == "steno_recent_postmortem_read_only"
+            }));
+        assert!(steno_panel
+            .recent_postmortem_results
+            .iter()
+            .any(|result| {
+                result.category == "hermes-assist-postmortem"
+                    && result.record_path == failed_assist_record.record_path
+                    && result.snippet.contains("timed_out")
+                    && result.status == "steno_recent_postmortem_read_only"
+            }));
+        assert!(steno_panel.read_only);
+        assert!(!steno_panel.capture_enabled);
+        assert!(!steno_panel.export_enabled);
+        assert!(!steno_panel.live_mcp_call_enabled);
+        assert!(!steno_panel.config_read_enabled);
+        assert!(!steno_panel.socket_connect_enabled);
+        assert!(!steno_panel.memory_write_enabled);
+        assert!(!steno_panel.desktop_control_enabled);
+        assert!(!steno_panel.terminal_enabled);
+        assert!(!steno_panel.process_spawn_enabled);
+        assert!(!steno_panel.file_write_enabled);
+        assert!(!steno_panel.patch_apply_enabled);
+        assert!(!steno_panel.writes_allowed);
+        assert!(!steno_panel.execution_enabled);
         assert_eq!(run_view.evidence_summary_count, 5);
         assert_eq!(run_view.active_task_run_id, stub.id);
         assert_eq!(run_view.disabled_gate_count, 9);

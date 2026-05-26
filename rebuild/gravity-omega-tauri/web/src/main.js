@@ -5879,6 +5879,7 @@ function renderStenoSearchPanel(panel) {
     panel.status,
     `query="${panel.query}"`,
     `results=${panel.result_count}`,
+    `postmortems=${panel.postmortem_result_count ?? 0}`,
     `matched=${panel.matched_file_count ?? 0}`,
     `searched=${panel.searched_file_count ?? 0}`,
     `limit=${panel.max_results ?? 0}`,
@@ -5895,8 +5896,30 @@ function renderStenoSearchPanel(panel) {
 
   clearList(stenoSearchPanelList);
   const results = panel.results ?? [];
+  const postmortems = panel.recent_postmortem_results ?? [];
   const sections = panel.sections ?? [];
-  stenoSearchPanelCount.textContent = String(results.length);
+  stenoSearchPanelCount.textContent = String(results.length + postmortems.length);
+
+  if (postmortems.length > 0) {
+    stenoSearchPanelList.append(
+      item(
+        "Recent Codex/Hermes postmortems",
+        `${postmortems.length} read-only records`,
+        "Failure and timeout recovery evidence appears here before query results; no runtime is launched.",
+      ),
+    );
+  }
+
+  for (const result of postmortems) {
+    const title = result.title || "Recent postmortem";
+    const meta = [
+      result.category || "postmortem",
+      result.status || "read-only",
+    ].filter(Boolean).join(" / ");
+    const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
+    node.dataset.state = "warning";
+    stenoSearchPanelList.append(node);
+  }
 
   if ((panel.query ?? "").trim() && results.length === 0) {
     stenoSearchPanelList.append(
@@ -5921,13 +5944,13 @@ function renderStenoSearchPanel(panel) {
   }
 
   if (sections.length === 0) {
-    if (results.length === 0) {
+    if (results.length === 0 && postmortems.length === 0) {
       stenoSearchPanelList.append(item("No Steno search readiness sections", "empty", "Refresh the read-only Steno search panel."));
     }
     return;
   }
 
-  if (results.length > 0) {
+  if (results.length > 0 || postmortems.length > 0) {
     stenoSearchPanelList.append(item("Read-only Steno readiness", `${sections.length} sections`, "Search results above are local evidence/transcript records; capture/export/live MCP remain disabled."));
   }
 
@@ -8118,6 +8141,7 @@ async function loadStenoSearchPanel(query = "") {
     result_count: 0,
     searched_file_count: 0,
     matched_file_count: 0,
+    postmortem_result_count: 0,
     max_results: 18,
     max_file_bytes: 262144,
     transcript_bundle_count: dashboard.transcript_bundle_count,
@@ -8146,6 +8170,7 @@ async function loadStenoSearchPanel(query = "") {
     writes_allowed: dashboard.writes_allowed,
     execution_enabled: dashboard.execution_enabled,
     results: [],
+    recent_postmortem_results: [],
     sections: dashboard.sections,
     reasons: [
       "Static preview binds the Steno query but defers local record reads to the Tauri runtime.",
