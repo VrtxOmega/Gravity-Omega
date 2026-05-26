@@ -3651,10 +3651,12 @@ function describeFirstClassMcpDashboardLane(record) {
   const runtimeCount = record.runtime_process_count ?? 0;
   const runtimeStatus = record.runtime_health_status ?? "runtime_process_snapshot_waiting";
   const runtimeTarget = record.runtime_target_id ?? "unknown-mcp-runtime";
+  const runtimeFreshness = record.runtime_snapshot_freshness_status ?? "runtime_process_snapshot_waiting";
+  const runtimeAge = record.runtime_snapshot_age_ms == null ? "unknown" : `${record.runtime_snapshot_age_ms}ms`;
   return {
     title: `${record.display_name} / ${record.lane_role}`,
-    meta: `${record.ready_evidence_count}/${record.evidence_record_count} evidence / ${record.command_count} commands / runtime=${runtimeCount}`,
-    text: `${record.status}. ${commands}. runtime=${runtimeStatus}; target=${runtimeTarget}; running=${Boolean(record.runtime_running)}; pattern=${record.runtime_expected_pattern ?? "unknown"}; record=${record.runtime_record_path ?? "none"}. ${record.next_action}`,
+    meta: `${record.ready_evidence_count}/${record.evidence_record_count} evidence / ${record.command_count} commands / runtime=${runtimeCount} / ${runtimeFreshness}`,
+    text: `${record.status}. ${commands}. runtime=${runtimeStatus}; target=${runtimeTarget}; running=${Boolean(record.runtime_running)}; age=${runtimeAge}; fresh=${Boolean(record.runtime_snapshot_fresh)}; stale=${Boolean(record.runtime_snapshot_stale)}; pipes=${Boolean(record.runtime_snapshot_pipe_reader_ready)}; timedOut=${Boolean(record.runtime_snapshot_timed_out)}; partial=${Boolean(record.runtime_snapshot_partial_output_captured)}; pattern=${record.runtime_expected_pattern ?? "unknown"}; record=${record.runtime_record_path ?? "none"}. ${record.next_action}`,
     state: record.execution_enabled || record.writes_allowed || record.live_call_enabled || record.config_read_enabled || record.socket_connect_enabled || record.capture_enabled || record.export_enabled ? "gated" : "disabled",
   };
 }
@@ -5491,6 +5493,10 @@ function renderFirstClassMcpDashboard(dashboard) {
     `runtime=${dashboard.running_runtime_lane_count ?? 0}/${dashboard.lane_count ?? 0}`,
     `mcp_processes=${dashboard.mcp_runtime_process_count ?? 0}`,
     `runtime_snapshots=${dashboard.runtime_process_snapshot_count ?? 0}`,
+    `runtime_fresh=${dashboard.latest_runtime_process_snapshot_fresh ?? false}`,
+    `runtime_age=${dashboard.latest_runtime_process_snapshot_age_ms ?? "unknown"}`,
+    `runtime_pipes=${dashboard.latest_runtime_process_snapshot_pipe_reader_ready ?? false}`,
+    `runtime_partial=${dashboard.latest_runtime_process_snapshot_partial_output_captured ?? false}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `live_call=${dashboard.live_call_enabled}`,
     `config=${dashboard.config_read_enabled}`,
@@ -5509,8 +5515,8 @@ function renderFirstClassMcpDashboard(dashboard) {
   for (const record of lanes) {
     const runtimeNode = item(
       `Runtime process: ${record.display_name}`,
-      `${record.runtime_health_status ?? "runtime_process_snapshot_waiting"} / running=${Boolean(record.runtime_running)}`,
-      `target=${record.runtime_target_id ?? "unknown-mcp-runtime"}; pattern=${record.runtime_expected_pattern ?? "unknown"}; processes=${record.runtime_process_count ?? 0}; snapshot=${record.runtime_record_path ?? dashboard.latest_runtime_process_snapshot_path ?? "none"}; dashboardExec=${dashboard.execution_enabled}`,
+      `${record.runtime_health_status ?? "runtime_process_snapshot_waiting"} / running=${Boolean(record.runtime_running)} / ${record.runtime_snapshot_freshness_status ?? dashboard.latest_runtime_process_snapshot_freshness_status ?? "runtime_process_snapshot_waiting"}`,
+      `target=${record.runtime_target_id ?? "unknown-mcp-runtime"}; pattern=${record.runtime_expected_pattern ?? "unknown"}; processes=${record.runtime_process_count ?? 0}; age=${record.runtime_snapshot_age_ms ?? dashboard.latest_runtime_process_snapshot_age_ms ?? "unknown"}; pipes=${Boolean(record.runtime_snapshot_pipe_reader_ready ?? dashboard.latest_runtime_process_snapshot_pipe_reader_ready)}; timedOut=${Boolean(record.runtime_snapshot_timed_out ?? dashboard.latest_runtime_process_snapshot_timed_out)}; partial=${Boolean(record.runtime_snapshot_partial_output_captured ?? dashboard.latest_runtime_process_snapshot_partial_output_captured)}; snapshot=${record.runtime_record_path ?? dashboard.latest_runtime_process_snapshot_path ?? "none"}; dashboardExec=${dashboard.execution_enabled}`,
     );
     runtimeNode.dataset.state = record.runtime_running ? "ready" : "disabled";
     firstClassMcpDashboardList.append(runtimeNode);
@@ -7897,6 +7903,13 @@ async function loadFirstClassMcpDashboard() {
     runtime_expected_pattern,
     runtime_record_path: null,
     runtime_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
+    runtime_snapshot_age_ms: null,
+    runtime_snapshot_freshness_status: "runtime_process_snapshot_waiting",
+    runtime_snapshot_fresh: false,
+    runtime_snapshot_stale: true,
+    runtime_snapshot_pipe_reader_ready: false,
+    runtime_snapshot_partial_output_captured: false,
+    runtime_snapshot_timed_out: false,
     first_class: true,
     read_only: true,
     live_probe_enabled: false,
@@ -7931,6 +7944,14 @@ async function loadFirstClassMcpDashboard() {
     runtime_process_snapshot_count: 0,
     latest_runtime_process_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
     latest_runtime_process_snapshot_path: null,
+    runtime_process_snapshot_freshness_threshold_ms: 120000,
+    latest_runtime_process_snapshot_age_ms: null,
+    latest_runtime_process_snapshot_freshness_status: "runtime_process_snapshot_waiting",
+    latest_runtime_process_snapshot_fresh: false,
+    latest_runtime_process_snapshot_stale: true,
+    latest_runtime_process_snapshot_pipe_reader_ready: false,
+    latest_runtime_process_snapshot_partial_output_captured: false,
+    latest_runtime_process_snapshot_timed_out: false,
     running_runtime_lane_count: 0,
     mcp_runtime_process_count: 0,
     disabled_gate_count: 3,
@@ -7996,6 +8017,13 @@ async function loadSswpStatusPanel() {
     runtime_expected_pattern: "mcp-servers/sswp",
     runtime_record_path: null,
     runtime_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
+    runtime_snapshot_age_ms: null,
+    runtime_snapshot_freshness_status: "runtime_process_snapshot_waiting",
+    runtime_snapshot_fresh: false,
+    runtime_snapshot_stale: true,
+    runtime_snapshot_pipe_reader_ready: false,
+    runtime_snapshot_partial_output_captured: false,
+    runtime_snapshot_timed_out: false,
     first_class: true,
     read_only: true,
     live_probe_enabled: false,
@@ -31004,6 +31032,10 @@ footer {
       dashboard.status,
       `lanes=${dashboard.first_class_lane_count ?? lanes.length}/${dashboard.lane_count ?? lanes.length}`,
       `evidence=${dashboard.ready_evidence_count ?? 0}/${dashboard.evidence_record_count ?? 0}`,
+      `runtime=${dashboard.running_runtime_lane_count ?? 0}/${dashboard.lane_count ?? lanes.length}`,
+      `fresh=${dashboard.latest_runtime_process_snapshot_fresh ?? false}`,
+      `age=${dashboard.latest_runtime_process_snapshot_age_ms ?? "unknown"}`,
+      `pipes=${dashboard.latest_runtime_process_snapshot_pipe_reader_ready ?? false}`,
       `disabled=${dashboard.disabled_gate_count ?? 0}`,
     ]);
 

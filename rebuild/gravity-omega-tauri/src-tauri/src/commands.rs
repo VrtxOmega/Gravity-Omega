@@ -833,6 +833,20 @@ pub struct RuntimeSidecarProcessSnapshotRecord {
     pub process_list_stdout_size_bytes: usize,
     pub process_list_stderr_preview: String,
     pub process_list_duration_ms: u64,
+    #[serde(default)]
+    pub process_list_timeout_ms: u64,
+    #[serde(default)]
+    pub process_list_timed_out: bool,
+    #[serde(default)]
+    pub stdout_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub stderr_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub process_list_timeout_kill_sent: bool,
+    #[serde(default)]
+    pub process_list_wait_after_kill_ms: u64,
+    #[serde(default)]
+    pub process_list_partial_output_captured: bool,
     pub target_count: usize,
     pub running_target_count: usize,
     pub missing_target_count: usize,
@@ -5219,6 +5233,13 @@ pub struct FirstClassMcpDashboardLane {
     pub runtime_expected_pattern: String,
     pub runtime_record_path: Option<String>,
     pub runtime_snapshot_status: String,
+    pub runtime_snapshot_age_ms: Option<u64>,
+    pub runtime_snapshot_freshness_status: String,
+    pub runtime_snapshot_fresh: bool,
+    pub runtime_snapshot_stale: bool,
+    pub runtime_snapshot_pipe_reader_ready: bool,
+    pub runtime_snapshot_partial_output_captured: bool,
+    pub runtime_snapshot_timed_out: bool,
     pub first_class: bool,
     pub read_only: bool,
     pub live_probe_enabled: bool,
@@ -5253,6 +5274,14 @@ pub struct FirstClassMcpDashboard {
     pub runtime_process_snapshot_count: usize,
     pub latest_runtime_process_snapshot_status: String,
     pub latest_runtime_process_snapshot_path: Option<String>,
+    pub runtime_process_snapshot_freshness_threshold_ms: u64,
+    pub latest_runtime_process_snapshot_age_ms: Option<u64>,
+    pub latest_runtime_process_snapshot_freshness_status: String,
+    pub latest_runtime_process_snapshot_fresh: bool,
+    pub latest_runtime_process_snapshot_stale: bool,
+    pub latest_runtime_process_snapshot_pipe_reader_ready: bool,
+    pub latest_runtime_process_snapshot_partial_output_captured: bool,
+    pub latest_runtime_process_snapshot_timed_out: bool,
     pub running_runtime_lane_count: usize,
     pub mcp_runtime_process_count: usize,
     pub disabled_gate_count: usize,
@@ -34080,6 +34109,26 @@ struct RuntimeProcessLine {
     command: String,
 }
 
+const RUNTIME_SIDECAR_PROCESS_LIST_TIMEOUT_MS: u64 = 2_500;
+const RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS: u64 = 120_000;
+
+#[derive(Debug)]
+struct RuntimeSidecarProcessListCapture {
+    command: Vec<String>,
+    exit_code: Option<i32>,
+    status: String,
+    stdout: String,
+    stderr_preview: String,
+    duration_ms: u64,
+    timeout_ms: u64,
+    timed_out: bool,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
+}
+
 fn runtime_sidecar_process_targets() -> Vec<RuntimeSidecarProcessTarget> {
     vec![
         RuntimeSidecarProcessTarget {
@@ -34185,6 +34234,124 @@ fn parse_runtime_process_lines(stdout: &str) -> Vec<RuntimeProcessLine> {
         .collect()
 }
 
+fn spawn_runtime_sidecar_process_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_runtime_sidecar_process_list_command(timeout_ms: u64) -> RuntimeSidecarProcessListCapture {
+    let command = vec![
+        "ps".to_string(),
+        "-eo".to_string(),
+        "pid=,args=".to_string(),
+    ];
+    let start = Instant::now();
+    let mut child = match Command::new("ps")
+        .args(["-eo", "pid=,args="])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => {
+            return RuntimeSidecarProcessListCapture {
+                command,
+                exit_code: None,
+                status: "process_list_spawn_failed".to_string(),
+                stdout: String::new(),
+                stderr_preview: prompt_preview(&error.to_string(), 1200),
+                duration_ms: start.elapsed().as_millis() as u64,
+                timeout_ms,
+                timed_out: false,
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
+            };
+        }
+    };
+
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_runtime_sidecar_process_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_runtime_sidecar_process_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
+    let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let exit_code;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
+            }
+            Ok(None) => {
+                if start.elapsed() >= Duration::from_millis(timeout_ms) {
+                    timed_out = true;
+                    timeout_kill_sent = child.kill().is_ok();
+                    let wait_start = Instant::now();
+                    let _ = child.wait();
+                    wait_after_kill_ms = wait_start.elapsed().as_millis() as u64;
+                    exit_code = None;
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => {
+                exit_code = None;
+                break;
+            }
+        }
+    }
+
+    let stdout = stdout_reader
+        .and_then(|reader| reader.join().ok())
+        .unwrap_or_default();
+    let stderr = stderr_reader
+        .and_then(|reader| reader.join().ok())
+        .unwrap_or_default();
+    let stdout = String::from_utf8_lossy(&stdout).to_string();
+    let stderr_preview = trim_probe_text(&stderr);
+    let partial_output_captured = timed_out && (!stdout.is_empty() || !stderr_preview.is_empty());
+    let status = if timed_out {
+        "process_list_timed_out"
+    } else if exit_code == Some(0) {
+        "process_list_succeeded"
+    } else {
+        "process_list_failed"
+    };
+
+    RuntimeSidecarProcessListCapture {
+        command,
+        exit_code,
+        status: status.to_string(),
+        stdout,
+        stderr_preview,
+        duration_ms: start.elapsed().as_millis() as u64,
+        timeout_ms,
+        timed_out,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
+    }
+}
+
 fn runtime_process_matches(target: &RuntimeSidecarProcessTarget, process: &RuntimeProcessLine) -> bool {
     let command = process.command.to_lowercase();
     target
@@ -34269,40 +34436,23 @@ pub fn record_runtime_sidecar_process_snapshot(
     })?;
     let record_path = dir.join(format!("{id}.json"));
     let log_path = dir.join(format!("{id}.jsonl"));
-    let process_list_command = vec![
-        "ps".to_string(),
-        "-eo".to_string(),
-        "pid=,args=".to_string(),
-    ];
-    let started = Instant::now();
-    let ps_output = Command::new("ps")
-        .args(["-eo", "pid=,args="])
-        .output();
-    let process_list_duration_ms = started.elapsed().as_millis() as u64;
     let mut blockers = Vec::new();
-    let (process_list_exit_code, process_list_status, stdout, stderr_preview) = match ps_output {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr_preview = trim_probe_text(&output.stderr);
-            let status = if output.status.success() {
-                "process_list_succeeded".to_string()
-            } else {
-                blockers.push("bounded ps process list returned a non-zero exit status".to_string());
-                "process_list_failed".to_string()
-            };
-            (output.status.code(), status, stdout, stderr_preview)
-        }
-        Err(error) => {
-            blockers.push(format!("bounded ps process list failed to spawn: {error}"));
-            (
-                None,
-                "process_list_spawn_failed".to_string(),
-                String::new(),
-                error.to_string(),
-            )
-        }
-    };
-    let processes = parse_runtime_process_lines(&stdout);
+    let process_list_capture =
+        run_runtime_sidecar_process_list_command(RUNTIME_SIDECAR_PROCESS_LIST_TIMEOUT_MS);
+    if process_list_capture.status == "process_list_spawn_failed" {
+        blockers.push(format!(
+            "bounded ps process list failed to spawn: {}",
+            process_list_capture.stderr_preview
+        ));
+    } else if process_list_capture.timed_out {
+        blockers.push(format!(
+            "bounded ps process list timed out after {}ms",
+            process_list_capture.timeout_ms
+        ));
+    } else if process_list_capture.status != "process_list_succeeded" {
+        blockers.push("bounded ps process list returned a non-zero exit status".to_string());
+    }
+    let processes = parse_runtime_process_lines(&process_list_capture.stdout);
     let targets = runtime_sidecar_process_targets()
         .iter()
         .map(|target| build_runtime_sidecar_target_snapshot(target, &processes))
@@ -34318,23 +34468,31 @@ pub fn record_runtime_sidecar_process_snapshot(
     let running_target_count = targets.iter().filter(|target| target.running).count();
     let missing_target_count = targets.len().saturating_sub(running_target_count);
     let process_count = targets.iter().map(|target| target.process_count).sum::<usize>();
-    let status = if process_list_status == "process_list_succeeded" && missing_target_count == 0 {
-        "runtime_sidecar_process_snapshot_recorded_ready"
-    } else {
-        "runtime_sidecar_process_snapshot_recorded_with_gaps"
-    };
+    let status =
+        if process_list_capture.status == "process_list_succeeded" && missing_target_count == 0 {
+            "runtime_sidecar_process_snapshot_recorded_ready"
+        } else {
+            "runtime_sidecar_process_snapshot_recorded_with_gaps"
+        };
     let record_path_display = record_path.display().to_string();
     let log_path_display = log_path.display().to_string();
     let record = RuntimeSidecarProcessSnapshotRecord {
         id: id.clone(),
         status: status.to_string(),
         requested_by,
-        process_list_command,
-        process_list_exit_code,
-        process_list_status,
-        process_list_stdout_size_bytes: stdout.len(),
-        process_list_stderr_preview: stderr_preview,
-        process_list_duration_ms,
+        process_list_command: process_list_capture.command,
+        process_list_exit_code: process_list_capture.exit_code,
+        process_list_status: process_list_capture.status,
+        process_list_stdout_size_bytes: process_list_capture.stdout.len(),
+        process_list_stderr_preview: process_list_capture.stderr_preview,
+        process_list_duration_ms: process_list_capture.duration_ms,
+        process_list_timeout_ms: process_list_capture.timeout_ms,
+        process_list_timed_out: process_list_capture.timed_out,
+        stdout_pipe_reader_enabled: process_list_capture.stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled: process_list_capture.stderr_pipe_reader_enabled,
+        process_list_timeout_kill_sent: process_list_capture.timeout_kill_sent,
+        process_list_wait_after_kill_ms: process_list_capture.wait_after_kill_ms,
+        process_list_partial_output_captured: process_list_capture.partial_output_captured,
         target_count: targets.len(),
         running_target_count,
         missing_target_count,
@@ -34383,6 +34541,14 @@ pub fn record_runtime_sidecar_process_snapshot(
             "event": "runtime_sidecar_process_snapshot_recorded",
             "id": &record.id,
             "status": &record.status,
+            "process_list_status": &record.process_list_status,
+            "process_list_timeout_ms": record.process_list_timeout_ms,
+            "process_list_timed_out": record.process_list_timed_out,
+            "stdout_pipe_reader_enabled": record.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": record.stderr_pipe_reader_enabled,
+            "process_list_timeout_kill_sent": record.process_list_timeout_kill_sent,
+            "process_list_wait_after_kill_ms": record.process_list_wait_after_kill_ms,
+            "process_list_partial_output_captured": record.process_list_partial_output_captured,
             "target_count": record.target_count,
             "running_target_count": record.running_target_count,
             "missing_target_count": record.missing_target_count,
@@ -98990,8 +99156,26 @@ fn first_class_mcp_runtime_target<'a>(
         .and_then(|record| record.targets.iter().find(|target| target.target_id == target_id))
 }
 
+fn runtime_snapshot_age_ms(
+    snapshot: Option<&RuntimeSidecarProcessSnapshotRecord>,
+    now_ms: u64,
+) -> Option<u64> {
+    snapshot.map(|record| now_ms.saturating_sub(record.created_at_ms))
+}
+
+fn runtime_snapshot_freshness_status(snapshot_age_ms: Option<u64>) -> String {
+    match snapshot_age_ms {
+        Some(age_ms) if age_ms <= RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS => {
+            "runtime_process_snapshot_fresh".to_string()
+        }
+        Some(_) => "runtime_process_snapshot_stale".to_string(),
+        None => "runtime_process_snapshot_waiting".to_string(),
+    }
+}
+
 #[tauri::command]
 pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
+    let dashboard_generated_at_ms = now_ms()?;
     let contracts = list_local_mcp_lane_capability_contracts()?;
     let health_preflights = list_local_mcp_health_preflights()?;
     let health_records = list_local_mcp_health_records()?;
@@ -99013,6 +99197,27 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
         .unwrap_or_else(|| "runtime_sidecar_process_snapshot_waiting".to_string());
     let latest_runtime_process_snapshot_path =
         latest_runtime_process_snapshot.map(|record| record.record_path.clone());
+    let latest_runtime_process_snapshot_age_ms =
+        runtime_snapshot_age_ms(latest_runtime_process_snapshot, dashboard_generated_at_ms);
+    let latest_runtime_process_snapshot_freshness_status =
+        runtime_snapshot_freshness_status(latest_runtime_process_snapshot_age_ms);
+    let latest_runtime_process_snapshot_fresh = matches!(
+        latest_runtime_process_snapshot_freshness_status.as_str(),
+        "runtime_process_snapshot_fresh"
+    );
+    let latest_runtime_process_snapshot_stale = matches!(
+        latest_runtime_process_snapshot_freshness_status.as_str(),
+        "runtime_process_snapshot_stale" | "runtime_process_snapshot_waiting"
+    );
+    let latest_runtime_process_snapshot_pipe_reader_ready = latest_runtime_process_snapshot
+        .map(|record| record.stdout_pipe_reader_enabled && record.stderr_pipe_reader_enabled)
+        .unwrap_or(false);
+    let latest_runtime_process_snapshot_partial_output_captured = latest_runtime_process_snapshot
+        .map(|record| record.process_list_partial_output_captured)
+        .unwrap_or(false);
+    let latest_runtime_process_snapshot_timed_out = latest_runtime_process_snapshot
+        .map(|record| record.process_list_timed_out)
+        .unwrap_or(false);
 
     let lane_specs = [
         (
@@ -99370,6 +99575,15 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
             runtime_expected_pattern,
             runtime_record_path: latest_runtime_process_snapshot_path.clone(),
             runtime_snapshot_status: latest_runtime_process_snapshot_status.clone(),
+            runtime_snapshot_age_ms: latest_runtime_process_snapshot_age_ms,
+            runtime_snapshot_freshness_status: latest_runtime_process_snapshot_freshness_status
+                .clone(),
+            runtime_snapshot_fresh: latest_runtime_process_snapshot_fresh,
+            runtime_snapshot_stale: latest_runtime_process_snapshot_stale,
+            runtime_snapshot_pipe_reader_ready: latest_runtime_process_snapshot_pipe_reader_ready,
+            runtime_snapshot_partial_output_captured:
+                latest_runtime_process_snapshot_partial_output_captured,
+            runtime_snapshot_timed_out: latest_runtime_process_snapshot_timed_out,
             first_class: true,
             read_only: true,
             live_probe_enabled: false,
@@ -99451,6 +99665,15 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
         runtime_process_snapshot_count: runtime_process_snapshots.len(),
         latest_runtime_process_snapshot_status,
         latest_runtime_process_snapshot_path,
+        runtime_process_snapshot_freshness_threshold_ms:
+            RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS,
+        latest_runtime_process_snapshot_age_ms,
+        latest_runtime_process_snapshot_freshness_status,
+        latest_runtime_process_snapshot_fresh,
+        latest_runtime_process_snapshot_stale,
+        latest_runtime_process_snapshot_pipe_reader_ready,
+        latest_runtime_process_snapshot_partial_output_captured,
+        latest_runtime_process_snapshot_timed_out,
         running_runtime_lane_count,
         mcp_runtime_process_count,
         disabled_gate_count,
@@ -114186,6 +114409,16 @@ printf 'agent transcript dashboard stderr ready\n' >&2
                 "pid=,args=".to_string()
             ]
         );
+        assert_eq!(
+            record.process_list_timeout_ms,
+            RUNTIME_SIDECAR_PROCESS_LIST_TIMEOUT_MS
+        );
+        assert!(record.stdout_pipe_reader_enabled);
+        assert!(record.stderr_pipe_reader_enabled);
+        assert!(!record.process_list_timed_out);
+        assert!(!record.process_list_timeout_kill_sent);
+        assert_eq!(record.process_list_wait_after_kill_ms, 0);
+        assert!(!record.process_list_partial_output_captured);
         assert_eq!(record.target_count, record.targets.len());
         assert!(record.target_count >= 7);
         assert_eq!(
@@ -114244,6 +114477,22 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         assert_eq!(mcp_dashboard.lane_count, 3);
         assert_eq!(mcp_dashboard.latest_runtime_process_snapshot_status, record.status);
         assert_eq!(
+            mcp_dashboard.runtime_process_snapshot_freshness_threshold_ms,
+            RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS
+        );
+        assert!(mcp_dashboard
+            .latest_runtime_process_snapshot_age_ms
+            .is_some());
+        assert_eq!(
+            mcp_dashboard.latest_runtime_process_snapshot_freshness_status,
+            "runtime_process_snapshot_fresh"
+        );
+        assert!(mcp_dashboard.latest_runtime_process_snapshot_fresh);
+        assert!(!mcp_dashboard.latest_runtime_process_snapshot_stale);
+        assert!(mcp_dashboard.latest_runtime_process_snapshot_pipe_reader_ready);
+        assert!(!mcp_dashboard.latest_runtime_process_snapshot_partial_output_captured);
+        assert!(!mcp_dashboard.latest_runtime_process_snapshot_timed_out);
+        assert_eq!(
             mcp_dashboard.latest_runtime_process_snapshot_path.as_deref(),
             Some(record.record_path.as_str())
         );
@@ -114251,6 +114500,12 @@ printf 'agent transcript dashboard stderr ready\n' >&2
             lane.subsystem == "sswp"
                 && lane.runtime_target_id == "sswp-mcp"
                 && lane.runtime_snapshot_status == record.status
+                && lane.runtime_snapshot_freshness_status == "runtime_process_snapshot_fresh"
+                && lane.runtime_snapshot_fresh
+                && !lane.runtime_snapshot_stale
+                && lane.runtime_snapshot_pipe_reader_ready
+                && !lane.runtime_snapshot_partial_output_captured
+                && !lane.runtime_snapshot_timed_out
                 && lane.runtime_record_path.as_deref() == Some(record.record_path.as_str())
                 && lane.runtime_expected_pattern.contains("sswp")
         }));
@@ -120421,7 +120676,11 @@ sleep 2
             steno_pet_dashboard.status,
             "steno_pet_companion_dashboard_read_only"
         );
-        assert_eq!(steno_pet_dashboard.section_count, 5);
+        assert_eq!(steno_pet_dashboard.section_count, 6);
+        assert!(steno_pet_dashboard
+            .sections
+            .iter()
+            .any(|section| section.section_id == "agent-transcript-sessions"));
         assert_eq!(steno_pet_dashboard.transcript_bundle_count, 1);
         assert_eq!(steno_pet_dashboard.transcript_bundle_ready_count, 1);
         assert_eq!(steno_pet_dashboard.transcript_export_policy_count, 2);
@@ -120487,7 +120746,7 @@ sleep 2
                 && !item.writes_allowed
                 && !item.execution_enabled
         }));
-        assert_eq!(steno_pet_dashboard.disabled_gate_count, 5);
+        assert_eq!(steno_pet_dashboard.disabled_gate_count, 6);
         assert!(steno_pet_dashboard.read_only);
         assert!(steno_pet_dashboard.steno_first_class);
         assert!(steno_pet_dashboard.pet_first_class);

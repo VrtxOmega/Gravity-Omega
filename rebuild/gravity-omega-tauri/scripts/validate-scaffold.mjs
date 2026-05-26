@@ -283,6 +283,31 @@ for (const agentTranscriptNeedle of [
   }
 }
 
+const runtimeSidecarSnapshotStart = rustCommandsSource.indexOf("pub fn record_runtime_sidecar_process_snapshot");
+const runtimeSidecarSnapshotEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn list_runtime_sidecar_process_snapshots", runtimeSidecarSnapshotStart);
+if (runtimeSidecarSnapshotStart < 0 || runtimeSidecarSnapshotEnd < runtimeSidecarSnapshotStart) {
+  throw new Error("Runtime sidecar process snapshot runner body is missing.");
+}
+const runtimeSidecarSnapshotBody = rustCommandsSource.slice(runtimeSidecarSnapshotStart, runtimeSidecarSnapshotEnd);
+if (runtimeSidecarSnapshotBody.includes(".output()")) {
+  throw new Error("Runtime sidecar process snapshot must drain stdout/stderr pipes with a timeout, not Command::output.");
+}
+for (const runtimeSnapshotNeedle of [
+  "run_runtime_sidecar_process_list_command",
+  "spawn_runtime_sidecar_process_pipe_reader",
+  "process_list_timeout_ms",
+  "process_list_timed_out",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "process_list_timeout_kill_sent",
+  "process_list_wait_after_kill_ms",
+  "process_list_partial_output_captured",
+]) {
+  if (!rustCommandsSource.includes(runtimeSnapshotNeedle)) {
+    throw new Error(`Runtime sidecar process snapshot missing bounded pipe-drain evidence field ${runtimeSnapshotNeedle}.`);
+  }
+}
+
 for (const unlockedUiNeedle of [
   "run-unlocked-codex-agent-btn",
   "run-unlocked-hermes-agent-btn",
@@ -2829,6 +2854,13 @@ for (const runtimeDepthNeedle of [
   "first_class_mcp_runtime_target",
   "runtime_target_id",
   "runtime_process_snapshot_count",
+  "runtime_process_snapshot_freshness_threshold_ms",
+  "latest_runtime_process_snapshot_freshness_status",
+  "latest_runtime_process_snapshot_pipe_reader_ready",
+  "runtime_snapshot_freshness_status",
+  "runtime_snapshot_pipe_reader_ready",
+  "runtime_snapshot_partial_output_captured",
+  "runtime_snapshot_timed_out",
   "runtime_process_snapshot_waiting",
   "running_runtime_lane_count",
   "mcp_runtime_process_count",
