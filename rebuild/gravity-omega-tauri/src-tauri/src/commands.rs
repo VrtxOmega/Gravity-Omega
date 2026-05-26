@@ -4383,6 +4383,12 @@ pub struct CodexHermesRunViewDashboard {
     pub codex_orchestration_count: usize,
     pub hermes_inventory_count: usize,
     pub hermes_assist_count: usize,
+    pub hermes_assist_failure_count: usize,
+    pub hermes_assist_timeout_count: usize,
+    pub latest_hermes_assist_status: String,
+    pub latest_hermes_assist_record_path: Option<String>,
+    pub latest_hermes_assist_postmortem_status: String,
+    pub latest_hermes_assist_postmortem_record_path: Option<String>,
     pub agent_session_count: usize,
     pub agent_session_failure_count: usize,
     pub agent_session_timeout_count: usize,
@@ -95732,6 +95738,8 @@ fn hermes_inventory_run_view_summary(
 
 fn hermes_assist_run_view_summary(
     record: &HermesKimiAssistBriefRecord,
+    source_id: &'static str,
+    title: &'static str,
 ) -> CodexHermesRunViewEvidenceSummary {
     let stdout_transcript =
         transcript_evidence_preview(&record.stdout_transcript_path, 64 * 1024, 900);
@@ -95746,8 +95754,8 @@ fn hermes_assist_run_view_summary(
         .clone()
         .or_else(|| Some(prompt_preview(&record.stderr, 480)));
     let mut summary = codex_hermes_run_view_evidence_summary(
-        "hermes-kimi-assist",
-        "Latest Hermes/Kimi assist brief",
+        source_id,
+        title,
         record.id.clone(),
         record.status.clone(),
         record.record_path.clone(),
@@ -95800,6 +95808,14 @@ fn hermes_assist_run_view_summary(
     summary.stderr_transcript_truncated = stderr_transcript.truncated;
     summary.transcript_evidence_ready = stdout_transcript.found && stderr_transcript.found;
     summary
+}
+
+fn hermes_assist_is_postmortem(record: &HermesKimiAssistBriefRecord) -> bool {
+    record.timed_out
+        || record.status.contains("failed")
+        || record.status.contains("timed_out")
+        || record.status.contains("rejected")
+        || record.exit_code.map(|code| code != 0).unwrap_or(false)
 }
 
 fn unlocked_agent_session_is_postmortem(record: &UnlockedAgentPromptSessionRecord) -> bool {
@@ -95931,6 +95947,28 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         .iter()
         .filter(|record| record.timed_out || record.status.contains("timed_out"))
         .count();
+    let hermes_assist_failure_count = hermes_assists
+        .iter()
+        .filter(|record| hermes_assist_is_postmortem(record))
+        .count();
+    let hermes_assist_timeout_count = hermes_assists
+        .iter()
+        .filter(|record| record.timed_out || record.status.contains("timed_out"))
+        .count();
+    let latest_hermes_assist_status = hermes_assists
+        .first()
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "hermes_kimi_assist_brief_waiting".to_string());
+    let latest_hermes_assist_record_path =
+        hermes_assists.first().map(|record| record.record_path.clone());
+    let latest_hermes_assist_postmortem = hermes_assists
+        .iter()
+        .find(|record| hermes_assist_is_postmortem(record));
+    let latest_hermes_assist_postmortem_status = latest_hermes_assist_postmortem
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "hermes_kimi_assist_postmortem_waiting".to_string());
+    let latest_hermes_assist_postmortem_record_path =
+        latest_hermes_assist_postmortem.map(|record| record.record_path.clone());
     let latest_agent_session_status = agent_sessions
         .first()
         .map(|record| record.status.clone())
@@ -95963,8 +96001,24 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
     if let Some(record) = hermes_inventories.first() {
         evidence_summaries.push(hermes_inventory_run_view_summary(record));
     }
+    if let Some(record) = latest_hermes_assist_postmortem {
+        evidence_summaries.push(hermes_assist_run_view_summary(
+            record,
+            "hermes-kimi-assist-postmortem",
+            "Latest failed/timed-out Hermes/Kimi assist brief",
+        ));
+    }
     if let Some(record) = hermes_assists.first() {
-        evidence_summaries.push(hermes_assist_run_view_summary(record));
+        if latest_hermes_assist_postmortem
+            .map(|postmortem| postmortem.id.as_str() != record.id.as_str())
+            .unwrap_or(true)
+        {
+            evidence_summaries.push(hermes_assist_run_view_summary(
+                record,
+                "hermes-kimi-assist",
+                "Latest Hermes/Kimi assist brief",
+            ));
+        }
     }
 
     let sections = vec![
@@ -96107,6 +96161,12 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         codex_orchestration_count: codex_orchestrations.len(),
         hermes_inventory_count: hermes_inventories.len(),
         hermes_assist_count: hermes_assists.len(),
+        hermes_assist_failure_count,
+        hermes_assist_timeout_count,
+        latest_hermes_assist_status,
+        latest_hermes_assist_record_path,
+        latest_hermes_assist_postmortem_status,
+        latest_hermes_assist_postmortem_record_path,
         agent_session_count: agent_sessions.len(),
         agent_session_failure_count,
         agent_session_timeout_count,
@@ -115799,6 +115859,44 @@ mod tests {
         fs::write(&assist_stderr_path, &assist_record.stderr)
             .expect("write assist stderr transcript");
 
+        let failed_assist_path = assist_dir.join("run-view-evidence-assist-timeout.json");
+        let failed_assist_log_path = assist_dir.join("run-view-evidence-assist-timeout.jsonl");
+        let failed_assist_stdout_path =
+            assist_dir.join("run-view-evidence-assist-timeout.stdout.txt");
+        let failed_assist_stderr_path =
+            assist_dir.join("run-view-evidence-assist-timeout.stderr.txt");
+        let failed_assist_stdout = "Hermes started reviewing but did not finish.".to_string();
+        let failed_assist_stderr = "Hermes/Kimi assist timed out before final answer.".to_string();
+        let failed_assist_record = HermesKimiAssistBriefRecord {
+            id: "run-view-evidence-assist-timeout".to_string(),
+            status: "hermes_kimi_assist_brief_timed_out".to_string(),
+            exit_code: None,
+            timed_out: true,
+            duration_ms: 5_000,
+            stdout: failed_assist_stdout.clone(),
+            stderr: failed_assist_stderr.clone(),
+            stdout_size_bytes: failed_assist_stdout.len() as u64,
+            stderr_size_bytes: failed_assist_stderr.len() as u64,
+            stdout_transcript_path: failed_assist_stdout_path.display().to_string(),
+            stderr_transcript_path: failed_assist_stderr_path.display().to_string(),
+            record_path: failed_assist_path.display().to_string(),
+            log_path: failed_assist_log_path.display().to_string(),
+            blockers: vec!["Hermes/Kimi assist timed out before final answer.".to_string()],
+            created_at_ms: now_ms().expect("clock") + 11,
+            next_step: "Show this Hermes/Kimi timeout before retrying assist delegation.".to_string(),
+            ..assist_record.clone()
+        };
+        fs::write(
+            &failed_assist_path,
+            serde_json::to_string_pretty(&failed_assist_record)
+                .expect("serialize failed assist"),
+        )
+        .expect("write failed assist");
+        fs::write(&failed_assist_stdout_path, &failed_assist_record.stdout)
+            .expect("write failed assist stdout transcript");
+        fs::write(&failed_assist_stderr_path, &failed_assist_record.stderr)
+            .expect("write failed assist stderr transcript");
+
         let agent_session_dir =
             unlocked_agent_prompt_sessions_dir().expect("unlocked agent session dir");
         fs::create_dir_all(&agent_session_dir).expect("create unlocked agent session dir");
@@ -115886,7 +115984,25 @@ mod tests {
         assert_eq!(run_view.typed_event_count, 2);
         assert_eq!(run_view.codex_orchestration_count, 1);
         assert_eq!(run_view.hermes_inventory_count, 1);
-        assert_eq!(run_view.hermes_assist_count, 1);
+        assert_eq!(run_view.hermes_assist_count, 2);
+        assert_eq!(run_view.hermes_assist_failure_count, 1);
+        assert_eq!(run_view.hermes_assist_timeout_count, 1);
+        assert_eq!(
+            run_view.latest_hermes_assist_status,
+            "hermes_kimi_assist_brief_succeeded"
+        );
+        assert_eq!(
+            run_view.latest_hermes_assist_record_path.as_deref(),
+            Some(assist_record.record_path.as_str())
+        );
+        assert_eq!(
+            run_view.latest_hermes_assist_postmortem_status,
+            "hermes_kimi_assist_brief_timed_out"
+        );
+        assert_eq!(
+            run_view.latest_hermes_assist_postmortem_record_path.as_deref(),
+            Some(failed_assist_record.record_path.as_str())
+        );
         assert_eq!(run_view.agent_session_count, 1);
         assert_eq!(run_view.agent_session_failure_count, 1);
         assert_eq!(run_view.agent_session_timeout_count, 1);
@@ -115906,7 +116022,7 @@ mod tests {
             run_view.latest_agent_postmortem_record_path.as_deref(),
             Some(agent_session_record.record_path.as_str())
         );
-        assert_eq!(run_view.evidence_summary_count, 4);
+        assert_eq!(run_view.evidence_summary_count, 5);
         assert_eq!(run_view.active_task_run_id, stub.id);
         assert_eq!(run_view.disabled_gate_count, 9);
         assert!(run_view.read_only);
@@ -115978,6 +116094,29 @@ mod tests {
                 && summary.stderr_preview_source == "stderr-transcript"
                 && summary.stdout_preview.as_deref().unwrap_or("").contains("Hermes says")
                 && summary.stderr_preview.as_deref().unwrap_or("").contains("stayed clean")
+                && summary.record_process_spawn_enabled
+                && summary.record_execution_enabled
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "hermes-kimi-assist-postmortem"
+                && summary.record_id == "run-view-evidence-assist-timeout"
+                && summary.title == "Latest failed/timed-out Hermes/Kimi assist brief"
+                && summary.primary_metric.contains("timeout=true")
+                && summary.transcript_evidence_ready
+                && summary.stdout_transcript_found
+                && summary.stderr_transcript_found
+                && summary.stdout_transcript_line_count == 1
+                && summary.stderr_transcript_line_count == 1
+                && summary.stdout_transcript_path.as_deref()
+                    == Some(failed_assist_record.stdout_transcript_path.as_str())
+                && summary.stderr_transcript_path.as_deref()
+                    == Some(failed_assist_record.stderr_transcript_path.as_str())
+                && summary.stdout_preview_source == "stdout-transcript"
+                && summary.stderr_preview_source == "stderr-transcript"
+                && summary.stdout_preview.as_deref().unwrap_or("").contains("did not finish")
+                && summary.stderr_preview.as_deref().unwrap_or("").contains("timed out")
+                && summary.blocker_count >= 1
                 && summary.record_process_spawn_enabled
                 && summary.record_execution_enabled
                 && summary.read_only
