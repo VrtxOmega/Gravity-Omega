@@ -3,6 +3,7 @@ use std::{
     env,
     fs::{self, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
+    os::unix::fs::FileTypeExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -5878,10 +5879,77 @@ pub struct LinuxDesktopControlReadinessDashboardSection {
     pub execution_enabled: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DesktopEnvironmentSnapshotRequest {
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DesktopEnvironmentSnapshotRecord {
+    pub id: String,
+    pub status: String,
+    pub requested_by: String,
+    pub session_type: String,
+    pub current_desktop: String,
+    pub desktop_session: String,
+    pub wayland_display: String,
+    pub wayland_display_present: bool,
+    pub display: String,
+    pub display_present: bool,
+    pub graphical_session_visible: bool,
+    pub dbus_session_bus_present: bool,
+    pub dbus_session_bus_preview: String,
+    pub at_spi_bus_present: bool,
+    pub ydotool_socket_path: String,
+    pub ydotool_socket_metadata_checked: bool,
+    pub ydotool_socket_visible: bool,
+    pub ydotool_socket_is_socket: bool,
+    pub backend_status: String,
+    pub read_only: bool,
+    pub environment_probe_enabled: bool,
+    pub capture_enabled: bool,
+    pub ocr_enabled: bool,
+    pub target_window_control_enabled: bool,
+    pub element_action_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub socket_connect_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub terminal_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct LinuxDesktopControlReadinessDashboard {
     pub status: &'static str,
     pub section_count: usize,
+    pub desktop_environment_snapshot_count: usize,
+    pub desktop_environment_snapshot_ready_count: usize,
+    pub desktop_environment_snapshot_freshness_threshold_ms: u64,
+    pub latest_desktop_environment_snapshot_status: String,
+    pub latest_desktop_environment_snapshot_record_path: String,
+    pub latest_desktop_environment_snapshot_age_ms: Option<u64>,
+    pub latest_desktop_environment_snapshot_fresh: bool,
+    pub latest_desktop_environment_graphical_session_visible: bool,
+    pub latest_desktop_environment_wayland_display_present: bool,
+    pub latest_desktop_environment_display_present: bool,
+    pub latest_desktop_environment_dbus_session_bus_present: bool,
+    pub latest_desktop_environment_at_spi_bus_present: bool,
+    pub latest_desktop_environment_ydotool_socket_visible: bool,
+    pub latest_desktop_environment_ydotool_socket_is_socket: bool,
+    pub latest_desktop_environment_backend_status: String,
     pub foundation_desktop_lane_count: usize,
     pub foundation_desktop_ready_count: usize,
     pub work_queue_desktop_lane_count: usize,
@@ -21896,6 +21964,10 @@ fn runtime_sidecar_process_snapshots_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("runtime-sidecar-process-snapshots"))
 }
 
+fn desktop_environment_snapshots_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("desktop-environment-snapshots"))
+}
+
 fn codex_lead_orchestrations_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("codex-lead-orchestrations"))
 }
@@ -32373,8 +32445,8 @@ pub fn command_manifest() -> Vec<CommandGroup> {
             title: "Codex-grade agent loop",
             safety: "safe-gated-restricted",
             phase: "phase-3",
-            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
-            command_count: 102,
+            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, desktop environment snapshots, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
+            command_count: 104,
         },
         CommandGroup {
             id: "threads",
@@ -46190,6 +46262,25 @@ fn product_evidence_title_detail(
                 format!("running={running}/{targets}; processes={processes}; hermes={hermes}; sswp={sswp}; steno={steno}; control_disabled=true"),
             )
         }
+        "desktop-environment" => {
+            let status = json_string(value, "status").unwrap_or_else(|| "desktop_environment_snapshot".to_string());
+            let wayland = value
+                .get("wayland_display_present")
+                .and_then(|inner| inner.as_bool())
+                .unwrap_or(false);
+            let x11 = value
+                .get("display_present")
+                .and_then(|inner| inner.as_bool())
+                .unwrap_or(false);
+            let ydotool = value
+                .get("ydotool_socket_is_socket")
+                .and_then(|inner| inner.as_bool())
+                .unwrap_or(false);
+            (
+                "Desktop environment snapshot".to_string(),
+                format!("{status}; wayland={wayland}; x11={x11}; ydotool_socket={ydotool}; control_disabled=true"),
+            )
+        }
         "codex-orchestration" => {
             let status = json_string(value, "status").unwrap_or_else(|| "orchestration".to_string());
             let delegations = json_u64(value, "delegation_count").unwrap_or(0);
@@ -46318,6 +46409,7 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
     push_product_evidence_history_dir(&mut items, "runtime-packet", runtime_launch_packets_dir()?)?;
     push_product_evidence_history_dir(&mut items, "runtime-depth", runtime_depth_probes_dir()?)?;
     push_product_evidence_history_dir(&mut items, "runtime-sidecar-process", runtime_sidecar_process_snapshots_dir()?)?;
+    push_product_evidence_history_dir(&mut items, "desktop-environment", desktop_environment_snapshots_dir()?)?;
     push_product_evidence_history_dir(&mut items, "codex-orchestration", codex_lead_orchestrations_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-inventory", hermes_kimi_capability_inventories_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-assist", hermes_kimi_assist_briefs_dir()?)?;
@@ -102298,6 +102390,278 @@ fn desktop_command_surface_group(group: &CommandGroup) -> bool {
     desktop_control_signal(&[group.id, group.title])
 }
 
+const DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS: u64 = 120_000;
+const YDOTOOL_SOCKET_PATH: &str = "/tmp/.ydotool_socket";
+
+fn desktop_env_value(key: &str) -> String {
+    env::var(key)
+        .ok()
+        .map(|value| value.trim().chars().take(180).collect::<String>())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "missing".to_string())
+}
+
+fn desktop_env_present(key: &str) -> bool {
+    env::var(key)
+        .ok()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn dbus_session_bus_preview() -> String {
+    match env::var("DBUS_SESSION_BUS_ADDRESS") {
+        Ok(value) if !value.trim().is_empty() => {
+            let trimmed = value.trim();
+            if trimmed.starts_with("unix:path=") {
+                "unix:path=<redacted>".to_string()
+            } else if trimmed.starts_with("unix:") {
+                "unix:<redacted>".to_string()
+            } else {
+                "present_redacted".to_string()
+            }
+        }
+        _ => "missing".to_string(),
+    }
+}
+
+fn ydotool_socket_status() -> (bool, bool, bool) {
+    match fs::metadata(YDOTOOL_SOCKET_PATH) {
+        Ok(metadata) => (true, true, metadata.file_type().is_socket()),
+        Err(_) => (true, false, false),
+    }
+}
+
+fn latest_desktop_environment_snapshot_age_ms(
+    latest: Option<&DesktopEnvironmentSnapshotRecord>,
+) -> Option<u64> {
+    latest.and_then(|record| {
+        now_ms()
+            .ok()
+            .map(|now| now.saturating_sub(record.created_at_ms))
+    })
+}
+
+fn desktop_environment_snapshot_ready(record: &DesktopEnvironmentSnapshotRecord) -> bool {
+    record.read_only
+        && record.environment_probe_enabled
+        && record.graphical_session_visible
+        && !record.capture_enabled
+        && !record.ocr_enabled
+        && !record.target_window_control_enabled
+        && !record.element_action_enabled
+        && !record.desktop_control_enabled
+        && !record.socket_connect_enabled
+        && !record.process_spawn_enabled
+        && !record.terminal_enabled
+        && !record.file_write_enabled
+        && !record.patch_apply_enabled
+        && !record.live_mcp_call_enabled
+        && !record.config_read_enabled
+        && !record.export_enabled
+        && !record.memory_write_enabled
+        && !record.writes_allowed
+        && !record.execution_enabled
+}
+
+#[tauri::command]
+pub fn record_desktop_environment_snapshot(
+    request: DesktopEnvironmentSnapshotRequest,
+) -> Result<DesktopEnvironmentSnapshotRecord, String> {
+    let timestamp = now_ms()?;
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "linux-desktop-readiness".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "linux-desktop-readiness".to_string()
+    } else {
+        requested_by
+    };
+    let id = format!(
+        "desktop-environment-snapshot-{}-{}",
+        timestamp,
+        std::process::id()
+    );
+    let dir = desktop_environment_snapshots_dir()?;
+    fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "failed to create desktop environment snapshots directory {}: {error}",
+            dir.display()
+        )
+    })?;
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+
+    let session_type = desktop_env_value("XDG_SESSION_TYPE");
+    let current_desktop = desktop_env_value("XDG_CURRENT_DESKTOP");
+    let desktop_session = desktop_env_value("DESKTOP_SESSION");
+    let wayland_display = desktop_env_value("WAYLAND_DISPLAY");
+    let display = desktop_env_value("DISPLAY");
+    let wayland_display_present = desktop_env_present("WAYLAND_DISPLAY");
+    let display_present = desktop_env_present("DISPLAY");
+    let graphical_session_visible = wayland_display_present || display_present;
+    let dbus_session_bus_present = desktop_env_present("DBUS_SESSION_BUS_ADDRESS");
+    let at_spi_bus_present = desktop_env_present("AT_SPI_BUS_ADDRESS");
+    let (ydotool_socket_metadata_checked, ydotool_socket_visible, ydotool_socket_is_socket) =
+        ydotool_socket_status();
+
+    let mut blockers = Vec::new();
+    if !graphical_session_visible {
+        blockers.push("no Wayland or X11 display variable is visible to this process".to_string());
+    }
+    if !dbus_session_bus_present {
+        blockers.push("DBUS_SESSION_BUS_ADDRESS is not visible to this process".to_string());
+    }
+    if !at_spi_bus_present {
+        blockers.push("AT_SPI_BUS_ADDRESS is not visible; accessibility tree reads remain blocked".to_string());
+    }
+    if !ydotool_socket_is_socket {
+        blockers.push("ydotool socket is not visible as a Unix socket; pointer/keyboard injection stays blocked".to_string());
+    }
+
+    let backend_status = if !graphical_session_visible {
+        "desktop_environment_snapshot_recorded_no_display_backend"
+    } else if ydotool_socket_is_socket {
+        "desktop_environment_snapshot_recorded_backend_and_ydotool_socket_visible"
+    } else {
+        "desktop_environment_snapshot_recorded_backend_visible_socket_missing"
+    }
+    .to_string();
+    let record_path_display = record_path.display().to_string();
+    let log_path_display = log_path.display().to_string();
+    let record = DesktopEnvironmentSnapshotRecord {
+        id: id.clone(),
+        status: backend_status.clone(),
+        requested_by,
+        session_type,
+        current_desktop,
+        desktop_session,
+        wayland_display,
+        wayland_display_present,
+        display,
+        display_present,
+        graphical_session_visible,
+        dbus_session_bus_present,
+        dbus_session_bus_preview: dbus_session_bus_preview(),
+        at_spi_bus_present,
+        ydotool_socket_path: YDOTOOL_SOCKET_PATH.to_string(),
+        ydotool_socket_metadata_checked,
+        ydotool_socket_visible,
+        ydotool_socket_is_socket,
+        backend_status,
+        read_only: true,
+        environment_probe_enabled: true,
+        capture_enabled: false,
+        ocr_enabled: false,
+        target_window_control_enabled: false,
+        element_action_enabled: false,
+        desktop_control_enabled: false,
+        socket_connect_enabled: false,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path_display.clone(),
+        log_path: log_path_display.clone(),
+        blockers,
+        next_step: "Use this read-only environment snapshot to decide the next desktop-control readiness slice; screenshots, accessibility reads, socket connects, pointer/keyboard injection, focus changes, app launch, and window control remain disabled.".to_string(),
+    };
+
+    let json = serde_json::to_string_pretty(&record)
+        .map_err(|error| format!("failed to serialize desktop environment snapshot: {error}"))?;
+    fs::write(&record_path, json).map_err(|error| {
+        format!(
+            "failed to write desktop environment snapshot {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "event": "desktop_environment_snapshot_recorded",
+            "id": &record.id,
+            "status": &record.status,
+            "requested_by": &record.requested_by,
+            "session_type": &record.session_type,
+            "current_desktop": &record.current_desktop,
+            "desktop_session": &record.desktop_session,
+            "wayland_display_present": record.wayland_display_present,
+            "display_present": record.display_present,
+            "graphical_session_visible": record.graphical_session_visible,
+            "dbus_session_bus_present": record.dbus_session_bus_present,
+            "at_spi_bus_present": record.at_spi_bus_present,
+            "ydotool_socket_metadata_checked": record.ydotool_socket_metadata_checked,
+            "ydotool_socket_visible": record.ydotool_socket_visible,
+            "ydotool_socket_is_socket": record.ydotool_socket_is_socket,
+            "backend_status": &record.backend_status,
+            "environment_probe_enabled": true,
+            "capture_enabled": false,
+            "ocr_enabled": false,
+            "target_window_control_enabled": false,
+            "element_action_enabled": false,
+            "desktop_control_enabled": false,
+            "socket_connect_enabled": false,
+            "process_spawn_enabled": false,
+            "terminal_enabled": false,
+            "file_write_enabled": false,
+            "patch_apply_enabled": false,
+            "live_mcp_call_enabled": false,
+            "config_read_enabled": false,
+            "export_enabled": false,
+            "memory_write_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": timestamp
+        }),
+    )?;
+    Ok(record)
+}
+
+#[tauri::command]
+pub fn list_desktop_environment_snapshots(
+) -> Result<Vec<DesktopEnvironmentSnapshotRecord>, String> {
+    let dir = desktop_environment_snapshots_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read desktop environment snapshots directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry =
+            entry.map_err(|error| format!("failed to read desktop environment snapshot entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<DesktopEnvironmentSnapshotRecord>(&content) {
+            records.push(record);
+        }
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(40);
+    Ok(records)
+}
+
 fn linux_desktop_control_readiness_dashboard_section(
     section_id: &'static str,
     title: &'static str,
@@ -102351,6 +102715,53 @@ pub fn linux_desktop_control_readiness_dashboard(
         .into_iter()
         .filter(desktop_command_surface_group)
         .collect::<Vec<_>>();
+    let desktop_environment_snapshots = list_desktop_environment_snapshots().unwrap_or_default();
+    let desktop_environment_snapshot_count = desktop_environment_snapshots.len();
+    let desktop_environment_snapshot_ready_count = desktop_environment_snapshots
+        .iter()
+        .filter(|record| desktop_environment_snapshot_ready(record))
+        .count();
+    let latest_desktop_environment_snapshot = desktop_environment_snapshots.first();
+    let latest_desktop_environment_snapshot_age_ms =
+        latest_desktop_environment_snapshot_age_ms(latest_desktop_environment_snapshot);
+    let latest_desktop_environment_snapshot_fresh = latest_desktop_environment_snapshot_age_ms
+        .map(|age| age <= DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS)
+        .unwrap_or(false);
+    let latest_desktop_environment_snapshot_status = latest_desktop_environment_snapshot
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "desktop_environment_snapshot_missing".to_string());
+    let latest_desktop_environment_snapshot_record_path = latest_desktop_environment_snapshot
+        .map(|record| record.record_path.clone())
+        .unwrap_or_default();
+    let latest_desktop_environment_graphical_session_visible =
+        latest_desktop_environment_snapshot
+            .map(|record| record.graphical_session_visible)
+            .unwrap_or(false);
+    let latest_desktop_environment_wayland_display_present =
+        latest_desktop_environment_snapshot
+            .map(|record| record.wayland_display_present)
+            .unwrap_or(false);
+    let latest_desktop_environment_display_present = latest_desktop_environment_snapshot
+        .map(|record| record.display_present)
+        .unwrap_or(false);
+    let latest_desktop_environment_dbus_session_bus_present =
+        latest_desktop_environment_snapshot
+            .map(|record| record.dbus_session_bus_present)
+            .unwrap_or(false);
+    let latest_desktop_environment_at_spi_bus_present = latest_desktop_environment_snapshot
+        .map(|record| record.at_spi_bus_present)
+        .unwrap_or(false);
+    let latest_desktop_environment_ydotool_socket_visible =
+        latest_desktop_environment_snapshot
+            .map(|record| record.ydotool_socket_visible)
+            .unwrap_or(false);
+    let latest_desktop_environment_ydotool_socket_is_socket =
+        latest_desktop_environment_snapshot
+            .map(|record| record.ydotool_socket_is_socket)
+            .unwrap_or(false);
+    let latest_desktop_environment_backend_status = latest_desktop_environment_snapshot
+        .map(|record| record.backend_status.clone())
+        .unwrap_or_else(|| "desktop_environment_snapshot_missing".to_string());
 
     let foundation_desktop_lanes = foundation
         .items
@@ -102409,7 +102820,7 @@ pub fn linux_desktop_control_readiness_dashboard(
         .filter(|group| group.command_count > 0)
         .count();
 
-    let sections = vec![
+    let mut sections = vec![
         linux_desktop_control_readiness_dashboard_section(
             "foundation-desktop-lane",
             "Foundation desktop lane",
@@ -102483,6 +102894,20 @@ pub fn linux_desktop_control_readiness_dashboard(
             true,
         ),
     ];
+    if desktop_environment_snapshot_count > 0 {
+        sections.push(linux_desktop_control_readiness_dashboard_section(
+            "desktop-environment-snapshot",
+            "Desktop environment snapshot",
+            "desktop-environment-snapshots",
+            desktop_environment_snapshot_count,
+            desktop_environment_snapshot_ready_count,
+            "desktop_environment_snapshot_recorded_control_disabled",
+            "Use the latest read-only desktop environment snapshot to decide whether screenshot, accessibility, socket, pointer, keyboard, focus, and window-control prerequisites are actually visible.",
+            true,
+            false,
+            true,
+        ));
+    }
 
     let disabled_gate_count = sections
         .iter()
@@ -102507,6 +102932,22 @@ pub fn linux_desktop_control_readiness_dashboard(
     Ok(LinuxDesktopControlReadinessDashboard {
         status: "linux_desktop_control_readiness_dashboard_read_only",
         section_count: sections.len(),
+        desktop_environment_snapshot_count,
+        desktop_environment_snapshot_ready_count,
+        desktop_environment_snapshot_freshness_threshold_ms:
+            DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS,
+        latest_desktop_environment_snapshot_status,
+        latest_desktop_environment_snapshot_record_path,
+        latest_desktop_environment_snapshot_age_ms,
+        latest_desktop_environment_snapshot_fresh,
+        latest_desktop_environment_graphical_session_visible,
+        latest_desktop_environment_wayland_display_present,
+        latest_desktop_environment_display_present,
+        latest_desktop_environment_dbus_session_bus_present,
+        latest_desktop_environment_at_spi_bus_present,
+        latest_desktop_environment_ydotool_socket_visible,
+        latest_desktop_environment_ydotool_socket_is_socket,
+        latest_desktop_environment_backend_status,
         foundation_desktop_lane_count,
         foundation_desktop_ready_count,
         work_queue_desktop_lane_count,
@@ -102537,10 +102978,10 @@ pub fn linux_desktop_control_readiness_dashboard(
         sections,
         reasons: vec![
             "dashboard groups existing desktop lane, work queue, inventory, readiness, approval spine, and command-surface evidence into one Linux desktop control readiness view",
-            "dashboard reads existing ledgers only and creates no desktop, capture, OCR, target-window, action, socket, process, terminal, config, export, memory, file, patch, or execution records",
+            "dashboard reads existing ledgers and the latest desktop environment snapshot only; snapshot creation is explicit and creates no capture, OCR, target-window, action, socket, process, terminal, config, export, memory, file, patch, or execution records",
             "desktop control, capture, sockets, process spawn, terminal control, file writes, patches, live MCP calls, config reads, exports, memory writes, workspace writes, and execution remain disabled",
         ],
-        next_slice: "Use this dashboard to add explicit screenshot/OCR/window/action approval policies before any Linux desktop control, capture, socket, process, terminal, or execution gate is opened.",
+        next_slice: "Use this dashboard to add explicit stage-1 read-only screenshot/accessibility/window inventory probes before any Linux desktop control, capture, socket, process, terminal, or execution gate is opened.",
     })
 }
 
@@ -115913,6 +116354,129 @@ sleep 2
         assert_eq!(decision.capability_tier, "restricted");
         assert!(decision.approval_required);
         assert!(!decision.execution_enabled);
+    }
+
+    #[test]
+    fn desktop_environment_snapshot_records_read_only_backend_evidence_without_control() {
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-desktop-env-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        let env_keys = [
+            "XDG_STATE_HOME",
+            "XDG_SESSION_TYPE",
+            "XDG_CURRENT_DESKTOP",
+            "DESKTOP_SESSION",
+            "WAYLAND_DISPLAY",
+            "DISPLAY",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "AT_SPI_BUS_ADDRESS",
+        ];
+        let saved_env = env_keys
+            .iter()
+            .map(|key| ((*key).to_string(), env::var_os(key)))
+            .collect::<Vec<_>>();
+
+        env::set_var("XDG_STATE_HOME", &test_root);
+        env::set_var("XDG_SESSION_TYPE", "wayland");
+        env::set_var("XDG_CURRENT_DESKTOP", "COSMIC");
+        env::set_var("DESKTOP_SESSION", "cosmic");
+        env::set_var("WAYLAND_DISPLAY", "wayland-test");
+        env::set_var("DISPLAY", ":99");
+        env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/fake-dbus");
+        env::set_var("AT_SPI_BUS_ADDRESS", "unix:path=/tmp/fake-atspi");
+
+        let record = record_desktop_environment_snapshot(DesktopEnvironmentSnapshotRequest {
+            requested_by: Some("rust-test".to_string()),
+        })
+        .expect("desktop environment snapshot records");
+        assert_eq!(record.requested_by, "rust-test");
+        assert!(record.status.contains("desktop_environment_snapshot_recorded"));
+        assert_eq!(record.session_type, "wayland");
+        assert_eq!(record.current_desktop, "COSMIC");
+        assert_eq!(record.desktop_session, "cosmic");
+        assert!(record.wayland_display_present);
+        assert!(record.display_present);
+        assert!(record.graphical_session_visible);
+        assert!(record.dbus_session_bus_present);
+        assert_eq!(record.dbus_session_bus_preview, "unix:path=<redacted>");
+        assert!(record.at_spi_bus_present);
+        assert_eq!(record.ydotool_socket_path, YDOTOOL_SOCKET_PATH);
+        assert!(record.ydotool_socket_metadata_checked);
+        assert!(record.read_only);
+        assert!(record.environment_probe_enabled);
+        assert!(!record.capture_enabled);
+        assert!(!record.ocr_enabled);
+        assert!(!record.target_window_control_enabled);
+        assert!(!record.element_action_enabled);
+        assert!(!record.desktop_control_enabled);
+        assert!(!record.socket_connect_enabled);
+        assert!(!record.process_spawn_enabled);
+        assert!(!record.terminal_enabled);
+        assert!(!record.file_write_enabled);
+        assert!(!record.patch_apply_enabled);
+        assert!(!record.live_mcp_call_enabled);
+        assert!(!record.config_read_enabled);
+        assert!(!record.export_enabled);
+        assert!(!record.memory_write_enabled);
+        assert!(!record.writes_allowed);
+        assert!(!record.execution_enabled);
+        assert!(fs::metadata(&record.record_path).is_ok());
+        assert!(fs::metadata(&record.log_path).is_ok());
+
+        let listed = list_desktop_environment_snapshots()
+            .expect("desktop environment snapshot list reads");
+        assert!(listed.iter().any(|item| item.id == record.id));
+
+        let dashboard = linux_desktop_control_readiness_dashboard()
+            .expect("desktop readiness dashboard includes environment snapshot");
+        assert_eq!(dashboard.desktop_environment_snapshot_count, 1);
+        assert_eq!(dashboard.desktop_environment_snapshot_ready_count, 1);
+        assert_eq!(
+            dashboard.desktop_environment_snapshot_freshness_threshold_ms,
+            DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS
+        );
+        assert_eq!(dashboard.latest_desktop_environment_snapshot_status, record.status);
+        assert!(dashboard.latest_desktop_environment_snapshot_fresh);
+        assert!(dashboard.latest_desktop_environment_graphical_session_visible);
+        assert!(dashboard.latest_desktop_environment_wayland_display_present);
+        assert!(dashboard.latest_desktop_environment_display_present);
+        assert!(dashboard.latest_desktop_environment_dbus_session_bus_present);
+        assert!(dashboard.latest_desktop_environment_at_spi_bus_present);
+        assert!(!dashboard.capture_enabled);
+        assert!(!dashboard.desktop_control_enabled);
+        assert!(!dashboard.socket_connect_enabled);
+        assert!(!dashboard.process_spawn_enabled);
+        assert!(!dashboard.execution_enabled);
+        assert!(dashboard.sections.iter().any(|section| {
+            section.section_id == "desktop-environment-snapshot"
+                && section.source_ledger == "desktop-environment-snapshots"
+                && section.record_count == 1
+                && section.ready_count == 1
+                && section.desktop_evidence
+                && section.operator_surface
+                && !section.capture_enabled
+                && !section.desktop_control_enabled
+                && !section.socket_connect_enabled
+                && !section.execution_enabled
+        }));
+
+        let history = product_evidence_history().expect("product evidence history loads");
+        assert!(history
+            .items
+            .iter()
+            .any(|item| item.category == "desktop-environment"
+                && item.record_path == record.record_path));
+
+        let _ = fs::remove_dir_all(&test_root);
+        for (key, value) in saved_env {
+            if let Some(value) = value {
+                env::set_var(key, value);
+            } else {
+                env::remove_var(key);
+            }
+        }
     }
 
     #[test]

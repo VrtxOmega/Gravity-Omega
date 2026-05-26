@@ -3689,10 +3689,13 @@ function describeApprovalEvidenceSpineSection(record) {
 }
 
 function describeLinuxDesktopControlReadinessSection(record) {
+  const environmentText = record.section_id === "desktop-environment-snapshot"
+    ? " Read-only environment snapshot evidence is recorded before any screenshot, accessibility, socket, pointer, keyboard, focus, or window-control gate can open."
+    : "";
   return {
     title: record.title,
     meta: `${record.ready_count}/${record.record_count} ready via #${record.source_ledger}`,
-    text: `${record.status}. desktop=${record.desktop_evidence}; approval=${record.approval_evidence}; surface=${record.operator_surface}; capture=${record.capture_enabled}; control=${record.desktop_control_enabled}. ${record.next_action}`,
+    text: `${record.status}. desktop=${record.desktop_evidence}; approval=${record.approval_evidence}; surface=${record.operator_surface}; capture=${record.capture_enabled}; control=${record.desktop_control_enabled}.${environmentText} ${record.next_action}`,
     state: record.execution_enabled || record.writes_allowed || record.desktop_control_enabled || record.capture_enabled || record.socket_connect_enabled || record.process_spawn_enabled || record.terminal_enabled || record.file_write_enabled || record.patch_apply_enabled || record.live_mcp_call_enabled || record.config_read_enabled || record.export_enabled || record.memory_write_enabled ? "gated" : "disabled",
   };
 }
@@ -6331,6 +6334,14 @@ function renderLinuxDesktopControlReadinessDashboard(dashboard) {
 
   linuxDesktopControlReadinessDashboardSummary.textContent = [
     dashboard.status,
+    `env=${dashboard.desktop_environment_snapshot_ready_count}/${dashboard.desktop_environment_snapshot_count}`,
+    `envStatus=${dashboard.latest_desktop_environment_snapshot_status}`,
+    `envFresh=${dashboard.latest_desktop_environment_snapshot_fresh}`,
+    `wayland=${dashboard.latest_desktop_environment_wayland_display_present}`,
+    `x11=${dashboard.latest_desktop_environment_display_present}`,
+    `dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}`,
+    `atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}`,
+    `ydotool=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}`,
     `foundation=${dashboard.foundation_desktop_ready_count}/${dashboard.foundation_desktop_lane_count}`,
     `queue=${dashboard.work_queue_desktop_ready_count}/${dashboard.work_queue_desktop_lane_count}`,
     `inventory=${dashboard.capability_desktop_ready_count}/${dashboard.capability_desktop_item_count}`,
@@ -6363,6 +6374,12 @@ function renderLinuxDesktopControlReadinessDashboard(dashboard) {
 async function refreshLinuxDesktopControlReadinessDashboard() {
   refreshLinuxDesktopControlReadinessDashboardBtn.disabled = true;
   try {
+    const invoke = tauriInvoke();
+    if (invoke) {
+      await invoke("record_desktop_environment_snapshot", {
+        request: { requested_by: "linux-desktop-control-readiness-dashboard" },
+      });
+    }
     const dashboard = await loadLinuxDesktopControlReadinessDashboard();
     renderLinuxDesktopControlReadinessDashboard(dashboard);
     return dashboard;
@@ -8533,6 +8550,7 @@ async function loadApprovalEvidenceSpineDashboard() {
 async function loadLinuxDesktopControlReadinessDashboard() {
   const invoke = tauriInvoke();
   if (invoke) {
+    await invoke("list_desktop_environment_snapshots").catch(() => []);
     return invoke("linux_desktop_control_readiness_dashboard");
   }
 
@@ -8543,6 +8561,7 @@ async function loadLinuxDesktopControlReadinessDashboard() {
     ["desktop-integration-readiness", "Desktop integration readiness", "first-class-integration-readiness-ledger", true, false, false],
     ["approval-spine-prerequisites", "Approval spine prerequisites", "approval-evidence-spine-dashboard", false, true, false],
     ["desktop-command-surface", "Desktop command surface", "command-manifest", true, false, true],
+    ["desktop-environment-snapshot", "Desktop environment snapshot", "desktop-environment-snapshots", true, false, true],
   ].map(([section_id, title, source_ledger, desktop_evidence, approval_evidence, operator_surface]) => ({
     section_id,
     title,
@@ -8574,6 +8593,21 @@ async function loadLinuxDesktopControlReadinessDashboard() {
   return {
     status: "linux_desktop_control_readiness_dashboard_browser_preview",
     section_count: sections.length,
+    desktop_environment_snapshot_count: 1,
+    desktop_environment_snapshot_ready_count: 0,
+    desktop_environment_snapshot_freshness_threshold_ms: 120000,
+    latest_desktop_environment_snapshot_status: "desktop_environment_snapshot_browser_preview",
+    latest_desktop_environment_snapshot_record_path: "",
+    latest_desktop_environment_snapshot_age_ms: null,
+    latest_desktop_environment_snapshot_fresh: false,
+    latest_desktop_environment_graphical_session_visible: false,
+    latest_desktop_environment_wayland_display_present: false,
+    latest_desktop_environment_display_present: false,
+    latest_desktop_environment_dbus_session_bus_present: false,
+    latest_desktop_environment_at_spi_bus_present: false,
+    latest_desktop_environment_ydotool_socket_visible: false,
+    latest_desktop_environment_ydotool_socket_is_socket: false,
+    latest_desktop_environment_backend_status: "desktop_environment_snapshot_browser_preview",
     foundation_desktop_lane_count: 0,
     foundation_desktop_ready_count: 0,
     work_queue_desktop_lane_count: 0,
@@ -27906,12 +27940,25 @@ function initOmegaProductShell() {
           completionMessage = "SSWP Lane opened as a central surface.";
           break;
         case "desktop": {
+          const invoke = tauriInvoke();
+          if (invoke) {
+            await invoke("record_desktop_environment_snapshot", {
+              request: { requested_by: "desktop-control-central-surface" },
+            });
+          }
           const dashboard = await loadLinuxDesktopControlReadinessDashboard();
           renderLinuxDesktopControlReadinessDashboard(dashboard);
           switchBottomView("output");
           const output = [
             "Desktop readiness card",
             `status=${dashboard.status}`,
+            `environment=${dashboard.latest_desktop_environment_snapshot_status}`,
+            `environment_fresh=${dashboard.latest_desktop_environment_snapshot_fresh}`,
+            `wayland=${dashboard.latest_desktop_environment_wayland_display_present}`,
+            `x11=${dashboard.latest_desktop_environment_display_present}`,
+            `dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}`,
+            `atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}`,
+            `ydotool_socket=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}`,
             `sections=${dashboard.section_count}`,
             `foundation=${dashboard.foundation_desktop_ready_count}/${dashboard.foundation_desktop_lane_count}`,
             `approvals=${dashboard.approval_spine_ready_section_count}/${dashboard.approval_spine_section_count}`,
@@ -27925,12 +27972,26 @@ function initOmegaProductShell() {
             kicker: "Linux Desktop Readiness",
             subtitle: dashboard.next_slice ?? "Desktop control remains guarded until explicit release evidence exists.",
             metrics: [
+              { label: "env", value: `${dashboard.desktop_environment_snapshot_ready_count ?? 0}/${dashboard.desktop_environment_snapshot_count ?? 0}` },
+              { label: "backend", value: dashboard.latest_desktop_environment_graphical_session_visible ? "seen" : "missing" },
+              { label: "ydotool", value: dashboard.latest_desktop_environment_ydotool_socket_is_socket ? "seen" : "missing" },
               { label: "sections", value: dashboard.section_count ?? 0 },
               { label: "capture", value: dashboard.capture_enabled ? "ON" : "OFF" },
               { label: "desktop", value: dashboard.desktop_control_enabled ? "ON" : "OFF" },
               { label: "exec", value: dashboard.execution_enabled ? "ON" : "OFF" },
             ],
             cards: [
+              panelSurfaceCard({
+                title: "Desktop Environment",
+                meta: dashboard.latest_desktop_environment_backend_status ?? "snapshot missing",
+                text: `fresh=${dashboard.latest_desktop_environment_snapshot_fresh}; wayland=${dashboard.latest_desktop_environment_wayland_display_present}; x11=${dashboard.latest_desktop_environment_display_present}; dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}; atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}; ydotool_socket=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}.`,
+                state: dashboard.latest_desktop_environment_graphical_session_visible ? "ready" : "warning",
+                chips: [
+                  panelSurfaceFlag("capture", dashboard.capture_enabled),
+                  panelSurfaceFlag("control", dashboard.desktop_control_enabled),
+                  panelSurfaceFlag("socket", dashboard.socket_connect_enabled),
+                ],
+              }),
               ...panelSurfaceSectionCards(dashboard.sections ?? []),
               panelSurfaceCard({
                 title: "Current Gates",
