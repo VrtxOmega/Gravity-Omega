@@ -3635,10 +3635,13 @@ function describeCodexHermesRunEvidenceOperatorConfirmationDryRunItem(record) {
 
 function describeFirstClassMcpDashboardLane(record) {
   const commands = (record.expected_command_ids ?? []).slice(0, 4).join(", ") || "commands pending";
+  const runtimeCount = record.runtime_process_count ?? 0;
+  const runtimeStatus = record.runtime_health_status ?? "runtime_process_snapshot_waiting";
+  const runtimeTarget = record.runtime_target_id ?? "unknown-mcp-runtime";
   return {
     title: `${record.display_name} / ${record.lane_role}`,
-    meta: `${record.ready_evidence_count}/${record.evidence_record_count} evidence / ${record.command_count} commands`,
-    text: `${record.status}. ${commands}. ${record.next_action}`,
+    meta: `${record.ready_evidence_count}/${record.evidence_record_count} evidence / ${record.command_count} commands / runtime=${runtimeCount}`,
+    text: `${record.status}. ${commands}. runtime=${runtimeStatus}; target=${runtimeTarget}; running=${Boolean(record.runtime_running)}; pattern=${record.runtime_expected_pattern ?? "unknown"}; record=${record.runtime_record_path ?? "none"}. ${record.next_action}`,
     state: record.execution_enabled || record.writes_allowed || record.live_call_enabled || record.config_read_enabled || record.socket_connect_enabled || record.capture_enabled || record.export_enabled ? "gated" : "disabled",
   };
 }
@@ -5467,6 +5470,9 @@ function renderFirstClassMcpDashboard(dashboard) {
     `omega=${dashboard.omega_brain_evidence_count}`,
     `sswp=${dashboard.sswp_evidence_count}`,
     `steno=${dashboard.steno_evidence_count}`,
+    `runtime=${dashboard.running_runtime_lane_count ?? 0}/${dashboard.lane_count ?? 0}`,
+    `mcp_processes=${dashboard.mcp_runtime_process_count ?? 0}`,
+    `runtime_snapshots=${dashboard.runtime_process_snapshot_count ?? 0}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `live_call=${dashboard.live_call_enabled}`,
     `config=${dashboard.config_read_enabled}`,
@@ -5483,6 +5489,14 @@ function renderFirstClassMcpDashboard(dashboard) {
   }
 
   for (const record of lanes) {
+    const runtimeNode = item(
+      `Runtime process: ${record.display_name}`,
+      `${record.runtime_health_status ?? "runtime_process_snapshot_waiting"} / running=${Boolean(record.runtime_running)}`,
+      `target=${record.runtime_target_id ?? "unknown-mcp-runtime"}; pattern=${record.runtime_expected_pattern ?? "unknown"}; processes=${record.runtime_process_count ?? 0}; snapshot=${record.runtime_record_path ?? dashboard.latest_runtime_process_snapshot_path ?? "none"}; dashboardExec=${dashboard.execution_enabled}`,
+    );
+    runtimeNode.dataset.state = record.runtime_running ? "ready" : "disabled";
+    firstClassMcpDashboardList.append(runtimeNode);
+
     const view = describeFirstClassMcpDashboardLane(record);
     const node = item(view.title, view.meta, view.text);
     node.dataset.state = view.state;
@@ -5493,6 +5507,11 @@ function renderFirstClassMcpDashboard(dashboard) {
 async function refreshFirstClassMcpDashboard() {
   refreshFirstClassMcpDashboardBtn.disabled = true;
   try {
+    try {
+      await recordRuntimeSidecarProcessSnapshot("gravity-omega-first-class-mcp-dashboard");
+    } catch (error) {
+      setProblemText(`First-class MCP runtime process snapshot failed: ${error.message}`);
+    }
     const dashboard = await loadFirstClassMcpDashboard();
     renderFirstClassMcpDashboard(dashboard);
     return dashboard;
@@ -5684,6 +5703,8 @@ function renderSswpStatusPanel(panel) {
     `registry=${panel.registry_node_count ?? 0}/${panel.registry_snapshot_count ?? 0}`,
     `risky=${panel.risky_node_count ?? 0}`,
     `high=${highRisk}%`,
+    `runtime=${panel.runtime_process_count ?? 0}`,
+    `running=${Boolean(panel.runtime_running)}`,
     `commands=${panel.command_count}`,
     `disabled_gates=${panel.disabled_gate_count}`,
     `live_probe=${panel.live_probe_enabled}`,
@@ -5708,6 +5729,12 @@ function renderSswpStatusPanel(panel) {
       state: panel.risky_node_count > 0 ? "gated" : "ready",
     },
     {
+      title: "Runtime Process Evidence",
+      meta: `${panel.runtime_health_status ?? "runtime_process_snapshot_waiting"} / running=${Boolean(panel.runtime_running)}`,
+      text: `target=${panel.runtime_target_id ?? "sswp-mcp"}; pattern=${panel.runtime_expected_pattern ?? "mcp-servers/sswp"}; processes=${panel.runtime_process_count ?? 0}; snapshot=${panel.latest_runtime_process_snapshot_path ?? "none"}; liveCall=${panel.live_call_enabled}; exec=${panel.execution_enabled}`,
+      state: panel.runtime_running ? "ready" : "disabled",
+    },
+    {
       title: "Disabled Gates",
       meta: `${panel.disabled_gate_count} sealed lane`,
       text: `probe=${panel.live_probe_enabled}; call=${panel.live_call_enabled}; config=${panel.config_read_enabled}; socket=${panel.socket_connect_enabled}; capture=${panel.capture_enabled}; export=${panel.export_enabled}; writes=${panel.writes_allowed}; exec=${panel.execution_enabled}`,
@@ -5730,6 +5757,11 @@ async function refreshSswpStatusPanel() {
       await recordSswpRegistrySnapshot("gravity-omega-sswp-panel");
     } catch (error) {
       setProblemText(`SSWP registry snapshot failed: ${error.message}`);
+    }
+    try {
+      await recordRuntimeSidecarProcessSnapshot("gravity-omega-sswp-panel");
+    } catch (error) {
+      setProblemText(`SSWP runtime process snapshot failed: ${error.message}`);
     }
     const panel = await loadSswpStatusPanel();
     renderSswpStatusPanel(panel);
@@ -7635,11 +7667,19 @@ async function loadFirstClassMcpDashboard() {
     return invoke("first_class_mcp_dashboard");
   }
 
+  const runtimeTargetForSubsystem = (subsystem) => ({
+    omega_brain: ["omega-brain-mcp", "omega-brain"],
+    sswp: ["sswp-mcp", "mcp-servers/sswp"],
+    omega_stenographer: ["omega-stenographer-mcp", "omega-stenographer"],
+  }[subsystem] ?? ["unknown-mcp-runtime", "unknown"]);
+
   const lanes = [
     ["omega_brain", "Omega Brain", "memory, search, citation, and memory-policy lane", ["omega_brain_status", "omega_brain_search", "omega_brain_cite", "omega_brain_memory_policy"]],
     ["sswp", "SSWP", "sovereign workflow protocol lane", ["sswp_status", "sswp_capabilities", "sswp_plan", "sswp_call_policy"]],
     ["omega_stenographer", "Omega Stenographer", "capture, transcript, search, and export lane", ["steno_status", "steno_capture_policy", "steno_search", "steno_export_policy"]],
-  ].map(([subsystem, display_name, lane_role, expected_command_ids]) => ({
+  ].map(([subsystem, display_name, lane_role, expected_command_ids]) => {
+    const [runtime_target_id, runtime_expected_pattern] = runtimeTargetForSubsystem(subsystem);
+    return {
     subsystem,
     display_name,
     lane_role,
@@ -7663,6 +7703,13 @@ async function loadFirstClassMcpDashboard() {
     typed_command_contract_count: 0,
     status_probe_preflight_count: 0,
     config_lookup_preflight_count: 0,
+    runtime_target_id,
+    runtime_process_count: 0,
+    runtime_running: false,
+    runtime_health_status: "runtime_process_snapshot_browser_preview",
+    runtime_expected_pattern,
+    runtime_record_path: null,
+    runtime_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
     first_class: true,
     read_only: true,
     live_probe_enabled: false,
@@ -7681,7 +7728,8 @@ async function loadFirstClassMcpDashboard() {
     writes_allowed: false,
     execution_enabled: false,
     next_action: "Open the Tauri app to resolve first-class MCP evidence through Rust.",
-  }));
+    };
+  });
 
   return {
     status: "first_class_mcp_dashboard_browser_preview",
@@ -7693,6 +7741,11 @@ async function loadFirstClassMcpDashboard() {
     omega_brain_evidence_count: 0,
     sswp_evidence_count: 0,
     steno_evidence_count: 0,
+    runtime_process_snapshot_count: 0,
+    latest_runtime_process_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
+    latest_runtime_process_snapshot_path: null,
+    running_runtime_lane_count: 0,
+    mcp_runtime_process_count: 0,
     disabled_gate_count: 3,
     read_only: true,
     live_probe_enabled: false,
@@ -7749,6 +7802,13 @@ async function loadSswpStatusPanel() {
     typed_command_contract_count: 0,
     status_probe_preflight_count: 0,
     config_lookup_preflight_count: 0,
+    runtime_target_id: "sswp-mcp",
+    runtime_process_count: 0,
+    runtime_running: false,
+    runtime_health_status: "runtime_process_snapshot_browser_preview",
+    runtime_expected_pattern: "mcp-servers/sswp",
+    runtime_record_path: null,
+    runtime_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
     first_class: true,
     read_only: true,
     live_probe_enabled: false,
@@ -7784,6 +7844,14 @@ async function loadSswpStatusPanel() {
     registry_node_count: 0,
     risky_node_count: 0,
     highest_risk_percent: 0,
+    runtime_process_snapshot_count: dashboard.runtime_process_snapshot_count ?? 0,
+    latest_runtime_process_snapshot_status: dashboard.latest_runtime_process_snapshot_status ?? "runtime_sidecar_process_snapshot_browser_preview",
+    latest_runtime_process_snapshot_path: dashboard.latest_runtime_process_snapshot_path ?? null,
+    runtime_target_id: lane.runtime_target_id ?? "sswp-mcp",
+    runtime_process_count: lane.runtime_process_count ?? 0,
+    runtime_running: Boolean(lane.runtime_running),
+    runtime_health_status: lane.runtime_health_status ?? "runtime_process_snapshot_browser_preview",
+    runtime_expected_pattern: lane.runtime_expected_pattern ?? "mcp-servers/sswp",
     command_count: lane.command_count,
     disabled_gate_count: lane.read_only && !lane.live_call_enabled && !lane.config_read_enabled && !lane.execution_enabled ? 1 : 0,
     read_only: lane.read_only,

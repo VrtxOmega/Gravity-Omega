@@ -5111,6 +5111,13 @@ pub struct FirstClassMcpDashboardLane {
     pub typed_command_contract_count: usize,
     pub status_probe_preflight_count: usize,
     pub config_lookup_preflight_count: usize,
+    pub runtime_target_id: &'static str,
+    pub runtime_process_count: usize,
+    pub runtime_running: bool,
+    pub runtime_health_status: String,
+    pub runtime_expected_pattern: String,
+    pub runtime_record_path: Option<String>,
+    pub runtime_snapshot_status: String,
     pub first_class: bool,
     pub read_only: bool,
     pub live_probe_enabled: bool,
@@ -5142,6 +5149,11 @@ pub struct FirstClassMcpDashboard {
     pub omega_brain_evidence_count: usize,
     pub sswp_evidence_count: usize,
     pub steno_evidence_count: usize,
+    pub runtime_process_snapshot_count: usize,
+    pub latest_runtime_process_snapshot_status: String,
+    pub latest_runtime_process_snapshot_path: Option<String>,
+    pub running_runtime_lane_count: usize,
+    pub mcp_runtime_process_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
     pub live_probe_enabled: bool,
@@ -5180,6 +5192,14 @@ pub struct SswpStatusPanel {
     pub registry_node_count: usize,
     pub risky_node_count: usize,
     pub highest_risk_percent: f64,
+    pub runtime_process_snapshot_count: usize,
+    pub latest_runtime_process_snapshot_status: String,
+    pub latest_runtime_process_snapshot_path: Option<String>,
+    pub runtime_target_id: &'static str,
+    pub runtime_process_count: usize,
+    pub runtime_running: bool,
+    pub runtime_health_status: String,
+    pub runtime_expected_pattern: String,
     pub command_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
@@ -97887,6 +97907,24 @@ fn first_class_mcp_dashboard_next_action(subsystem: &str) -> &'static str {
     }
 }
 
+fn first_class_mcp_runtime_target_id(subsystem: &str) -> &'static str {
+    match subsystem {
+        "omega_brain" => "omega-brain-mcp",
+        "sswp" => "sswp-mcp",
+        "omega_stenographer" => "omega-stenographer-mcp",
+        _ => "unknown-mcp-runtime",
+    }
+}
+
+fn first_class_mcp_runtime_target<'a>(
+    snapshot: Option<&'a RuntimeSidecarProcessSnapshotRecord>,
+    subsystem: &str,
+) -> Option<&'a RuntimeSidecarProcessTargetSnapshot> {
+    let target_id = first_class_mcp_runtime_target_id(subsystem);
+    snapshot
+        .and_then(|record| record.targets.iter().find(|target| target.target_id == target_id))
+}
+
 #[tauri::command]
 pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
     let contracts = list_local_mcp_lane_capability_contracts()?;
@@ -97903,6 +97941,13 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
     let typed_command_contracts = list_local_mcp_typed_command_contracts()?;
     let status_probe_preflights = list_local_mcp_status_probe_preflights()?;
     let config_lookup_preflights = list_local_mcp_config_lookup_preflights()?;
+    let runtime_process_snapshots = list_runtime_sidecar_process_snapshots().unwrap_or_default();
+    let latest_runtime_process_snapshot = runtime_process_snapshots.first();
+    let latest_runtime_process_snapshot_status = latest_runtime_process_snapshot
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "runtime_sidecar_process_snapshot_waiting".to_string());
+    let latest_runtime_process_snapshot_path =
+        latest_runtime_process_snapshot.map(|record| record.record_path.clone());
 
     let lane_specs = [
         (
@@ -98167,6 +98212,23 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
             .collect();
         expected_command_ids.sort();
         expected_command_ids.dedup();
+        let runtime_target_id = first_class_mcp_runtime_target_id(subsystem);
+        let runtime_target =
+            first_class_mcp_runtime_target(latest_runtime_process_snapshot, subsystem);
+        let runtime_process_count = runtime_target.map(|target| target.process_count).unwrap_or(0);
+        let runtime_running = runtime_target.map(|target| target.running).unwrap_or(false);
+        let runtime_health_status = runtime_target
+            .map(|target| target.health_status.clone())
+            .unwrap_or_else(|| "runtime_process_snapshot_waiting".to_string());
+        let runtime_expected_pattern = runtime_target
+            .map(|target| target.expected_pattern.clone())
+            .unwrap_or_else(|| {
+                runtime_sidecar_process_targets()
+                    .into_iter()
+                    .find(|target| target.target_id == runtime_target_id)
+                    .map(|target| target.expected_pattern.to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
+            });
 
         let evidence_record_count = contract_count
             + health_preflight_count
@@ -98236,6 +98298,13 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
             typed_command_contract_count,
             status_probe_preflight_count,
             config_lookup_preflight_count,
+            runtime_target_id,
+            runtime_process_count,
+            runtime_running,
+            runtime_health_status,
+            runtime_expected_pattern,
+            runtime_record_path: latest_runtime_process_snapshot_path.clone(),
+            runtime_snapshot_status: latest_runtime_process_snapshot_status.clone(),
             first_class: true,
             read_only: true,
             live_probe_enabled: false,
@@ -98298,6 +98367,11 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
         .find(|lane| lane.subsystem == "omega_stenographer")
         .map(|lane| lane.evidence_record_count)
         .unwrap_or(0);
+    let running_runtime_lane_count = lanes.iter().filter(|lane| lane.runtime_running).count();
+    let mcp_runtime_process_count = lanes
+        .iter()
+        .map(|lane| lane.runtime_process_count)
+        .sum();
 
     Ok(FirstClassMcpDashboard {
         status: "first_class_mcp_dashboard_read_only",
@@ -98309,6 +98383,11 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
         omega_brain_evidence_count,
         sswp_evidence_count,
         steno_evidence_count,
+        runtime_process_snapshot_count: runtime_process_snapshots.len(),
+        latest_runtime_process_snapshot_status,
+        latest_runtime_process_snapshot_path,
+        running_runtime_lane_count,
+        mcp_runtime_process_count,
         disabled_gate_count,
         read_only: true,
         live_probe_enabled: false,
@@ -98647,6 +98726,11 @@ pub fn list_sswp_registry_snapshots() -> Result<Vec<SswpRegistrySnapshotRecord>,
 #[tauri::command]
 pub fn sswp_status() -> Result<SswpStatusPanel, String> {
     let dashboard = first_class_mcp_dashboard()?;
+    let runtime_process_snapshot_count = dashboard.runtime_process_snapshot_count;
+    let latest_runtime_process_snapshot_status =
+        dashboard.latest_runtime_process_snapshot_status.clone();
+    let latest_runtime_process_snapshot_path =
+        dashboard.latest_runtime_process_snapshot_path.clone();
     let lane = dashboard
         .lanes
         .into_iter()
@@ -98698,6 +98782,14 @@ pub fn sswp_status() -> Result<SswpStatusPanel, String> {
         highest_risk_percent: latest_registry_snapshot
             .map(|record| record.highest_risk_percent)
             .unwrap_or(0.0),
+        runtime_process_snapshot_count,
+        latest_runtime_process_snapshot_status,
+        latest_runtime_process_snapshot_path,
+        runtime_target_id: lane.runtime_target_id,
+        runtime_process_count: lane.runtime_process_count,
+        runtime_running: lane.runtime_running,
+        runtime_health_status: lane.runtime_health_status.clone(),
+        runtime_expected_pattern: lane.runtime_expected_pattern.clone(),
         command_count: lane.command_count,
         disabled_gate_count,
         read_only: lane.read_only,
@@ -112267,6 +112359,32 @@ mod tests {
         assert!(!health_packets.spawn_enabled);
         assert!(!health_packets.execution_enabled);
 
+        let mcp_dashboard =
+            first_class_mcp_dashboard().expect("first-class MCP dashboard loads runtime evidence");
+        assert!(mcp_dashboard.runtime_process_snapshot_count > 0);
+        assert_eq!(mcp_dashboard.lane_count, 3);
+        assert_eq!(mcp_dashboard.latest_runtime_process_snapshot_status, record.status);
+        assert_eq!(
+            mcp_dashboard.latest_runtime_process_snapshot_path.as_deref(),
+            Some(record.record_path.as_str())
+        );
+        assert!(mcp_dashboard.lanes.iter().any(|lane| {
+            lane.subsystem == "sswp"
+                && lane.runtime_target_id == "sswp-mcp"
+                && lane.runtime_snapshot_status == record.status
+                && lane.runtime_record_path.as_deref() == Some(record.record_path.as_str())
+                && lane.runtime_expected_pattern.contains("sswp")
+        }));
+        assert!(mcp_dashboard.lanes.iter().all(|lane| {
+            !lane.live_call_enabled
+                && !lane.config_read_enabled
+                && !lane.socket_connect_enabled
+                && !lane.memory_write_enabled
+                && !lane.process_spawn_enabled
+                && !lane.writes_allowed
+                && !lane.execution_enabled
+        }));
+
         let history = product_evidence_history().expect("product evidence history loads");
         assert!(history
             .categories
@@ -112730,6 +112848,10 @@ mod tests {
 
     #[test]
     fn sswp_status_opens_read_only_lane_without_live_mcp() {
+        let snapshot = record_runtime_sidecar_process_snapshot(RuntimeSidecarProcessSnapshotRequest {
+            requested_by: Some("rust-test-sswp-status".to_string()),
+        })
+        .expect("runtime sidecar process snapshot records before SSWP status");
         let panel = sswp_status().expect("SSWP status opens");
 
         assert_eq!(panel.status, "sswp_status_panel_read_only");
@@ -112745,6 +112867,16 @@ mod tests {
             panel.registry_snapshot_count == 0,
             panel.latest_registry_snapshot_path.is_none()
         );
+        assert!(panel.runtime_process_snapshot_count > 0);
+        assert_eq!(panel.latest_runtime_process_snapshot_status, snapshot.status);
+        assert_eq!(
+            panel.latest_runtime_process_snapshot_path.as_deref(),
+            Some(snapshot.record_path.as_str())
+        );
+        assert_eq!(panel.runtime_target_id, "sswp-mcp");
+        assert_eq!(panel.runtime_health_status, panel.lane.runtime_health_status);
+        assert_eq!(panel.runtime_process_count, panel.lane.runtime_process_count);
+        assert!(panel.runtime_expected_pattern.contains("sswp"));
         assert!(panel.highest_risk_percent >= 0.0);
         assert!(panel.read_only);
         assert!(panel.lane.read_only);
