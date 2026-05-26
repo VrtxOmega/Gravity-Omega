@@ -1433,7 +1433,17 @@
           <article class="panel">
             <div class="panel-heading">
               <span>Steno Search</span>
-              <span><span id="steno-search-panel-count">0</span> sections</span>
+              <span><span id="steno-search-panel-count">0</span> results</span>
+            </div>
+            <div class="toolbar-search-row">
+              <input
+                id="steno-search-query"
+                class="toolbar-search-input"
+                type="search"
+                autocomplete="off"
+                placeholder="Search transcript and evidence records..."
+              />
+              <button id="steno-search-run-btn" class="panel-mini-btn" type="button">Search</button>
             </div>
             <div id="steno-search-panel-list" class="list"></div>
           </article>

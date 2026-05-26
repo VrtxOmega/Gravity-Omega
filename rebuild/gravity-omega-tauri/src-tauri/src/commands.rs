@@ -5317,12 +5317,37 @@ pub struct PetRuntimeSignalRecord {
 }
 
 #[derive(Debug, Serialize)]
+pub struct StenoSearchResult {
+    pub title: String,
+    pub category: String,
+    pub record_path: String,
+    pub snippet: String,
+    pub line_number: usize,
+    pub created_at_ms: u64,
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StenoSearchRequest {
+    #[serde(default)]
+    pub query: Option<String>,
+    #[serde(default)]
+    pub max_results: Option<usize>,
+    #[serde(default)]
+    pub max_file_bytes: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct StenoSearchPanel {
     pub status: &'static str,
     pub panel_id: &'static str,
     pub panel_title: &'static str,
-    pub query: &'static str,
+    pub query: String,
     pub result_count: usize,
+    pub searched_file_count: usize,
+    pub matched_file_count: usize,
+    pub max_results: usize,
+    pub max_file_bytes: u64,
     pub transcript_bundle_count: usize,
     pub transcript_bundle_ready_count: usize,
     pub transcript_protection_policy_count: usize,
@@ -5348,6 +5373,7 @@ pub struct StenoSearchPanel {
     pub patch_apply_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub results: Vec<StenoSearchResult>,
     pub sections: Vec<StenoPetCompanionDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -98854,16 +98880,177 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
     })
 }
 
+fn steno_search_dirs() -> Result<Vec<(&'static str, PathBuf)>, String> {
+    Ok(vec![
+        ("workspace", product_workspace_events_dir()?),
+        ("terminal-session", product_terminal_sessions_dir()?),
+        ("terminal-replay", product_terminal_transcript_replays_dir()?),
+        ("sovereign-docs", sovereign_docs_previews_dir()?),
+        ("omega-computer", omega_computer_sessions_dir()?),
+        ("smoke", product_workbench_smokes_dir()?),
+        ("agent", unlocked_agent_prompt_sessions_dir()?),
+        ("agent-transcript", agent_transcript_sessions_dir()?),
+        ("run-transcript", run_transcript_bundles_dir()?),
+        ("runtime-depth", runtime_depth_probes_dir()?),
+        (
+            "runtime-sidecar-process",
+            runtime_sidecar_process_snapshots_dir()?,
+        ),
+        ("codex-orchestration", codex_lead_orchestrations_dir()?),
+        (
+            "hermes-inventory",
+            hermes_kimi_capability_inventories_dir()?,
+        ),
+        ("hermes-assist", hermes_kimi_assist_briefs_dir()?),
+        ("sswp-registry", sswp_registry_snapshots_dir()?),
+        ("pet-signal", pet_runtime_signals_dir()?),
+        ("joint-packet", joint_runtime_run_packets_dir()?),
+        ("runner-evidence", runner_evidence_spines_dir()?),
+    ])
+}
+
+fn steno_search_file_allowed(path: &Path) -> bool {
+    let path_text = path.display().to_string().to_ascii_lowercase();
+    if path_text.contains(".sswp") {
+        return false;
+    }
+
+    matches!(
+        path.extension().and_then(|value| value.to_str()),
+        Some("json") | Some("jsonl") | Some("txt") | Some("md") | Some("html")
+    )
+}
+
+fn steno_search_file_created_at(path: &Path) -> u64 {
+    path.metadata()
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn steno_search_snippet(content: &str, query: &str) -> Option<(usize, String)> {
+    let query_lower = query.to_ascii_lowercase();
+    content.lines().enumerate().find_map(|(index, line)| {
+        if line.to_ascii_lowercase().contains(&query_lower) {
+            let snippet = prompt_preview(line, 420);
+            Some((index + 1, snippet))
+        } else {
+            None
+        }
+    })
+}
+
+fn run_steno_search(
+    query: &str,
+    max_results: usize,
+    max_file_bytes: u64,
+) -> Result<(Vec<StenoSearchResult>, usize, usize), String> {
+    let mut results = Vec::new();
+    let mut searched_file_count = 0;
+    let mut matched_file_count = 0;
+
+    for (category, dir) in steno_search_dirs()? {
+        if !dir.exists() {
+            continue;
+        }
+
+        for entry in fs::read_dir(&dir).map_err(|error| {
+            format!(
+                "failed to read Steno search directory {}: {error}",
+                dir.display()
+            )
+        })? {
+            let entry = entry.map_err(|error| {
+                format!(
+                    "failed to read Steno search directory entry {}: {error}",
+                    dir.display()
+                )
+            })?;
+            let path = entry.path();
+            if !path.is_file() || !steno_search_file_allowed(&path) {
+                continue;
+            }
+
+            let metadata = match path.metadata() {
+                Ok(metadata) => metadata,
+                Err(_) => continue,
+            };
+            if metadata.len() > max_file_bytes {
+                continue;
+            }
+
+            searched_file_count += 1;
+            let content = match fs::read_to_string(&path) {
+                Ok(content) => content,
+                Err(_) => continue,
+            };
+
+            let Some((line_number, snippet)) = steno_search_snippet(&content, query) else {
+                continue;
+            };
+
+            matched_file_count += 1;
+            let title = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("Steno evidence record")
+                .to_string();
+            results.push(StenoSearchResult {
+                title,
+                category: category.to_string(),
+                record_path: path.display().to_string(),
+                snippet,
+                line_number,
+                created_at_ms: steno_search_file_created_at(&path),
+                status: "steno_search_result_read_only".to_string(),
+            });
+        }
+    }
+
+    results.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    results.truncate(max_results);
+    Ok((results, searched_file_count, matched_file_count))
+}
+
 #[tauri::command]
-pub fn steno_search() -> Result<StenoSearchPanel, String> {
+pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPanel, String> {
     let dashboard = steno_pet_companion_dashboard()?;
+    let request = request.unwrap_or(StenoSearchRequest {
+        query: None,
+        max_results: None,
+        max_file_bytes: None,
+    });
+    let query = request
+        .query
+        .unwrap_or_default()
+        .trim()
+        .chars()
+        .take(160)
+        .collect::<String>();
+    let max_results = request.max_results.unwrap_or(18).clamp(1, 30);
+    let max_file_bytes = request
+        .max_file_bytes
+        .unwrap_or(262_144)
+        .clamp(4_096, 1_048_576);
+    let (results, searched_file_count, matched_file_count) = if query.is_empty() {
+        (Vec::new(), 0, 0)
+    } else {
+        run_steno_search(&query, max_results, max_file_bytes)?
+    };
+    let search_ran = !query.is_empty();
 
     Ok(StenoSearchPanel {
         status: "steno_search_panel_read_only",
         panel_id: "steno-search-panel",
         panel_title: "Steno Search",
-        query: "",
-        result_count: 0,
+        query,
+        result_count: results.len(),
+        searched_file_count,
+        matched_file_count,
+        max_results,
+        max_file_bytes,
         transcript_bundle_count: dashboard.transcript_bundle_count,
         transcript_bundle_ready_count: dashboard.transcript_bundle_ready_count,
         transcript_protection_policy_count: dashboard.transcript_protection_policy_count,
@@ -98873,9 +99060,9 @@ pub fn steno_search() -> Result<StenoSearchPanel, String> {
         section_count: dashboard.section_count,
         disabled_gate_count: dashboard.disabled_gate_count,
         read_only: dashboard.read_only,
-        transcript_read_enabled: false,
-        transcript_index_enabled: false,
-        query_binding_enabled: false,
+        transcript_read_enabled: search_ran,
+        transcript_index_enabled: search_ran,
+        query_binding_enabled: true,
         capture_enabled: dashboard.capture_enabled,
         export_enabled: dashboard.export_enabled,
         live_mcp_call_enabled: dashboard.live_mcp_call_enabled,
@@ -98889,13 +99076,14 @@ pub fn steno_search() -> Result<StenoSearchPanel, String> {
         patch_apply_enabled: dashboard.patch_apply_enabled,
         writes_allowed: dashboard.writes_allowed,
         execution_enabled: dashboard.execution_enabled,
+        results,
         sections: dashboard.sections,
         reasons: vec![
-            "panel exposes Steno search readiness without reading transcript contents",
-            "panel reuses existing Steno/pet companion evidence and creates no records",
-            "query binding, transcript indexing, capture, export, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
+            "panel searches only approved Gravity Omega evidence and transcript record directories",
+            "panel creates no records and never reads old Electron .sswp files",
+            "capture, export, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
         ],
-        next_slice: "Add a read-only Steno capture consent/readiness panel while keeping recording disabled.",
+        next_slice: "Add result-to-Monaco preview and approval-aware Steno export controls after explicit export consent exists.",
     })
 }
 
@@ -112109,18 +112297,21 @@ mod tests {
     }
 
     #[test]
-    fn steno_search_opens_read_only_panel_without_transcript_reads() {
-        let panel = steno_search().expect("Steno search opens");
+    fn steno_search_opens_read_only_panel_with_query_binding() {
+        let panel = steno_search(None).expect("Steno search opens");
 
         assert_eq!(panel.status, "steno_search_panel_read_only");
         assert_eq!(panel.panel_id, "steno-search-panel");
         assert_eq!(panel.query, "");
         assert_eq!(panel.result_count, 0);
+        assert_eq!(panel.searched_file_count, 0);
+        assert_eq!(panel.matched_file_count, 0);
+        assert!(panel.results.is_empty());
         assert!(panel.section_count >= 5);
         assert!(panel.read_only);
         assert!(!panel.transcript_read_enabled);
         assert!(!panel.transcript_index_enabled);
-        assert!(!panel.query_binding_enabled);
+        assert!(panel.query_binding_enabled);
         assert!(!panel.capture_enabled);
         assert!(!panel.export_enabled);
         assert!(!panel.live_mcp_call_enabled);
@@ -112138,6 +112329,57 @@ mod tests {
             .sections
             .iter()
             .any(|section| section.section_id == "steno-transcript-evidence"));
+    }
+
+    #[test]
+    fn steno_search_reads_approved_evidence_records_without_live_mcp() {
+        let marker = format!("steno search rust test unique signal {}", now_ms().unwrap());
+        let record = record_pet_runtime_signal(PetRuntimeSignalRequest {
+            state: Some("working".to_string()),
+            source: Some("steno-search-rust-test".to_string()),
+            message: Some(marker.clone()),
+            severity: Some("info".to_string()),
+            progress: Some(44),
+            related_record_path: None,
+        })
+        .expect("pet signal record writes bounded evidence");
+
+        let panel = steno_search(Some(StenoSearchRequest {
+            query: Some(marker.clone()),
+            max_results: Some(8),
+            max_file_bytes: Some(262_144),
+        }))
+        .expect("Steno search reads approved evidence");
+
+        assert_eq!(panel.status, "steno_search_panel_read_only");
+        assert_eq!(panel.query, marker);
+        assert!(panel.result_count >= 1);
+        assert!(panel.searched_file_count >= 1);
+        assert!(panel.matched_file_count >= 1);
+        assert!(panel.transcript_read_enabled);
+        assert!(panel.transcript_index_enabled);
+        assert!(panel.query_binding_enabled);
+        assert!(panel.results.iter().any(|result| {
+            result.category == "pet-signal"
+                && result.record_path == record.record_path
+                && result.snippet.contains("steno search rust test unique signal")
+                && result.line_number > 0
+                && result.status == "steno_search_result_read_only"
+        }));
+        assert!(panel.read_only);
+        assert!(!panel.capture_enabled);
+        assert!(!panel.export_enabled);
+        assert!(!panel.live_mcp_call_enabled);
+        assert!(!panel.config_read_enabled);
+        assert!(!panel.socket_connect_enabled);
+        assert!(!panel.memory_write_enabled);
+        assert!(!panel.desktop_control_enabled);
+        assert!(!panel.terminal_enabled);
+        assert!(!panel.process_spawn_enabled);
+        assert!(!panel.file_write_enabled);
+        assert!(!panel.patch_apply_enabled);
+        assert!(!panel.writes_allowed);
+        assert!(!panel.execution_enabled);
     }
 
     #[test]

@@ -161,6 +161,8 @@ const refreshStenoPetCompanionDashboardBtn = document.querySelector("#refresh-st
 const stenoSearchPanelList = document.querySelector("#steno-search-panel-list");
 const stenoSearchPanelCount = document.querySelector("#steno-search-panel-count");
 const stenoSearchPanelSummary = document.querySelector("#steno-search-panel-summary");
+const stenoSearchQueryInput = document.querySelector("#steno-search-query");
+const stenoSearchRunBtn = document.querySelector("#steno-search-run-btn");
 const refreshStenoSearchPanelBtn = document.querySelector("#refresh-steno-search-panel-btn");
 const terminalProcessLaneDashboardList = document.querySelector("#terminal-process-lane-dashboard-list");
 const terminalProcessLaneDashboardCount = document.querySelector("#terminal-process-lane-dashboard-count");
@@ -5782,6 +5784,9 @@ function renderStenoSearchPanel(panel) {
     panel.status,
     `query="${panel.query}"`,
     `results=${panel.result_count}`,
+    `matched=${panel.matched_file_count ?? 0}`,
+    `searched=${panel.searched_file_count ?? 0}`,
+    `limit=${panel.max_results ?? 0}`,
     `transcripts=${panel.transcript_bundle_ready_count}/${panel.transcript_bundle_count}`,
     `protection=${panel.transcript_protection_policy_ready_count}/${panel.transcript_protection_policy_count}`,
     `steno=${panel.steno_mcp_ready_count}/${panel.steno_mcp_evidence_count}`,
@@ -5794,12 +5799,41 @@ function renderStenoSearchPanel(panel) {
   ].join(" | ");
 
   clearList(stenoSearchPanelList);
+  const results = panel.results ?? [];
   const sections = panel.sections ?? [];
-  stenoSearchPanelCount.textContent = String(sections.length);
+  stenoSearchPanelCount.textContent = String(results.length);
+
+  if ((panel.query ?? "").trim() && results.length === 0) {
+    stenoSearchPanelList.append(
+      item(
+        "No Steno matches",
+        `searched ${panel.searched_file_count ?? 0} approved files`,
+        "Try a term from Omega Agent Work, terminal output, runtime evidence, pet signals, or Codex/Hermes run records.",
+      ),
+    );
+  }
+
+  for (const result of results) {
+    const title = result.title || "Steno evidence match";
+    const meta = [
+      result.category || "evidence",
+      result.line_number ? `line ${result.line_number}` : "",
+      result.status || "read-only",
+    ].filter(Boolean).join(" / ");
+    const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
+    node.dataset.state = "ready";
+    stenoSearchPanelList.append(node);
+  }
 
   if (sections.length === 0) {
-    stenoSearchPanelList.append(item("No Steno search readiness sections", "empty", "Refresh the read-only Steno search panel."));
+    if (results.length === 0) {
+      stenoSearchPanelList.append(item("No Steno search readiness sections", "empty", "Refresh the read-only Steno search panel."));
+    }
     return;
+  }
+
+  if (results.length > 0) {
+    stenoSearchPanelList.append(item("Read-only Steno readiness", `${sections.length} sections`, "Search results above are local evidence/transcript records; capture/export/live MCP remain disabled."));
   }
 
   for (const record of sections) {
@@ -5810,14 +5844,16 @@ function renderStenoSearchPanel(panel) {
   }
 }
 
-async function refreshStenoSearchPanel() {
-  refreshStenoSearchPanelBtn.disabled = true;
+async function refreshStenoSearchPanel(query = stenoSearchQueryInput?.value ?? "") {
+  if (refreshStenoSearchPanelBtn) refreshStenoSearchPanelBtn.disabled = true;
+  if (stenoSearchRunBtn) stenoSearchRunBtn.disabled = true;
   try {
-    const panel = await loadStenoSearchPanel();
+    const panel = await loadStenoSearchPanel(query);
     renderStenoSearchPanel(panel);
     return panel;
   } finally {
-    refreshStenoSearchPanelBtn.disabled = false;
+    if (refreshStenoSearchPanelBtn) refreshStenoSearchPanelBtn.disabled = false;
+    if (stenoSearchRunBtn) stenoSearchRunBtn.disabled = false;
   }
 }
 
@@ -7700,10 +7736,17 @@ async function loadStenoPetCompanionDashboard() {
   };
 }
 
-async function loadStenoSearchPanel() {
+async function loadStenoSearchPanel(query = "") {
+  const normalizedQuery = String(query ?? "").trim();
   const invoke = tauriInvoke();
   if (invoke) {
-    return invoke("steno_search");
+    return invoke("steno_search", {
+      request: {
+        query: normalizedQuery,
+        max_results: 18,
+        max_file_bytes: 262144,
+      },
+    });
   }
 
   const dashboard = await loadStenoPetCompanionDashboard();
@@ -7711,8 +7754,12 @@ async function loadStenoSearchPanel() {
     status: "steno_search_panel_browser_preview",
     panel_id: "steno-search-panel",
     panel_title: "Steno Search",
-    query: "",
+    query: normalizedQuery,
     result_count: 0,
+    searched_file_count: 0,
+    matched_file_count: 0,
+    max_results: 18,
+    max_file_bytes: 262144,
     transcript_bundle_count: dashboard.transcript_bundle_count,
     transcript_bundle_ready_count: dashboard.transcript_bundle_ready_count,
     transcript_protection_policy_count: dashboard.transcript_protection_policy_count,
@@ -7724,7 +7771,7 @@ async function loadStenoSearchPanel() {
     read_only: dashboard.read_only,
     transcript_read_enabled: false,
     transcript_index_enabled: false,
-    query_binding_enabled: false,
+    query_binding_enabled: true,
     capture_enabled: dashboard.capture_enabled,
     export_enabled: dashboard.export_enabled,
     live_mcp_call_enabled: dashboard.live_mcp_call_enabled,
@@ -7738,9 +7785,10 @@ async function loadStenoSearchPanel() {
     patch_apply_enabled: dashboard.patch_apply_enabled,
     writes_allowed: dashboard.writes_allowed,
     execution_enabled: dashboard.execution_enabled,
+    results: [],
     sections: dashboard.sections,
     reasons: [
-      "Static preview exposes Steno search readiness without transcript reads or indexing.",
+      "Static preview binds the Steno query but defers local record reads to the Tauri runtime.",
       "Capture, export, live MCP calls, config reads, sockets, writes, and execution remain disabled.",
     ],
     next_slice: "Resolve through Rust inside Tauri.",
@@ -23861,6 +23909,22 @@ refreshStenoPetCompanionDashboardBtn?.addEventListener("click", () => {
 refreshStenoSearchPanelBtn?.addEventListener("click", () => {
   refreshStenoSearchPanel().catch((error) => {
     statusEl.textContent = `Steno search panel failed: ${error.message}`;
+    statusEl.classList.add("error");
+  });
+});
+
+stenoSearchRunBtn?.addEventListener("click", () => {
+  refreshStenoSearchPanel(stenoSearchQueryInput?.value ?? "").catch((error) => {
+    statusEl.textContent = `Steno search failed: ${error.message}`;
+    statusEl.classList.add("error");
+  });
+});
+
+stenoSearchQueryInput?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  refreshStenoSearchPanel(stenoSearchQueryInput.value).catch((error) => {
+    statusEl.textContent = `Steno search failed: ${error.message}`;
     statusEl.classList.add("error");
   });
 });
