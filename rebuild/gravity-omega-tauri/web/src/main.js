@@ -25415,6 +25415,7 @@ function initOmegaProductShell() {
   let activeTerminalStreamId = "";
   let activeAgentStreamId = "";
   let activeAgentRun = null;
+  let agentRunWatchdogTimer = 0;
   let suppressEditorDirty = false;
   let activeAgentTranscript = null;
   let activeAgentWorkArtifact = null;
@@ -25481,6 +25482,8 @@ function initOmegaProductShell() {
   };
   let promptContextState = { ...defaultPromptContext };
   let agentRunMode = "codex-lead";
+  const agentRunWatchdogIntervalMs = 15000;
+  const agentRunStaleEventThresholdMs = 60000;
 
   const productCommandRegistry = [
     { id: "menu-file", title: "File Menu", keys: "", aliases: ["file", "new", "open", "save", "save as"] },
@@ -25556,7 +25559,81 @@ function initOmegaProductShell() {
     return `${label} is already ${phase} (session=${session}).`;
   };
 
-  const beginAgentRunGate = ({ runtime, label, phase = "preparing" } = {}) => {
+  const syncAgentRunGateDataset = () => {
+    if (!activeAgentRun) return;
+    productShell?.setAttribute("data-agent-run-gate", activeAgentRun.phase || "running");
+    productShell?.setAttribute("data-agent-run-runtime", activeAgentRun.runtime || "agent");
+    productShell?.setAttribute("data-agent-run-label", activeAgentRun.label || "Agent run");
+    productShell?.setAttribute("data-agent-run-session", activeAgentRun.sessionId || activeAgentStreamId || "pending");
+    productShell?.setAttribute("data-agent-run-prompt-chars", String(activeAgentRun.promptChars || 0));
+    productShell?.setAttribute("data-agent-run-last-event", activeAgentRun.lastEvent || "started");
+  };
+
+  const recordAgentRunLifecycleEvent = (eventName, details = {}, options = {}) => {
+    if (!activeAgentRun) return;
+    const now = Date.now();
+    const markFresh = options.markFresh !== false;
+    activeAgentRun = {
+      ...activeAgentRun,
+      ...details,
+      lastEvent: eventName,
+      lastEventAt: markFresh ? now : activeAgentRun.lastEventAt,
+    };
+    syncAgentRunGateDataset();
+    const session = activeAgentRun.sessionId || activeAgentStreamId || "pending";
+    const record = activeAgentRun.recordPath || details.recordPath || "none";
+    const ageMs = Math.max(0, now - (activeAgentRun.startedAt || now));
+    if (!options.silent) {
+      appendEvidenceText(
+        `agent lifecycle ${eventName}: runtime=${activeAgentRun.runtime}; phase=${activeAgentRun.phase}; session=${session}; prompt_chars=${activeAgentRun.promptChars || 0}; age=${ageMs}ms; record=${record}`
+      );
+    }
+  };
+
+  const stopAgentRunWatchdog = () => {
+    if (agentRunWatchdogTimer) {
+      window.clearInterval(agentRunWatchdogTimer);
+      agentRunWatchdogTimer = 0;
+    }
+  };
+
+  const tickAgentRunWatchdog = () => {
+    if (!activeAgentRun) {
+      stopAgentRunWatchdog();
+      return;
+    }
+    const now = Date.now();
+    const lastEventAt = activeAgentRun.lastEventAt || activeAgentRun.startedAt || now;
+    const quietMs = now - lastEventAt;
+    if (quietMs < agentRunStaleEventThresholdMs) return;
+    const lastWarningAt = activeAgentRun.staleWarningIssuedAt || 0;
+    if (lastWarningAt && now - lastWarningAt < agentRunStaleEventThresholdMs) return;
+    activeAgentRun = {
+      ...activeAgentRun,
+      staleWarningIssuedAt: now,
+      staleWarningCount: (activeAgentRun.staleWarningCount || 0) + 1,
+    };
+    const session = activeAgentRun.sessionId || activeAgentStreamId || "pending";
+    const seconds = Math.round(quietMs / 1000);
+    const message = `${activeAgentRun.label || "Agent run"} is still active but has not emitted a stream event for ${seconds}s (session=${session}).`;
+    setProductStatus(message, "warning");
+    appendAgentWorkArtifact("Run Lifecycle Watchdog", message);
+    recordAgentRunLifecycleEvent("stale-stream-warning", { phase: activeAgentRun.phase || "streaming" }, { markFresh: false });
+    setPetCompanionRuntimeState({
+      state: "warning",
+      source: "agent-run-watchdog",
+      message,
+      progress: 80,
+      relatedRecordPath: activeAgentRun.recordPath || "",
+    }, { record: true });
+  };
+
+  const startAgentRunWatchdog = () => {
+    stopAgentRunWatchdog();
+    agentRunWatchdogTimer = window.setInterval(tickAgentRunWatchdog, agentRunWatchdogIntervalMs);
+  };
+
+  const beginAgentRunGate = ({ runtime, label, phase = "preparing", promptChars = 0 } = {}) => {
     if (activeAgentRun || activeAgentStreamId) {
       const message = `${describeActiveAgentRun()} Wait for it to finish before starting another run.`;
       setProductStatus(message, "warning");
@@ -25570,12 +25647,17 @@ function initOmegaProductShell() {
       phase,
       sessionId: "",
       recordPath: "",
+      promptChars,
       startedAt: Date.now(),
+      lastEventAt: Date.now(),
+      lastEvent: "gate-started",
+      staleWarningIssuedAt: 0,
+      staleWarningCount: 0,
     };
-    productShell?.setAttribute("data-agent-run-gate", phase);
-    productShell?.setAttribute("data-agent-run-runtime", activeAgentRun.runtime);
-    productShell?.setAttribute("data-agent-run-label", activeAgentRun.label);
+    syncAgentRunGateDataset();
     setAgentRunControlsDisabled(true);
+    startAgentRunWatchdog();
+    recordAgentRunLifecycleEvent("gate-started");
     return true;
   };
 
@@ -25585,17 +25667,20 @@ function initOmegaProductShell() {
     if (activeAgentRun.sessionId) {
       activeAgentStreamId = activeAgentRun.sessionId;
     }
-    productShell?.setAttribute("data-agent-run-gate", activeAgentRun.phase || "running");
-    productShell?.setAttribute("data-agent-run-runtime", activeAgentRun.runtime || "agent");
-    productShell?.setAttribute("data-agent-run-label", activeAgentRun.label || "Agent run");
+    syncAgentRunGateDataset();
   };
 
   const clearAgentRunGate = () => {
+    recordAgentRunLifecycleEvent("gate-cleared", { phase: "finished" }, { markFresh: false });
     activeAgentRun = null;
     activeAgentStreamId = "";
+    stopAgentRunWatchdog();
     productShell?.removeAttribute("data-agent-run-gate");
     productShell?.removeAttribute("data-agent-run-runtime");
     productShell?.removeAttribute("data-agent-run-label");
+    productShell?.removeAttribute("data-agent-run-session");
+    productShell?.removeAttribute("data-agent-run-prompt-chars");
+    productShell?.removeAttribute("data-agent-run-last-event");
     setAgentRunControlsDisabled(false);
   };
 
@@ -30387,6 +30472,12 @@ footer {
       if (activeAgentStreamId && payload.session_id !== activeAgentStreamId) return;
       const runtime = payload.runtime || "agent";
       if (payload.kind === "stdout" || payload.kind === "stderr") {
+        recordAgentRunLifecycleEvent(`stream-${payload.kind}`, {
+          runtime,
+          phase: "streaming",
+          sessionId: payload.session_id || activeAgentStreamId,
+          recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+        }, { silent: true });
         terminalWrite(`[${runtime} ${payload.kind}] ${payload.line ?? ""}`);
         if (activeAgentTranscript) {
           const bucket = payload.kind === "stdout" ? activeAgentTranscript.stdoutLines : activeAgentTranscript.stderrLines;
@@ -30405,6 +30496,12 @@ footer {
         return;
       }
       if (payload.kind === "error") {
+        recordAgentRunLifecycleEvent("stream-error", {
+          runtime,
+          phase: "error",
+          sessionId: payload.session_id || activeAgentStreamId,
+          recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+        });
         terminalWrite(`[${runtime} error] ${payload.line ?? payload.status}`);
         setPetCompanionRuntimeState({
           state: "error",
@@ -30429,6 +30526,12 @@ footer {
             sessionId: payload.session_id || activeAgentStreamId,
             recordPath: payload.record_path || activeAgentRun?.recordPath || "",
           });
+          recordAgentRunLifecycleEvent("stream-started", {
+            runtime,
+            phase: "streaming",
+            sessionId: payload.session_id || activeAgentStreamId,
+            recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+          });
           setPetCompanionRuntimeState({
             state: "working",
             source: "agent-stream",
@@ -30438,6 +30541,12 @@ footer {
           }, { record: true });
         }
         if (payload.status && payload.status !== "unlocked_agent_prompt_stream_started") {
+          recordAgentRunLifecycleEvent("stream-finished", {
+            runtime,
+            phase: payload.exit_code === 0 ? "succeeded" : "failed",
+            sessionId: payload.session_id || activeAgentStreamId,
+            recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+          });
           setOutputText(`${runtime}\n${payload.status}\n${payload.line ?? ""}\nEvidence: ${payload.record_path}`);
           appendEvidenceText(`${runtime} agent stream ${payload.status}: ${payload.record_path}`);
           const label = activeAgentTranscript?.label ?? runtime;
@@ -31920,6 +32029,7 @@ footer {
       runtime: "codex-lead-dual",
       label: "Codex Lead + Hermes/Kimi",
       phase: "preparing",
+      promptChars: prompt.length,
     })) {
       return;
     }
@@ -32121,6 +32231,12 @@ footer {
         sessionId: started.session_id,
         recordPath: started.record_path || "",
       });
+      recordAgentRunLifecycleEvent("stream-accepted", {
+        runtime: started.runtime,
+        phase: "streaming",
+        sessionId: started.session_id,
+        recordPath: started.record_path || "",
+      });
       activeAgentTranscript.sessionId = started.session_id;
       activeAgentTranscript.runtime = started.runtime;
       terminalWrite(`[${started.runtime}] Codex Lead responsive stream started session=${started.session_id}`);
@@ -32189,6 +32305,7 @@ footer {
       runtime,
       label,
       phase: "preparing",
+      promptChars: prompt.length,
     })) {
       return;
     }
@@ -32243,6 +32360,13 @@ footer {
           return;
         }
         updateAgentRunGate({
+          runtime: started.runtime,
+          label,
+          phase: "streaming",
+          sessionId: started.session_id,
+          recordPath: started.record_path || "",
+        });
+        recordAgentRunLifecycleEvent("stream-accepted", {
           runtime: started.runtime,
           label,
           phase: "streaming",

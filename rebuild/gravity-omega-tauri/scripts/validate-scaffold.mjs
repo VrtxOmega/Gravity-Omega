@@ -772,8 +772,20 @@ if (!codexLeadFunctionBody.includes("beginAgentRunGate({")) {
   throw new Error("Run Dual must acquire the shared agent run gate before runtime preflight/stream work.");
 }
 
+if (!frontendSource.includes("const recordAgentRunLifecycleEvent = (eventName") || !frontendSource.includes("const tickAgentRunWatchdog = () => {")) {
+  throw new Error("Agent runs must record lifecycle telemetry and include a stale-stream watchdog.");
+}
+
+if (!frontendSource.includes("agentRunStaleEventThresholdMs") || !frontendSource.includes("stale-stream-warning")) {
+  throw new Error("Agent run watchdog must emit explicit stale-stream warnings without clearing the run gate.");
+}
+
 if (!codexLeadFunctionBody.includes("updateAgentRunGate({")) {
   throw new Error("Run Dual must update the shared agent run gate after the stream is accepted.");
+}
+
+if (!codexLeadFunctionBody.includes("promptChars: prompt.length") || !codexLeadFunctionBody.includes("recordAgentRunLifecycleEvent(\"stream-accepted\"")) {
+  throw new Error("Run Dual must track prompt size and accepted-stream lifecycle evidence.");
 }
 
 if (codexLeadFunctionBody.includes("runBlockingAgentStage(") || codexLeadFunctionBody.includes("runUnlockedAgentPromptSession(")) {
@@ -873,8 +885,23 @@ if (!visibleAgentFunctionBody.includes("updateAgentRunGate({")) {
   throw new Error("Single-agent runs must update the shared agent run gate after stream acceptance.");
 }
 
+if (!visibleAgentFunctionBody.includes("promptChars: prompt.length") || !visibleAgentFunctionBody.includes("recordAgentRunLifecycleEvent(\"stream-accepted\"")) {
+  throw new Error("Single-agent runs must track prompt size and accepted-stream lifecycle evidence.");
+}
+
 if (!visibleAgentFunctionBody.includes("activeAgentRun?.phase !== \"streaming\"")) {
   throw new Error("Single-agent runs must keep controls locked while an accepted stream is still running.");
+}
+
+for (const streamLifecycleNeedle of [
+  "recordAgentRunLifecycleEvent(`stream-${payload.kind}`",
+  "recordAgentRunLifecycleEvent(\"stream-error\"",
+  "recordAgentRunLifecycleEvent(\"stream-started\"",
+  "recordAgentRunLifecycleEvent(\"stream-finished\"",
+]) {
+  if (!frontendSource.includes(streamLifecycleNeedle)) {
+    throw new Error(`Agent stream listener missing lifecycle telemetry: ${streamLifecycleNeedle}`);
+  }
 }
 
 if (visibleAgentFunctionBody.includes("finally {\n      sendBtn?.removeAttribute(\"disabled\")")) {
