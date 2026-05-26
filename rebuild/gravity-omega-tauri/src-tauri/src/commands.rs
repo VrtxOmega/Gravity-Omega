@@ -95537,7 +95537,19 @@ fn hermes_inventory_run_view_summary(
 fn hermes_assist_run_view_summary(
     record: &HermesKimiAssistBriefRecord,
 ) -> CodexHermesRunViewEvidenceSummary {
-    codex_hermes_run_view_evidence_summary(
+    let stdout_transcript =
+        transcript_evidence_preview(&record.stdout_transcript_path, 64 * 1024, 900);
+    let stderr_transcript =
+        transcript_evidence_preview(&record.stderr_transcript_path, 64 * 1024, 480);
+    let stdout_preview = stdout_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stdout, 900)));
+    let stderr_preview = stderr_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stderr, 480)));
+    let mut summary = codex_hermes_run_view_evidence_summary(
         "hermes-kimi-assist",
         "Latest Hermes/Kimi assist brief",
         record.id.clone(),
@@ -95554,18 +95566,44 @@ fn hermes_assist_run_view_summary(
             record.stdout_size_bytes, record.stderr_size_bytes
         ),
         format!(
-            "source={} max_turns={} stdout_transcript={} stderr_transcript={}",
+            "source={} max_turns={} stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={}",
             record.source,
             record.max_turns,
             record.stdout_transcript_path,
-            record.stderr_transcript_path
+            stdout_transcript.found,
+            stdout_transcript.line_count,
+            record.stderr_transcript_path,
+            stderr_transcript.found,
+            stderr_transcript.line_count
         ),
-        Some(prompt_preview(&record.stdout, 900)),
-        Some(prompt_preview(&record.stderr, 480)),
+        stdout_preview,
+        stderr_preview,
         record.blockers.clone(),
         record.process_spawn_enabled,
         record.execution_enabled,
-    )
+    );
+    summary.stdout_preview_source = if stdout_transcript.preview.is_some() {
+        "stdout-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stderr_preview_source = if stderr_transcript.preview.is_some() {
+        "stderr-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stdout_transcript_path = stdout_transcript.path.clone();
+    summary.stderr_transcript_path = stderr_transcript.path.clone();
+    summary.stdout_transcript_found = stdout_transcript.found;
+    summary.stderr_transcript_found = stderr_transcript.found;
+    summary.stdout_transcript_line_count = stdout_transcript.line_count;
+    summary.stderr_transcript_line_count = stderr_transcript.line_count;
+    summary.stdout_transcript_size_bytes = stdout_transcript.size_bytes;
+    summary.stderr_transcript_size_bytes = stderr_transcript.size_bytes;
+    summary.stdout_transcript_truncated = stdout_transcript.truncated;
+    summary.stderr_transcript_truncated = stderr_transcript.truncated;
+    summary.transcript_evidence_ready = stdout_transcript.found && stderr_transcript.found;
+    summary
 }
 
 fn unlocked_agent_session_is_postmortem(record: &UnlockedAgentPromptSessionRecord) -> bool {
@@ -115468,9 +115506,9 @@ mod tests {
             timed_out: false,
             duration_ms: 222,
             stdout: "Hermes says keep the test scoped and verify the run view.".to_string(),
-            stderr: String::new(),
-            stdout_size_bytes: 58,
-            stderr_size_bytes: 0,
+            stderr: "Hermes stderr stayed clean".to_string(),
+            stdout_size_bytes: 57,
+            stderr_size_bytes: 26,
             stdout_transcript_path: assist_stdout_path.display().to_string(),
             stderr_transcript_path: assist_stderr_path.display().to_string(),
             inventory_record_path: Some(inventory_path.display().to_string()),
@@ -115503,6 +115541,10 @@ mod tests {
             serde_json::to_string_pretty(&assist_record).expect("serialize assist"),
         )
         .expect("write assist");
+        fs::write(&assist_stdout_path, &assist_record.stdout)
+            .expect("write assist stdout transcript");
+        fs::write(&assist_stderr_path, &assist_record.stderr)
+            .expect("write assist stderr transcript");
 
         let agent_session_dir =
             unlocked_agent_prompt_sessions_dir().expect("unlocked agent session dir");
@@ -115668,7 +115710,21 @@ mod tests {
         assert!(run_view.evidence_summaries.iter().any(|summary| {
             summary.source_id == "hermes-kimi-assist"
                 && summary.record_id == "run-view-evidence-assist"
+                && summary.transcript_evidence_ready
+                && summary.stdout_transcript_found
+                && summary.stderr_transcript_found
+                && summary.stdout_transcript_line_count == 1
+                && summary.stderr_transcript_line_count == 1
+                && summary.stdout_transcript_size_bytes == 57
+                && summary.stderr_transcript_size_bytes == 26
+                && summary.stdout_transcript_path.as_deref()
+                    == Some(assist_record.stdout_transcript_path.as_str())
+                && summary.stderr_transcript_path.as_deref()
+                    == Some(assist_record.stderr_transcript_path.as_str())
+                && summary.stdout_preview_source == "stdout-transcript"
+                && summary.stderr_preview_source == "stderr-transcript"
                 && summary.stdout_preview.as_deref().unwrap_or("").contains("Hermes says")
+                && summary.stderr_preview.as_deref().unwrap_or("").contains("stayed clean")
                 && summary.record_process_spawn_enabled
                 && summary.record_execution_enabled
                 && summary.read_only
