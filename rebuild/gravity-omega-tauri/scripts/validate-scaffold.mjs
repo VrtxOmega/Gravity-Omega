@@ -555,6 +555,12 @@ for (const productBridgeNeedle of [
   "hermes-chat",
   "agentRunModeStorageKey",
   "restoreAgentRunMode",
+  "activeAgentRun",
+  "beginAgentRunGate",
+  "updateAgentRunGate",
+  "clearAgentRunGate",
+  "describeActiveAgentRun",
+  "data-agent-run-gate",
   "runAgentEvidenceComparison",
   "runCodexLeadDualExecution",
   "productCommandFeedback",
@@ -662,6 +668,14 @@ if (!codexLeadFunctionBody.includes("runUnlockedAgentPromptSessionStream(\"codex
   throw new Error("Run Dual must start a responsive codex-workspace-write stream.");
 }
 
+if (!codexLeadFunctionBody.includes("beginAgentRunGate({")) {
+  throw new Error("Run Dual must acquire the shared agent run gate before runtime preflight/stream work.");
+}
+
+if (!codexLeadFunctionBody.includes("updateAgentRunGate({")) {
+  throw new Error("Run Dual must update the shared agent run gate after the stream is accepted.");
+}
+
 if (codexLeadFunctionBody.includes("runBlockingAgentStage(") || codexLeadFunctionBody.includes("runUnlockedAgentPromptSession(")) {
   throw new Error("Run Dual must not await blocking renderer-side agent stages.");
 }
@@ -726,6 +740,22 @@ if (!visibleAgentFunctionBody.includes("await waitForProductPaint();")) {
 
 if (visibleAgentFunctionBody.indexOf("await waitForProductPaint();") > visibleAgentFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(runtime, promptWithContext)")) {
   throw new Error("Single-agent paint yield must happen before the long streaming invoke starts.");
+}
+
+if (!visibleAgentFunctionBody.includes("beginAgentRunGate({")) {
+  throw new Error("Single-agent runs must acquire the shared agent run gate before starting.");
+}
+
+if (!visibleAgentFunctionBody.includes("updateAgentRunGate({")) {
+  throw new Error("Single-agent runs must update the shared agent run gate after stream acceptance.");
+}
+
+if (!visibleAgentFunctionBody.includes("activeAgentRun?.phase !== \"streaming\"")) {
+  throw new Error("Single-agent runs must keep controls locked while an accepted stream is still running.");
+}
+
+if (visibleAgentFunctionBody.includes("finally {\n      sendBtn?.removeAttribute(\"disabled\")")) {
+  throw new Error("Single-agent runs must not unconditionally re-enable buttons in finally after stream acceptance.");
 }
 
 for (const productStyleNeedle of [

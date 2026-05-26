@@ -24909,6 +24909,7 @@ function initOmegaProductShell() {
   let activeProductPanel = "explorer";
   let activeTerminalStreamId = "";
   let activeAgentStreamId = "";
+  let activeAgentRun = null;
   let suppressEditorDirty = false;
   let activeAgentTranscript = null;
   let activeAgentWorkArtifact = null;
@@ -25027,6 +25028,69 @@ function initOmegaProductShell() {
     if (productTerminalStatus) {
       productTerminalStatus.textContent = message;
     }
+  };
+
+  const agentRunControlButtons = () => [sendBtn, codexBtn, hermesBtn, compareBtn].filter(Boolean);
+
+  const setAgentRunControlsDisabled = (disabled) => {
+    for (const button of agentRunControlButtons()) {
+      if (disabled) {
+        button.setAttribute("disabled", "disabled");
+      } else {
+        button.removeAttribute("disabled");
+      }
+    }
+  };
+
+  const describeActiveAgentRun = () => {
+    if (!activeAgentRun && !activeAgentStreamId) return "";
+    const label = activeAgentRun?.label || "Agent run";
+    const phase = activeAgentRun?.phase || "streaming";
+    const session = activeAgentRun?.sessionId || activeAgentStreamId || "pending";
+    return `${label} is already ${phase} (session=${session}).`;
+  };
+
+  const beginAgentRunGate = ({ runtime, label, phase = "preparing" } = {}) => {
+    if (activeAgentRun || activeAgentStreamId) {
+      const message = `${describeActiveAgentRun()} Wait for it to finish before starting another run.`;
+      setProductStatus(message, "warning");
+      appendEvidenceText(`agent run blocked by active lifecycle: ${message}`);
+      productShell?.setAttribute("data-agent-run-gate", "blocked");
+      return false;
+    }
+    activeAgentRun = {
+      runtime: runtime || "agent",
+      label: label || "Agent run",
+      phase,
+      sessionId: "",
+      recordPath: "",
+      startedAt: Date.now(),
+    };
+    productShell?.setAttribute("data-agent-run-gate", phase);
+    productShell?.setAttribute("data-agent-run-runtime", activeAgentRun.runtime);
+    productShell?.setAttribute("data-agent-run-label", activeAgentRun.label);
+    setAgentRunControlsDisabled(true);
+    return true;
+  };
+
+  const updateAgentRunGate = (patch = {}) => {
+    if (!activeAgentRun) return;
+    activeAgentRun = { ...activeAgentRun, ...patch };
+    if (activeAgentRun.sessionId) {
+      activeAgentStreamId = activeAgentRun.sessionId;
+    }
+    productShell?.setAttribute("data-agent-run-gate", activeAgentRun.phase || "running");
+    productShell?.setAttribute("data-agent-run-runtime", activeAgentRun.runtime || "agent");
+    productShell?.setAttribute("data-agent-run-label", activeAgentRun.label || "Agent run");
+  };
+
+  const clearAgentRunGate = () => {
+    activeAgentRun = null;
+    activeAgentStreamId = "";
+    productShell?.removeAttribute("data-agent-run-gate");
+    productShell?.removeAttribute("data-agent-run-runtime");
+    productShell?.removeAttribute("data-agent-run-label");
+    setAgentRunControlsDisabled(false);
   };
 
   const readStoredJson = (key, fallback) => {
@@ -29604,15 +29668,18 @@ footer {
         appendAgentWorkArtifact("Run Issue", agentStreamIssueSummary(runtime, payload));
         setProblemText(`${runtime} stream failed: ${payload.line ?? payload.status}`);
         setProductStatus(`${runtime} stream failed: ${payload.status}`, "error");
-        sendBtn?.removeAttribute("disabled");
-        codexBtn?.removeAttribute("disabled");
-        hermesBtn?.removeAttribute("disabled");
-        compareBtn?.removeAttribute("disabled");
+        clearAgentRunGate();
         return;
       }
       if (payload.kind === "lifecycle") {
         terminalWrite(`[${runtime} ${payload.status}] ${payload.line ?? ""}`);
         if (payload.status === "unlocked_agent_prompt_stream_started") {
+          updateAgentRunGate({
+            runtime,
+            phase: "streaming",
+            sessionId: payload.session_id || activeAgentStreamId,
+            recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+          });
           setPetCompanionRuntimeState({
             state: "working",
             source: "agent-stream",
@@ -29657,17 +29724,13 @@ footer {
             setProblemText(agentStreamIssueSummary(runtime, payload));
             setProductStatus(`${runtime} stream finished: ${payload.status}.`, "error");
           }
-          sendBtn?.removeAttribute("disabled");
-          codexBtn?.removeAttribute("disabled");
-          hermesBtn?.removeAttribute("disabled");
-          compareBtn?.removeAttribute("disabled");
           Promise.allSettled([
             refreshProductAgentRunCenter(),
             refreshProductEvidenceHistory(),
           ]).catch((error) => {
             setProblemText(`Agent stream refresh failed: ${error.message}`);
           });
-          activeAgentStreamId = "";
+          clearAgentRunGate();
         }
       }
     }).catch((error) => {
@@ -30650,8 +30713,8 @@ footer {
 
   const runAgentEvidenceComparison = async () => {
     const prompt = getPrompt();
-    if (activeAgentStreamId) {
-      setProductStatus("Evidence Compare waits for the active Codex/Hermes stream to finish.", "warning");
+    if (activeAgentRun || activeAgentStreamId) {
+      setProductStatus(`Evidence Compare waits for the active Codex/Hermes run to finish. ${describeActiveAgentRun()}`, "warning");
       return;
     }
     if (!invoke) {
@@ -31064,12 +31127,15 @@ footer {
       setProductStatus("Type a prompt before running Codex Lead dual mode.", "warning");
       return;
     }
-    if (activeAgentStreamId) {
-      setProductStatus("Codex Lead waits for the active agent stream to finish.", "warning");
-      return;
-    }
     if (!invoke) {
       setProductStatus("Codex Lead dual mode requires the Tauri runtime.", "warning");
+      return;
+    }
+    if (!beginAgentRunGate({
+      runtime: "codex-lead-dual",
+      label: "Codex Lead + Hermes/Kimi",
+      phase: "preparing",
+    })) {
       return;
     }
 
@@ -31210,13 +31276,15 @@ footer {
           progress: 100,
           relatedRecordPath: started.record_path || "",
         }, { record: true });
-        sendBtn?.removeAttribute("disabled");
-        codexBtn?.removeAttribute("disabled");
-        hermesBtn?.removeAttribute("disabled");
-        compareBtn?.removeAttribute("disabled");
+        clearAgentRunGate();
         return;
       }
-      activeAgentStreamId = started.session_id;
+      updateAgentRunGate({
+        runtime: started.runtime,
+        phase: "streaming",
+        sessionId: started.session_id,
+        recordPath: started.record_path || "",
+      });
       activeAgentTranscript.sessionId = started.session_id;
       activeAgentTranscript.runtime = started.runtime;
       terminalWrite(`[${started.runtime}] Codex Lead responsive stream started session=${started.session_id}`);
@@ -31252,10 +31320,7 @@ footer {
         message: `Codex Lead failed before stream completion: ${error.message}`,
         progress: 100,
       }, { record: true });
-      sendBtn?.removeAttribute("disabled");
-      codexBtn?.removeAttribute("disabled");
-      hermesBtn?.removeAttribute("disabled");
-      compareBtn?.removeAttribute("disabled");
+      clearAgentRunGate();
     }
   };
 
@@ -31282,6 +31347,13 @@ footer {
     if (!prompt) {
       productInput.focus();
       setProductStatus(`Type a prompt before running ${label}.`, "warning");
+      return;
+    }
+    if (!beginAgentRunGate({
+      runtime,
+      label,
+      phase: "preparing",
+    })) {
       return;
     }
     const promptWithContext = buildAgentPrompt(prompt, runtime);
@@ -31331,13 +31403,16 @@ footer {
             progress: 100,
             relatedRecordPath: started.record_path || "",
           }, { record: true });
-          sendBtn?.removeAttribute("disabled");
-          codexBtn?.removeAttribute("disabled");
-          hermesBtn?.removeAttribute("disabled");
-          compareBtn?.removeAttribute("disabled");
+          clearAgentRunGate();
           return;
         }
-        activeAgentStreamId = started.session_id;
+        updateAgentRunGate({
+          runtime: started.runtime,
+          label,
+          phase: "streaming",
+          sessionId: started.session_id,
+          recordPath: started.record_path || "",
+        });
         activeAgentTranscript.sessionId = started.session_id;
         activeAgentTranscript.runtime = started.runtime;
         terminalWrite(`[${started.runtime}] stream started session=${started.session_id}`);
@@ -31411,10 +31486,9 @@ footer {
         progress: 100,
       }, { record: true });
     } finally {
-      sendBtn?.removeAttribute("disabled");
-      codexBtn?.removeAttribute("disabled");
-      hermesBtn?.removeAttribute("disabled");
-      compareBtn?.removeAttribute("disabled");
+      if (activeAgentRun?.phase !== "streaming") {
+        clearAgentRunGate();
+      }
     }
   };
 
