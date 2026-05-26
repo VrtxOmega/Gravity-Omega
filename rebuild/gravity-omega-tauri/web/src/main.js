@@ -1120,7 +1120,7 @@ async function loadReplacementFoundationWorkQueue() {
     ready_count: 8,
     first_class_count: 8,
     read_only_count: 8,
-    disabled_gate_count: 8,
+    disabled_gate_count: 9,
     top_priority_lane: "workspace-editor",
     execution_enabled: false,
     writes_allowed: false,
@@ -3513,6 +3513,7 @@ function describeCodexHermesRunViewSection(record) {
 function describeCodexHermesRunViewEvidence(record) {
   const stdout = String(record.stdout_preview || "").trim();
   const stderr = String(record.stderr_preview || "").trim();
+  const status = String(record.status || "");
   const preview = [
     record.detail,
     stdout ? `stdout: ${stdout}` : "",
@@ -3524,7 +3525,9 @@ function describeCodexHermesRunViewEvidence(record) {
     title: record.title,
     meta: `${record.source_id} / ${record.primary_metric} / ${record.secondary_metric}`,
     text: `${record.status}. ${preview}`,
-    state: record.blocker_count > 0
+    state: record.source_id === "agent-run-postmortem" && (status.includes("failed") || status.includes("timed_out"))
+      ? "error"
+      : record.blocker_count > 0
       ? "warning"
       : record.record_execution_enabled || record.record_process_spawn_enabled
         ? "review"
@@ -4873,6 +4876,9 @@ function renderCodexHermesRunView(dashboard) {
     `orchestrations=${dashboard.codex_orchestration_count ?? 0}`,
     `inventories=${dashboard.hermes_inventory_count ?? 0}`,
     `assists=${dashboard.hermes_assist_count ?? 0}`,
+    `agent_sessions=${dashboard.agent_session_count ?? 0}`,
+    `postmortems=${dashboard.agent_session_failure_count ?? 0}`,
+    `timeouts=${dashboard.agent_session_timeout_count ?? 0}`,
     `summaries=${dashboard.evidence_summary_count ?? 0}`,
     `approvals=${dashboard.resolved_approval_count}/${dashboard.approval_count}`,
     `runners=${dashboard.runner_ready_count}/${dashboard.runner_count}`,
@@ -6568,7 +6574,7 @@ async function loadCodexHermesRunViewDashboard() {
 
   return {
     status: "codex_hermes_run_view_dashboard_browser_preview",
-    section_count: 8,
+    section_count: 9,
     run_count: 0,
     approval_count: 0,
     resolved_approval_count: 0,
@@ -6584,7 +6590,14 @@ async function loadCodexHermesRunViewDashboard() {
     codex_orchestration_count: 0,
     hermes_inventory_count: 0,
     hermes_assist_count: 0,
-    evidence_summary_count: 3,
+    agent_session_count: 0,
+    agent_session_failure_count: 0,
+    agent_session_timeout_count: 0,
+    latest_agent_session_status: "unlocked_agent_prompt_session_waiting",
+    latest_agent_session_record_path: null,
+    latest_agent_postmortem_status: "agent_run_postmortem_waiting",
+    latest_agent_postmortem_record_path: null,
+    evidence_summary_count: 4,
     active_task_run_id: "none",
     read_only: true,
     disabled_gate_count: 8,
@@ -6604,6 +6617,36 @@ async function loadCodexHermesRunViewDashboard() {
       "Static preview groups Codex/Hermes evidence while every live gate remains disabled.",
     ],
     evidence_summaries: [
+      {
+        source_id: "agent-run-postmortem",
+        title: "Latest failed/timed-out agent session",
+        record_id: "browser-preview-agent-postmortem",
+        status: "agent_run_postmortem_waiting",
+        record_path: "Open Tauri to load real unlocked agent session records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "runtime=none exit=none timeout=false duration=0ms",
+        secondary_metric: "stdout=0b stderr=0b prompt=0b",
+        detail: "Static preview placeholder for failed or timed-out Codex/Hermes session postmortems.",
+        stdout_preview: "",
+        stderr_preview: "",
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
       {
         source_id: "codex-lead-orchestration",
         title: "Latest Codex Lead orchestration",
@@ -6703,6 +6746,7 @@ async function loadCodexHermesRunViewDashboard() {
       ["artifacts", "Artifacts", "artifact-preview"],
       ["transcripts", "Transcript bundles", "transcript-bundle-ledger"],
       ["evidence-policies", "Transcript export and protection", "export-policy-ledger + protection-policy-ledger"],
+      ["agent-sessions", "Agent sessions", "unlocked-agent-prompt-sessions"],
       ["typed-events", "Typed event logs", "agent-event-preview"],
     ].map(([section_id, title, source_ledger]) => ({
       section_id,
@@ -29689,24 +29733,29 @@ footer {
   };
 
   const renderProductAgentRunCenter = ({ sessions = [], plans = [], packets = [] } = {}) => {
+    const postmortems = sessions.filter((session) => {
+      const status = String(session.status ?? "");
+      return session.timed_out === true || status.includes("failed") || status.includes("timed_out");
+    });
     if (productUnlockedSessionCount) productUnlockedSessionCount.textContent = String(sessions.length);
     if (productJointPlanCount) productJointPlanCount.textContent = String(plans.length);
     if (productJointPacketCount) productJointPacketCount.textContent = String(packets.length);
     if (productAgentRunCompact) {
       const latestStatus = sessions[0]?.status ? ` / latest ${sessions[0].status}` : "";
-      productAgentRunCompact.textContent = `${sessions.length} sessions / ${plans.length} plans / ${packets.length} packets${latestStatus}`;
+      const postmortemStatus = postmortems.length ? ` / postmortems ${postmortems.length}` : "";
+      productAgentRunCompact.textContent = `${sessions.length} sessions / ${plans.length} plans / ${packets.length} packets${postmortemStatus}${latestStatus}`;
     }
     productAgentRunDetails?.setAttribute("data-has-runs", sessions.length > 0 || plans.length > 0 || packets.length > 0 ? "true" : "false");
     if (productAgentRunSummary) {
       const latestSession = sessions[0];
       const latestPacket = packets[0];
       productAgentRunSummary.textContent = latestSession
-        ? `Latest ${latestSession.runtime}: ${latestSession.status}, exit=${latestSession.exit_code ?? "n/a"}, ${latestSession.duration_ms ?? 0}ms. Joint packets=${packets.length}.`
+        ? `Latest ${latestSession.runtime}: ${latestSession.status}, exit=${latestSession.exit_code ?? "n/a"}, timed_out=${Boolean(latestSession.timed_out)}, ${latestSession.duration_ms ?? 0}ms. Postmortems=${postmortems.length}; joint packets=${packets.length}.`
         : `No Codex/Hermes run captured yet. Joint plans=${plans.length}; packets=${packets.length}.`;
     }
     if (!productAgentRunList) return;
     productAgentRunList.innerHTML = "";
-    const recentSessions = sessions.slice(0, 4);
+    const recentSessions = [...postmortems, ...sessions.filter((session) => !postmortems.includes(session))].slice(0, 4);
     if (recentSessions.length === 0) {
       productAgentRunList.textContent = "No agent sessions yet. Use Codex Write or Hermes after typing a prompt.";
       return;
@@ -29717,9 +29766,12 @@ footer {
       const title = document.createElement("strong");
       title.textContent = `${session.runtime} / ${session.status}`;
       const meta = document.createElement("span");
-      meta.textContent = `exit=${session.exit_code ?? "n/a"} duration=${session.duration_ms ?? 0}ms stdout=${session.stdout_size_bytes ?? 0}b stderr=${session.stderr_size_bytes ?? 0}b`;
+      meta.textContent = `exit=${session.exit_code ?? "n/a"} timed_out=${Boolean(session.timed_out)} duration=${session.duration_ms ?? 0}ms stdout=${session.stdout_size_bytes ?? 0}b stderr=${session.stderr_size_bytes ?? 0}b record=${session.record_path ?? "none"}`;
       const prompt = document.createElement("span");
       prompt.textContent = session.prompt_preview || session.next_step || "transcript captured";
+      if (postmortems.includes(session)) {
+        node.dataset.state = "error";
+      }
       node.append(title, meta, prompt);
       productAgentRunList.append(node);
     }

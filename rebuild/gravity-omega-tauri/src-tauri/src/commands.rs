@@ -4338,6 +4338,13 @@ pub struct CodexHermesRunViewDashboard {
     pub codex_orchestration_count: usize,
     pub hermes_inventory_count: usize,
     pub hermes_assist_count: usize,
+    pub agent_session_count: usize,
+    pub agent_session_failure_count: usize,
+    pub agent_session_timeout_count: usize,
+    pub latest_agent_session_status: String,
+    pub latest_agent_session_record_path: Option<String>,
+    pub latest_agent_postmortem_status: String,
+    pub latest_agent_postmortem_record_path: Option<String>,
     pub evidence_summary_count: usize,
     pub active_task_run_id: String,
     pub read_only: bool,
@@ -95464,6 +95471,50 @@ fn hermes_assist_run_view_summary(
     )
 }
 
+fn unlocked_agent_session_is_postmortem(record: &UnlockedAgentPromptSessionRecord) -> bool {
+    record.timed_out || record.status.contains("failed") || record.status.contains("timed_out")
+}
+
+fn unlocked_agent_session_run_view_summary(
+    record: &UnlockedAgentPromptSessionRecord,
+    title: &'static str,
+) -> CodexHermesRunViewEvidenceSummary {
+    let mut blockers = record.reasons.clone();
+    if unlocked_agent_session_is_postmortem(record) {
+        blockers.push(record.next_step.clone());
+    }
+    codex_hermes_run_view_evidence_summary(
+        "agent-run-postmortem",
+        title,
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "runtime={} exit={:?} timeout={} duration={}ms",
+            record.runtime, record.exit_code, record.timed_out, record.duration_ms
+        ),
+        format!(
+            "stdout={}b stderr={}b prompt={}b",
+            record.stdout_size_bytes, record.stderr_size_bytes, record.prompt_size_bytes
+        ),
+        format!(
+            "task_run={} found={} stdout_transcript={} stderr_transcript={} prompt={}",
+            record.task_run_id,
+            record.task_run_found,
+            record.stdout_transcript_path,
+            record.stderr_transcript_path,
+            record.prompt_preview
+        ),
+        Some(prompt_preview(&record.stdout, 900)),
+        Some(prompt_preview(&record.stderr, 640)),
+        blockers,
+        record.process_spawn_enabled,
+        record.execution_enabled,
+    )
+}
+
 #[tauri::command]
 pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, String> {
     let task_runs = list_task_runs()?;
@@ -95476,6 +95527,7 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
     let codex_orchestrations = list_codex_lead_orchestration_records()?;
     let hermes_inventories = list_hermes_kimi_capability_inventories()?;
     let hermes_assists = list_hermes_kimi_assist_briefs()?;
+    let agent_sessions = list_unlocked_agent_prompt_sessions()?;
 
     let active_task_run_id = task_runs
         .first()
@@ -95502,7 +95554,40 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         .iter()
         .map(|preview| preview.line_count)
         .sum();
+    let agent_session_failure_count = agent_sessions
+        .iter()
+        .filter(|record| unlocked_agent_session_is_postmortem(record))
+        .count();
+    let agent_session_timeout_count = agent_sessions
+        .iter()
+        .filter(|record| record.timed_out || record.status.contains("timed_out"))
+        .count();
+    let latest_agent_session_status = agent_sessions
+        .first()
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "unlocked_agent_prompt_session_waiting".to_string());
+    let latest_agent_session_record_path =
+        agent_sessions.first().map(|record| record.record_path.clone());
+    let latest_agent_postmortem = agent_sessions
+        .iter()
+        .find(|record| unlocked_agent_session_is_postmortem(record));
+    let latest_agent_postmortem_status = latest_agent_postmortem
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "agent_run_postmortem_waiting".to_string());
+    let latest_agent_postmortem_record_path =
+        latest_agent_postmortem.map(|record| record.record_path.clone());
     let mut evidence_summaries = Vec::new();
+    if let Some(record) = latest_agent_postmortem {
+        evidence_summaries.push(unlocked_agent_session_run_view_summary(
+            record,
+            "Latest failed/timed-out agent session",
+        ));
+    } else if let Some(record) = agent_sessions.first() {
+        evidence_summaries.push(unlocked_agent_session_run_view_summary(
+            record,
+            "Latest agent session",
+        ));
+    }
     if let Some(record) = codex_orchestrations.first() {
         evidence_summaries.push(codex_orchestration_run_view_summary(record));
     }
@@ -95594,6 +95679,19 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
             "Keep export and protection policies disabled until consent, redaction, retention, and export gates exist.",
         ),
         codex_hermes_run_view_section(
+            "agent-sessions",
+            "Agent sessions",
+            "unlocked-agent-prompt-sessions",
+            agent_sessions.len(),
+            agent_sessions
+                .iter()
+                .filter(|record| record.status == "unlocked_agent_prompt_session_succeeded"
+                    || record.status == "unlocked_agent_prompt_stream_succeeded")
+                .count(),
+            "agent_session_postmortems_visible",
+            "Use failed and timed-out agent session records as postmortem evidence before retrying long prompts.",
+        ),
+        codex_hermes_run_view_section(
             "typed-events",
             "Typed event logs",
             "agent-event-preview",
@@ -95640,6 +95738,13 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         codex_orchestration_count: codex_orchestrations.len(),
         hermes_inventory_count: hermes_inventories.len(),
         hermes_assist_count: hermes_assists.len(),
+        agent_session_count: agent_sessions.len(),
+        agent_session_failure_count,
+        agent_session_timeout_count,
+        latest_agent_session_status,
+        latest_agent_session_record_path,
+        latest_agent_postmortem_status,
+        latest_agent_postmortem_record_path,
         evidence_summary_count: evidence_summaries.len(),
         active_task_run_id,
         read_only: true,
@@ -95659,6 +95764,7 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         sections,
         reasons: vec![
             "run view dashboard groups existing Codex/Hermes evidence ledgers into one operator surface",
+            "failed and timed-out unlocked agent sessions are promoted as postmortem evidence before generic ledgers",
             "latest Codex Lead orchestration, Hermes/Kimi inventory, and Hermes/Kimi assist records are surfaced as read-only evidence summaries when present",
             "dashboard reads existing records only and creates no task, approval, runner, joint plan, artifact, transcript, export, protection, or event records",
             "process spawn, terminal control, live MCP calls, writes, patches, desktop control, capture, export, memory writes, and execution remain disabled",
@@ -115263,10 +115369,79 @@ mod tests {
         )
         .expect("write assist");
 
+        let agent_session_dir =
+            unlocked_agent_prompt_sessions_dir().expect("unlocked agent session dir");
+        fs::create_dir_all(&agent_session_dir).expect("create unlocked agent session dir");
+        let agent_session_path = agent_session_dir.join("run-view-agent-postmortem.json");
+        let agent_session_log_path = agent_session_dir.join("run-view-agent-postmortem.jsonl");
+        let agent_session_stdout_path = agent_session_dir.join("run-view-agent-postmortem.stdout.txt");
+        let agent_session_stderr_path = agent_session_dir.join("run-view-agent-postmortem.stderr.txt");
+        let agent_session_record = UnlockedAgentPromptSessionRecord {
+            id: "run-view-agent-postmortem".to_string(),
+            runtime: "codex-workspace-write".to_string(),
+            title: "Codex Write".to_string(),
+            binary: "codex".to_string(),
+            argv_redacted: vec![
+                "codex".to_string(),
+                "exec".to_string(),
+                "<prompt>".to_string(),
+            ],
+            sandbox_policy: "workspace-write".to_string(),
+            workspace_root: test_root.display().to_string(),
+            task_run_id: stub.id.clone(),
+            task_run_found: true,
+            prompt_preview: "long prompt stress test".to_string(),
+            prompt_size_bytes: 4096,
+            requested_by: "rust-test".to_string(),
+            status: "unlocked_agent_prompt_stream_timed_out".to_string(),
+            pid: Some(5252),
+            exit_code: None,
+            timed_out: true,
+            duration_ms: 15_000,
+            stdout: "stream started and partial output arrived".to_string(),
+            stderr: "timed out while waiting for final answer".to_string(),
+            stdout_size_bytes: 41,
+            stderr_size_bytes: 40,
+            stdout_transcript_path: agent_session_stdout_path.display().to_string(),
+            stderr_transcript_path: agent_session_stderr_path.display().to_string(),
+            process_spawn_enabled: true,
+            transcript_capture_enabled: true,
+            agent_prompt_execution_enabled: true,
+            bounded_execution_performed: true,
+            sidecar_launch_enabled: false,
+            terminal_enabled: false,
+            workspace_read_enabled: true,
+            workspace_write_enabled: true,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            live_mcp_call_enabled: false,
+            config_read_enabled: false,
+            export_enabled: false,
+            memory_write_enabled: false,
+            writes_allowed: false,
+            execution_enabled: true,
+            created_at_ms: now_ms().expect("clock") + 13,
+            updated_at_ms: now_ms().expect("clock") + 14,
+            record_path: agent_session_path.display().to_string(),
+            log_path: agent_session_log_path.display().to_string(),
+            reasons: vec!["stream timed out before final answer".to_string()],
+            next_step: "Show this timeout as a postmortem before retry.".to_string(),
+        };
+        fs::write(
+            &agent_session_path,
+            serde_json::to_string_pretty(&agent_session_record)
+                .expect("serialize agent session"),
+        )
+        .expect("write agent session");
+        fs::write(&agent_session_stdout_path, &agent_session_record.stdout)
+            .expect("write agent session stdout");
+        fs::write(&agent_session_stderr_path, &agent_session_record.stderr)
+            .expect("write agent session stderr");
+
         let run_view = codex_hermes_run_view_dashboard()
             .expect("codex hermes run view dashboard");
         assert_eq!(run_view.status, "codex_hermes_run_view_dashboard_read_only");
-        assert_eq!(run_view.section_count, 8);
+        assert_eq!(run_view.section_count, 9);
         assert_eq!(run_view.run_count, 1);
         assert_eq!(run_view.approval_count, 1);
         assert_eq!(run_view.resolved_approval_count, 1);
@@ -115282,9 +115457,28 @@ mod tests {
         assert_eq!(run_view.codex_orchestration_count, 1);
         assert_eq!(run_view.hermes_inventory_count, 1);
         assert_eq!(run_view.hermes_assist_count, 1);
-        assert_eq!(run_view.evidence_summary_count, 3);
+        assert_eq!(run_view.agent_session_count, 1);
+        assert_eq!(run_view.agent_session_failure_count, 1);
+        assert_eq!(run_view.agent_session_timeout_count, 1);
+        assert_eq!(
+            run_view.latest_agent_session_status,
+            "unlocked_agent_prompt_stream_timed_out"
+        );
+        assert_eq!(
+            run_view.latest_agent_session_record_path.as_deref(),
+            Some(agent_session_record.record_path.as_str())
+        );
+        assert_eq!(
+            run_view.latest_agent_postmortem_status,
+            "unlocked_agent_prompt_stream_timed_out"
+        );
+        assert_eq!(
+            run_view.latest_agent_postmortem_record_path.as_deref(),
+            Some(agent_session_record.record_path.as_str())
+        );
+        assert_eq!(run_view.evidence_summary_count, 4);
         assert_eq!(run_view.active_task_run_id, stub.id);
-        assert_eq!(run_view.disabled_gate_count, 8);
+        assert_eq!(run_view.disabled_gate_count, 9);
         assert!(run_view.read_only);
         assert!(!run_view.process_spawn_enabled);
         assert!(!run_view.terminal_enabled);
@@ -115297,6 +115491,18 @@ mod tests {
         assert!(!run_view.memory_write_enabled);
         assert!(!run_view.writes_allowed);
         assert!(!run_view.execution_enabled);
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "agent-run-postmortem"
+                && summary.record_id == "run-view-agent-postmortem"
+                && summary.primary_metric.contains("timeout=true")
+                && summary.secondary_metric.contains("stdout=41b")
+                && summary.stdout_preview.as_deref().unwrap_or("").contains("partial output")
+                && summary.stderr_preview.as_deref().unwrap_or("").contains("timed out")
+                && summary.blocker_count >= 2
+                && summary.record_process_spawn_enabled
+                && summary.record_execution_enabled
+                && summary.read_only
+        }));
         assert!(run_view.evidence_summaries.iter().any(|summary| {
             summary.source_id == "codex-lead-orchestration"
                 && summary.record_id == "run-view-evidence-orchestration"
@@ -115345,9 +115551,16 @@ mod tests {
                 && section.ready_count == 3
         }));
         assert!(run_view.sections.iter().any(|section| {
-            section.section_id == "typed-events"
+            section.section_id == "agent-sessions"
                 && section.record_count == 1
-                && section.ready_count == 2
+                && section.ready_count == 0
+                && section.blocked_count == 1
+                && section.source_ledger == "unlocked-agent-prompt-sessions"
+        }));
+        assert!(run_view.sections.iter().any(|section| {
+            section.section_id == "typed-events"
+            && section.record_count == 1
+            && section.ready_count == 2
         }));
         assert!(run_view.sections.iter().all(|section| {
             section.read_only
@@ -140756,7 +140969,8 @@ mod tests {
 
         let unlocked_prompt_sessions =
             list_unlocked_agent_prompt_sessions().expect("unlocked prompt session list");
-        assert_eq!(unlocked_prompt_sessions.len(), 0);
+        assert_eq!(unlocked_prompt_sessions.len(), 1);
+        assert_eq!(unlocked_prompt_sessions[0].id, "run-view-agent-postmortem");
 
         let _ = fs::remove_dir_all(&test_root);
         env::remove_var("XDG_STATE_HOME");
