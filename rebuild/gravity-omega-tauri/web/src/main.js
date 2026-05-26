@@ -5776,6 +5776,17 @@ function renderStenoPetCompanionDashboard(dashboard) {
   runtimeNode.dataset.state = (dashboard.running_runtime_target_count ?? 0) > 0 ? "ok" : "warning";
   stenoPetCompanionDashboardList.append(runtimeNode);
 
+  const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
+  for (const signal of recentPetSignals.slice(0, 6)) {
+    const signalNode = item(
+      `Pet signal: ${signal.state ?? "idle"}`,
+      `${signal.progress ?? 0}% / ${signal.source ?? "runtime"}`,
+      `${signal.message ?? "Pet runtime signal recorded."}\n${signal.record_path ?? ""}`,
+    );
+    signalNode.dataset.state = signal.state === "success" ? "ok" : signal.state === "error" ? "error" : signal.state === "warning" || signal.state === "reminder" ? "warning" : "ready";
+    stenoPetCompanionDashboardList.append(signalNode);
+  }
+
   if (sections.length === 0) {
     stenoPetCompanionDashboardList.append(item("No Steno pet companion sections", "empty", "Refresh the read-only Steno/pet dashboard."));
     return;
@@ -7832,6 +7843,7 @@ async function loadStenoPetCompanionDashboard() {
     pet_runtime_signal_count: 0,
     latest_pet_state: "idle",
     latest_pet_signal_status: "pet_runtime_signal_waiting",
+    recent_pet_runtime_signals: [],
     runtime_process_snapshot_count: 0,
     latest_runtime_process_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
     latest_runtime_process_snapshot_path: null,
@@ -30459,9 +30471,21 @@ footer {
       `transcripts=${dashboard.transcript_bundle_ready_count ?? 0}/${dashboard.transcript_bundle_count ?? 0}`,
       `pet=${dashboard.pet_readiness_ready_count ?? 0}/${dashboard.pet_readiness_count ?? 0}`,
       `runtime=${dashboard.latest_pet_state ?? petCompanionRuntimeState.state}`,
+      `signals=${dashboard.pet_runtime_signal_count ?? 0}`,
       `disabled=${dashboard.disabled_gate_count ?? 0}`,
     ]);
     renderPetRuntimeCard();
+
+    const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
+    for (const signal of recentPetSignals.slice(0, 6)) {
+      appendProductDashboardCard(
+        stenoPetDashboardList,
+        `Pet signal: ${petStateLabel(signal.state ?? "idle")}`,
+        `${signal.progress ?? 0}% / ${signal.source ?? "runtime"}`,
+        `${signal.message ?? "Pet runtime signal recorded."}${signal.record_path ? ` Evidence: ${compactPath(signal.record_path)}` : ""}`,
+        signal.state === "success" ? "ready" : signal.state === "error" ? "error" : signal.state === "warning" || signal.state === "reminder" ? "gated" : "disabled"
+      );
+    }
 
     if (sections.length === 0) {
       appendProductDashboardCard(stenoPetDashboardList, "No Steno/Pet sections", "empty", dashboard.next_slice ?? "Refresh the companion dashboard.");

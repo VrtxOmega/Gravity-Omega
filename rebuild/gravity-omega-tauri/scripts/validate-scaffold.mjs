@@ -640,6 +640,8 @@ for (const productBridgeNeedle of [
   "Kimi/Moonshot",
   "omega-stenographer",
   "sswp",
+  "recent_pet_runtime_signals",
+  "Pet signal:",
 ]) {
   if (!frontendSource.includes(productBridgeNeedle)) {
     throw new Error(`Visible workbench prompt bridge missing ${productBridgeNeedle}.`);
@@ -1524,6 +1526,7 @@ for (const stateNeedle of [
   "transcript-protection-policies",
   "AgentTranscriptSessionRecord",
   "agent-transcript-sessions",
+  "recent_pet_runtime_signals",
   "LocalMcpLaneCapabilityContractRecord",
   "local-mcp-lane-capability-contracts",
   "LocalMcpHealthPreflightRecord",

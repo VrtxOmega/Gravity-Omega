@@ -5276,6 +5276,7 @@ pub struct StenoPetCompanionDashboard {
     pub pet_runtime_signal_count: usize,
     pub latest_pet_state: String,
     pub latest_pet_signal_status: String,
+    pub recent_pet_runtime_signals: Vec<PetRuntimeSignalRecord>,
     pub runtime_process_snapshot_count: usize,
     pub latest_runtime_process_snapshot_status: String,
     pub latest_runtime_process_snapshot_path: Option<String>,
@@ -98981,6 +98982,11 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
         .count();
     let pet_first_class = pet_inventory_ready_count > 0 || pet_readiness_ready_count > 0;
     let latest_pet_signal = pet_runtime_signals.first();
+    let recent_pet_runtime_signals = pet_runtime_signals
+        .iter()
+        .take(6)
+        .cloned()
+        .collect::<Vec<_>>();
     let transcript_evidence = transcript_bundle_ready_count > 0
         || transcript_export_policy_ready_count > 0
         || transcript_protection_policy_ready_count > 0;
@@ -99091,6 +99097,7 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
         latest_pet_signal_status: latest_pet_signal
             .map(|record| record.status.clone())
             .unwrap_or_else(|| "pet_runtime_signal_waiting".to_string()),
+        recent_pet_runtime_signals,
         runtime_process_snapshot_count: runtime_process_snapshots.len(),
         latest_runtime_process_snapshot_status: latest_runtime_process_snapshot
             .map(|record| record.status.clone())
@@ -112092,6 +112099,20 @@ mod tests {
         let dashboard = steno_pet_companion_dashboard().expect("Steno pet companion dashboard");
         assert!(dashboard.pet_runtime_signal_count > 0);
         assert_eq!(dashboard.latest_pet_state, signal.state);
+        assert!(dashboard
+            .recent_pet_runtime_signals
+            .iter()
+            .any(|record| record.id == signal.id && record.record_path == signal.record_path));
+        assert!(dashboard
+            .recent_pet_runtime_signals
+            .iter()
+            .all(|record| !record.memory_write_enabled
+                && !record.live_mcp_call_enabled
+                && !record.file_write_enabled
+                && !record.patch_apply_enabled
+                && !record.desktop_control_enabled
+                && !record.writes_allowed
+                && !record.execution_enabled));
         let history = product_evidence_history().expect("product evidence history loads");
         assert!(history.categories.iter().any(|category| category == "pet-signal"));
     }
