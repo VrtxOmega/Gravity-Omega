@@ -3514,8 +3514,18 @@ function describeCodexHermesRunViewEvidence(record) {
   const stdout = String(record.stdout_preview || "").trim();
   const stderr = String(record.stderr_preview || "").trim();
   const status = String(record.status || "");
+  const hasTranscriptEvidence = record.stdout_transcript_path || record.stderr_transcript_path || typeof record.transcript_evidence_ready === "boolean";
+  const transcriptText = hasTranscriptEvidence
+    ? [
+        `transcripts: ready=${Boolean(record.transcript_evidence_ready)}`,
+        `stdout=${record.stdout_transcript_found ? "found" : "missing"} ${record.stdout_transcript_line_count ?? 0}l/${record.stdout_transcript_size_bytes ?? 0}b`,
+        `stderr=${record.stderr_transcript_found ? "found" : "missing"} ${record.stderr_transcript_line_count ?? 0}l/${record.stderr_transcript_size_bytes ?? 0}b`,
+        `preview=${record.stdout_preview_source ?? "record-inline"}/${record.stderr_preview_source ?? "record-inline"}`,
+      ].join(" ")
+    : "";
   const preview = [
     record.detail,
+    transcriptText,
     stdout ? `stdout: ${stdout}` : "",
     stderr ? `stderr: ${stderr}` : "",
     (record.blockers ?? []).length ? `blockers: ${(record.blockers ?? []).slice(0, 4).join("; ")}` : "blockers: none",
@@ -6630,6 +6640,19 @@ async function loadCodexHermesRunViewDashboard() {
         detail: "Static preview placeholder for failed or timed-out Codex/Hermes session postmortems.",
         stdout_preview: "",
         stderr_preview: "",
+        stdout_preview_source: "record-inline",
+        stderr_preview_source: "record-inline",
+        stdout_transcript_path: null,
+        stderr_transcript_path: null,
+        stdout_transcript_found: false,
+        stderr_transcript_found: false,
+        stdout_transcript_line_count: 0,
+        stderr_transcript_line_count: 0,
+        stdout_transcript_size_bytes: 0,
+        stderr_transcript_size_bytes: 0,
+        stdout_transcript_truncated: false,
+        stderr_transcript_truncated: false,
+        transcript_evidence_ready: false,
         blocker_count: 0,
         blockers: [],
         read_only: true,
@@ -29732,11 +29755,16 @@ footer {
     }
   };
 
-  const renderProductAgentRunCenter = ({ sessions = [], plans = [], packets = [] } = {}) => {
+  const renderProductAgentRunCenter = ({ sessions = [], plans = [], packets = [], runView = null } = {}) => {
     const postmortems = sessions.filter((session) => {
       const status = String(session.status ?? "");
       return session.timed_out === true || status.includes("failed") || status.includes("timed_out");
     });
+    const transcriptEvidenceBySession = new Map(
+      (runView?.evidence_summaries ?? [])
+        .filter((summary) => summary?.source_id === "agent-run-postmortem")
+        .map((summary) => [summary.record_id, summary])
+    );
     if (productUnlockedSessionCount) productUnlockedSessionCount.textContent = String(sessions.length);
     if (productJointPlanCount) productJointPlanCount.textContent = String(plans.length);
     if (productJointPacketCount) productJointPacketCount.textContent = String(packets.length);
@@ -29766,7 +29794,11 @@ footer {
       const title = document.createElement("strong");
       title.textContent = `${session.runtime} / ${session.status}`;
       const meta = document.createElement("span");
-      meta.textContent = `exit=${session.exit_code ?? "n/a"} timed_out=${Boolean(session.timed_out)} duration=${session.duration_ms ?? 0}ms stdout=${session.stdout_size_bytes ?? 0}b stderr=${session.stderr_size_bytes ?? 0}b record=${session.record_path ?? "none"}`;
+      const transcriptEvidence = transcriptEvidenceBySession.get(session.id);
+      const transcriptMeta = transcriptEvidence
+        ? `transcripts ready=${Boolean(transcriptEvidence.transcript_evidence_ready)} stdout=${transcriptEvidence.stdout_transcript_found ? "found" : "missing"} ${transcriptEvidence.stdout_transcript_line_count ?? 0}l/${transcriptEvidence.stdout_transcript_size_bytes ?? 0}b stderr=${transcriptEvidence.stderr_transcript_found ? "found" : "missing"} ${transcriptEvidence.stderr_transcript_line_count ?? 0}l/${transcriptEvidence.stderr_transcript_size_bytes ?? 0}b preview=${transcriptEvidence.stdout_preview_source ?? "record-inline"}/${transcriptEvidence.stderr_preview_source ?? "record-inline"}`
+        : `transcripts paths stdout=${session.stdout_transcript_path ? "recorded" : "missing"} stderr=${session.stderr_transcript_path ? "recorded" : "missing"}`;
+      meta.textContent = `exit=${session.exit_code ?? "n/a"} timed_out=${Boolean(session.timed_out)} duration=${session.duration_ms ?? 0}ms stdout=${session.stdout_size_bytes ?? 0}b stderr=${session.stderr_size_bytes ?? 0}b ${transcriptMeta} record=${session.record_path ?? "none"}`;
       const prompt = document.createElement("span");
       prompt.textContent = session.prompt_preview || session.next_step || "transcript captured";
       if (postmortems.includes(session)) {
@@ -29785,7 +29817,8 @@ footer {
         loadJointPlanLedger(),
         loadJointRuntimeRunPackets(),
       ]);
-      renderProductAgentRunCenter({ sessions, plans, packets });
+      const runView = await loadCodexHermesRunViewDashboard().catch(() => null);
+      renderProductAgentRunCenter({ sessions, plans, packets, runView });
       appendEvidenceText(`agent run center refresh: sessions=${sessions.length}, plans=${plans.length}, packets=${packets.length}`);
     } catch (error) {
       if (productAgentRunSummary) {

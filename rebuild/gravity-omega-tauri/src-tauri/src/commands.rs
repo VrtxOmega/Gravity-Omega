@@ -4301,6 +4301,19 @@ pub struct CodexHermesRunViewEvidenceSummary {
     pub detail: String,
     pub stdout_preview: Option<String>,
     pub stderr_preview: Option<String>,
+    pub stdout_preview_source: String,
+    pub stderr_preview_source: String,
+    pub stdout_transcript_path: Option<String>,
+    pub stderr_transcript_path: Option<String>,
+    pub stdout_transcript_found: bool,
+    pub stderr_transcript_found: bool,
+    pub stdout_transcript_line_count: usize,
+    pub stderr_transcript_line_count: usize,
+    pub stdout_transcript_size_bytes: u64,
+    pub stderr_transcript_size_bytes: u64,
+    pub stdout_transcript_truncated: bool,
+    pub stderr_transcript_truncated: bool,
+    pub transcript_evidence_ready: bool,
     pub blocker_count: usize,
     pub blockers: Vec<String>,
     pub read_only: bool,
@@ -95300,6 +95313,77 @@ fn codex_hermes_run_view_section(
     }
 }
 
+#[derive(Debug, Clone)]
+struct TranscriptEvidencePreview {
+    path: Option<String>,
+    found: bool,
+    line_count: usize,
+    size_bytes: u64,
+    truncated: bool,
+    preview: Option<String>,
+}
+
+fn transcript_evidence_preview(
+    path: &str,
+    max_bytes: usize,
+    max_preview_chars: usize,
+) -> TranscriptEvidencePreview {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return TranscriptEvidencePreview {
+            path: None,
+            found: false,
+            line_count: 0,
+            size_bytes: 0,
+            truncated: false,
+            preview: None,
+        };
+    }
+
+    let mut preview = TranscriptEvidencePreview {
+        path: Some(trimmed.to_string()),
+        found: false,
+        line_count: 0,
+        size_bytes: 0,
+        truncated: false,
+        preview: None,
+    };
+
+    let Ok(metadata) = fs::metadata(trimmed) else {
+        return preview;
+    };
+    if !metadata.is_file() {
+        return preview;
+    }
+    preview.found = true;
+    preview.size_bytes = metadata.len();
+    preview.truncated = metadata.len() > max_bytes as u64;
+
+    let Ok(mut file) = fs::File::open(trimmed) else {
+        return preview;
+    };
+    let mut bytes = Vec::new();
+    let mut limited = std::io::Read::by_ref(&mut file).take((max_bytes + 1) as u64);
+    if limited.read_to_end(&mut bytes).is_err() {
+        return preview;
+    }
+    if bytes.len() > max_bytes {
+        bytes.truncate(max_bytes);
+        preview.truncated = true;
+    }
+    let content = String::from_utf8_lossy(&bytes).to_string();
+    preview.line_count = if content.is_empty() {
+        0
+    } else {
+        content.lines().count()
+    };
+    let compact = prompt_preview(&content, max_preview_chars);
+    if !compact.trim().is_empty() {
+        preview.preview = Some(compact);
+    }
+    preview
+}
+
 fn codex_hermes_run_view_evidence_summary(
     source_id: &'static str,
     title: &'static str,
@@ -95330,6 +95414,19 @@ fn codex_hermes_run_view_evidence_summary(
         detail,
         stdout_preview,
         stderr_preview,
+        stdout_preview_source: "record-inline".to_string(),
+        stderr_preview_source: "record-inline".to_string(),
+        stdout_transcript_path: None,
+        stderr_transcript_path: None,
+        stdout_transcript_found: false,
+        stderr_transcript_found: false,
+        stdout_transcript_line_count: 0,
+        stderr_transcript_line_count: 0,
+        stdout_transcript_size_bytes: 0,
+        stderr_transcript_size_bytes: 0,
+        stdout_transcript_truncated: false,
+        stderr_transcript_truncated: false,
+        transcript_evidence_ready: false,
         blocker_count: blockers.len(),
         blockers,
         read_only: true,
@@ -95483,7 +95580,19 @@ fn unlocked_agent_session_run_view_summary(
     if unlocked_agent_session_is_postmortem(record) {
         blockers.push(record.next_step.clone());
     }
-    codex_hermes_run_view_evidence_summary(
+    let stdout_transcript =
+        transcript_evidence_preview(&record.stdout_transcript_path, 64 * 1024, 900);
+    let stderr_transcript =
+        transcript_evidence_preview(&record.stderr_transcript_path, 64 * 1024, 640);
+    let stdout_preview = stdout_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stdout, 900)));
+    let stderr_preview = stderr_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stderr, 640)));
+    let mut summary = codex_hermes_run_view_evidence_summary(
         "agent-run-postmortem",
         title,
         record.id.clone(),
@@ -95500,19 +95609,45 @@ fn unlocked_agent_session_run_view_summary(
             record.stdout_size_bytes, record.stderr_size_bytes, record.prompt_size_bytes
         ),
         format!(
-            "task_run={} found={} stdout_transcript={} stderr_transcript={} prompt={}",
+            "task_run={} found={} stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={} prompt={}",
             record.task_run_id,
             record.task_run_found,
             record.stdout_transcript_path,
+            stdout_transcript.found,
+            stdout_transcript.line_count,
             record.stderr_transcript_path,
+            stderr_transcript.found,
+            stderr_transcript.line_count,
             record.prompt_preview
         ),
-        Some(prompt_preview(&record.stdout, 900)),
-        Some(prompt_preview(&record.stderr, 640)),
+        stdout_preview,
+        stderr_preview,
         blockers,
         record.process_spawn_enabled,
         record.execution_enabled,
-    )
+    );
+    summary.stdout_preview_source = if stdout_transcript.preview.is_some() {
+        "stdout-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stderr_preview_source = if stderr_transcript.preview.is_some() {
+        "stderr-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stdout_transcript_path = stdout_transcript.path.clone();
+    summary.stderr_transcript_path = stderr_transcript.path.clone();
+    summary.stdout_transcript_found = stdout_transcript.found;
+    summary.stderr_transcript_found = stderr_transcript.found;
+    summary.stdout_transcript_line_count = stdout_transcript.line_count;
+    summary.stderr_transcript_line_count = stderr_transcript.line_count;
+    summary.stdout_transcript_size_bytes = stdout_transcript.size_bytes;
+    summary.stderr_transcript_size_bytes = stderr_transcript.size_bytes;
+    summary.stdout_transcript_truncated = stdout_transcript.truncated;
+    summary.stderr_transcript_truncated = stderr_transcript.truncated;
+    summary.transcript_evidence_ready = stdout_transcript.found && stderr_transcript.found;
+    summary
 }
 
 #[tauri::command]
@@ -115496,6 +115631,19 @@ mod tests {
                 && summary.record_id == "run-view-agent-postmortem"
                 && summary.primary_metric.contains("timeout=true")
                 && summary.secondary_metric.contains("stdout=41b")
+                && summary.transcript_evidence_ready
+                && summary.stdout_transcript_found
+                && summary.stderr_transcript_found
+                && summary.stdout_transcript_line_count == 1
+                && summary.stderr_transcript_line_count == 1
+                && summary.stdout_transcript_size_bytes == 41
+                && summary.stderr_transcript_size_bytes == 40
+                && summary.stdout_transcript_path.as_deref()
+                    == Some(agent_session_record.stdout_transcript_path.as_str())
+                && summary.stderr_transcript_path.as_deref()
+                    == Some(agent_session_record.stderr_transcript_path.as_str())
+                && summary.stdout_preview_source == "stdout-transcript"
+                && summary.stderr_preview_source == "stderr-transcript"
                 && summary.stdout_preview.as_deref().unwrap_or("").contains("partial output")
                 && summary.stderr_preview.as_deref().unwrap_or("").contains("timed out")
                 && summary.blocker_count >= 2
