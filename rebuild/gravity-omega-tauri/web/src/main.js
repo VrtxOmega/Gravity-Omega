@@ -24957,6 +24957,7 @@ function initOmegaProductShell() {
     logPath: "",
     stdoutTranscriptPath: "",
     stderrTranscriptPath: "",
+    replayRecordPath: "",
   };
   let openEditorTabs = [
     {
@@ -25603,6 +25604,7 @@ function initOmegaProductShell() {
         `log=${lastTerminalSession.logPath || "none"}`,
         `stdout=${lastTerminalSession.stdoutTranscriptPath || "none"}`,
         `stderr=${lastTerminalSession.stderrTranscriptPath || "none"}`,
+        `replay=${lastTerminalSession.replayRecordPath || "none"}`,
       ].join("\n");
     }
   };
@@ -25627,6 +25629,20 @@ function initOmegaProductShell() {
         tail_lines: 80,
       },
     });
+  };
+
+  const captureTerminalTranscriptReplay = async (sourceRecordPath = "", requestedBy = "terminal-auto-replay") => {
+    try {
+      const replay = await recordTerminalTranscriptReplay(sourceRecordPath, requestedBy);
+      if (replay?.record_path) {
+        updateTerminalSessionHud({ replayRecordPath: replay.record_path });
+        appendEvidenceText(`terminal replay captured: ${replay.record_path}`);
+      }
+      return replay;
+    } catch (error) {
+      setProblemText(`Terminal transcript replay capture failed: ${error.message}`);
+      return null;
+    }
   };
 
   const loadTerminalTranscriptReplays = async () => {
@@ -25656,11 +25672,7 @@ function initOmegaProductShell() {
   const showTerminalEvidence = async () => {
     switchBottomView("evidence");
     let replay = null;
-    try {
-      replay = await recordTerminalTranscriptReplay(lastTerminalSession.recordPath || "", "terminal-evidence-button");
-    } catch (error) {
-      setProblemText(`Terminal transcript replay failed: ${error.message}`);
-    }
+    replay = await captureTerminalTranscriptReplay(lastTerminalSession.recordPath || "", "terminal-evidence-button");
     const lines = [
       `Terminal command: ${lastTerminalSession.command || "none"}`,
       `status=${lastTerminalSession.status || "idle"}`,
@@ -29798,6 +29810,17 @@ footer {
         if (payload.status && payload.status !== "product_terminal_stream_started") {
           setOutputText(`${payload.status}\n${payload.line ?? ""}\nEvidence: ${payload.record_path}`);
           appendEvidenceText(`terminal stream ${payload.status}: ${payload.record_path}`);
+          captureTerminalTranscriptReplay(
+            payload.record_path || lastTerminalSession.recordPath || "",
+            "terminal-stream-completion",
+          ).then((replay) => {
+            if (replay?.record_path) {
+              terminalWrite(`[terminal_replay] ${replay.record_path}`);
+            }
+            return refreshProductEvidenceHistory();
+          }).catch((error) => {
+            setProblemText(`Terminal replay refresh failed: ${error.message}`);
+          });
           if (payload.exit_code === 0) {
             setPetCompanionRuntimeState({
               state: "success",
@@ -29821,9 +29844,6 @@ footer {
           }
           terminalRunBtn?.removeAttribute("disabled");
           activeTerminalStreamId = "";
-          refreshProductEvidenceHistory().catch((error) => {
-            setProblemText(`Evidence refresh failed after terminal stream: ${error.message}`);
-          });
         }
       }
     }).catch((error) => {
@@ -30023,6 +30043,10 @@ footer {
       terminalWrite(`[${result.status}] exit=${result.exit_code ?? "none"} duration=${result.duration_ms}ms evidence=${result.record_path}`);
       setOutputText(`${trimmed}\n${result.status}\nexit=${result.exit_code ?? "none"} duration=${result.duration_ms}ms\nEvidence: ${result.record_path}`);
       appendEvidenceText(`terminal ${trimmed}: ${result.record_path}`);
+      const replay = await captureTerminalTranscriptReplay(result.record_path || "", "terminal-sync-completion");
+      if (replay?.record_path) {
+        terminalWrite(`[terminal_replay] ${replay.record_path}`);
+      }
       if (result.exit_code !== 0) {
         setProblemText(`${trimmed} returned exit=${result.exit_code ?? "none"}; stderr=${result.stderr.slice(0, 240)}`);
       } else {
