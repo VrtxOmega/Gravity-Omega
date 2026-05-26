@@ -6001,10 +6001,12 @@ function describeTerminalSessionSummary(record) {
   const duration = record.duration_ms ?? 0;
   const stdoutBytes = record.stdout_size_bytes ?? 0;
   const stderrBytes = record.stderr_size_bytes ?? 0;
+  const pipeReaders = `${Boolean(record.stdout_pipe_reader_enabled)}/${Boolean(record.stderr_pipe_reader_enabled)}`;
+  const timeoutEvidence = `kill=${Boolean(record.timeout_kill_sent)} wait=${record.wait_after_kill_ms ?? 0}ms partial=${Boolean(record.partial_output_captured)}`;
   return {
     title: `Terminal session: ${command}`,
     meta: `${status} / exit=${exit} / ${duration}ms`,
-    text: `stdout=${stdoutBytes}b; stderr=${stderrBytes}b; stream=${record.source_stream_enabled ?? false}; sourceExec=${record.source_execution_enabled ?? false}; dashboardExec=${record.execution_enabled ?? false}; record=${record.record_path ?? "none"}`,
+    text: `stdout=${stdoutBytes}b; stderr=${stderrBytes}b; pipeReaders=${pipeReaders}; timeout=${timeoutEvidence}; stream=${record.source_stream_enabled ?? false}; sourceExec=${record.source_execution_enabled ?? false}; dashboardExec=${record.execution_enabled ?? false}; record=${record.record_path ?? "none"}`,
     state: record.timed_out ? "warning" : exit === 0 ? "ok" : status.includes("failed") ? "error" : "ready",
   };
 }

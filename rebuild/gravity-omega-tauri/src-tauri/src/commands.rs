@@ -2650,6 +2650,11 @@ pub struct ProductTerminalCommandResult {
     pub exit_code: Option<i32>,
     pub timed_out: bool,
     pub duration_ms: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
     pub stdout: String,
     pub stderr: String,
     pub stdout_transcript_path: String,
@@ -2760,6 +2765,11 @@ pub struct ProductTerminalSessionSummary {
     pub stderr_transcript_path: String,
     pub stdout_size_bytes: u64,
     pub stderr_size_bytes: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
     pub source_stream_enabled: bool,
     pub source_process_spawn_enabled: bool,
     pub source_transcript_capture_enabled: bool,
@@ -42460,6 +42470,159 @@ fn record_product_terminal_blocked_command(
     Ok(record)
 }
 
+struct ProductTerminalCommandProcessOutput {
+    pid: Option<u32>,
+    exit_code: Option<i32>,
+    timed_out: bool,
+    duration_ms: u64,
+    stdout_bytes: Vec<u8>,
+    stderr_bytes: Vec<u8>,
+    status: String,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
+}
+
+fn spawn_product_terminal_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_product_terminal_command_process(
+    binary: &str,
+    args: &[String],
+    workspace_root: &Path,
+    timeout_ms: u64,
+) -> ProductTerminalCommandProcessOutput {
+    let started = Instant::now();
+    let mut child = match Command::new(binary)
+        .args(args)
+        .current_dir(workspace_root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => {
+            return ProductTerminalCommandProcessOutput {
+                pid: None,
+                exit_code: None,
+                timed_out: false,
+                duration_ms: started.elapsed().as_millis() as u64,
+                stdout_bytes: Vec::new(),
+                stderr_bytes: error.to_string().into_bytes(),
+                status: "product_terminal_command_spawn_failed".to_string(),
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
+            };
+        }
+    };
+
+    let pid = Some(child.id());
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_product_terminal_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_product_terminal_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
+    let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let exit_code;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
+            }
+            Ok(None) => {
+                if started.elapsed() >= Duration::from_millis(timeout_ms) {
+                    timed_out = true;
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    exit_code = child.wait().ok().and_then(|status| status.code());
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(error) => {
+                let stdout_bytes = stdout_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                let mut stderr_bytes = stderr_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                if stderr_bytes.is_empty() {
+                    stderr_bytes = error.to_string().into_bytes();
+                }
+                let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+                return ProductTerminalCommandProcessOutput {
+                    pid,
+                    exit_code: None,
+                    timed_out: false,
+                    duration_ms: started.elapsed().as_millis() as u64,
+                    stdout_bytes,
+                    stderr_bytes,
+                    status: "product_terminal_command_wait_failed".to_string(),
+                    stdout_pipe_reader_enabled,
+                    stderr_pipe_reader_enabled,
+                    timeout_kill_sent: false,
+                    wait_after_kill_ms: 0,
+                    partial_output_captured,
+                };
+            }
+        }
+    }
+
+    let stdout_bytes = stdout_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let stderr_bytes = stderr_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+    let status = if timed_out {
+        "product_terminal_command_timed_out"
+    } else if exit_code == Some(0) {
+        "product_terminal_command_succeeded"
+    } else {
+        "product_terminal_command_failed"
+    }
+    .to_string();
+
+    ProductTerminalCommandProcessOutput {
+        pid,
+        exit_code,
+        timed_out,
+        duration_ms: started.elapsed().as_millis() as u64,
+        stdout_bytes,
+        stderr_bytes,
+        status,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
+    }
+}
+
 #[tauri::command]
 pub fn run_product_terminal_command(
     request: ProductTerminalCommandRequest,
@@ -42498,94 +42661,25 @@ pub fn run_product_terminal_command(
     let log_path = dir.join(format!("{id}.jsonl"));
     let stdout_transcript_path = dir.join(format!("{id}.stdout.txt"));
     let stderr_transcript_path = dir.join(format!("{id}.stderr.txt"));
-    let started = Instant::now();
-    let mut pid = None;
-    let mut exit_code = None;
-    let mut timed_out = false;
-    let stdout_bytes: Vec<u8>;
-    let stderr_bytes: Vec<u8>;
-    let status: String;
-
-    match Command::new(&binary)
-        .args(&args)
-        .current_dir(&workspace_root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
-        Ok(mut child) => {
-            pid = Some(child.id());
-            loop {
-                match child.try_wait() {
-                    Ok(Some(_status)) => break,
-                    Ok(None) => {
-                        if started.elapsed() >= Duration::from_millis(timeout_ms) {
-                            timed_out = true;
-                            let _ = child.kill();
-                            break;
-                        }
-                        std::thread::sleep(Duration::from_millis(50));
-                    }
-                    Err(error) => {
-                        stdout_bytes = Vec::new();
-                        stderr_bytes = error.to_string().into_bytes();
-                        status = "product_terminal_command_wait_failed".to_string();
-                        return write_product_terminal_command_result(
-                            command,
-                            argv,
-                            workspace_root,
-                            timestamp,
-                            started.elapsed().as_millis() as u64,
-                            pid,
-                            None,
-                            false,
-                            stdout_bytes,
-                            stderr_bytes,
-                            status,
-                            record_path,
-                            log_path,
-                            stdout_transcript_path,
-                            stderr_transcript_path,
-                        );
-                    }
-                }
-            }
-
-            let output = child.wait_with_output().map_err(|error| {
-                format!("failed to collect product terminal command output: {error}")
-            })?;
-            exit_code = output.status.code();
-            stdout_bytes = output.stdout;
-            stderr_bytes = output.stderr;
-            status = if timed_out {
-                "product_terminal_command_timed_out"
-            } else if output.status.success() {
-                "product_terminal_command_succeeded"
-            } else {
-                "product_terminal_command_failed"
-            }
-            .to_string();
-        }
-        Err(error) => {
-            stdout_bytes = Vec::new();
-            stderr_bytes = error.to_string().into_bytes();
-            status = "product_terminal_command_spawn_failed".to_string();
-        }
-    }
+    let output = run_product_terminal_command_process(&binary, &args, &workspace_root, timeout_ms);
 
     write_product_terminal_command_result(
         command,
         argv,
         workspace_root,
         timestamp,
-        started.elapsed().as_millis() as u64,
-        pid,
-        exit_code,
-        timed_out,
-        stdout_bytes,
-        stderr_bytes,
-        status,
+        output.duration_ms,
+        output.pid,
+        output.exit_code,
+        output.timed_out,
+        output.stdout_bytes,
+        output.stderr_bytes,
+        output.status,
+        output.stdout_pipe_reader_enabled,
+        output.stderr_pipe_reader_enabled,
+        output.timeout_kill_sent,
+        output.wait_after_kill_ms,
+        output.partial_output_captured,
         record_path,
         log_path,
         stdout_transcript_path,
@@ -42962,6 +43056,11 @@ fn write_product_terminal_command_result(
     stdout_bytes: Vec<u8>,
     stderr_bytes: Vec<u8>,
     status: String,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
     record_path: PathBuf,
     log_path: PathBuf,
     stdout_transcript_path: PathBuf,
@@ -42983,6 +43082,11 @@ fn write_product_terminal_command_result(
         exit_code,
         timed_out,
         duration_ms,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
         stdout,
         stderr,
         stdout_transcript_path: stdout_transcript_path.display().to_string(),
@@ -43004,6 +43108,11 @@ fn write_product_terminal_command_result(
         "exit_code": result.exit_code,
         "timed_out": result.timed_out,
         "duration_ms": result.duration_ms,
+        "stdout_pipe_reader_enabled": result.stdout_pipe_reader_enabled,
+        "stderr_pipe_reader_enabled": result.stderr_pipe_reader_enabled,
+        "timeout_kill_sent": result.timeout_kill_sent,
+        "wait_after_kill_ms": result.wait_after_kill_ms,
+        "partial_output_captured": result.partial_output_captured,
         "stdout_transcript_path": result.stdout_transcript_path,
         "stderr_transcript_path": result.stderr_transcript_path,
         "process_spawn_enabled": true,
@@ -43032,6 +43141,11 @@ fn write_product_terminal_command_result(
             "exit_code": result.exit_code,
             "timed_out": result.timed_out,
             "duration_ms": result.duration_ms,
+            "stdout_pipe_reader_enabled": result.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": result.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": result.timeout_kill_sent,
+            "wait_after_kill_ms": result.wait_after_kill_ms,
+            "partial_output_captured": result.partial_output_captured,
             "created_at_ms": timestamp
         }),
     )?;
@@ -43107,6 +43221,11 @@ fn terminal_session_summary_from_record(
         duration_ms: terminal_record_u64(&value, "duration_ms"),
         stdout_size_bytes: terminal_transcript_size(&stdout_transcript_path),
         stderr_size_bytes: terminal_transcript_size(&stderr_transcript_path),
+        stdout_pipe_reader_enabled: terminal_record_bool(&value, "stdout_pipe_reader_enabled"),
+        stderr_pipe_reader_enabled: terminal_record_bool(&value, "stderr_pipe_reader_enabled"),
+        timeout_kill_sent: terminal_record_bool(&value, "timeout_kill_sent"),
+        wait_after_kill_ms: terminal_record_u64(&value, "wait_after_kill_ms"),
+        partial_output_captured: terminal_record_bool(&value, "partial_output_captured"),
         stdout_transcript_path,
         stderr_transcript_path,
         source_stream_enabled: terminal_record_bool(&value, "stream_enabled"),
@@ -112199,6 +112318,11 @@ mod tests {
             timeout_ms: Some(5_000),
         })
         .expect("bounded terminal command runs");
+        assert!(terminal.stdout_pipe_reader_enabled);
+        assert!(terminal.stderr_pipe_reader_enabled);
+        assert!(!terminal.timeout_kill_sent);
+        assert_eq!(terminal.wait_after_kill_ms, 0);
+        assert!(terminal.partial_output_captured);
         let replay = record_product_terminal_transcript_replay(
             ProductTerminalTranscriptReplayRequest {
                 session_record_path: Some(terminal.record_path.clone()),
@@ -112280,6 +112404,10 @@ mod tests {
                         && record.source_transcript_capture_enabled
                         && record.source_command_runner_enabled
                         && record.source_execution_enabled
+                        && record.stdout_pipe_reader_enabled
+                        && record.stderr_pipe_reader_enabled
+                        && !record.timeout_kill_sent
+                        && record.partial_output_captured
                         && !record.source_writes_allowed
                         && !record.terminal_write_enabled
                         && !record.live_tail_enabled
@@ -112343,6 +112471,56 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn product_terminal_process_drains_pipes_and_captures_timeout_partial_output() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-terminal-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake terminal dir");
+        let fake_command = test_root.join("fake-terminal-command");
+        fs::write(
+            &fake_command,
+            r#"#!/bin/sh
+printf 'terminal stdout ready\n'
+printf 'terminal stderr ready\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'terminal stdout chunk %s\n' "$i"
+  printf 'terminal stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake terminal command");
+        let mut permissions = fs::metadata(&fake_command)
+            .expect("fake terminal metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_command, permissions).expect("chmod fake terminal command");
+
+        let output = run_product_terminal_command_process(
+            fake_command.to_str().expect("fake terminal path"),
+            &[],
+            &test_root,
+            100,
+        );
+        assert_eq!(output.status, "product_terminal_command_timed_out");
+        assert!(output.timed_out);
+        assert!(output.timeout_kill_sent);
+        assert!(output.stdout_pipe_reader_enabled);
+        assert!(output.stderr_pipe_reader_enabled);
+        assert!(output.partial_output_captured);
+        assert!(String::from_utf8_lossy(&output.stdout_bytes).contains("terminal stdout ready"));
+        assert!(String::from_utf8_lossy(&output.stderr_bytes).contains("terminal stderr ready"));
+        let _ = fs::remove_dir_all(&test_root);
     }
 
     #[cfg(unix)]

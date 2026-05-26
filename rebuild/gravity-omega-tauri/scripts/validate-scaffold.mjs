@@ -210,6 +210,16 @@ if (hermesAssistProcessBody.includes("wait_with_output")) {
   throw new Error("Hermes/Kimi assist runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
 }
 
+const productTerminalProcessStart = rustCommandsSource.indexOf("fn run_product_terminal_command_process");
+const productTerminalProcessEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn run_product_terminal_command", productTerminalProcessStart);
+if (productTerminalProcessStart < 0 || productTerminalProcessEnd < productTerminalProcessStart) {
+  throw new Error("Product terminal command process runner body is missing.");
+}
+const productTerminalProcessBody = rustCommandsSource.slice(productTerminalProcessStart, productTerminalProcessEnd);
+if (productTerminalProcessBody.includes("wait_with_output")) {
+  throw new Error("Product terminal command runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+}
+
 for (const unlockedUiNeedle of [
   "run-unlocked-codex-agent-btn",
   "run-unlocked-hermes-agent-btn",
@@ -692,6 +702,12 @@ for (const productBridgeNeedle of [
   "blocked_terminal_command_count",
   "recent_process_control_policies",
   "recent_process_exit_summaries",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+  "pipeReaders=",
   "Terminal session:",
   "Terminal replay:",
   "Blocked terminal command:",
@@ -2756,6 +2772,14 @@ for (const runtimeDepthNeedle of [
   "list_product_terminal_transcript_replays",
   "product-terminal-transcript-replays",
   "product_terminal_transcript_replay_recorded",
+  "ProductTerminalCommandProcessOutput",
+  "spawn_product_terminal_pipe_reader",
+  "run_product_terminal_command_process",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
   "recent_process_control_policies",
   "recent_process_exit_summaries",
   "\"terminal-blocked\"",
