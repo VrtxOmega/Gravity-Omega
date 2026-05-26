@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     env,
     fs::{self, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
@@ -3031,6 +3032,65 @@ pub struct ProductEvidenceHistory {
     pub live_mcp_call_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EvidenceDurabilityManifestRequest {
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EvidenceDurabilityManifestCategory {
+    pub category: String,
+    pub record_count: usize,
+    pub readable_record_count: usize,
+    pub missing_record_count: usize,
+    pub latest_created_at_ms: u64,
+    pub latest_record_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EvidenceDurabilityManifestRecord {
+    pub id: String,
+    pub status: String,
+    pub requested_by: String,
+    pub source_history_status: String,
+    pub source_history_item_count: usize,
+    pub category_count: usize,
+    pub evidence_record_count: usize,
+    pub readable_record_count: usize,
+    pub missing_record_count: usize,
+    pub manifest_input_bytes: usize,
+    pub manifest_hash: String,
+    pub latest_evidence_category: String,
+    pub latest_evidence_id: String,
+    pub latest_evidence_status: String,
+    pub latest_evidence_title: String,
+    pub latest_evidence_record_path: String,
+    pub latest_evidence_created_at_ms: u64,
+    pub categories: Vec<EvidenceDurabilityManifestCategory>,
+    pub local_manifest_recorded: bool,
+    pub read_only: bool,
+    pub history_enabled: bool,
+    pub evidence_read_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub terminal_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub capture_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub export_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+    pub blockers: Vec<String>,
+    pub next_step: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -22046,6 +22106,10 @@ fn desktop_read_only_capability_snapshots_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("desktop-read-only-capability-snapshots"))
 }
 
+fn evidence_durability_manifests_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("evidence-durability-manifests"))
+}
+
 fn codex_lead_orchestrations_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("codex-lead-orchestrations"))
 }
@@ -32523,8 +32587,8 @@ pub fn command_manifest() -> Vec<CommandGroup> {
             title: "Codex-grade agent loop",
             safety: "safe-gated-restricted",
             phase: "phase-3",
-            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, desktop environment snapshots, desktop stage-1 capability snapshots, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
-            command_count: 106,
+            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, evidence durability manifests, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, desktop environment snapshots, desktop stage-1 capability snapshots, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
+            command_count: 108,
         },
         CommandGroup {
             id: "threads",
@@ -46371,6 +46435,18 @@ fn product_evidence_title_detail(
                 format!("{status}; available={available}/{tools}; windows={windows}; screenshots={screenshots}; accessibility={accessibility}; process_spawn=false"),
             )
         }
+        "evidence-durability" => {
+            let status = json_string(value, "status").unwrap_or_else(|| "evidence_durability_manifest".to_string());
+            let readable = json_u64(value, "readable_record_count").unwrap_or(0);
+            let records = json_u64(value, "evidence_record_count").unwrap_or(0);
+            let missing = json_u64(value, "missing_record_count").unwrap_or(0);
+            let categories = json_u64(value, "category_count").unwrap_or(0);
+            let manifest_hash = json_string(value, "manifest_hash").unwrap_or_else(|| "hash-missing".to_string());
+            (
+                "Evidence durability manifest".to_string(),
+                format!("{status}; readable={readable}/{records}; missing={missing}; categories={categories}; seal={manifest_hash}; export=false"),
+            )
+        }
         "codex-orchestration" => {
             let status = json_string(value, "status").unwrap_or_else(|| "orchestration".to_string());
             let delegations = json_u64(value, "delegation_count").unwrap_or(0);
@@ -46501,6 +46577,7 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
     push_product_evidence_history_dir(&mut items, "runtime-sidecar-process", runtime_sidecar_process_snapshots_dir()?)?;
     push_product_evidence_history_dir(&mut items, "desktop-environment", desktop_environment_snapshots_dir()?)?;
     push_product_evidence_history_dir(&mut items, "desktop-stage1-capability", desktop_read_only_capability_snapshots_dir()?)?;
+    push_product_evidence_history_dir(&mut items, "evidence-durability", evidence_durability_manifests_dir()?)?;
     push_product_evidence_history_dir(&mut items, "codex-orchestration", codex_lead_orchestrations_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-inventory", hermes_kimi_capability_inventories_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-assist", hermes_kimi_assist_briefs_dir()?)?;
@@ -46534,6 +46611,229 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
         writes_allowed: false,
         execution_enabled: false,
     })
+}
+
+fn stable_local_evidence_hash(input: &str) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in input.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("fnv1a64:{hash:016x}")
+}
+
+#[tauri::command]
+pub fn record_evidence_durability_manifest(
+    request: EvidenceDurabilityManifestRequest,
+) -> Result<EvidenceDurabilityManifestRecord, String> {
+    let timestamp = now_ms()?;
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "evidence-durability".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "evidence-durability".to_string()
+    } else {
+        requested_by
+    };
+    let history = product_evidence_history()?;
+    let mut categories = BTreeMap::<String, EvidenceDurabilityManifestCategory>::new();
+    let mut rows = Vec::new();
+    let mut readable_record_count = 0usize;
+    let mut missing_record_count = 0usize;
+
+    for item in &history.items {
+        let read_result = fs::read_to_string(&item.record_path);
+        let (readable, byte_count) = match read_result {
+            Ok(content) => {
+                readable_record_count += 1;
+                (true, content.len())
+            }
+            Err(_) => {
+                missing_record_count += 1;
+                (false, 0usize)
+            }
+        };
+        let category = categories
+            .entry(item.category.clone())
+            .or_insert_with(|| EvidenceDurabilityManifestCategory {
+                category: item.category.clone(),
+                record_count: 0,
+                readable_record_count: 0,
+                missing_record_count: 0,
+                latest_created_at_ms: 0,
+                latest_record_path: String::new(),
+            });
+        category.record_count += 1;
+        if readable {
+            category.readable_record_count += 1;
+        } else {
+            category.missing_record_count += 1;
+        }
+        if item.created_at_ms >= category.latest_created_at_ms {
+            category.latest_created_at_ms = item.created_at_ms;
+            category.latest_record_path = item.record_path.clone();
+        }
+        rows.push(serde_json::json!({
+            "category": &item.category,
+            "id": &item.id,
+            "status": &item.status,
+            "record_path": &item.record_path,
+            "created_at_ms": item.created_at_ms,
+            "readable": readable,
+            "byte_count": byte_count,
+        }));
+    }
+
+    rows.sort_by(|left, right| {
+        serde_json::to_string(left)
+            .unwrap_or_default()
+            .cmp(&serde_json::to_string(right).unwrap_or_default())
+    });
+    let manifest_input = serde_json::to_string(&serde_json::json!({
+        "source_history_status": &history.status,
+        "source_history_item_count": history.item_count,
+        "rows": rows,
+    }))
+    .map_err(|error| format!("failed to serialize evidence manifest input: {error}"))?;
+    let manifest_hash = stable_local_evidence_hash(&manifest_input);
+    let id = format!("evidence-durability-manifest-{}-{}", timestamp, std::process::id());
+    let dir = evidence_durability_manifests_dir()?;
+    fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "failed to create evidence durability manifests directory {}: {error}",
+            dir.display()
+        )
+    })?;
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+    let latest = history.items.first();
+    let blockers = if missing_record_count > 0 {
+        vec![format!(
+            "{missing_record_count} product evidence record path(s) were not readable during manifest creation"
+        )]
+    } else {
+        Vec::new()
+    };
+    let status = if history.items.is_empty() {
+        "evidence_durability_manifest_empty"
+    } else if missing_record_count > 0 {
+        "evidence_durability_manifest_recorded_with_missing_records"
+    } else {
+        "evidence_durability_manifest_recorded"
+    }
+    .to_string();
+    let record_path_display = record_path.display().to_string();
+    let log_path_display = log_path.display().to_string();
+    let record = EvidenceDurabilityManifestRecord {
+        id: id.clone(),
+        status: status.clone(),
+        requested_by,
+        source_history_status: history.status.clone(),
+        source_history_item_count: history.item_count,
+        category_count: history.category_count,
+        evidence_record_count: history.items.len(),
+        readable_record_count,
+        missing_record_count,
+        manifest_input_bytes: manifest_input.len(),
+        manifest_hash: manifest_hash.clone(),
+        latest_evidence_category: latest.map(|item| item.category.clone()).unwrap_or_default(),
+        latest_evidence_id: latest.map(|item| item.id.clone()).unwrap_or_default(),
+        latest_evidence_status: latest.map(|item| item.status.clone()).unwrap_or_default(),
+        latest_evidence_title: latest.map(|item| item.title.clone()).unwrap_or_default(),
+        latest_evidence_record_path: latest.map(|item| item.record_path.clone()).unwrap_or_default(),
+        latest_evidence_created_at_ms: latest.map(|item| item.created_at_ms).unwrap_or(0),
+        categories: categories.into_values().collect(),
+        local_manifest_recorded: true,
+        read_only: true,
+        history_enabled: true,
+        evidence_read_enabled: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        export_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path_display.clone(),
+        log_path: log_path_display.clone(),
+        blockers,
+        next_step: "Use this local manifest to prove evidence continuity before any export, live MCP, terminal/process, desktop, write, patch, or memory gate can open.".to_string(),
+    };
+    let json = serde_json::to_string_pretty(&record)
+        .map_err(|error| format!("failed to serialize evidence durability manifest: {error}"))?;
+    fs::write(&record_path, json).map_err(|error| {
+        format!(
+            "failed to write evidence durability manifest {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "event": "evidence_durability_manifest_recorded",
+            "id": &record.id,
+            "status": &record.status,
+            "evidence_record_count": record.evidence_record_count,
+            "readable_record_count": record.readable_record_count,
+            "missing_record_count": record.missing_record_count,
+            "category_count": record.category_count,
+            "manifest_hash": &record.manifest_hash,
+            "local_manifest_recorded": true,
+            "export_enabled": false,
+            "process_spawn_enabled": false,
+            "terminal_enabled": false,
+            "desktop_control_enabled": false,
+            "live_mcp_call_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": timestamp
+        }),
+    )?;
+    Ok(record)
+}
+
+#[tauri::command]
+pub fn list_evidence_durability_manifests(
+) -> Result<Vec<EvidenceDurabilityManifestRecord>, String> {
+    let dir = evidence_durability_manifests_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read evidence durability manifests directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry = entry.map_err(|error| format!("failed to read evidence durability manifest entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<EvidenceDurabilityManifestRecord>(&content) {
+            records.push(record);
+        }
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(40);
+    Ok(records)
 }
 
 fn inventory_item(
@@ -114412,6 +114712,81 @@ printf 'agent transcript dashboard stderr ready\n' >&2
             .items
             .iter()
             .all(|item| !item.category.is_empty() && !item.record_path.is_empty()));
+    }
+
+    #[test]
+    fn evidence_durability_manifest_seals_readable_product_evidence_without_export() {
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-evidence-durability-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        let saved_state = env::var_os("XDG_STATE_HOME");
+        env::set_var("XDG_STATE_HOME", &test_root);
+
+        let smoke = run_product_workbench_smoke().expect("product workbench smoke seeds evidence");
+        let record = record_evidence_durability_manifest(EvidenceDurabilityManifestRequest {
+            requested_by: Some("rust-test".to_string()),
+        })
+        .expect("evidence durability manifest records");
+
+        assert_eq!(record.requested_by, "rust-test");
+        assert_eq!(record.status, "evidence_durability_manifest_recorded");
+        assert_eq!(record.source_history_status, "product_evidence_history_ready");
+        assert!(record.evidence_record_count >= 1);
+        assert_eq!(record.readable_record_count, record.evidence_record_count);
+        assert_eq!(record.missing_record_count, 0);
+        assert!(record.category_count >= 1);
+        assert!(record.manifest_input_bytes > 0);
+        assert!(record.manifest_hash.starts_with("fnv1a64:"));
+        assert!(record.latest_evidence_record_path.contains("gravity-omega-native"));
+        assert!(record
+            .categories
+            .iter()
+            .any(|category| category.category == "smoke"
+                && category.record_count >= 1
+                && category.readable_record_count >= 1
+                && category.latest_record_path == smoke.record_path));
+        assert!(record.local_manifest_recorded);
+        assert!(record.read_only);
+        assert!(record.history_enabled);
+        assert!(record.evidence_read_enabled);
+        assert!(!record.process_spawn_enabled);
+        assert!(!record.terminal_enabled);
+        assert!(!record.desktop_control_enabled);
+        assert!(!record.capture_enabled);
+        assert!(!record.file_write_enabled);
+        assert!(!record.patch_apply_enabled);
+        assert!(!record.export_enabled);
+        assert!(!record.live_mcp_call_enabled);
+        assert!(!record.config_read_enabled);
+        assert!(!record.memory_write_enabled);
+        assert!(!record.writes_allowed);
+        assert!(!record.execution_enabled);
+        assert!(record.blockers.is_empty());
+        assert!(fs::metadata(&record.record_path).is_ok());
+        assert!(fs::metadata(&record.log_path).is_ok());
+
+        let listed = list_evidence_durability_manifests()
+            .expect("evidence durability manifest list loads");
+        assert!(listed.iter().any(|item| item.id == record.id));
+        let history = product_evidence_history().expect("product evidence history includes manifest");
+        assert!(history
+            .categories
+            .iter()
+            .any(|category| category == "evidence-durability"));
+        assert!(history.items.iter().any(|item| {
+            item.category == "evidence-durability"
+                && item.record_path == record.record_path
+                && item.detail.contains("seal=fnv1a64:")
+        }));
+
+        let _ = fs::remove_dir_all(&test_root);
+        if let Some(value) = saved_state {
+            env::set_var("XDG_STATE_HOME", value);
+        } else {
+            env::remove_var("XDG_STATE_HOME");
+        }
     }
 
     #[test]

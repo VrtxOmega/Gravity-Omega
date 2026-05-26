@@ -161,6 +161,8 @@
         {"id": "codex_hermes_run_evidence_validation_summary", "safety": "safe"},
         {"id": "codex_hermes_run_evidence_operator_confirmation_dry_runs", "safety": "safe"},
         {"id": "omega_computer_session", "safety": "safe"},
+        {"id": "evidence_durability_manifest_record", "safety": "safe"},
+        {"id": "evidence_durability_manifest_list", "safety": "safe"},
         {"id": "steno_pet_companion_dashboard", "safety": "safe"},
         {"id": "terminal_process_lane_dashboard", "safety": "safe"},
         {"id": "approval_evidence_spine_dashboard", "safety": "safe"},

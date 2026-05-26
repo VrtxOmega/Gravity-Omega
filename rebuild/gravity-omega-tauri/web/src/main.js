@@ -29848,7 +29848,15 @@ footer {
 
   const loadProductEvidenceHistory = async () => {
     if (!invoke) return emptyProductEvidenceHistory();
+    await invoke("list_evidence_durability_manifests").catch(() => []);
     return invoke("product_evidence_history");
+  };
+
+  const recordEvidenceDurabilityManifest = async (requestedBy) => {
+    if (!invoke) return null;
+    return invoke("record_evidence_durability_manifest", {
+      request: { requested_by: requestedBy },
+    });
   };
 
   const runtimeEvidenceState = (ready, warning = false) => {
@@ -29884,6 +29892,7 @@ footer {
     const latestTerminalReplay = terminalRows[0] ?? null;
     const latestUnlockedRun = unlockedRows[0] ?? null;
     const historyItems = productHistory.items ?? [];
+    const latestDurabilityManifest = historyItems.find((item) => item.category === "evidence-durability") ?? null;
     const destructiveWriteEnabled = Boolean(
       productHistory.writes_allowed
       || latestTranscript?.writes_allowed
@@ -29911,7 +29920,7 @@ footer {
       || latestUnlockedRun?.process_spawn_enabled
       || productHistory.process_spawn_enabled
     );
-    const laneCount = 5;
+    const laneCount = 6;
 
     if (runtimeEvidenceSpineStatus) {
       const errorText = errors?.length ? `; ${errors.length} refresh issue(s)` : "";
@@ -29991,6 +30000,17 @@ footer {
         ),
       }),
       runtimeEvidenceCard({
+        title: "Evidence Durability",
+        meta: latestDurabilityManifest
+          ? latestDurabilityManifest.status
+          : "no manifest",
+        detail: latestDurabilityManifest
+          ? latestDurabilityManifest.detail
+          : "Refresh product evidence to record a local manifest/seal of readable evidence paths.",
+        path: latestDurabilityManifest?.record_path,
+        state: runtimeEvidenceState(Boolean(latestDurabilityManifest), historyItems.length > 0),
+      }),
+      runtimeEvidenceCard({
         title: "Safety Gates",
         meta: destructiveExecutionEnabled || destructiveWriteEnabled ? "attention required" : "destructive gates disabled",
         detail: `bounded_agent=${Boolean(latestUnlockedRun?.agent_prompt_execution_enabled)}; process_capture=${boundedProcessCapture}; export=${exportEnabled}; live_mcp=${liveMcpEnabled}`,
@@ -30025,8 +30045,9 @@ footer {
   };
 
   const renderProductEvidenceHistory = (history) => {
+    const durabilityItem = history.items?.find((item) => item.category === "evidence-durability") ?? null;
     if (evidenceHistoryStatus) {
-      evidenceHistoryStatus.textContent = `${history.status}; ${history.item_count ?? 0} records across ${history.category_count ?? 0} categories`;
+      evidenceHistoryStatus.textContent = `${history.status}; ${history.item_count ?? 0} records across ${history.category_count ?? 0} categories; durability=${durabilityItem?.status ?? "missing"}`;
     }
     if (!evidenceHistoryList) return;
     evidenceHistoryList.innerHTML = "";
@@ -30052,6 +30073,13 @@ footer {
   const refreshProductEvidenceHistory = async () => {
     if (!evidenceHistoryStatus && !evidenceHistoryList && !runtimeEvidenceSpineList) return;
     try {
+      const manifest = await recordEvidenceDurabilityManifest("product-evidence-history-refresh").catch((error) => {
+        setProblemText(`Evidence durability manifest failed: ${error.message}`);
+        return null;
+      });
+      if (manifest) {
+        appendEvidenceText(`Evidence durability manifest recorded: ${manifest.manifest_hash}`);
+      }
       const history = await loadProductEvidenceHistory();
       renderProductEvidenceHistory(history);
       await refreshRuntimeEvidenceSpine(history);

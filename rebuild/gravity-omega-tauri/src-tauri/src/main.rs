@@ -64,6 +64,8 @@ fn main() {
             commands::run_product_workbench_smoke,
             commands::list_product_workbench_smokes,
             commands::product_evidence_history,
+            commands::record_evidence_durability_manifest,
+            commands::list_evidence_durability_manifests,
             commands::veritas_modules_dashboard,
             commands::agent_runtime_status,
             commands::provider_settings_dashboard,
