@@ -97195,6 +97195,7 @@ fn codex_hermes_run_evidence_diff_item(
 pub fn codex_hermes_run_evidence_diff_board(
 ) -> Result<CodexHermesRunEvidenceDiffBoard, String> {
     let comparison = codex_hermes_run_selection_comparison()?;
+    let run_view = codex_hermes_run_view_dashboard()?;
     let codex = comparison
         .runtime_lanes
         .iter()
@@ -97276,6 +97277,22 @@ pub fn codex_hermes_run_evidence_diff_board(
             hermes.ready_evidence_count,
             "Use Gravity Omega reconciliation to close evidence gaps before live execution or mutation gates open.",
         ),
+        codex_hermes_run_evidence_diff_item(
+            "postmortem-failures",
+            "Postmortem failures",
+            "failure_postmortem_count",
+            run_view.agent_session_failure_count,
+            run_view.hermes_assist_failure_count,
+            "Compare Codex agent failures against Hermes/Kimi assist failures before retrying or delegating.",
+        ),
+        codex_hermes_run_evidence_diff_item(
+            "postmortem-timeouts",
+            "Postmortem timeouts",
+            "timeout_postmortem_count",
+            run_view.agent_session_timeout_count,
+            run_view.hermes_assist_timeout_count,
+            "Compare timeout pressure across Codex and Hermes/Kimi before launching another long run.",
+        ),
     ];
 
     let balanced_diff_count = diffs.iter().filter(|diff| diff.balanced).count();
@@ -97323,7 +97340,7 @@ pub fn codex_hermes_run_evidence_diff_board(
         execution_enabled: false,
         diffs,
         reasons: vec![
-            "evidence diff board derives Codex-vs-Hermes parity gaps from the read-only run selection comparison",
+            "evidence diff board derives Codex-vs-Hermes parity gaps from the read-only run selection comparison and postmortem run-view counts",
             "diffs are advisory evidence only and do not create, select, mutate, reorder, delete, export, or execute any run records",
             "process spawn, terminal control, live MCP calls, writes, patches, desktop control, capture, export, memory writes, workspace writes, and execution remain disabled",
         ],
@@ -116410,13 +116427,13 @@ mod tests {
         );
         assert_eq!(evidence_diff_board.active_task_run_id, stub.id);
         assert!(evidence_diff_board.selected_run_found);
-        assert_eq!(evidence_diff_board.diff_count, 8);
-        assert_eq!(evidence_diff_board.balanced_diff_count, 3);
+        assert_eq!(evidence_diff_board.diff_count, 10);
+        assert_eq!(evidence_diff_board.balanced_diff_count, 5);
         assert_eq!(evidence_diff_board.gap_diff_count, 5);
         assert_eq!(evidence_diff_board.codex_ready_evidence_count, 8);
         assert_eq!(evidence_diff_board.hermes_ready_evidence_count, 3);
         assert_eq!(evidence_diff_board.gravity_ready_evidence_count, 2);
-        assert_eq!(evidence_diff_board.disabled_gate_count, 8);
+        assert_eq!(evidence_diff_board.disabled_gate_count, 10);
         assert!(evidence_diff_board.read_only);
         assert!(!evidence_diff_board.process_spawn_enabled);
         assert!(!evidence_diff_board.terminal_enabled);
@@ -116483,6 +116500,24 @@ mod tests {
                 && diff.delta == 5
                 && diff.gap_detected
         }));
+        assert!(evidence_diff_board.diffs.iter().any(|diff| {
+            diff.diff_id == "postmortem-failures"
+                && diff.metric == "failure_postmortem_count"
+                && diff.source_count == 1
+                && diff.target_count == 1
+                && diff.delta == 0
+                && diff.balanced
+                && !diff.gap_detected
+        }));
+        assert!(evidence_diff_board.diffs.iter().any(|diff| {
+            diff.diff_id == "postmortem-timeouts"
+                && diff.metric == "timeout_postmortem_count"
+                && diff.source_count == 1
+                && diff.target_count == 1
+                && diff.delta == 0
+                && diff.balanced
+                && !diff.gap_detected
+        }));
         assert!(evidence_diff_board.diffs.iter().all(|diff| {
             diff.read_only
                 && diff.source_runtime == "codex"
@@ -116508,15 +116543,15 @@ mod tests {
         );
         assert_eq!(reconciliation_checklist.active_task_run_id, stub.id);
         assert!(reconciliation_checklist.selected_run_found);
-        assert_eq!(reconciliation_checklist.checklist_count, 9);
-        assert_eq!(reconciliation_checklist.ready_check_count, 4);
-        assert_eq!(reconciliation_checklist.balanced_check_count, 4);
+        assert_eq!(reconciliation_checklist.checklist_count, 11);
+        assert_eq!(reconciliation_checklist.ready_check_count, 6);
+        assert_eq!(reconciliation_checklist.balanced_check_count, 6);
         assert_eq!(reconciliation_checklist.gap_check_count, 5);
         assert_eq!(reconciliation_checklist.action_required_count, 5);
         assert_eq!(reconciliation_checklist.codex_ready_evidence_count, 8);
         assert_eq!(reconciliation_checklist.hermes_ready_evidence_count, 3);
         assert_eq!(reconciliation_checklist.gravity_ready_evidence_count, 2);
-        assert_eq!(reconciliation_checklist.disabled_gate_count, 9);
+        assert_eq!(reconciliation_checklist.disabled_gate_count, 11);
         assert!(reconciliation_checklist.read_only);
         assert!(!reconciliation_checklist.process_spawn_enabled);
         assert!(!reconciliation_checklist.terminal_enabled);
@@ -116554,6 +116589,24 @@ mod tests {
                 && item.hermes_count == 3
         }));
         assert!(reconciliation_checklist.checklist.iter().any(|item| {
+            item.item_id == "reconcile-postmortem-failures"
+                && item.ready
+                && item.balanced
+                && !item.action_required
+                && item.metric == "failure_postmortem_count"
+                && item.codex_count == 1
+                && item.hermes_count == 1
+        }));
+        assert!(reconciliation_checklist.checklist.iter().any(|item| {
+            item.item_id == "reconcile-postmortem-timeouts"
+                && item.ready
+                && item.balanced
+                && !item.action_required
+                && item.metric == "timeout_postmortem_count"
+                && item.codex_count == 1
+                && item.hermes_count == 1
+        }));
+        assert!(reconciliation_checklist.checklist.iter().any(|item| {
             item.item_id == "gravity-omega-reconciliation"
                 && item.ready
                 && item.balanced
@@ -116589,8 +116642,8 @@ mod tests {
         assert_eq!(reconciliation_action_plan.gap_action_count, 5);
         assert_eq!(reconciliation_action_plan.blocked_action_count, 5);
         assert_eq!(reconciliation_action_plan.missing_evidence_total, 10);
-        assert_eq!(reconciliation_action_plan.checklist_count, 9);
-        assert_eq!(reconciliation_action_plan.ready_check_count, 4);
+        assert_eq!(reconciliation_action_plan.checklist_count, 11);
+        assert_eq!(reconciliation_action_plan.ready_check_count, 6);
         assert_eq!(reconciliation_action_plan.action_required_count, 5);
         assert_eq!(reconciliation_action_plan.codex_ready_evidence_count, 8);
         assert_eq!(reconciliation_action_plan.hermes_ready_evidence_count, 3);

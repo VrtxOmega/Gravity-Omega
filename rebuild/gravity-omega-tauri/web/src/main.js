@@ -7048,6 +7048,7 @@ async function loadCodexHermesRunEvidenceDiffBoard() {
   }
 
   const comparison = await loadCodexHermesRunSelectionComparison();
+  const runView = await loadCodexHermesRunViewDashboard();
   const laneFor = (runtime) => (comparison.runtime_lanes ?? []).find((lane) => lane.runtime === runtime) ?? {};
   const codex = laneFor("codex");
   const hermes = laneFor("hermes");
@@ -7061,6 +7062,8 @@ async function loadCodexHermesRunEvidenceDiffBoard() {
     ["export-policies", "Export policies", "export_policy_ready_count", codex.export_policy_ready_count ?? 0, hermes.export_policy_ready_count ?? 0, "Keep export disabled until both runtimes have consent and destination policy evidence."],
     ["protection-policies", "Protection policies", "protection_policy_ready_count", codex.protection_policy_ready_count ?? 0, hermes.protection_policy_ready_count ?? 0, "Keep redaction, retention, deletion, clipboard, share, and export actions disabled until both runtimes have protection policy evidence."],
     ["total-ready-evidence", "Total ready evidence", "ready_evidence_count", codex.ready_evidence_count ?? 0, hermes.ready_evidence_count ?? 0, "Use Gravity Omega reconciliation to close evidence gaps before live execution or mutation gates open."],
+    ["postmortem-failures", "Postmortem failures", "failure_postmortem_count", runView.agent_session_failure_count ?? 0, runView.hermes_assist_failure_count ?? 0, "Compare Codex agent failures against Hermes/Kimi assist failures before retrying or delegating."],
+    ["postmortem-timeouts", "Postmortem timeouts", "timeout_postmortem_count", runView.agent_session_timeout_count ?? 0, runView.hermes_assist_timeout_count ?? 0, "Compare timeout pressure across Codex and Hermes/Kimi before launching another long run."],
   ];
   const diffs = diffSource.map(([diff_id, title, metric, source_count, target_count, recommendation]) => {
     const delta = source_count - target_count;
@@ -7119,7 +7122,7 @@ async function loadCodexHermesRunEvidenceDiffBoard() {
     execution_enabled: false,
     diffs,
     reasons: [
-      "Static preview exposes Codex/Hermes evidence diffs while every live gate remains disabled.",
+      "Static preview exposes Codex/Hermes evidence and postmortem diffs while every live gate remains disabled.",
     ],
     next_slice: "Resolve through Rust inside Tauri.",
   };
