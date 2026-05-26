@@ -5372,6 +5372,30 @@ pub struct StenoPetCompanionDashboardSection {
     pub execution_enabled: bool,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct PetRuntimeAttentionItem {
+    pub item_id: String,
+    pub state: String,
+    pub source: String,
+    pub title: String,
+    pub message: String,
+    pub severity: String,
+    pub progress: u8,
+    pub related_record_path: Option<String>,
+    pub created_at_ms: u64,
+    pub read_only: bool,
+    pub steno_write_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub terminal_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+}
+
 #[derive(Debug, Serialize)]
 pub struct StenoPetCompanionDashboard {
     pub status: &'static str,
@@ -5392,6 +5416,9 @@ pub struct StenoPetCompanionDashboard {
     pub latest_pet_state: String,
     pub latest_pet_signal_status: String,
     pub recent_pet_runtime_signals: Vec<PetRuntimeSignalRecord>,
+    pub pet_attention_item_count: usize,
+    pub latest_pet_attention_state: String,
+    pub recent_pet_attention_items: Vec<PetRuntimeAttentionItem>,
     pub runtime_process_snapshot_count: usize,
     pub latest_runtime_process_snapshot_status: String,
     pub latest_runtime_process_snapshot_path: Option<String>,
@@ -99453,6 +99480,164 @@ fn normalize_pet_runtime_severity(value: Option<String>, state: &str) -> String 
     }
 }
 
+fn pet_runtime_attention_item(
+    source: &'static str,
+    state: &'static str,
+    severity: &'static str,
+    title: &'static str,
+    message: String,
+    progress: u8,
+    related_record_path: Option<String>,
+    created_at_ms: u64,
+) -> PetRuntimeAttentionItem {
+    let path_slug = related_record_path
+        .as_deref()
+        .map(|path| slug_limit(path, 80))
+        .unwrap_or_else(|| "no-record".to_string());
+    PetRuntimeAttentionItem {
+        item_id: format!("{source}-{created_at_ms}-{path_slug}"),
+        state: state.to_string(),
+        source: source.to_string(),
+        title: title.to_string(),
+        message: prompt_preview(&message, 600),
+        severity: severity.to_string(),
+        progress,
+        related_record_path,
+        created_at_ms,
+        read_only: true,
+        steno_write_enabled: false,
+        memory_write_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        terminal_enabled: false,
+        process_spawn_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+    }
+}
+
+fn pet_runtime_attention_items(
+    agent_sessions: &[UnlockedAgentPromptSessionRecord],
+    hermes_assists: &[HermesKimiAssistBriefRecord],
+    blocked_terminal_commands: &[ProductTerminalBlockedCommandRecord],
+    process_control_policies: &[ProcessControlPolicyRecord],
+    process_exit_summaries: &[ProcessSupervisorExitSummaryRecord],
+) -> Vec<PetRuntimeAttentionItem> {
+    let mut items = Vec::new();
+
+    for record in agent_sessions
+        .iter()
+        .filter(|record| unlocked_agent_session_is_postmortem(record))
+        .take(4)
+    {
+        items.push(pet_runtime_attention_item(
+            "codex-agent-postmortem",
+            "error",
+            "error",
+            "Codex agent postmortem needs attention",
+            format!(
+                "{}; timed_out={}; exit={:?}; duration={}ms; next={}",
+                record.status,
+                record.timed_out,
+                record.exit_code,
+                record.duration_ms,
+                record.next_step
+            ),
+            100,
+            Some(record.record_path.clone()),
+            record.updated_at_ms.max(record.created_at_ms),
+        ));
+    }
+
+    for record in hermes_assists
+        .iter()
+        .filter(|record| hermes_assist_is_postmortem(record))
+        .take(4)
+    {
+        let blocker = record
+            .blockers
+            .first()
+            .cloned()
+            .unwrap_or_else(|| record.next_step.clone());
+        items.push(pet_runtime_attention_item(
+            "hermes-kimi-postmortem",
+            "warning",
+            "warning",
+            "Hermes/Kimi assist postmortem needs review",
+            format!(
+                "{}; timed_out={}; exit={:?}; duration={}ms; blocker={}",
+                record.status, record.timed_out, record.exit_code, record.duration_ms, blocker
+            ),
+            80,
+            Some(record.record_path.clone()),
+            record.created_at_ms,
+        ));
+    }
+
+    for record in blocked_terminal_commands.iter().take(4) {
+        items.push(pet_runtime_attention_item(
+            "terminal-blocked",
+            "warning",
+            "warning",
+            "Blocked terminal command needs operator review",
+            format!(
+                "{}; mode={}; reason={}; command={}",
+                record.status, record.requested_mode, record.denied_reason, record.command_preview
+            ),
+            65,
+            Some(record.record_path.clone()),
+            record.created_at_ms,
+        ));
+    }
+
+    for record in process_control_policies.iter().take(4) {
+        items.push(pet_runtime_attention_item(
+            "process-control-policy",
+            "reminder",
+            "warning",
+            "Process control policy awaiting release gate",
+            format!(
+                "{} requested for lifecycle {}; signal={}; retry_spawn={}; process_spawn={}; exec={}",
+                record.requested_action,
+                record.process_lifecycle_id,
+                record.signal_enabled,
+                record.retry_spawn_enabled,
+                record.process_spawn_enabled,
+                record.execution_enabled
+            ),
+            35,
+            Some(record.record_path.clone()),
+            record.updated_at_ms.max(record.created_at_ms),
+        ));
+    }
+
+    for record in process_exit_summaries.iter().take(4) {
+        items.push(pet_runtime_attention_item(
+            "process-exit-summary",
+            "reminder",
+            "info",
+            "Process exit summary recorded without live process",
+            format!(
+                "{}; final_state={}; exit_code={:?}; process_started={}; exec={}",
+                record.status,
+                record.final_supervisor_state,
+                record.exit_code,
+                record.process_started,
+                record.execution_enabled
+            ),
+            50,
+            Some(record.record_path.clone()),
+            record.updated_at_ms.max(record.created_at_ms),
+        ));
+    }
+
+    items.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    items.truncate(8);
+    items
+}
+
 #[tauri::command]
 pub fn record_pet_runtime_signal(
     request: PetRuntimeSignalRequest,
@@ -99698,6 +99883,22 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
     let pet_runtime_signals = list_pet_runtime_signals()?;
     let runtime_process_snapshots = list_runtime_sidecar_process_snapshots().unwrap_or_default();
     let latest_runtime_process_snapshot = runtime_process_snapshots.first();
+    let agent_sessions = list_unlocked_agent_prompt_sessions().unwrap_or_default();
+    let hermes_assists = list_hermes_kimi_assist_briefs().unwrap_or_default();
+    let blocked_terminal_commands = list_product_terminal_blocked_commands(6).unwrap_or_default();
+    let process_control_policies = list_process_control_policies().unwrap_or_default();
+    let process_exit_summaries = list_process_supervisor_exit_summaries().unwrap_or_default();
+    let recent_pet_attention_items = pet_runtime_attention_items(
+        &agent_sessions,
+        &hermes_assists,
+        &blocked_terminal_commands,
+        &process_control_policies,
+        &process_exit_summaries,
+    );
+    let latest_pet_attention_state = recent_pet_attention_items
+        .first()
+        .map(|item| item.state.clone())
+        .unwrap_or_else(|| "idle".to_string());
 
     let transcript_bundle_ready_count = transcript_bundles
         .iter()
@@ -99910,6 +100111,9 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
             .map(|record| record.status.clone())
             .unwrap_or_else(|| "pet_runtime_signal_waiting".to_string()),
         recent_pet_runtime_signals,
+        pet_attention_item_count: recent_pet_attention_items.len(),
+        latest_pet_attention_state,
+        recent_pet_attention_items,
         runtime_process_snapshot_count: runtime_process_snapshots.len(),
         latest_runtime_process_snapshot_status: latest_runtime_process_snapshot
             .map(|record| record.status.clone())
@@ -111957,6 +112161,24 @@ mod tests {
         assert!(!terminal_process_dashboard.process_control_enabled);
         assert!(!terminal_process_dashboard.writes_allowed);
         assert!(!terminal_process_dashboard.execution_enabled);
+
+        let pet_dashboard =
+            steno_pet_companion_dashboard().expect("pet dashboard loads blocked terminal attention");
+        assert!(pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "terminal-blocked"
+                    && item.related_record_path.as_deref()
+                        == Some(blocked_record.record_path.as_str())
+                    && item.state == "warning"
+                    && item.title.contains("Blocked terminal command")
+                    && item.read_only
+                    && !item.terminal_enabled
+                    && !item.process_spawn_enabled
+                    && !item.writes_allowed
+                    && !item.execution_enabled
+            }));
         assert!(
             record_product_terminal_transcript_replay(ProductTerminalTranscriptReplayRequest {
                 session_record_path: Some("/etc/passwd".to_string()),
@@ -113149,6 +113371,27 @@ mod tests {
                 && !record.desktop_control_enabled
                 && !record.writes_allowed
                 && !record.execution_enabled));
+        assert_eq!(
+            dashboard.pet_attention_item_count,
+            dashboard.recent_pet_attention_items.len()
+        );
+        assert!(matches!(
+            dashboard.latest_pet_attention_state.as_str(),
+            "idle" | "error" | "warning" | "reminder" | "success" | "working" | "thinking"
+        ));
+        assert!(dashboard.recent_pet_attention_items.iter().all(|item| {
+            item.read_only
+                && !item.steno_write_enabled
+                && !item.memory_write_enabled
+                && !item.live_mcp_call_enabled
+                && !item.file_write_enabled
+                && !item.patch_apply_enabled
+                && !item.desktop_control_enabled
+                && !item.terminal_enabled
+                && !item.process_spawn_enabled
+                && !item.writes_allowed
+                && !item.execution_enabled
+        }));
         let history = product_evidence_history().expect("product evidence history loads");
         assert!(history.categories.iter().any(|category| category == "pet-signal"));
     }
@@ -119188,6 +119431,56 @@ mod tests {
         assert_eq!(steno_pet_dashboard.pet_inventory_ready_count, 1);
         assert_eq!(steno_pet_dashboard.pet_readiness_count, 1);
         assert_eq!(steno_pet_dashboard.pet_readiness_ready_count, 1);
+        assert!(steno_pet_dashboard.pet_attention_item_count >= 5);
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "codex-agent-postmortem"
+                    && item.state == "error"
+                    && item.related_record_path.as_deref()
+                        == Some(agent_session_record.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "hermes-kimi-postmortem"
+                    && item.state == "warning"
+                    && item.related_record_path.as_deref()
+                        == Some(failed_assist_record.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "process-control-policy"
+                    && item.state == "reminder"
+                    && item.related_record_path.as_deref()
+                        == Some(retry_policy.policy.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "process-exit-summary"
+                    && item.state == "reminder"
+                    && item.related_record_path.as_deref()
+                        == Some(exit_summary.summary.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard.recent_pet_attention_items.iter().all(|item| {
+            item.read_only
+                && !item.steno_write_enabled
+                && !item.memory_write_enabled
+                && !item.live_mcp_call_enabled
+                && !item.file_write_enabled
+                && !item.patch_apply_enabled
+                && !item.desktop_control_enabled
+                && !item.terminal_enabled
+                && !item.process_spawn_enabled
+                && !item.writes_allowed
+                && !item.execution_enabled
+        }));
         assert_eq!(steno_pet_dashboard.disabled_gate_count, 5);
         assert!(steno_pet_dashboard.read_only);
         assert!(steno_pet_dashboard.steno_first_class);

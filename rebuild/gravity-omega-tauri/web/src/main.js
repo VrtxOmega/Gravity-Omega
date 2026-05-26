@@ -5808,6 +5808,8 @@ function renderStenoPetCompanionDashboard(dashboard) {
     `stenoProc=${dashboard.steno_runtime_process_count ?? 0}`,
     `sswpProc=${dashboard.sswp_runtime_process_count ?? 0}`,
     `hermesProc=${dashboard.hermes_runtime_process_count ?? 0}`,
+    `attention=${dashboard.pet_attention_item_count ?? 0}`,
+    `attentionState=${dashboard.latest_pet_attention_state ?? "idle"}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `capture=${dashboard.capture_enabled}`,
     `export=${dashboard.export_enabled}`,
@@ -5816,7 +5818,11 @@ function renderStenoPetCompanionDashboard(dashboard) {
 
   clearList(stenoPetCompanionDashboardList);
   const sections = dashboard.sections ?? [];
-  stenoPetCompanionDashboardCount.textContent = String(sections.length);
+  const petAttentionItems = dashboard.recent_pet_attention_items ?? [];
+  const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
+  stenoPetCompanionDashboardCount.textContent = String(
+    sections.length + petAttentionItems.length + recentPetSignals.length + 1,
+  );
 
   const runtimeNode = item(
     "Live runtime processes",
@@ -5826,7 +5832,20 @@ function renderStenoPetCompanionDashboard(dashboard) {
   runtimeNode.dataset.state = (dashboard.running_runtime_target_count ?? 0) > 0 ? "ok" : "warning";
   stenoPetCompanionDashboardList.append(runtimeNode);
 
-  const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
+  for (const attention of petAttentionItems.slice(0, 8)) {
+    const attentionNode = item(
+      `Pet attention: ${attention.title ?? "Runtime evidence"}`,
+      `${attention.state ?? "idle"} / ${attention.source ?? "runtime"} / ${attention.progress ?? 0}%`,
+      `${attention.message ?? "Runtime attention item recorded."}\n${attention.related_record_path ?? ""}`,
+    );
+    attentionNode.dataset.state = attention.state === "error"
+      ? "error"
+      : attention.state === "warning" || attention.state === "reminder"
+        ? "warning"
+        : attention.state === "success" ? "ok" : "ready";
+    stenoPetCompanionDashboardList.append(attentionNode);
+  }
+
   for (const signal of recentPetSignals.slice(0, 6)) {
     const signalNode = item(
       `Pet signal: ${signal.state ?? "idle"}`,
@@ -8103,6 +8122,9 @@ async function loadStenoPetCompanionDashboard() {
     latest_pet_state: "idle",
     latest_pet_signal_status: "pet_runtime_signal_waiting",
     recent_pet_runtime_signals: [],
+    pet_attention_item_count: 0,
+    latest_pet_attention_state: "idle",
+    recent_pet_attention_items: [],
     runtime_process_snapshot_count: 0,
     latest_runtime_process_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
     latest_runtime_process_snapshot_path: null,
@@ -30765,9 +30787,23 @@ footer {
       `pet=${dashboard.pet_readiness_ready_count ?? 0}/${dashboard.pet_readiness_count ?? 0}`,
       `runtime=${dashboard.latest_pet_state ?? petCompanionRuntimeState.state}`,
       `signals=${dashboard.pet_runtime_signal_count ?? 0}`,
+      `attention=${dashboard.pet_attention_item_count ?? 0}`,
       `disabled=${dashboard.disabled_gate_count ?? 0}`,
     ]);
     renderPetRuntimeCard();
+
+    const petAttentionItems = dashboard.recent_pet_attention_items ?? [];
+    for (const attention of petAttentionItems.slice(0, 8)) {
+      appendProductDashboardCard(
+        stenoPetDashboardList,
+        `Pet attention: ${attention.title ?? "Runtime evidence"}`,
+        `${attention.state ?? "idle"} / ${attention.source ?? "runtime"} / ${attention.progress ?? 0}%`,
+        `${attention.message ?? "Runtime attention item recorded."}${attention.related_record_path ? ` Evidence: ${compactPath(attention.related_record_path)}` : ""}`,
+        attention.state === "error"
+          ? "error"
+          : attention.state === "warning" || attention.state === "reminder" ? "gated" : "ready"
+      );
+    }
 
     const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
     for (const signal of recentPetSignals.slice(0, 6)) {
