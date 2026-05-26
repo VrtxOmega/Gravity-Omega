@@ -565,6 +565,7 @@ for (const productBridgeNeedle of [
   "waitForProductPaint",
   "agentRunStartingText",
   "agentRunAcceptedText",
+  "agentRunFinalSummaryText",
   "codexLeadAssistTimeoutMs",
   "updateCodexLeadPreparationStatus",
   "is starting now.",
@@ -575,6 +576,10 @@ for (const productBridgeNeedle of [
   "runPrimaryAgentWork",
   "createComparisonSummary",
   "compareExistingAgentEvidence",
+  "isAgentRunStatusFollowup",
+  "runLatestAgentRunStatusRecap",
+  "Latest Omega Computer recap",
+  "mode=local-evidence-recap",
   "Compare reads existing Codex/Hermes evidence only; it does not launch live agents.",
   "codex-hermes-compare-preview",
   "compare does not launch live agents",
@@ -868,6 +873,11 @@ if (!primaryFunctionMatch) {
   throw new Error("Primary agent work function could not be found.");
 }
 
+const primaryFunctionBody = primaryFunctionMatch[0];
+if (!primaryFunctionBody.includes("isAgentRunStatusFollowup(prompt)") || !primaryFunctionBody.includes("runLatestAgentRunStatusRecap(prompt)")) {
+  throw new Error("Primary agent work must answer status/recap follow-ups from existing evidence instead of launching a new run.");
+}
+
 const sendHandlerMatch = frontendSource.match(/sendBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*?\n  \}\);\n\n  const runVisibleAgent/);
 if (!sendHandlerMatch || !sendHandlerMatch[0].includes("runPrimaryAgentWork")) {
   throw new Error("Primary composer Send button must run the Codex Lead + Hermes/Kimi main work path.");
@@ -897,6 +907,14 @@ if (!frontendSource.includes("const recordAgentRunLifecycleEvent = (eventName") 
 
 if (!frontendSource.includes("agentRunStaleEventThresholdMs") || !frontendSource.includes("stale-stream-warning")) {
   throw new Error("Agent run watchdog must emit explicit stale-stream warnings without clearing the run gate.");
+}
+
+if (!frontendSource.includes("Omega Agent Work is still being updated in Monaco.")) {
+  throw new Error("Agent run watchdog must update the visible chat answer when a stream goes quiet.");
+}
+
+if (!frontendSource.includes("agentRunFinalSummaryText({ label, runtime, payload, readback, loaded })")) {
+  throw new Error("Agent stream completion must replace the running chat bubble with a final evidence summary.");
 }
 
 if (!codexLeadFunctionBody.includes("updateAgentRunGate({")) {

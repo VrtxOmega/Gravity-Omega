@@ -25750,6 +25750,16 @@ function initOmegaProductShell() {
     const seconds = Math.round(quietMs / 1000);
     const message = `${activeAgentRun.label || "Agent run"} is still active but has not emitted a stream event for ${seconds}s (session=${session}).`;
     setProductStatus(message, "warning");
+    updateAgentAnswerMessage(
+      `${activeAgentRun.label || "Agent run"} still working`,
+      [
+        message,
+        "Omega Agent Work is still being updated in Monaco.",
+        activeAgentRun.recordPath ? `Evidence: ${activeAgentRun.recordPath}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
     appendAgentWorkArtifact("Run Lifecycle Watchdog", message);
     recordAgentRunLifecycleEvent("stale-stream-warning", { phase: activeAgentRun.phase || "streaming" }, { markFresh: false });
     setPetCompanionRuntimeState({
@@ -26550,6 +26560,28 @@ function initOmegaProductShell() {
       value.slice(0, max),
       "",
       `[long prompt clipped in ${surface}: ${value.length} chars total, ${value.length - max} hidden here. Full request is sent to the agent runner; detailed evidence belongs in Omega Agent Work and run records.]`,
+    ].join("\n");
+  };
+
+  const agentRunFinalSummaryText = ({ label = "Agent run", runtime = "agent", payload = {}, readback = {}, loaded = [] } = {}) => {
+    const record = readback.record ?? {};
+    const answer = String(readback.answer ?? "").trim();
+    const recordPath = payload.record_path || record.record_path || "none";
+    const durationMs = record.duration_ms ?? payload.duration_ms ?? "n/a";
+    const durationLine = Number.isFinite(Number(durationMs)) ? `${durationMs}ms` : String(durationMs);
+    return [
+      `${label} finished${payload.exit_code === 0 ? " successfully" : " with an issue"}.`,
+      `Runtime: ${runtime}`,
+      `Status: ${payload.status || record.status || "unknown"}`,
+      `Exit: ${payload.exit_code ?? record.exit_code ?? "none"}`,
+      `Duration: ${durationLine}`,
+      `Evidence: ${recordPath}`,
+      "Omega Agent Work: updated in Monaco with plan, files, commands, warnings, and verification evidence.",
+      loaded.length ? `Generated/changed tabs loaded: ${loaded.join(", ")}` : "Generated/changed tabs loaded: none detected from stream text.",
+      "",
+      answer
+        ? `Readable answer:\n${limitText(answer, 1800)}`
+        : "No readable final answer was captured in the chat stream; use Omega Agent Work and the evidence record above.",
     ].join("\n");
   };
 
@@ -30886,7 +30918,11 @@ footer {
               `answer_readback=${readback.answer ? "captured" : "empty"}`,
             ].join("\n")
           );
-          await hydrateAgentWorkFileCandidates();
+          const loaded = await hydrateAgentWorkFileCandidates();
+          updateAgentAnswerMessage(
+            payload.exit_code === 0 ? `${label} finished` : `${label} finished with issue`,
+            agentRunFinalSummaryText({ label, runtime, payload, readback, loaded })
+          );
           if (payload.exit_code === 0) {
             setPetCompanionRuntimeState({
               state: "success",
@@ -31957,6 +31993,102 @@ footer {
     return { sessions, codex, hermes, summary };
   };
 
+  const isAgentRunStatusFollowup = (prompt = "") => {
+    const text = String(prompt ?? "").trim().toLowerCase();
+    if (!text || text.length > 600) return false;
+    return /\b(how'?s it going|how did it go|how was everything|what happened|what did you do|did it finish|status|progress|recap|summary|where are we|how did everything go)\b/.test(text);
+  };
+
+  const latestAgentSession = (sessions = []) =>
+    sessions
+      .filter((session) => session?.record_path || session?.id || session?.status)
+      .sort((left, right) => Number(right?.created_at_ms ?? 0) - Number(left?.created_at_ms ?? 0))[0] ?? null;
+
+  const latestAgentWorkExcerpt = () => {
+    const tab = openEditorTabs.find((item) => item.path === agentWorkArtifactPath);
+    const content = String(
+      activeAgentWorkArtifact?.content ||
+        tab?.content ||
+        (activeFilePath === agentWorkArtifactPath ? getEditorValue() : "") ||
+        ""
+    );
+    if (!content.trim()) {
+      return "Omega Agent Work is not currently loaded in the editor session.";
+    }
+    const markers = ["### Verification Results", "## Run Result", "## Generated/Changed File Tabs", "## Issues, warnings, and next actions"];
+    const markerIndex = markers
+      .map((marker) => content.lastIndexOf(marker))
+      .filter((index) => index >= 0)
+      .sort((left, right) => right - left)[0];
+    const excerpt = markerIndex >= 0 ? content.slice(markerIndex) : content.slice(Math.max(0, content.length - 1800));
+    return limitText(excerpt.trim(), 1800);
+  };
+
+  const runLatestAgentRunStatusRecap = async (prompt = "") => {
+    if (activeAgentRun || activeAgentStreamId) {
+      setProductStatus(`Status recap waits for the active run to finish. ${describeActiveAgentRun()}`, "warning");
+      return;
+    }
+    appendPromptMessage("user", prompt);
+    productInput.value = "";
+    const recapMessage = createAgentAnswerMessage("Latest Omega Computer recap", "Reading latest captured run evidence. This does not launch a new agent.");
+    const updateRecap = (title, text) => {
+      recapMessage.title.textContent = title;
+      recapMessage.body.textContent = text;
+      scrollProductMessages();
+    };
+
+    setAgentRunControlsDisabled(true);
+    setProductStatus("Reading latest Omega Computer run evidence without launching agents.", "running");
+    await waitForProductPaint();
+    try {
+      const sessions = await loadUnlockedAgentPromptSessions().catch((error) => {
+        setProblemText(`Latest run recap read failed: ${error.message}`);
+        return [];
+      });
+      const latest = latestAgentSession(sessions);
+      const codex = comparisonRecordFromSession(latestAgentSessionForComparison(sessions, "codex"), "Codex");
+      const hermes = comparisonRecordFromSession(latestAgentSessionForComparison(sessions, "hermes"), "Hermes/Kimi");
+      const latestRecord = comparisonRecordFromSession(latest, "Latest run");
+      const summaryLines = [
+        "Latest Omega Computer recap.",
+        "No live Codex/Hermes/Kimi execution was launched for this status question.",
+        `Evidence scanned: ${sessions.length} captured session(s).`,
+        latestRecord ? formatComparisonEvidenceLine(latestRecord) : "Latest run: missing",
+        formatComparisonEvidenceLine(codex),
+        formatComparisonEvidenceLine(hermes),
+        "",
+        "Latest readable output:",
+        latest ? limitText(displayTextFromAgentRecord(latest), 1400) : "No unlocked agent session records were found.",
+        "",
+        "Omega Agent Work excerpt:",
+        latestAgentWorkExcerpt(),
+      ];
+      const summary = summaryLines.join("\n");
+      updateRecap("Latest Omega Computer recap", summary);
+      setOutputText(summary);
+      appendAgentWorkArtifact(
+        "Latest Run Recap",
+        [
+          `prompt=${compactMultilineForAgentWork(prompt || "(status follow-up)", 500)}`,
+          "mode=local-evidence-recap",
+          latestRecord ? formatComparisonEvidenceLine(latestRecord) : "latest=missing",
+          formatComparisonEvidenceLine(codex),
+          formatComparisonEvidenceLine(hermes),
+        ].join("\n")
+      );
+      appendEvidenceText(`latest Omega Computer recap read from existing evidence; sessions=${sessions.length}; latest=${latest?.record_path || "missing"}`);
+      await Promise.allSettled([refreshProductAgentRunCenter(), refreshProductEvidenceHistory()]);
+      setProductStatus("Latest Omega Computer recap posted from existing evidence.", latest ? "done" : "warning");
+    } catch (error) {
+      updateRecap("Latest Omega Computer recap failed", error.message);
+      setProblemText(`Latest Omega Computer recap failed: ${error.message}`);
+      setProductStatus(`Latest Omega Computer recap failed: ${error.message}`, "error");
+    } finally {
+      setAgentRunControlsDisabled(false);
+    }
+  };
+
   const runAgentEvidenceComparison = async () => {
     const prompt = getPrompt();
     if (activeAgentRun || activeAgentStreamId) {
@@ -32639,6 +32771,11 @@ footer {
   };
 
   const runPrimaryAgentWork = async () => {
+    const prompt = getPrompt();
+    if (isAgentRunStatusFollowup(prompt)) {
+      await runLatestAgentRunStatusRecap(prompt);
+      return;
+    }
     await runAgentComparison();
   };
 

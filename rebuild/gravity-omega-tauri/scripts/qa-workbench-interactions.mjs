@@ -379,6 +379,14 @@ async function workbenchQa() {
     chatInput.value = longPrompt;
     chatInput.dispatchEvent(new Event("input", { bubbles: true }));
     assert(chatInput.value.length > 3000, "chat input accepts long dictated prompt text");
+    chatInput.value = "how did it go";
+    chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+    if (await click("#omega-parity-send", "run-button:status-recap")) {
+      assert(text("#omega-parity-chat-messages").includes("Latest Omega Computer recap"), "status follow-up posts latest run recap");
+      assert(text("#omega-product-status-detail").toLowerCase().includes("recap"), "status follow-up updates status detail");
+    }
+    chatInput.value = longPrompt;
+    chatInput.dispatchEvent(new Event("input", { bubbles: true }));
   } else {
     failures.push("chat input is missing");
   }
