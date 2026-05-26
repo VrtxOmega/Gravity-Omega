@@ -175,6 +175,15 @@ for (const unlockedNeedle of [
   "HermesKimiAssistBriefRecord",
   "hermes-kimi-assist-briefs",
   "<compact-assist-query>",
+  "spawn_hermes_kimi_pipe_reader",
+  "run_hermes_kimi_assist_process_with_binary",
+  "query_transport",
+  "argv_char_count",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
   "Do not edit files.",
   "Do not run shell commands or call tools.",
   "bounded_execution_performed",
@@ -189,6 +198,16 @@ for (const unlockedNeedle of [
 
 if (/workspace_arg\.clone\(\),\s*prompt\.to_string\(\),/.test(rustCommandsSource)) {
   throw new Error("Codex unlocked prompt targets must not pass full prompt text as argv after -C; use stdin transport.");
+}
+
+const hermesAssistProcessStart = rustCommandsSource.indexOf("fn run_hermes_kimi_assist_process_with_binary");
+const hermesAssistProcessEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn record_hermes_kimi_assist_brief", hermesAssistProcessStart);
+if (hermesAssistProcessStart < 0 || hermesAssistProcessEnd < hermesAssistProcessStart) {
+  throw new Error("Hermes/Kimi assist process runner body is missing.");
+}
+const hermesAssistProcessBody = rustCommandsSource.slice(hermesAssistProcessStart, hermesAssistProcessEnd);
+if (hermesAssistProcessBody.includes("wait_with_output")) {
+  throw new Error("Hermes/Kimi assist runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
 }
 
 for (const unlockedUiNeedle of [

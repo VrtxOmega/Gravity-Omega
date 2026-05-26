@@ -31741,6 +31741,8 @@ footer {
       `- status: ${assist.status ?? "unknown"}`,
       `- exit: ${assist.exit_code ?? "none"}; timed_out=${Boolean(assist.timed_out)}; duration=${assist.duration_ms ?? 0}ms`,
       `- stdout_bytes: ${assist.stdout_size_bytes ?? 0}; stderr_bytes=${assist.stderr_size_bytes ?? 0}`,
+      `- transport: ${assist.query_transport ?? "unknown"}; argv_chars=${assist.argv_char_count ?? 0}; pipe_readers=${Boolean(assist.stdout_pipe_reader_enabled)}/${Boolean(assist.stderr_pipe_reader_enabled)}`,
+      `- timeout: kill_sent=${Boolean(assist.timeout_kill_sent)}; wait_after_kill=${assist.wait_after_kill_ms ?? 0}ms; partial_output=${Boolean(assist.partial_output_captured)}`,
       `- focus_skills: ${(assist.focus_skills ?? []).slice(0, 12).join(", ") || "none"}`,
       `- blockers: ${(assist.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
       "",

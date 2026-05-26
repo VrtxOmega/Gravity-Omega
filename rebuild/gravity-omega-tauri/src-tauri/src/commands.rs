@@ -1203,6 +1203,20 @@ pub struct HermesKimiAssistBriefRecord {
     pub stderr: String,
     pub stdout_size_bytes: u64,
     pub stderr_size_bytes: u64,
+    #[serde(default)]
+    pub query_transport: String,
+    #[serde(default)]
+    pub argv_char_count: u64,
+    #[serde(default)]
+    pub stdout_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub stderr_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub timeout_kill_sent: bool,
+    #[serde(default)]
+    pub wait_after_kill_ms: u64,
+    #[serde(default)]
+    pub partial_output_captured: bool,
     pub stdout_transcript_path: String,
     pub stderr_transcript_path: String,
     pub inventory_record_path: Option<String>,
@@ -36234,14 +36248,52 @@ struct HermesKimiAssistProcessOutput {
     stderr_bytes: Vec<u8>,
     status: String,
     bounded_execution_performed: bool,
+    query_transport: String,
+    argv_char_count: u64,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
+}
+
+fn spawn_hermes_kimi_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
 }
 
 fn run_hermes_kimi_assist_process(
     compact_query: &str,
     timeout_ms: u64,
 ) -> HermesKimiAssistProcessOutput {
+    run_hermes_kimi_assist_process_with_binary("hermes", compact_query, timeout_ms)
+}
+
+fn run_hermes_kimi_assist_process_with_binary(
+    hermes_binary: &str,
+    compact_query: &str,
+    timeout_ms: u64,
+) -> HermesKimiAssistProcessOutput {
     let started = Instant::now();
-    let mut child = match Command::new("hermes")
+    let argv_char_count = [
+        "chat",
+        "-Q",
+        "--max-turns",
+        "1",
+        "--source",
+        "gravity-omega-native",
+        "--query",
+        compact_query,
+    ]
+    .iter()
+    .map(|value| value.chars().count() as u64)
+    .sum();
+    let mut child = match Command::new(hermes_binary)
         .args([
             "chat",
             "-Q",
@@ -36268,66 +36320,143 @@ fn run_hermes_kimi_assist_process(
                 stderr_bytes: error.to_string().into_bytes(),
                 status: "hermes_kimi_assist_brief_spawn_failed".to_string(),
                 bounded_execution_performed: false,
+                query_transport: "argv-compact-query".to_string(),
+                argv_char_count,
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
             };
         }
     };
 
     let pid = Some(child.id());
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_hermes_kimi_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_hermes_kimi_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
     let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let mut wait_error: Option<String> = None;
+    let exit_code;
     loop {
         match child.try_wait() {
-            Ok(Some(_status)) => break,
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
+            }
             Ok(None) => {
                 if started.elapsed() >= Duration::from_millis(timeout_ms) {
                     timed_out = true;
-                    let _ = child.kill();
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    match child.wait() {
+                        Ok(status) => {
+                            exit_code = status.code();
+                        }
+                        Err(error) => {
+                            exit_code = None;
+                            wait_error = Some(error.to_string());
+                        }
+                    }
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                     break;
                 }
                 std::thread::sleep(Duration::from_millis(50));
             }
             Err(error) => {
+                let stdout_bytes = stdout_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                let mut stderr_bytes = stderr_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                if stderr_bytes.is_empty() {
+                    stderr_bytes = error.to_string().into_bytes();
+                }
+                let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
                 return HermesKimiAssistProcessOutput {
                     pid,
                     exit_code: None,
                     timed_out: false,
                     duration_ms: started.elapsed().as_millis() as u64,
-                    stdout_bytes: Vec::new(),
-                    stderr_bytes: error.to_string().into_bytes(),
+                    stdout_bytes,
+                    stderr_bytes,
                     status: "hermes_kimi_assist_brief_wait_failed".to_string(),
                     bounded_execution_performed: true,
+                    query_transport: "argv-compact-query".to_string(),
+                    argv_char_count,
+                    stdout_pipe_reader_enabled,
+                    stderr_pipe_reader_enabled,
+                    timeout_kill_sent: false,
+                    wait_after_kill_ms: 0,
+                    partial_output_captured,
                 };
             }
         }
     }
 
-    match child.wait_with_output() {
-        Ok(output) => HermesKimiAssistProcessOutput {
+    let stdout_bytes = stdout_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let mut stderr_bytes = stderr_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+    if let Some(error) = wait_error {
+        if stderr_bytes.is_empty() {
+            stderr_bytes = error.into_bytes();
+        }
+        return HermesKimiAssistProcessOutput {
             pid,
-            exit_code: output.status.code(),
+            exit_code,
             timed_out,
             duration_ms: started.elapsed().as_millis() as u64,
-            stdout_bytes: output.stdout,
-            stderr_bytes: output.stderr,
-            status: if timed_out {
-                "hermes_kimi_assist_brief_timed_out"
-            } else if output.status.success() {
-                "hermes_kimi_assist_brief_succeeded"
-            } else {
-                "hermes_kimi_assist_brief_failed"
-            }
-            .to_string(),
+            stdout_bytes,
+            stderr_bytes,
+            status: "hermes_kimi_assist_brief_wait_failed".to_string(),
             bounded_execution_performed: true,
-        },
-        Err(error) => HermesKimiAssistProcessOutput {
-            pid,
-            exit_code: None,
-            timed_out,
-            duration_ms: started.elapsed().as_millis() as u64,
-            stdout_bytes: Vec::new(),
-            stderr_bytes: error.to_string().into_bytes(),
-            status: "hermes_kimi_assist_brief_collect_failed".to_string(),
-            bounded_execution_performed: true,
-        },
+            query_transport: "argv-compact-query".to_string(),
+            argv_char_count,
+            stdout_pipe_reader_enabled,
+            stderr_pipe_reader_enabled,
+            timeout_kill_sent,
+            wait_after_kill_ms,
+            partial_output_captured,
+        };
+    }
+
+    HermesKimiAssistProcessOutput {
+        pid,
+        exit_code,
+        timed_out,
+        duration_ms: started.elapsed().as_millis() as u64,
+        stdout_bytes,
+        stderr_bytes,
+        status: if timed_out {
+            "hermes_kimi_assist_brief_timed_out"
+        } else if exit_code == Some(0) {
+            "hermes_kimi_assist_brief_succeeded"
+        } else {
+            "hermes_kimi_assist_brief_failed"
+        }
+        .to_string(),
+        bounded_execution_performed: true,
+        query_transport: "argv-compact-query".to_string(),
+        argv_char_count,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
     }
 }
 
@@ -36401,6 +36530,13 @@ pub fn record_hermes_kimi_assist_brief(
         stderr_bytes: Vec::new(),
         status: "hermes_kimi_assist_brief_not_started".to_string(),
         bounded_execution_performed: false,
+        query_transport: "not-started".to_string(),
+        argv_char_count: 0,
+        stdout_pipe_reader_enabled: false,
+        stderr_pipe_reader_enabled: false,
+        timeout_kill_sent: false,
+        wait_after_kill_ms: 0,
+        partial_output_captured: false,
     };
 
     if prompt_trimmed.is_empty() {
@@ -36485,6 +36621,13 @@ pub fn record_hermes_kimi_assist_brief(
         stderr: trim_probe_text(&output.stderr_bytes),
         stdout_size_bytes: output.stdout_bytes.len() as u64,
         stderr_size_bytes: output.stderr_bytes.len() as u64,
+        query_transport: output.query_transport.clone(),
+        argv_char_count: output.argv_char_count,
+        stdout_pipe_reader_enabled: output.stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled: output.stderr_pipe_reader_enabled,
+        timeout_kill_sent: output.timeout_kill_sent,
+        wait_after_kill_ms: output.wait_after_kill_ms,
+        partial_output_captured: output.partial_output_captured,
         stdout_transcript_path: stdout_transcript_display.clone(),
         stderr_transcript_path: stderr_transcript_display.clone(),
         inventory_record_path,
@@ -36538,6 +36681,13 @@ pub fn record_hermes_kimi_assist_brief(
             "duration_ms": record.duration_ms,
             "stdout_size_bytes": record.stdout_size_bytes,
             "stderr_size_bytes": record.stderr_size_bytes,
+            "query_transport": &record.query_transport,
+            "argv_char_count": record.argv_char_count,
+            "stdout_pipe_reader_enabled": record.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": record.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": record.timeout_kill_sent,
+            "wait_after_kill_ms": record.wait_after_kill_ms,
+            "partial_output_captured": record.partial_output_captured,
             "focus_skill_count": record.focus_skills.len(),
             "mcp_focus_count": record.mcp_servers.len(),
             "hook_focus_count": record.hooks.len(),
@@ -95799,13 +95949,19 @@ fn hermes_assist_run_view_summary(
             record.exit_code, record.timed_out, record.duration_ms
         ),
         format!(
-            "stdout={}b stderr={}b",
-            record.stdout_size_bytes, record.stderr_size_bytes
+            "stdout={}b stderr={}b partial={}",
+            record.stdout_size_bytes, record.stderr_size_bytes, record.partial_output_captured
         ),
         format!(
-            "source={} max_turns={} stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={}",
+            "source={} max_turns={} transport={} argv_chars={} pipe_readers={}/{} timeout_kill={} wait_after_kill={}ms stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={}",
             record.source,
             record.max_turns,
+            record.query_transport,
+            record.argv_char_count,
+            record.stdout_pipe_reader_enabled,
+            record.stderr_pipe_reader_enabled,
+            record.timeout_kill_sent,
+            record.wait_after_kill_ms,
             record.stdout_transcript_path,
             stdout_transcript.found,
             stdout_transcript.line_count,
@@ -112189,6 +112345,58 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn hermes_kimi_assist_process_drains_pipes_and_captures_timeout_partial_output() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-hermes-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake hermes dir");
+        let fake_hermes = test_root.join("hermes");
+        fs::write(
+            &fake_hermes,
+            r#"#!/bin/sh
+printf 'ready stdout\n'
+printf 'ready stderr\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'stdout chunk %s\n' "$i"
+  printf 'stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake hermes");
+        let mut permissions = fs::metadata(&fake_hermes)
+            .expect("fake hermes metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_hermes, permissions).expect("chmod fake hermes");
+
+        let output = run_hermes_kimi_assist_process_with_binary(
+            fake_hermes.to_str().expect("fake hermes path"),
+            "verify Hermes pipe drain robustness",
+            100,
+        );
+        assert_eq!(output.status, "hermes_kimi_assist_brief_timed_out");
+        assert!(output.timed_out);
+        assert!(output.timeout_kill_sent);
+        assert!(output.stdout_pipe_reader_enabled);
+        assert!(output.stderr_pipe_reader_enabled);
+        assert!(output.partial_output_captured);
+        assert_eq!(output.query_transport, "argv-compact-query");
+        assert!(output.argv_char_count > 0);
+        assert!(String::from_utf8_lossy(&output.stdout_bytes).contains("ready stdout"));
+        assert!(String::from_utf8_lossy(&output.stderr_bytes).contains("ready stderr"));
+        assert_eq!(output.bounded_execution_performed, true);
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
     #[test]
     fn sovereign_docs_preview_records_self_contained_html_without_export_gates() {
         let markdown = "# Gravity Omega Brief\n\n- Codex Lead\n- Hermes/Kimi assist\n\n```txt\nsealed evidence\n```\n";
@@ -116248,6 +116456,13 @@ mod tests {
             stderr: "Hermes stderr stayed clean".to_string(),
             stdout_size_bytes: 57,
             stderr_size_bytes: 26,
+            query_transport: "argv-compact-query".to_string(),
+            argv_char_count: 220,
+            stdout_pipe_reader_enabled: true,
+            stderr_pipe_reader_enabled: true,
+            timeout_kill_sent: false,
+            wait_after_kill_ms: 0,
+            partial_output_captured: true,
             stdout_transcript_path: assist_stdout_path.display().to_string(),
             stderr_transcript_path: assist_stderr_path.display().to_string(),
             inventory_record_path: Some(inventory_path.display().to_string()),
