@@ -10142,7 +10142,7 @@ async function loadHermesKimiCapabilityInventories() {
   return invoke("list_hermes_kimi_capability_inventories");
 }
 
-async function recordHermesKimiAssistBrief({ prompt = "", orchestration = null, hermesInventory = null } = {}) {
+async function recordHermesKimiAssistBrief({ prompt = "", orchestration = null, hermesInventory = null, timeoutMs = 15000 } = {}) {
   const focusSkills = (hermesInventory?.focus_skills ?? []).slice(0, 18);
   const mcpServers = (hermesInventory?.mcp_servers ?? [])
     .slice(0, 8)
@@ -10175,7 +10175,7 @@ async function recordHermesKimiAssistBrief({ prompt = "", orchestration = null, 
     request: {
       prompt,
       requested_by: "gravity-omega-main-workflow",
-      timeout_ms: 45000,
+      timeout_ms: timeoutMs,
       inventory_record_path: hermesInventory?.record_path || null,
       orchestration_record_path: orchestration?.record_path || null,
       focus_skills: focusSkills,
@@ -25551,6 +25551,8 @@ function initOmegaProductShell() {
       });
     });
 
+  const codexLeadAssistTimeoutMs = 15000;
+
   const agentRunStartingText = (label, contextSummary = "") =>
     [
       `${label} is starting now.`,
@@ -25588,6 +25590,16 @@ function initOmegaProductShell() {
     activeAgentTranscript.message.title.textContent = title;
     activeAgentTranscript.message.body.textContent = text || "Waiting for agent output...";
     scrollProductMessages();
+  };
+
+  const updateCodexLeadPreparationStatus = async (title, lines = []) => {
+    const body = [
+      "Codex Lead is still in control of this run.",
+      ...lines.filter(Boolean),
+    ].join("\n");
+    updateAgentAnswerMessage(title, body);
+    setProductStatus(title, "running");
+    await waitForProductPaint();
   };
 
   const getPrompt = () => productInput.value.trim();
@@ -31595,6 +31607,10 @@ footer {
       let hermesInventory = null;
       let hermesAssist = null;
       try {
+        await updateCodexLeadPreparationStatus("Codex Lead recording orchestration", [
+          "Creating the Codex-owned run plan and delegation evidence before the stream starts.",
+          "This should be quick; if it fails, Codex Lead will continue with the gap recorded.",
+        ]);
         orchestration = await createCodexLeadOrchestrationRecord(prompt);
         appendEvidenceText(`Codex Lead orchestration recorded: ${orchestration.record_path || orchestration.status || "no-record"}`);
         appendAgentWorkArtifact(
@@ -31623,12 +31639,24 @@ footer {
           ].join("\n")
         );
         setProductStatus("Codex Lead orchestration recorded. Starting responsive stream next.", "running");
+        await updateCodexLeadPreparationStatus("Codex Lead orchestration recorded", [
+          `Record: ${orchestration.record_path || orchestration.status || "no-record"}`,
+          `Delegation lanes: ${orchestration.delegation_count ?? 0} (${orchestration.codex_owned_count ?? 0} Codex / ${orchestration.hermes_assist_count ?? 0} Hermes-Kimi).`,
+        ]);
       } catch (orchestrationError) {
         appendAgentWorkArtifact("Codex Lead Orchestration Warning", orchestrationError.message);
         appendEvidenceText(`Codex Lead orchestration failed before stream: ${orchestrationError.message}`);
         setProblemText(`Codex Lead orchestration failed before stream: ${orchestrationError.message}`);
+        await updateCodexLeadPreparationStatus("Codex Lead orchestration warning", [
+          orchestrationError.message,
+          "The stream will continue with the orchestration gap recorded.",
+        ]);
       }
       try {
+        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory running", [
+          "Reading local Hermes/Kimi skills, MCP awareness, and hooks for delegation context.",
+          "Hermes/Kimi is advisory here; Codex Lead remains the execution owner.",
+        ]);
         hermesInventory = await recordHermesKimiCapabilityInventory(prompt);
         appendEvidenceText(`Hermes/Kimi capability inventory recorded: ${hermesInventory.record_path || hermesInventory.status || "no-record"}`);
         appendAgentWorkArtifact(
@@ -31644,14 +31672,31 @@ footer {
             `blockers=${(hermesInventory.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
           ].join("\n")
         );
+        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory recorded", [
+          `Record: ${hermesInventory.record_path || hermesInventory.status || "no-record"}`,
+          `Skills: ${hermesInventory.enabled_skill_count ?? 0}; MCP: ${hermesInventory.mcp_server_count ?? 0}; hooks: ${hermesInventory.hook_count ?? 0}.`,
+        ]);
       } catch (inventoryError) {
         appendAgentWorkArtifact("Hermes/Kimi Capability Inventory Warning", inventoryError.message);
         appendEvidenceText(`Hermes/Kimi capability inventory failed before stream: ${inventoryError.message}`);
         setProblemText(`Hermes/Kimi capability inventory failed before stream: ${inventoryError.message}`);
+        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory warning", [
+          inventoryError.message,
+          "Codex Lead will continue with compact built-in Hermes/Kimi awareness.",
+        ]);
       }
       try {
         setProductStatus("Hermes/Kimi assist brief is running with a bounded no-write policy.", "running");
-        hermesAssist = await recordHermesKimiAssistBrief({ prompt, orchestration, hermesInventory });
+        await updateCodexLeadPreparationStatus("Hermes/Kimi assist running", [
+          `Bounded secondary assist timeout: ${codexLeadAssistTimeoutMs}ms.`,
+          "The assist cannot edit, patch, run shell commands, call live MCP tools, or write memory.",
+        ]);
+        hermesAssist = await recordHermesKimiAssistBrief({
+          prompt,
+          orchestration,
+          hermesInventory,
+          timeoutMs: codexLeadAssistTimeoutMs,
+        });
         appendEvidenceText(`Hermes/Kimi assist brief recorded: ${hermesAssist.record_path || hermesAssist.status || "no-record"}`);
         appendAgentWorkArtifact(
           "Hermes/Kimi Assist Brief",
@@ -31673,13 +31718,31 @@ footer {
           setProblemText(`Hermes/Kimi assist brief returned ${hermesAssist.status}; Codex Lead will continue with recorded warning.`);
         }
         setProductStatus("Hermes/Kimi assist brief recorded. Starting Codex Lead stream.", "running");
+        await updateCodexLeadPreparationStatus(
+          hermesAssist.status === "hermes_kimi_assist_brief_succeeded"
+            ? "Hermes/Kimi assist recorded"
+            : "Hermes/Kimi assist recorded with warning",
+          [
+            `Status: ${hermesAssist.status ?? "unknown"}; exit=${hermesAssist.exit_code ?? "none"}; timed_out=${Boolean(hermesAssist.timed_out)}; duration=${hermesAssist.duration_ms ?? 0}ms.`,
+            `Record: ${hermesAssist.record_path || "none"}`,
+            "Codex Lead is starting the implementation stream next.",
+          ]
+        );
       } catch (assistError) {
         appendAgentWorkArtifact("Hermes/Kimi Assist Brief Warning", assistError.message);
         appendEvidenceText(`Hermes/Kimi assist brief failed before stream: ${assistError.message}`);
         setProblemText(`Hermes/Kimi assist brief failed before stream: ${assistError.message}`);
+        await updateCodexLeadPreparationStatus("Hermes/Kimi assist warning", [
+          assistError.message,
+          "Codex Lead will start the implementation stream without blocking on the secondary assist.",
+        ]);
       }
       const promptWithContext = buildAgentPrompt(codexLeadStreamingPrompt({ prompt, orchestration, hermesInventory, hermesAssist }), "codex-workspace-write");
       mirrorPromptToRuntimeComposer(promptWithContext);
+      await updateCodexLeadPreparationStatus("Codex Lead stream handoff", [
+        "Preparation evidence is recorded.",
+        "Starting the responsive Codex-owned implementation stream now.",
+      ]);
       const started = await runUnlockedAgentPromptSessionStream("codex-workspace-write", promptWithContext);
       if (!started.accepted) {
         const blockers = (started.blockers ?? []).join("; ") || started.next_step || "stream rejected";

@@ -448,6 +448,8 @@ for (const productBridgeNeedle of [
   "waitForProductPaint",
   "agentRunStartingText",
   "agentRunAcceptedText",
+  "codexLeadAssistTimeoutMs",
+  "updateCodexLeadPreparationStatus",
   "is starting now.",
   "Run accepted. Watching stream for readable output.",
   "Agent work artifact opens in Monaco",
@@ -741,6 +743,29 @@ if (codexLeadFunctionBody.includes("Waiting for readable stream output")) {
   throw new Error("Run Dual must not overwrite the immediate chat preamble with a generic waiting message after stream acceptance.");
 }
 
+for (const prepNeedle of [
+  "await updateCodexLeadPreparationStatus(\"Codex Lead recording orchestration\"",
+  "await updateCodexLeadPreparationStatus(\"Codex Lead orchestration recorded\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory running\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory recorded\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi assist running\"",
+  "timeoutMs: codexLeadAssistTimeoutMs",
+  "await updateCodexLeadPreparationStatus(\"Codex Lead stream handoff\"",
+]) {
+  if (!codexLeadFunctionBody.includes(prepNeedle)) {
+    throw new Error(`Run Dual missing visible preparation status step: ${prepNeedle}`);
+  }
+}
+
+if (!frontendSource.includes("const codexLeadAssistTimeoutMs = 15000")) {
+  throw new Error("Run Dual must use an explicit shorter renderer-side Hermes/Kimi assist timeout.");
+}
+
+const assistBriefFunctionMatch = frontendSource.match(/async function recordHermesKimiAssistBrief\(\{[\s\S]*?\n\}/);
+if (!assistBriefFunctionMatch?.[0]?.includes("timeoutMs = 15000") || !assistBriefFunctionMatch[0].includes("timeout_ms: timeoutMs")) {
+  throw new Error("Hermes/Kimi assist helper must accept and forward an explicit timeoutMs value.");
+}
+
 if (!codexLeadFunctionBody.includes("createCodexLeadOrchestrationRecord(prompt)")) {
   throw new Error("Run Dual must record a Codex Lead orchestration packet before starting the stream.");
 }
@@ -757,11 +782,11 @@ if (codexLeadFunctionBody.indexOf("recordHermesKimiCapabilityInventory(prompt)")
   throw new Error("Hermes/Kimi capability inventory evidence must be created before the responsive stream starts.");
 }
 
-if (!codexLeadFunctionBody.includes("recordHermesKimiAssistBrief({ prompt, orchestration, hermesInventory })")) {
+if (!codexLeadFunctionBody.includes("recordHermesKimiAssistBrief({") || !codexLeadFunctionBody.includes("timeoutMs: codexLeadAssistTimeoutMs")) {
   throw new Error("Run Dual must run a bounded Hermes/Kimi assist brief before starting the stream.");
 }
 
-if (codexLeadFunctionBody.indexOf("recordHermesKimiAssistBrief({ prompt, orchestration, hermesInventory })") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
+if (codexLeadFunctionBody.indexOf("recordHermesKimiAssistBrief({") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
   throw new Error("Hermes/Kimi assist evidence must be created before the responsive Codex stream starts.");
 }
 
