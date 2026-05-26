@@ -5283,6 +5283,14 @@ pub struct SswpStatusPanel {
     pub registry_node_count: usize,
     pub risky_node_count: usize,
     pub highest_risk_percent: f64,
+    pub registry_list_status: String,
+    pub registry_risky_status: String,
+    pub registry_list_pipe_reader_enabled: bool,
+    pub registry_risky_pipe_reader_enabled: bool,
+    pub registry_list_timeout_kill_sent: bool,
+    pub registry_risky_timeout_kill_sent: bool,
+    pub registry_list_partial_output_captured: bool,
+    pub registry_risky_partial_output_captured: bool,
     pub runtime_process_snapshot_count: usize,
     pub latest_runtime_process_snapshot_status: String,
     pub latest_runtime_process_snapshot_path: Option<String>,
@@ -5341,6 +5349,11 @@ pub struct SswpRegistryCommandCapture {
     pub exit_code: Option<i32>,
     pub timed_out: bool,
     pub duration_ms: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -99375,12 +99388,26 @@ fn command_path_on_env(command: &str) -> String {
         .unwrap_or_else(|| command.to_string())
 }
 
-fn run_sswp_registry_command(args: &[&str], timeout_ms: u64) -> SswpRegistryCommandCapture {
-    let command = std::iter::once("sswp".to_string())
+fn spawn_sswp_registry_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_sswp_registry_command_with_binary(
+    binary: &str,
+    args: &[&str],
+    timeout_ms: u64,
+) -> SswpRegistryCommandCapture {
+    let command = std::iter::once(binary.to_string())
         .chain(args.iter().map(|arg| (*arg).to_string()))
         .collect::<Vec<_>>();
     let start = Instant::now();
-    let mut child = match Command::new("sswp")
+    let mut child = match Command::new(binary)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -99397,78 +99424,115 @@ fn run_sswp_registry_command(args: &[&str], timeout_ms: u64) -> SswpRegistryComm
                 exit_code: None,
                 timed_out: false,
                 duration_ms: start.elapsed().as_millis() as u64,
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
             };
         }
     };
 
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_sswp_registry_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_sswp_registry_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
+    let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let exit_code;
+
     loop {
         match child.try_wait() {
-            Ok(Some(_status)) => {
-                return match child.wait_with_output() {
-                    Ok(output) => SswpRegistryCommandCapture {
-                        command,
-                        status: if output.status.success() {
-                            "ready".to_string()
-                        } else {
-                            "failed".to_string()
-                        },
-                        stdout_preview: trim_probe_text(&output.stdout),
-                        stderr_preview: trim_probe_text(&output.stderr),
-                        exit_code: output.status.code(),
-                        timed_out: false,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                    },
-                    Err(error) => SswpRegistryCommandCapture {
-                        command,
-                        status: "collect_failed".to_string(),
-                        stdout_preview: String::new(),
-                        stderr_preview: prompt_preview(&error.to_string(), 1200),
-                        exit_code: None,
-                        timed_out: false,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                    },
-                };
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
             }
             Ok(None) => {
                 if start.elapsed() >= Duration::from_millis(timeout_ms) {
-                    let _ = child.kill();
-                    return match child.wait_with_output() {
-                        Ok(output) => SswpRegistryCommandCapture {
-                            command,
-                            status: "timed_out".to_string(),
-                            stdout_preview: trim_probe_text(&output.stdout),
-                            stderr_preview: trim_probe_text(&output.stderr),
-                            exit_code: output.status.code(),
-                            timed_out: true,
-                            duration_ms: start.elapsed().as_millis() as u64,
-                        },
-                        Err(error) => SswpRegistryCommandCapture {
-                            command,
-                            status: "timed_out_collect_failed".to_string(),
-                            stdout_preview: String::new(),
-                            stderr_preview: prompt_preview(&error.to_string(), 1200),
-                            exit_code: None,
-                            timed_out: true,
-                            duration_ms: start.elapsed().as_millis() as u64,
-                        },
-                    };
+                    timed_out = true;
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    exit_code = child.wait().ok().and_then(|status| status.code());
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                    break;
                 }
                 std::thread::sleep(Duration::from_millis(25));
             }
             Err(error) => {
-                let _ = child.kill();
+                let kill_started = Instant::now();
+                timeout_kill_sent = child.kill().is_ok();
+                exit_code = child.wait().ok().and_then(|status| status.code());
+                wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                let mut stderr_bytes = error.to_string().into_bytes();
+                if let Some(handle) = stderr_reader {
+                    if let Ok(mut existing) = handle.join() {
+                        existing.extend_from_slice(b"\n");
+                        existing.extend(stderr_bytes);
+                        stderr_bytes = existing;
+                    }
+                }
+                let stdout_bytes = stdout_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
                 return SswpRegistryCommandCapture {
                     command,
                     status: "wait_failed".to_string(),
-                    stdout_preview: String::new(),
-                    stderr_preview: prompt_preview(&error.to_string(), 1200),
-                    exit_code: None,
+                    stdout_preview: trim_probe_text(&stdout_bytes),
+                    stderr_preview: trim_probe_text(&stderr_bytes),
+                    exit_code,
                     timed_out: false,
                     duration_ms: start.elapsed().as_millis() as u64,
+                    stdout_pipe_reader_enabled,
+                    stderr_pipe_reader_enabled,
+                    timeout_kill_sent,
+                    wait_after_kill_ms,
+                    partial_output_captured,
                 };
             }
         }
     }
+
+    let stdout_bytes = stdout_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let stderr_bytes = stderr_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+    let status = if timed_out {
+        "timed_out"
+    } else if exit_code == Some(0) {
+        "ready"
+    } else {
+        "failed"
+    };
+
+    SswpRegistryCommandCapture {
+        command,
+        status: status.to_string(),
+        stdout_preview: trim_probe_text(&stdout_bytes),
+        stderr_preview: trim_probe_text(&stderr_bytes),
+        exit_code,
+        timed_out,
+        duration_ms: start.elapsed().as_millis() as u64,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
+    }
+}
+
+fn run_sswp_registry_command(args: &[&str], timeout_ms: u64) -> SswpRegistryCommandCapture {
+    run_sswp_registry_command_with_binary("sswp", args, timeout_ms)
 }
 
 fn parse_sswp_registry_nodes(stdout: &str) -> Vec<SswpRegistryNodeSnapshot> {
@@ -99616,6 +99680,18 @@ pub fn record_sswp_registry_snapshot(
             "risky_node_count": record.risky_node_count,
             "highest_risk_percent": record.highest_risk_percent,
             "sswp_binary": &record.sswp_binary,
+            "registry_list_pipe_readers": [
+                record.registry_list.stdout_pipe_reader_enabled,
+                record.registry_list.stderr_pipe_reader_enabled
+            ],
+            "registry_risky_pipe_readers": [
+                record.registry_risky.stdout_pipe_reader_enabled,
+                record.registry_risky.stderr_pipe_reader_enabled
+            ],
+            "registry_list_timeout_kill_sent": record.registry_list.timeout_kill_sent,
+            "registry_risky_timeout_kill_sent": record.registry_risky.timeout_kill_sent,
+            "registry_list_partial_output_captured": record.registry_list.partial_output_captured,
+            "registry_risky_partial_output_captured": record.registry_risky.partial_output_captured,
             "registry_probe_enabled": true,
             "witness_enabled": false,
             "verify_enabled": false,
@@ -99727,6 +99803,36 @@ pub fn sswp_status() -> Result<SswpStatusPanel, String> {
         highest_risk_percent: latest_registry_snapshot
             .map(|record| record.highest_risk_percent)
             .unwrap_or(0.0),
+        registry_list_status: latest_registry_snapshot
+            .map(|record| record.registry_list.status.clone())
+            .unwrap_or_else(|| "waiting".to_string()),
+        registry_risky_status: latest_registry_snapshot
+            .map(|record| record.registry_risky.status.clone())
+            .unwrap_or_else(|| "waiting".to_string()),
+        registry_list_pipe_reader_enabled: latest_registry_snapshot
+            .map(|record| {
+                record.registry_list.stdout_pipe_reader_enabled
+                    && record.registry_list.stderr_pipe_reader_enabled
+            })
+            .unwrap_or(false),
+        registry_risky_pipe_reader_enabled: latest_registry_snapshot
+            .map(|record| {
+                record.registry_risky.stdout_pipe_reader_enabled
+                    && record.registry_risky.stderr_pipe_reader_enabled
+            })
+            .unwrap_or(false),
+        registry_list_timeout_kill_sent: latest_registry_snapshot
+            .map(|record| record.registry_list.timeout_kill_sent)
+            .unwrap_or(false),
+        registry_risky_timeout_kill_sent: latest_registry_snapshot
+            .map(|record| record.registry_risky.timeout_kill_sent)
+            .unwrap_or(false),
+        registry_list_partial_output_captured: latest_registry_snapshot
+            .map(|record| record.registry_list.partial_output_captured)
+            .unwrap_or(false),
+        registry_risky_partial_output_captured: latest_registry_snapshot
+            .map(|record| record.registry_risky.partial_output_captured)
+            .unwrap_or(false),
         runtime_process_snapshot_count,
         latest_runtime_process_snapshot_status,
         latest_runtime_process_snapshot_path,
@@ -114402,6 +114508,59 @@ sleep 2
         assert_eq!(nodes[1].node_id, "gravity-omega");
         assert_eq!(nodes[1].risk_percent, 12.5);
         assert_eq!(nodes[1].witness_count, 48);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sswp_registry_command_drains_pipes_and_captures_timeout_partial_output() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-sswp-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake sswp dir");
+        let fake_sswp = test_root.join("sswp");
+        fs::write(
+            &fake_sswp,
+            r#"#!/bin/sh
+printf 'SSWP Registry - 1 node(s)\n\n'
+printf 'NODE ID                     RISK      LAST WITNESS          COUNT\n'
+printf '----------------------------------------------------------------------\n'
+printf 'gravity-omega               12.5%%     5/25/2026, 4:02:55 AM 48\n'
+printf 'sswp stderr ready\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'sswp stdout chunk %s\n' "$i"
+  printf 'sswp stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake sswp");
+        let mut permissions = fs::metadata(&fake_sswp)
+            .expect("fake sswp metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_sswp, permissions).expect("chmod fake sswp");
+
+        let output = run_sswp_registry_command_with_binary(
+            fake_sswp.to_str().expect("fake sswp path"),
+            &["registry", "list"],
+            100,
+        );
+        assert_eq!(output.status, "timed_out");
+        assert!(output.timed_out);
+        assert!(output.timeout_kill_sent);
+        assert!(output.stdout_pipe_reader_enabled);
+        assert!(output.stderr_pipe_reader_enabled);
+        assert!(output.partial_output_captured);
+        assert!(output.command[0].ends_with("/sswp"));
+        assert!(output.stdout_preview.contains("gravity-omega"));
+        assert!(output.stderr_preview.contains("sswp stderr ready"));
+        let _ = fs::remove_dir_all(&test_root);
     }
 
     #[test]

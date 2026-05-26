@@ -239,6 +239,28 @@ for (const terminalStreamNeedle of [
   }
 }
 
+const sswpRegistryCommandStart = rustCommandsSource.indexOf("fn run_sswp_registry_command");
+const sswpRegistryCommandEnd = rustCommandsSource.indexOf("fn parse_sswp_registry_nodes", sswpRegistryCommandStart);
+if (sswpRegistryCommandStart < 0 || sswpRegistryCommandEnd < sswpRegistryCommandStart) {
+  throw new Error("SSWP registry command runner body is missing.");
+}
+const sswpRegistryCommandBody = rustCommandsSource.slice(sswpRegistryCommandStart, sswpRegistryCommandEnd);
+if (sswpRegistryCommandBody.includes("wait_with_output")) {
+  throw new Error("SSWP registry runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+}
+for (const sswpProbeNeedle of [
+  "spawn_sswp_registry_pipe_reader",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+]) {
+  if (!sswpRegistryCommandBody.includes(sswpProbeNeedle)) {
+    throw new Error(`SSWP registry runner missing pipe-drain evidence field ${sswpProbeNeedle}.`);
+  }
+}
+
 for (const unlockedUiNeedle of [
   "run-unlocked-codex-agent-btn",
   "run-unlocked-hermes-agent-btn",
@@ -608,6 +630,9 @@ for (const productBridgeNeedle of [
   "MCP lanes=${mcp.lane_count",
   "Approval Evidence Spine",
   "SSWP Registry",
+  "probePipes=",
+  "registry_list_pipe_reader_enabled",
+  "registry_risky_pipe_reader_enabled",
   "Sidecar Launch + Probe",
   "providers.providers",
   "ship.items",
