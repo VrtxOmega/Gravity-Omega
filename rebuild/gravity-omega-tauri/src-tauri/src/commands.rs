@@ -2770,6 +2770,38 @@ pub struct ProductTerminalSessionSummary {
     pub log_path: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProductTerminalBlockedCommandRecord {
+    pub id: String,
+    pub status: String,
+    pub command_preview: String,
+    pub command_size_bytes: u64,
+    pub requested_mode: String,
+    pub denied_reason: String,
+    pub block_class: String,
+    pub allowlist_enforced: bool,
+    pub process_spawn_enabled: bool,
+    pub transcript_capture_enabled: bool,
+    pub command_runner_enabled: bool,
+    pub terminal_write_enabled: bool,
+    pub live_tail_enabled: bool,
+    pub process_control_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+    pub next_step: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SovereignDocsPreviewRequest {
     pub source_path: String,
@@ -5551,6 +5583,7 @@ pub struct TerminalProcessLaneDashboard {
     pub process_output_tail_summary_ready_count: usize,
     pub recent_terminal_session_count: usize,
     pub recent_terminal_replay_count: usize,
+    pub blocked_terminal_command_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
     pub terminal_process_visible: bool,
@@ -5572,6 +5605,7 @@ pub struct TerminalProcessLaneDashboard {
     pub execution_enabled: bool,
     pub recent_terminal_sessions: Vec<ProductTerminalSessionSummary>,
     pub recent_terminal_replays: Vec<ProductTerminalTranscriptReplayRecord>,
+    pub recent_blocked_terminal_commands: Vec<ProductTerminalBlockedCommandRecord>,
     pub sections: Vec<TerminalProcessLaneDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -21554,6 +21588,10 @@ fn product_workspace_events_dir() -> Result<PathBuf, String> {
 
 fn product_terminal_sessions_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("product-terminal-sessions"))
+}
+
+fn product_terminal_blocked_commands_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("product-terminal-blocked-commands"))
 }
 
 fn product_terminal_transcript_replays_dir() -> Result<PathBuf, String> {
@@ -42142,12 +42180,109 @@ fn product_terminal_allowed_argv(command: &str) -> Result<Vec<String>, String> {
     Ok(argv.iter().map(|value| value.to_string()).collect())
 }
 
+fn product_terminal_block_class(denied_reason: &str) -> String {
+    if denied_reason.contains("blocked shell pattern") {
+        "blocked-shell-pattern".to_string()
+    } else if denied_reason.contains("cannot be empty") {
+        "empty-command".to_string()
+    } else {
+        "allowlist-denied".to_string()
+    }
+}
+
+fn record_product_terminal_blocked_command(
+    command: &str,
+    requested_mode: &str,
+    denied_reason: &str,
+) -> Result<ProductTerminalBlockedCommandRecord, String> {
+    let timestamp = now_ms()?;
+    let dir = product_terminal_blocked_commands_dir()?;
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("failed to create blocked terminal command dir: {error}"))?;
+    let id = format!(
+        "product-terminal-blocked-command-{}-{}-{}",
+        timestamp,
+        std::process::id(),
+        slug_limit(requested_mode, 32)
+    );
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+    let record = ProductTerminalBlockedCommandRecord {
+        id,
+        status: "product_terminal_command_blocked".to_string(),
+        command_preview: prompt_preview(command, 240),
+        command_size_bytes: command.len() as u64,
+        requested_mode: requested_mode.to_string(),
+        denied_reason: denied_reason.to_string(),
+        block_class: product_terminal_block_class(denied_reason),
+        allowlist_enforced: true,
+        process_spawn_enabled: false,
+        transcript_capture_enabled: false,
+        command_runner_enabled: false,
+        terminal_write_enabled: false,
+        live_tail_enabled: false,
+        process_control_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path.display().to_string(),
+        log_path: log_path.display().to_string(),
+        next_step: "Review the denied command evidence and choose an already allowed product terminal command."
+            .to_string(),
+    };
+
+    fs::write(
+        &record_path,
+        serde_json::to_string_pretty(&record).map_err(|error| {
+            format!("failed to serialize blocked terminal command record: {error}")
+        })?,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write blocked terminal command record {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "id": &record.id,
+            "status": &record.status,
+            "requested_mode": &record.requested_mode,
+            "denied_reason": &record.denied_reason,
+            "block_class": &record.block_class,
+            "allowlist_enforced": record.allowlist_enforced,
+            "process_spawn_enabled": false,
+            "command_runner_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": record.created_at_ms
+        }),
+    )?;
+
+    Ok(record)
+}
+
 #[tauri::command]
 pub fn run_product_terminal_command(
     request: ProductTerminalCommandRequest,
 ) -> Result<ProductTerminalCommandResult, String> {
     let command = request.command.trim().to_string();
-    let argv = product_terminal_allowed_argv(&command)?;
+    let argv = match product_terminal_allowed_argv(&command) {
+        Ok(argv) => argv,
+        Err(error) => {
+            let _ = record_product_terminal_blocked_command(&command, "sync", &error);
+            return Err(error);
+        }
+    };
     let binary = argv
         .first()
         .ok_or_else(|| "terminal command allowlist produced no binary".to_string())?
@@ -42332,7 +42467,13 @@ pub fn run_product_terminal_command_stream(
     request: ProductTerminalCommandRequest,
 ) -> Result<ProductTerminalStreamStartResult, String> {
     let command = request.command.trim().to_string();
-    let argv = product_terminal_allowed_argv(&command)?;
+    let argv = match product_terminal_allowed_argv(&command) {
+        Ok(argv) => argv,
+        Err(error) => {
+            let _ = record_product_terminal_blocked_command(&command, "stream", &error);
+            return Err(error);
+        }
+    };
     let binary = argv
         .first()
         .ok_or_else(|| "terminal command allowlist produced no binary".to_string())?
@@ -42830,6 +42971,47 @@ fn list_recent_product_terminal_session_summaries(
             Err(_) => continue,
         };
         records.push(terminal_session_summary_from_record(path, value));
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(limit);
+    Ok(records)
+}
+
+fn list_product_terminal_blocked_commands(
+    limit: usize,
+) -> Result<Vec<ProductTerminalBlockedCommandRecord>, String> {
+    let dir = product_terminal_blocked_commands_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir)
+        .map_err(|error| format!("failed to read blocked terminal command directory: {error}"))?
+    {
+        let entry = entry.map_err(|error| {
+            format!("failed to read blocked terminal command directory entry: {error}")
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let mut record = match serde_json::from_str::<ProductTerminalBlockedCommandRecord>(&content) {
+            Ok(record) => record,
+            Err(_) => continue,
+        };
+        if record.record_path.trim().is_empty() {
+            record.record_path = path.display().to_string();
+        }
+        if record.log_path.trim().is_empty() {
+            record.log_path = path.with_extension("jsonl").display().to_string();
+        }
+        records.push(record);
     }
 
     records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
@@ -45238,6 +45420,15 @@ fn product_evidence_title_detail(
             let duration = json_u64(value, "duration_ms").unwrap_or(0);
             (command, format!("exit={exit_code}; duration={duration}ms"))
         }
+        "terminal-blocked" => {
+            let mode = json_string(value, "requested_mode").unwrap_or_else(|| "terminal".to_string());
+            let block_class = json_string(value, "block_class").unwrap_or_else(|| "allowlist-denied".to_string());
+            let preview = json_string(value, "command_preview").unwrap_or_else(|| "blocked command".to_string());
+            (
+                format!("Blocked terminal command: {mode}"),
+                format!("{block_class}; preview={preview}; process_spawn=false; execution=false"),
+            )
+        }
         "terminal-replay" => {
             let command = json_string(value, "command").unwrap_or_else(|| "terminal replay".to_string());
             let stdout_lines = json_u64(value, "stdout_line_count").unwrap_or(0);
@@ -45434,6 +45625,11 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
     let mut items = Vec::new();
     push_product_evidence_history_dir(&mut items, "workspace", product_workspace_events_dir()?)?;
     push_product_evidence_history_dir(&mut items, "terminal", product_terminal_sessions_dir()?)?;
+    push_product_evidence_history_dir(
+        &mut items,
+        "terminal-blocked",
+        product_terminal_blocked_commands_dir()?,
+    )?;
     push_product_evidence_history_dir(&mut items, "terminal-replay", product_terminal_transcript_replays_dir()?)?;
     push_product_evidence_history_dir(&mut items, "sovereign-docs", sovereign_docs_previews_dir()?)?;
     push_product_evidence_history_dir(&mut items, "omega-computer", omega_computer_sessions_dir()?)?;
@@ -99684,6 +99880,10 @@ fn steno_search_dirs() -> Result<Vec<(&'static str, PathBuf)>, String> {
     Ok(vec![
         ("workspace", product_workspace_events_dir()?),
         ("terminal-session", product_terminal_sessions_dir()?),
+        (
+            "terminal-blocked",
+            product_terminal_blocked_commands_dir()?,
+        ),
         ("terminal-replay", product_terminal_transcript_replays_dir()?),
         ("sovereign-docs", sovereign_docs_previews_dir()?),
         ("omega-computer", omega_computer_sessions_dir()?),
@@ -99942,6 +100142,7 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
     let process_supervisor_exit_summaries = list_process_supervisor_exit_summaries()?;
     let process_output_tail_summaries = list_process_output_tail_summaries()?;
     let recent_terminal_sessions = list_recent_product_terminal_session_summaries(6)?;
+    let recent_blocked_terminal_commands = list_product_terminal_blocked_commands(6)?;
     let mut recent_terminal_replays = list_product_terminal_transcript_replays()?;
     recent_terminal_replays.truncate(6);
 
@@ -100258,6 +100459,7 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         || process_supervisor_exit_summary_ready_count > 0
         || process_output_tail_summary_ready_count > 0
         || !recent_terminal_sessions.is_empty()
+        || !recent_blocked_terminal_commands.is_empty()
         || !recent_terminal_replays.is_empty();
 
     Ok(TerminalProcessLaneDashboard {
@@ -100285,6 +100487,7 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         process_output_tail_summary_ready_count,
         recent_terminal_session_count: recent_terminal_sessions.len(),
         recent_terminal_replay_count: recent_terminal_replays.len(),
+        blocked_terminal_command_count: recent_blocked_terminal_commands.len(),
         disabled_gate_count,
         read_only: true,
         terminal_process_visible,
@@ -100306,10 +100509,11 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         execution_enabled: false,
         recent_terminal_sessions,
         recent_terminal_replays,
+        recent_blocked_terminal_commands,
         sections,
         reasons: vec![
             "dashboard groups runner, adapter, command plan, stream, lifecycle, supervisor, exit, and output-tail evidence into one terminal/process lane",
-            "dashboard reads existing runner, process, terminal session, and transcript replay ledgers only and creates no records",
+            "dashboard reads existing runner, process, terminal session, blocked terminal command, and transcript replay ledgers only and creates no records",
             "terminal writes, process spawn, stream reads, live tailing, process control, live MCP calls, config reads, captures, exports, writes, patches, memory writes, and execution remain disabled",
         ],
         next_slice: "Use this terminal/process lane to add approval and evidence spine views before any process, terminal, stream, or control gate is opened.",
@@ -111489,6 +111693,41 @@ mod tests {
         let listed = list_product_terminal_transcript_replays()
             .expect("terminal transcript replay list loads");
         assert!(listed.iter().any(|record| record.id == replay.id));
+
+        let blocked_result = run_product_terminal_command(ProductTerminalCommandRequest {
+            command: "cat /etc/passwd".to_string(),
+            timeout_ms: Some(1_000),
+        });
+        assert!(blocked_result.is_err());
+        let blocked_records = list_product_terminal_blocked_commands(12)
+            .expect("blocked terminal command evidence list loads");
+        let blocked_record = blocked_records
+            .iter()
+            .find(|record| record.command_preview.contains("cat /etc/passwd"))
+            .expect("blocked terminal command is persisted");
+        assert_eq!(blocked_record.status, "product_terminal_command_blocked");
+        assert_eq!(blocked_record.requested_mode, "sync");
+        assert_eq!(blocked_record.block_class, "allowlist-denied");
+        assert!(blocked_record.allowlist_enforced);
+        assert!(!blocked_record.process_spawn_enabled);
+        assert!(!blocked_record.transcript_capture_enabled);
+        assert!(!blocked_record.command_runner_enabled);
+        assert!(!blocked_record.terminal_write_enabled);
+        assert!(!blocked_record.live_tail_enabled);
+        assert!(!blocked_record.process_control_enabled);
+        assert!(!blocked_record.file_write_enabled);
+        assert!(!blocked_record.patch_apply_enabled);
+        assert!(!blocked_record.desktop_control_enabled);
+        assert!(!blocked_record.live_mcp_call_enabled);
+        assert!(!blocked_record.config_read_enabled);
+        assert!(!blocked_record.capture_enabled);
+        assert!(!blocked_record.export_enabled);
+        assert!(!blocked_record.memory_write_enabled);
+        assert!(!blocked_record.writes_allowed);
+        assert!(!blocked_record.execution_enabled);
+        assert!(fs::metadata(&blocked_record.record_path).is_ok());
+        assert!(fs::metadata(&blocked_record.log_path).is_ok());
+
         let terminal_process_dashboard =
             terminal_process_lane_dashboard().expect("terminal/process dashboard loads");
         assert!(
@@ -111518,6 +111757,20 @@ mod tests {
         );
         assert!(terminal_process_dashboard.recent_terminal_session_count >= 1);
         assert!(terminal_process_dashboard.recent_terminal_replay_count >= 1);
+        assert!(terminal_process_dashboard.blocked_terminal_command_count >= 1);
+        assert!(
+            terminal_process_dashboard
+                .recent_blocked_terminal_commands
+                .iter()
+                .any(|record| {
+                    record.command_preview.contains("cat /etc/passwd")
+                        && record.status == "product_terminal_command_blocked"
+                        && !record.process_spawn_enabled
+                        && !record.command_runner_enabled
+                        && !record.writes_allowed
+                        && !record.execution_enabled
+                })
+        );
         assert!(terminal_process_dashboard.terminal_process_visible);
         assert!(terminal_process_dashboard.read_only);
         assert!(!terminal_process_dashboard.terminal_write_enabled);

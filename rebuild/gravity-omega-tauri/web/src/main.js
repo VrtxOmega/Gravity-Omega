@@ -5981,6 +5981,20 @@ function describeTerminalReplaySummary(record) {
   };
 }
 
+function describeTerminalBlockedCommand(record) {
+  const status = record.status ?? "product_terminal_command_blocked";
+  const mode = record.requested_mode ?? "terminal";
+  const blockClass = record.block_class ?? "allowlist-denied";
+  const preview = record.command_preview ?? "none";
+  const size = record.command_size_bytes ?? 0;
+  return {
+    title: `Blocked terminal command: ${mode}`,
+    meta: `${status} / ${blockClass} / ${size}b`,
+    text: `${preview}; reason=${record.denied_reason ?? "denied"}; allowlist=${record.allowlist_enforced ?? true}; spawn=${record.process_spawn_enabled ?? false}; runner=${record.command_runner_enabled ?? false}; exec=${record.execution_enabled ?? false}; record=${record.record_path ?? "none"}`,
+    state: "warning",
+  };
+}
+
 function renderTerminalProcessLaneDashboard(dashboard) {
   if (!dashboard) {
     terminalProcessLaneDashboardSummary.textContent = "Terminal process lane dashboard unavailable.";
@@ -5999,6 +6013,7 @@ function renderTerminalProcessLaneDashboard(dashboard) {
     `tails=${dashboard.process_output_tail_summary_ready_count}/${dashboard.process_output_tail_summary_count}`,
     `sessions=${dashboard.recent_terminal_session_count ?? 0}`,
     `replays=${dashboard.recent_terminal_replay_count ?? 0}`,
+    `blocked=${dashboard.blocked_terminal_command_count ?? 0}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `terminal=${dashboard.terminal_enabled}`,
     `spawn=${dashboard.process_spawn_enabled}`,
@@ -6009,7 +6024,8 @@ function renderTerminalProcessLaneDashboard(dashboard) {
   const sections = dashboard.sections ?? [];
   const recentSessions = dashboard.recent_terminal_sessions ?? [];
   const recentReplays = dashboard.recent_terminal_replays ?? [];
-  terminalProcessLaneDashboardCount.textContent = String(sections.length + recentSessions.length + recentReplays.length);
+  const recentBlockedCommands = dashboard.recent_blocked_terminal_commands ?? [];
+  terminalProcessLaneDashboardCount.textContent = String(sections.length + recentSessions.length + recentReplays.length + recentBlockedCommands.length);
 
   for (const record of recentSessions.slice(0, 6)) {
     const view = describeTerminalSessionSummary(record);
@@ -6025,7 +6041,14 @@ function renderTerminalProcessLaneDashboard(dashboard) {
     terminalProcessLaneDashboardList.append(node);
   }
 
-  if (sections.length === 0 && recentSessions.length === 0 && recentReplays.length === 0) {
+  for (const record of recentBlockedCommands.slice(0, 6)) {
+    const view = describeTerminalBlockedCommand(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  if (sections.length === 0 && recentSessions.length === 0 && recentReplays.length === 0 && recentBlockedCommands.length === 0) {
     terminalProcessLaneDashboardList.append(item("No terminal/process lane records", "empty", "Run an allowed terminal command, then refresh the read-only terminal/process dashboard."));
     return;
   }
@@ -8193,6 +8216,7 @@ async function loadTerminalProcessLaneDashboard() {
     process_output_tail_summary_ready_count: 0,
     recent_terminal_session_count: 0,
     recent_terminal_replay_count: 0,
+    blocked_terminal_command_count: 0,
     disabled_gate_count: sections.length,
     read_only: true,
     terminal_process_visible: false,
@@ -8214,6 +8238,7 @@ async function loadTerminalProcessLaneDashboard() {
     execution_enabled: false,
     recent_terminal_sessions: [],
     recent_terminal_replays: [],
+    recent_blocked_terminal_commands: [],
     sections,
     reasons: [
       "Static preview groups terminal and process evidence while terminal writes, process spawn, stream readers, and execution remain disabled.",
@@ -30483,6 +30508,10 @@ footer {
       terminalWrite(`blocked: ${error.message}`);
       setProblemText(`Terminal command blocked: ${error.message}`);
       setProductStatus(`Terminal command blocked: ${error.message}`, "error");
+      await Promise.allSettled([
+        refreshTerminalProcessLaneDashboard(),
+        refreshProductEvidenceHistory(),
+      ]);
     } finally {
       if (!listen) {
         terminalRunBtn?.removeAttribute("disabled");
