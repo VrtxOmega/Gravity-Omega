@@ -3510,6 +3510,28 @@ function describeCodexHermesRunViewSection(record) {
   };
 }
 
+function describeCodexHermesRunViewEvidence(record) {
+  const stdout = String(record.stdout_preview || "").trim();
+  const stderr = String(record.stderr_preview || "").trim();
+  const preview = [
+    record.detail,
+    stdout ? `stdout: ${stdout}` : "",
+    stderr ? `stderr: ${stderr}` : "",
+    (record.blockers ?? []).length ? `blockers: ${(record.blockers ?? []).slice(0, 4).join("; ")}` : "blockers: none",
+    `record=${record.record_path || "none"}`,
+  ].filter(Boolean).join(" ");
+  return {
+    title: record.title,
+    meta: `${record.source_id} / ${record.primary_metric} / ${record.secondary_metric}`,
+    text: `${record.status}. ${preview}`,
+    state: record.blocker_count > 0
+      ? "warning"
+      : record.record_execution_enabled || record.record_process_spawn_enabled
+        ? "review"
+        : "disabled",
+  };
+}
+
 function describeCodexHermesRunDetailTimelineItem(record) {
   return {
     title: record.title,
@@ -4845,6 +4867,10 @@ function renderCodexHermesRunView(dashboard) {
     dashboard.status,
     `active=${dashboard.active_task_run_id}`,
     `runs=${dashboard.run_count}`,
+    `orchestrations=${dashboard.codex_orchestration_count ?? 0}`,
+    `inventories=${dashboard.hermes_inventory_count ?? 0}`,
+    `assists=${dashboard.hermes_assist_count ?? 0}`,
+    `summaries=${dashboard.evidence_summary_count ?? 0}`,
     `approvals=${dashboard.resolved_approval_count}/${dashboard.approval_count}`,
     `runners=${dashboard.runner_ready_count}/${dashboard.runner_count}`,
     `plans=${dashboard.joint_plan_count}`,
@@ -4856,11 +4882,19 @@ function renderCodexHermesRunView(dashboard) {
 
   clearList(codexHermesRunViewList);
   const sections = dashboard.sections ?? [];
-  codexHermesRunViewCount.textContent = String(sections.length);
+  const evidenceSummaries = dashboard.evidence_summaries ?? [];
+  codexHermesRunViewCount.textContent = String(sections.length + evidenceSummaries.length);
 
-  if (sections.length === 0) {
-    codexHermesRunViewList.append(item("No Codex/Hermes run view sections", "empty", "Refresh the read-only run view."));
+  if (sections.length === 0 && evidenceSummaries.length === 0) {
+    codexHermesRunViewList.append(item("No Codex/Hermes run view evidence", "empty", "Refresh the read-only run view after a Codex Lead or Hermes/Kimi run."));
     return;
+  }
+
+  for (const record of evidenceSummaries) {
+    const view = describeCodexHermesRunViewEvidence(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    codexHermesRunViewList.append(node);
   }
 
   for (const record of sections) {
@@ -6455,6 +6489,10 @@ async function loadCodexHermesRunViewDashboard() {
     transcript_protection_policy_count: 0,
     typed_event_log_count: 0,
     typed_event_count: 0,
+    codex_orchestration_count: 0,
+    hermes_inventory_count: 0,
+    hermes_assist_count: 0,
+    evidence_summary_count: 3,
     active_task_run_id: "none",
     read_only: true,
     disabled_gate_count: 8,
@@ -6472,6 +6510,98 @@ async function loadCodexHermesRunViewDashboard() {
     next_slice: "Open the Tauri app to resolve Codex/Hermes run view through Rust.",
     reasons: [
       "Static preview groups Codex/Hermes evidence while every live gate remains disabled.",
+    ],
+    evidence_summaries: [
+      {
+        source_id: "codex-lead-orchestration",
+        title: "Latest Codex Lead orchestration",
+        record_id: "browser-preview-codex",
+        status: "browser_preview_read_only",
+        record_path: "Open Tauri to load real Codex Lead records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "0 lanes",
+        secondary_metric: "skills=0 mcp=0 hooks=0",
+        detail: "Static preview placeholder for the latest Codex Lead orchestration record.",
+        stdout_preview: "",
+        stderr_preview: "",
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
+      {
+        source_id: "hermes-kimi-inventory",
+        title: "Latest Hermes/Kimi capability inventory",
+        record_id: "browser-preview-inventory",
+        status: "browser_preview_read_only",
+        record_path: "Open Tauri to load real Hermes/Kimi inventory records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "skills=0 filesystem=0",
+        secondary_metric: "mcp=0 hooks=0 focus=none",
+        detail: "Static preview placeholder for the latest Hermes/Kimi skills, MCP, and hooks inventory.",
+        stdout_preview: "",
+        stderr_preview: "",
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
+      {
+        source_id: "hermes-kimi-assist",
+        title: "Latest Hermes/Kimi assist brief",
+        record_id: "browser-preview-assist",
+        status: "browser_preview_read_only",
+        record_path: "Open Tauri to load real Hermes/Kimi assist records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "exit=none timeout=false duration=0ms",
+        secondary_metric: "stdout=0b stderr=0b",
+        detail: "Static preview placeholder for the latest bounded Hermes/Kimi assist brief.",
+        stdout_preview: "",
+        stderr_preview: "",
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
     ],
     sections: [
       ["task-runs", "Task runs", "task-run-ledger"],

@@ -1011,7 +1011,7 @@ pub struct CodexLeadOrchestrationRequest {
     pub force_runtime_depth_refresh: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CodexLeadDelegationLane {
     pub id: String,
     pub title: String,
@@ -1033,7 +1033,7 @@ pub struct CodexLeadDelegationLane {
     pub next_step: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CodexLeadOrchestrationRecord {
     pub id: String,
     pub status: String,
@@ -4251,6 +4251,38 @@ pub struct CodexHermesRunViewSection {
 }
 
 #[derive(Debug, Serialize)]
+pub struct CodexHermesRunViewEvidenceSummary {
+    pub source_id: &'static str,
+    pub title: &'static str,
+    pub record_id: String,
+    pub status: String,
+    pub record_path: String,
+    pub log_path: String,
+    pub created_at_ms: u64,
+    pub primary_metric: String,
+    pub secondary_metric: String,
+    pub detail: String,
+    pub stdout_preview: Option<String>,
+    pub stderr_preview: Option<String>,
+    pub blocker_count: usize,
+    pub blockers: Vec<String>,
+    pub read_only: bool,
+    pub process_spawn_enabled: bool,
+    pub terminal_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub dashboard_execution_enabled: bool,
+    pub record_process_spawn_enabled: bool,
+    pub record_execution_enabled: bool,
+}
+
+#[derive(Debug, Serialize)]
 pub struct CodexHermesRunViewDashboard {
     pub status: &'static str,
     pub section_count: usize,
@@ -4266,6 +4298,10 @@ pub struct CodexHermesRunViewDashboard {
     pub transcript_protection_policy_count: usize,
     pub typed_event_log_count: usize,
     pub typed_event_count: usize,
+    pub codex_orchestration_count: usize,
+    pub hermes_inventory_count: usize,
+    pub hermes_assist_count: usize,
+    pub evidence_summary_count: usize,
     pub active_task_run_id: String,
     pub read_only: bool,
     pub disabled_gate_count: usize,
@@ -4280,6 +4316,7 @@ pub struct CodexHermesRunViewDashboard {
     pub memory_write_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub evidence_summaries: Vec<CodexHermesRunViewEvidenceSummary>,
     pub sections: Vec<CodexHermesRunViewSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -35385,6 +35422,39 @@ pub fn create_codex_lead_orchestration_record(
     )?;
 
     Ok(record)
+}
+
+#[tauri::command]
+pub fn list_codex_lead_orchestration_records() -> Result<Vec<CodexLeadOrchestrationRecord>, String> {
+    let dir = codex_lead_orchestrations_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read codex-lead-orchestrations directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry = entry.map_err(|error| {
+            format!("failed to read Codex Lead orchestration entry: {error}")
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<CodexLeadOrchestrationRecord>(&content) {
+            records.push(record);
+        }
+    }
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(20);
+    Ok(records)
 }
 
 #[derive(Debug)]
@@ -95040,6 +95110,177 @@ fn codex_hermes_run_view_section(
     }
 }
 
+fn codex_hermes_run_view_evidence_summary(
+    source_id: &'static str,
+    title: &'static str,
+    record_id: String,
+    status: String,
+    record_path: String,
+    log_path: String,
+    created_at_ms: u64,
+    primary_metric: String,
+    secondary_metric: String,
+    detail: String,
+    stdout_preview: Option<String>,
+    stderr_preview: Option<String>,
+    blockers: Vec<String>,
+    record_process_spawn_enabled: bool,
+    record_execution_enabled: bool,
+) -> CodexHermesRunViewEvidenceSummary {
+    CodexHermesRunViewEvidenceSummary {
+        source_id,
+        title,
+        record_id,
+        status,
+        record_path,
+        log_path,
+        created_at_ms,
+        primary_metric,
+        secondary_metric,
+        detail,
+        stdout_preview,
+        stderr_preview,
+        blocker_count: blockers.len(),
+        blockers,
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled,
+        record_execution_enabled,
+    }
+}
+
+fn codex_orchestration_run_view_summary(
+    record: &CodexLeadOrchestrationRecord,
+) -> CodexHermesRunViewEvidenceSummary {
+    codex_hermes_run_view_evidence_summary(
+        "codex-lead-orchestration",
+        "Latest Codex Lead orchestration",
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "{} lanes ({} Codex / {} Hermes)",
+            record.delegation_count, record.codex_owned_count, record.hermes_assist_count
+        ),
+        format!(
+            "skills={} mcp={} hooks={}",
+            record.hermes_skill_count, record.hermes_mcp_server_count, record.hermes_hook_count
+        ),
+        format!(
+            "stream={} hermes={} runtime_depth_ready={} codex_ready={} hermes_ready={} sswp_ready={} mcp_ready={} steno_ready={} pet_ready={}",
+            record.stream_runtime,
+            record.hermes_lane_runtime,
+            record.runtime_depth_ready,
+            record.codex_runtime_ready,
+            record.hermes_runtime_ready,
+            record.sswp_runtime_ready,
+            record.mcp_metadata_ready,
+            record.steno_metadata_ready,
+            record.pet_metadata_ready
+        ),
+        None,
+        None,
+        record.blockers.clone(),
+        record.process_spawn_enabled || record.sidecar_launch_enabled,
+        record.execution_enabled,
+    )
+}
+
+fn hermes_inventory_run_view_summary(
+    record: &HermesKimiCapabilityInventoryRecord,
+) -> CodexHermesRunViewEvidenceSummary {
+    let focus = if record.focus_skills.is_empty() {
+        "focus=none".to_string()
+    } else {
+        format!(
+            "focus={}",
+            record
+                .focus_skills
+                .iter()
+                .take(8)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    codex_hermes_run_view_evidence_summary(
+        "hermes-kimi-inventory",
+        "Latest Hermes/Kimi capability inventory",
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "skills={} filesystem={}",
+            record.enabled_skill_count, record.filesystem_skill_count
+        ),
+        format!(
+            "mcp={} hooks={} {}",
+            record.mcp_server_count, record.hook_count, focus
+        ),
+        format!(
+            "skills_exit={:?} mcp_exit={:?} hooks_exit={:?} metadata_only={} skill_content_read={}",
+            record.skills_exit_code,
+            record.mcp_exit_code,
+            record.hooks_exit_code,
+            record.metadata_only,
+            record.skill_content_read_enabled
+        ),
+        None,
+        None,
+        record.blockers.clone(),
+        record.process_spawn_enabled,
+        record.execution_enabled,
+    )
+}
+
+fn hermes_assist_run_view_summary(
+    record: &HermesKimiAssistBriefRecord,
+) -> CodexHermesRunViewEvidenceSummary {
+    codex_hermes_run_view_evidence_summary(
+        "hermes-kimi-assist",
+        "Latest Hermes/Kimi assist brief",
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "exit={:?} timeout={} duration={}ms",
+            record.exit_code, record.timed_out, record.duration_ms
+        ),
+        format!(
+            "stdout={}b stderr={}b",
+            record.stdout_size_bytes, record.stderr_size_bytes
+        ),
+        format!(
+            "source={} max_turns={} stdout_transcript={} stderr_transcript={}",
+            record.source,
+            record.max_turns,
+            record.stdout_transcript_path,
+            record.stderr_transcript_path
+        ),
+        Some(prompt_preview(&record.stdout, 900)),
+        Some(prompt_preview(&record.stderr, 480)),
+        record.blockers.clone(),
+        record.process_spawn_enabled,
+        record.execution_enabled,
+    )
+}
+
 #[tauri::command]
 pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, String> {
     let task_runs = list_task_runs()?;
@@ -95049,6 +95290,9 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
     let transcript_bundles = list_run_transcript_bundles()?;
     let transcript_export_policies = list_transcript_export_policies()?;
     let transcript_protection_policies = list_transcript_protection_policies()?;
+    let codex_orchestrations = list_codex_lead_orchestration_records()?;
+    let hermes_inventories = list_hermes_kimi_capability_inventories()?;
+    let hermes_assists = list_hermes_kimi_assist_briefs()?;
 
     let active_task_run_id = task_runs
         .first()
@@ -95075,6 +95319,16 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         .iter()
         .map(|preview| preview.line_count)
         .sum();
+    let mut evidence_summaries = Vec::new();
+    if let Some(record) = codex_orchestrations.first() {
+        evidence_summaries.push(codex_orchestration_run_view_summary(record));
+    }
+    if let Some(record) = hermes_inventories.first() {
+        evidence_summaries.push(hermes_inventory_run_view_summary(record));
+    }
+    if let Some(record) = hermes_assists.first() {
+        evidence_summaries.push(hermes_assist_run_view_summary(record));
+    }
 
     let sections = vec![
         codex_hermes_run_view_section(
@@ -95200,6 +95454,10 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         transcript_protection_policy_count: transcript_protection_policies.len(),
         typed_event_log_count,
         typed_event_count,
+        codex_orchestration_count: codex_orchestrations.len(),
+        hermes_inventory_count: hermes_inventories.len(),
+        hermes_assist_count: hermes_assists.len(),
+        evidence_summary_count: evidence_summaries.len(),
         active_task_run_id,
         read_only: true,
         disabled_gate_count,
@@ -95214,13 +95472,15 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         memory_write_enabled: false,
         writes_allowed: false,
         execution_enabled: false,
+        evidence_summaries,
         sections,
         reasons: vec![
             "run view dashboard groups existing Codex/Hermes evidence ledgers into one operator surface",
+            "latest Codex Lead orchestration, Hermes/Kimi inventory, and Hermes/Kimi assist records are surfaced as read-only evidence summaries when present",
             "dashboard reads existing records only and creates no task, approval, runner, joint plan, artifact, transcript, export, protection, or event records",
             "process spawn, terminal control, live MCP calls, writes, patches, desktop control, capture, export, memory writes, and execution remain disabled",
         ],
-        next_slice: "Use this run view to add a first-class MCP dashboard, then Steno and pet surfaces, while keeping all live gates disabled until approvals and tests exist.",
+        next_slice: "Use these visible run summaries to deepen Hermes/Kimi execution robustness, PTY/process maturity, live MCP/SSWP/Steno behavior, and pet runtime linkage while keeping unsafe live gates explicit.",
     })
 }
 
@@ -114447,6 +114707,202 @@ mod tests {
                 && !policy.execution_enabled
         }));
 
+        let orchestration_dir =
+            codex_lead_orchestrations_dir().expect("codex orchestration dir");
+        fs::create_dir_all(&orchestration_dir).expect("create codex orchestration dir");
+        let orchestration_path = orchestration_dir.join("run-view-evidence-orchestration.json");
+        let orchestration_log_path =
+            orchestration_dir.join("run-view-evidence-orchestration.jsonl");
+        let orchestration_record = CodexLeadOrchestrationRecord {
+            id: "run-view-evidence-orchestration".to_string(),
+            status: "codex_lead_orchestration_recorded_ready_for_responsive_stream".to_string(),
+            requested_by: "rust-test".to_string(),
+            task_run_id: Some(stub.id.clone()),
+            prompt_preview: "test run view evidence".to_string(),
+            stream_runtime: "codex-workspace-write".to_string(),
+            hermes_lane_runtime: "hermes-chat-kimi".to_string(),
+            runtime_depth_record_id: Some("runtime-depth-test".to_string()),
+            runtime_depth_record_path: Some("/tmp/runtime-depth-test.json".to_string()),
+            hermes_skill_count: 12,
+            hermes_mcp_server_count: 3,
+            hermes_hook_count: 4,
+            codex_runtime_ready: true,
+            hermes_runtime_ready: true,
+            sswp_runtime_ready: true,
+            mcp_metadata_ready: true,
+            steno_metadata_ready: true,
+            pet_metadata_ready: true,
+            hermes_log_writable: true,
+            runtime_depth_ready: true,
+            delegation_count: 3,
+            codex_owned_count: 2,
+            hermes_assist_count: 1,
+            process_spawn_enabled: false,
+            sidecar_launch_enabled: false,
+            live_mcp_call_enabled: false,
+            workspace_write_enabled: false,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            writes_allowed: false,
+            execution_enabled: false,
+            created_at_ms: now_ms().expect("clock") + 10,
+            record_path: orchestration_path.display().to_string(),
+            log_path: orchestration_log_path.display().to_string(),
+            delegations: Vec::new(),
+            blockers: Vec::new(),
+            next_step: "Surface this orchestration in the run view.".to_string(),
+        };
+        fs::write(
+            &orchestration_path,
+            serde_json::to_string_pretty(&orchestration_record)
+                .expect("serialize orchestration"),
+        )
+        .expect("write orchestration");
+
+        let inventory_dir =
+            hermes_kimi_capability_inventories_dir().expect("hermes inventory dir");
+        fs::create_dir_all(&inventory_dir).expect("create hermes inventory dir");
+        let inventory_path = inventory_dir.join("run-view-evidence-inventory.json");
+        let inventory_log_path = inventory_dir.join("run-view-evidence-inventory.jsonl");
+        let inventory_record = HermesKimiCapabilityInventoryRecord {
+            id: "run-view-evidence-inventory".to_string(),
+            status: "hermes_kimi_capability_inventory_recorded_ready_for_codex_lead".to_string(),
+            requested_by: "rust-test".to_string(),
+            prompt_preview: "test run view evidence".to_string(),
+            hermes_binary: "hermes".to_string(),
+            enabled_skill_count: 12,
+            builtin_skill_count: 8,
+            local_skill_count: 4,
+            filesystem_skill_count: 12,
+            mcp_server_count: 3,
+            hook_count: 4,
+            focus_skill_count: 2,
+            skills_stdout_preview: "skills ok".to_string(),
+            mcp_stdout_preview: "mcp ok".to_string(),
+            hooks_stdout_preview: "hooks ok".to_string(),
+            skills_stderr_preview: String::new(),
+            mcp_stderr_preview: String::new(),
+            hooks_stderr_preview: String::new(),
+            skills_exit_code: Some(0),
+            mcp_exit_code: Some(0),
+            hooks_exit_code: Some(0),
+            skills_duration_ms: 11,
+            mcp_duration_ms: 12,
+            hooks_duration_ms: 13,
+            skills: vec![HermesKimiSkillInventoryItem {
+                id: "software-development/rust".to_string(),
+                name: "Rust".to_string(),
+                category: "software-development".to_string(),
+                source: "filesystem".to_string(),
+                status: "enabled".to_string(),
+                path: "/tmp/skill".to_string(),
+                metadata_only: true,
+            }],
+            focus_skills: vec![
+                "software-development/rust".to_string(),
+                "veritas/omega-strike-deep".to_string(),
+            ],
+            mcp_servers: vec![HermesKimiMcpInventoryItem {
+                name: "omega-stenographer".to_string(),
+                transport_preview: "stdio".to_string(),
+                tools: "search, capture".to_string(),
+                status: "ready".to_string(),
+            }],
+            hooks: vec![HermesKimiHookInventoryItem {
+                hook: "PreToolUse".to_string(),
+                command: "omega-hook".to_string(),
+                timeout_seconds: Some(3),
+                allowed: true,
+                approved_at: Some("2026-05-25T00:00:00Z".to_string()),
+            }],
+            metadata_only: true,
+            skill_content_read_enabled: false,
+            hermes_chat_enabled: false,
+            process_spawn_enabled: true,
+            live_mcp_call_enabled: false,
+            workspace_write_enabled: false,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            memory_write_enabled: false,
+            writes_allowed: false,
+            execution_enabled: false,
+            created_at_ms: now_ms().expect("clock") + 11,
+            record_path: inventory_path.display().to_string(),
+            log_path: inventory_log_path.display().to_string(),
+            blockers: Vec::new(),
+            next_step: "Surface this inventory in the run view.".to_string(),
+        };
+        fs::write(
+            &inventory_path,
+            serde_json::to_string_pretty(&inventory_record).expect("serialize inventory"),
+        )
+        .expect("write inventory");
+
+        let assist_dir = hermes_kimi_assist_briefs_dir().expect("hermes assist dir");
+        fs::create_dir_all(&assist_dir).expect("create hermes assist dir");
+        let assist_path = assist_dir.join("run-view-evidence-assist.json");
+        let assist_log_path = assist_dir.join("run-view-evidence-assist.jsonl");
+        let assist_stdout_path = assist_dir.join("run-view-evidence-assist.stdout.txt");
+        let assist_stderr_path = assist_dir.join("run-view-evidence-assist.stderr.txt");
+        let assist_record = HermesKimiAssistBriefRecord {
+            id: "run-view-evidence-assist".to_string(),
+            status: "hermes_kimi_assist_brief_succeeded".to_string(),
+            requested_by: "rust-test".to_string(),
+            task_run_id: Some(stub.id.clone()),
+            prompt_preview: "test run view evidence".to_string(),
+            prompt_size_bytes: 22,
+            compact_query_preview: "compact query".to_string(),
+            compact_query_size_bytes: 13,
+            hermes_binary: "hermes".to_string(),
+            argv_redacted: vec![
+                "hermes".to_string(),
+                "chat".to_string(),
+                "<compact-assist-query>".to_string(),
+            ],
+            source: "gravity-omega-native".to_string(),
+            max_turns: 1,
+            timeout_ms: 5_000,
+            pid: Some(4242),
+            exit_code: Some(0),
+            timed_out: false,
+            duration_ms: 222,
+            stdout: "Hermes says keep the test scoped and verify the run view.".to_string(),
+            stderr: String::new(),
+            stdout_size_bytes: 58,
+            stderr_size_bytes: 0,
+            stdout_transcript_path: assist_stdout_path.display().to_string(),
+            stderr_transcript_path: assist_stderr_path.display().to_string(),
+            inventory_record_path: Some(inventory_path.display().to_string()),
+            orchestration_record_path: Some(orchestration_path.display().to_string()),
+            focus_skills: vec!["software-development/rust".to_string()],
+            mcp_servers: vec!["omega-stenographer".to_string()],
+            hooks: vec!["PreToolUse: omega-hook".to_string()],
+            hermes_chat_enabled: true,
+            process_spawn_enabled: true,
+            transcript_capture_enabled: true,
+            agent_prompt_execution_enabled: true,
+            bounded_execution_performed: true,
+            live_mcp_call_enabled: false,
+            workspace_read_enabled: true,
+            workspace_write_enabled: false,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            memory_write_enabled: false,
+            writes_allowed: false,
+            execution_enabled: true,
+            created_at_ms: now_ms().expect("clock") + 12,
+            record_path: assist_path.display().to_string(),
+            log_path: assist_log_path.display().to_string(),
+            blockers: Vec::new(),
+            reasons: vec!["bounded assist captured".to_string()],
+            next_step: "Surface this assist in the run view.".to_string(),
+        };
+        fs::write(
+            &assist_path,
+            serde_json::to_string_pretty(&assist_record).expect("serialize assist"),
+        )
+        .expect("write assist");
+
         let run_view = codex_hermes_run_view_dashboard()
             .expect("codex hermes run view dashboard");
         assert_eq!(run_view.status, "codex_hermes_run_view_dashboard_read_only");
@@ -114463,6 +114919,10 @@ mod tests {
         assert_eq!(run_view.transcript_protection_policy_count, 1);
         assert_eq!(run_view.typed_event_log_count, 1);
         assert_eq!(run_view.typed_event_count, 2);
+        assert_eq!(run_view.codex_orchestration_count, 1);
+        assert_eq!(run_view.hermes_inventory_count, 1);
+        assert_eq!(run_view.hermes_assist_count, 1);
+        assert_eq!(run_view.evidence_summary_count, 3);
         assert_eq!(run_view.active_task_run_id, stub.id);
         assert_eq!(run_view.disabled_gate_count, 8);
         assert!(run_view.read_only);
@@ -114477,6 +114937,42 @@ mod tests {
         assert!(!run_view.memory_write_enabled);
         assert!(!run_view.writes_allowed);
         assert!(!run_view.execution_enabled);
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "codex-lead-orchestration"
+                && summary.record_id == "run-view-evidence-orchestration"
+                && summary.primary_metric.contains("3 lanes")
+                && summary.secondary_metric.contains("skills=12")
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "hermes-kimi-inventory"
+                && summary.record_id == "run-view-evidence-inventory"
+                && summary.primary_metric.contains("skills=12")
+                && summary.secondary_metric.contains("mcp=3")
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "hermes-kimi-assist"
+                && summary.record_id == "run-view-evidence-assist"
+                && summary.stdout_preview.as_deref().unwrap_or("").contains("Hermes says")
+                && summary.record_process_spawn_enabled
+                && summary.record_execution_enabled
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().all(|summary| {
+            summary.read_only
+                && !summary.process_spawn_enabled
+                && !summary.terminal_enabled
+                && !summary.live_mcp_call_enabled
+                && !summary.file_write_enabled
+                && !summary.patch_apply_enabled
+                && !summary.desktop_control_enabled
+                && !summary.capture_enabled
+                && !summary.export_enabled
+                && !summary.memory_write_enabled
+                && !summary.writes_allowed
+                && !summary.dashboard_execution_enabled
+        }));
         assert!(run_view.sections.iter().any(|section| {
             section.section_id == "task-runs"
                 && section.record_count == 1
