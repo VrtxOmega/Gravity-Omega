@@ -114027,9 +114027,17 @@ pub fn open_workspace_stub(path: String) -> WorkspaceStub {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static TEST_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn test_env_lock() -> MutexGuard<'static, ()> {
+        TEST_ENV_LOCK.lock().expect("test env lock")
+    }
 
     #[test]
     fn product_workspace_paths_are_rebuild_scoped() {
+        let _test_env_guard = test_env_lock();
         let read_path = resolve_product_workspace_read_path("README.md")
             .expect("README.md resolves inside the rebuild workspace");
         assert_eq!(read_path.1, "README.md");
@@ -114042,6 +114050,7 @@ mod tests {
 
     #[test]
     fn product_terminal_allowlist_blocks_shell_interpolation() {
+        let _test_env_guard = test_env_lock();
         let validate = product_terminal_allowed_argv("npm run validate")
             .expect("validate command is allowed");
         assert_eq!(validate, vec!["npm", "run", "validate"]);
@@ -114060,6 +114069,7 @@ mod tests {
 
     #[test]
     fn product_terminal_transcript_replay_reads_existing_session_without_execution() {
+        let _test_env_guard = test_env_lock();
         let terminal = run_product_terminal_command(ProductTerminalCommandRequest {
             command: "pwd".to_string(),
             timeout_ms: Some(5_000),
@@ -114222,6 +114232,7 @@ mod tests {
 
     #[test]
     fn product_terminal_stream_record_summary_preserves_lifecycle_evidence() {
+        let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
             "gravity-omega-terminal-stream-summary-test-{}-{}",
             std::process::id(),
@@ -114286,6 +114297,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn product_terminal_process_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
         use std::os::unix::fs::PermissionsExt;
 
         let test_root = env::temp_dir().join(format!(
@@ -114336,6 +114348,7 @@ sleep 2
     #[cfg(unix)]
     #[test]
     fn hermes_kimi_assist_process_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
         use std::os::unix::fs::PermissionsExt;
 
         let test_root = env::temp_dir().join(format!(
@@ -114388,6 +114401,7 @@ sleep 2
     #[cfg(unix)]
     #[test]
     fn agent_transcript_session_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
         use std::os::unix::fs::PermissionsExt;
 
         let test_root = env::temp_dir().join(format!(
@@ -114452,6 +114466,7 @@ sleep 2
     #[cfg(unix)]
     #[test]
     fn steno_pet_dashboard_surfaces_agent_transcript_pipe_evidence() {
+        let _test_env_guard = test_env_lock();
         use std::os::unix::fs::PermissionsExt;
 
         let test_root = env::temp_dir().join(format!(
@@ -114527,6 +114542,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn sovereign_docs_preview_records_self_contained_html_without_export_gates() {
+        let _test_env_guard = test_env_lock();
         let markdown = "# Gravity Omega Brief\n\n- Codex Lead\n- Hermes/Kimi assist\n\n```txt\nsealed evidence\n```\n";
         let record = record_sovereign_docs_preview(SovereignDocsPreviewRequest {
             source_path: "Omega Agent Work.md".to_string(),
@@ -114570,6 +114586,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn omega_computer_session_records_codex_lead_hermes_roles_without_desktop_control() {
+        let _test_env_guard = test_env_lock();
         let record = record_omega_computer_session(OmegaComputerSessionRequest {
             prompt_preview: Some(
                 "Use Codex as lead, delegate bounded review to Hermes/Kimi, and verify before reporting."
@@ -114646,6 +114663,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn provider_settings_dashboard_redacts_secret_values() {
+        let _test_env_guard = test_env_lock();
         let dashboard = provider_settings_dashboard();
 
         assert!(dashboard.read_only);
@@ -114662,6 +114680,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn product_workbench_smoke_runs_and_is_listed() {
+        let _test_env_guard = test_env_lock();
         let smoke = run_product_workbench_smoke().expect("product workbench smoke runs");
 
         assert!(smoke.accepted);
@@ -114695,6 +114714,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn product_evidence_history_reads_existing_product_ledgers() {
+        let _test_env_guard = test_env_lock();
         let _ = run_product_workbench_smoke().expect("product workbench smoke seeds evidence");
         let history = product_evidence_history().expect("product evidence history loads");
 
@@ -114716,6 +114736,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn evidence_durability_manifest_seals_readable_product_evidence_without_export() {
+        let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
             "gravity-omega-evidence-durability-test-{}-{}",
             std::process::id(),
@@ -114791,6 +114812,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn command_dry_run_resolves_joint_ci_launchpad() {
+        let _test_env_guard = test_env_lock();
         let result = execute_command_stub("agent.joint_ci".to_string()).expect("dry-run resolves");
 
         assert!(result.found);
@@ -114805,6 +114827,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn toolbar_registry_has_no_missing_commands_and_resolves_former_holes() {
+        let _test_env_guard = test_env_lock();
         let commands = command_registry().expect("toolbar registry loads");
 
         assert_eq!(commands.len(), 34);
@@ -115034,6 +115057,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn command_surface_collapse_board_maps_kimi_findings_to_twenty_families() {
+        let _test_env_guard = test_env_lock();
         let board = command_surface_collapse_board();
 
         assert_eq!(board.status, "command_surface_collapse_board_read_only");
@@ -115095,6 +115119,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn finish_line_readiness_surfaces_name_ship_blockers_without_enabling_live_gates() {
+        let _test_env_guard = test_env_lock();
         let readiness = replacement_app_ship_readiness();
 
         assert_eq!(readiness.status, "replacement_app_ship_readiness_read_only");
@@ -115405,6 +115430,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn runtime_probe_board_is_bounded_and_keeps_launch_gates_disabled() {
+        let _test_env_guard = test_env_lock();
         let targets = runtime_probe_targets();
         assert_eq!(targets.len(), 9);
         assert!(targets.iter().any(|target| {
@@ -115635,6 +115661,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn runtime_sidecar_process_snapshot_records_bounded_process_evidence_without_control() {
+        let _test_env_guard = test_env_lock();
         let record = record_runtime_sidecar_process_snapshot(RuntimeSidecarProcessSnapshotRequest {
             requested_by: Some("rust-test".to_string()),
         })
@@ -115770,6 +115797,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn pet_runtime_snapshot_signal_reflects_latest_process_snapshot_without_memory_writes() {
+        let _test_env_guard = test_env_lock();
         let snapshot = record_runtime_sidecar_process_snapshot(RuntimeSidecarProcessSnapshotRequest {
             requested_by: Some("rust-test-pet".to_string()),
         })
@@ -115841,6 +115869,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn workspace_explorer_snapshot_reads_rebuild_tree_without_mutation_gates() {
+        let _test_env_guard = test_env_lock();
         let snapshot = workspace_explorer_snapshot(WorkspaceExplorerRequest {
             root: None,
             preview_path: Some(workspace_explorer_default_preview_path()),
@@ -115907,6 +115936,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn product_workspace_search_finds_rebuild_text_without_mutation_gates() {
+        let _test_env_guard = test_env_lock();
         let result = product_workspace_search(ProductWorkspaceSearchRequest {
             query: "omega-product-shell".to_string(),
             max_results: Some(25),
@@ -115953,6 +115983,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn workspace_edit_save_preview_is_family_shaped_and_read_only() {
+        let _test_env_guard = test_env_lock();
         let plan = workspace_edit(WorkspaceEditRequest {
             mode: Some("save_preview".to_string()),
             source_command_id: Some("file.save".to_string()),
@@ -116014,6 +116045,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn ui_ux_test_matrix_covers_twenty_families_with_disabled_live_gates() {
+        let _test_env_guard = test_env_lock();
         let matrix = ui_ux_test_matrix();
 
         assert_eq!(matrix.status, "ui_ux_test_matrix_read_only");
@@ -116089,6 +116121,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn bundled_docs_and_about_are_live_static_surfaces() {
+        let _test_env_guard = test_env_lock();
         let docs = docs_open();
         assert_eq!(docs.status, "docs_open_bundled_in_app");
         assert_eq!(docs.section_count, 5);
@@ -116132,6 +116165,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn command_palette_open_is_read_only_registry_browser() {
+        let _test_env_guard = test_env_lock();
         let palette = command_palette_open().expect("command palette opens");
 
         assert_eq!(palette.status, "command_palette_open_read_only");
@@ -116178,6 +116212,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn terminal_toggle_opens_read_only_panel_without_pty_or_process() {
+        let _test_env_guard = test_env_lock();
         let toggle = terminal_toggle().expect("terminal toggle opens");
 
         assert_eq!(toggle.status, "terminal_toggle_panel_visible_read_only");
@@ -116212,6 +116247,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn editor_find_opens_read_only_panel_without_buffer_reads() {
+        let _test_env_guard = test_env_lock();
         let find = editor_find();
 
         assert_eq!(find.status, "editor_find_panel_read_only");
@@ -116245,6 +116281,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn sswp_status_opens_read_only_lane_without_live_mcp() {
+        let _test_env_guard = test_env_lock();
         let snapshot = record_runtime_sidecar_process_snapshot(RuntimeSidecarProcessSnapshotRequest {
             requested_by: Some("rust-test-sswp-status".to_string()),
         })
@@ -116300,6 +116337,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
 
     #[test]
     fn sswp_registry_parser_extracts_cli_table_without_witness_or_verify() {
+        let _test_env_guard = test_env_lock();
         let nodes = parse_sswp_registry_nodes(
             "⬡  SSWP Registry — 3 node(s)\n\nNODE ID                     RISK      LAST WITNESS          COUNT\n----------------------------------------------------------------------\naegis                       0.0%      5/13/2026, 4:03:17 AM 2\ngravity-omega               12.5%     5/25/2026, 4:02:55 AM 48\nNo nodes exceed risk threshold 0.3.\n",
         );
@@ -116316,6 +116354,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
     #[cfg(unix)]
     #[test]
     fn sswp_registry_command_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
         use std::os::unix::fs::PermissionsExt;
 
         let test_root = env::temp_dir().join(format!(
@@ -116368,6 +116407,7 @@ sleep 2
 
     #[test]
     fn steno_search_opens_read_only_panel_with_query_binding() {
+        let _test_env_guard = test_env_lock();
         let panel = steno_search(None).expect("Steno search opens");
 
         assert_eq!(panel.status, "steno_search_panel_read_only");
@@ -116407,6 +116447,7 @@ sleep 2
 
     #[test]
     fn steno_search_reads_approved_evidence_records_without_live_mcp() {
+        let _test_env_guard = test_env_lock();
         let marker = format!("steno search rust test unique signal {}", now_ms().unwrap());
         let record = record_pet_runtime_signal(PetRuntimeSignalRequest {
             state: Some("working".to_string()),
@@ -116462,6 +116503,7 @@ sleep 2
 
     #[test]
     fn toolbar_action_readiness_covers_every_non_live_toolbar_command() {
+        let _test_env_guard = test_env_lock();
         let commands = command_registry().expect("toolbar registry loads");
         let non_live_commands: Vec<&ToolbarCommand> = commands
             .iter()
@@ -116543,6 +116585,7 @@ sleep 2
 
     #[test]
     fn first_class_integration_launchpad_exposes_remaining_core_integrations_read_only() {
+        let _test_env_guard = test_env_lock();
         let panel = first_class_integration_launchpad(Some("steno.capture".to_string()))
             .expect("integration launchpad opens");
 
@@ -116606,6 +116649,7 @@ sleep 2
 
     #[test]
     fn gated_action_release_board_groups_remaining_gated_toolbar_actions() {
+        let _test_env_guard = test_env_lock();
         let board = gated_action_release_board().expect("gated action board opens");
 
         assert!(!board.accepted);
@@ -116657,6 +116701,7 @@ sleep 2
 
     #[test]
     fn workspace_mutation_workbench_groups_save_save_as_and_replace_without_writes() {
+        let _test_env_guard = test_env_lock();
         let workbench = workspace_mutation_workbench(Some("search.replace".to_string()))
             .expect("workspace mutation workbench opens");
 
@@ -116731,6 +116776,7 @@ sleep 2
 
     #[test]
     fn terminal_process_workbench_exposes_terminal_create_without_pty_or_spawn() {
+        let _test_env_guard = test_env_lock();
         let workbench = terminal_process_workbench(Some("terminal.new".to_string()))
             .expect("terminal process workbench opens");
 
@@ -116809,6 +116855,7 @@ sleep 2
 
     #[test]
     fn security_shield_workbench_groups_restricted_controls_without_host_actions() {
+        let _test_env_guard = test_env_lock();
         let workbench = security_shield_workbench(Some("security.basilisk_activate".to_string()))
             .expect("security shield workbench opens");
 
@@ -116896,6 +116943,7 @@ sleep 2
 
     #[test]
     fn native_shell_pairing_workbench_closes_devtools_and_mobile_without_tokens_or_sockets() {
+        let _test_env_guard = test_env_lock();
         let workbench = native_shell_pairing_workbench(Some("mobile.qr".to_string()))
             .expect("native shell pairing workbench opens");
 
@@ -116973,6 +117021,7 @@ sleep 2
 
     #[test]
     fn gated_adapter_release_pipeline_records_all_gated_commands_without_enabling_adapters() {
+        let _test_env_guard = test_env_lock();
         let queue = gated_adapter_release_queue().expect("gated adapter release queue opens");
 
         assert!(!queue.accepted);
@@ -117122,6 +117171,7 @@ sleep 2
 
     #[test]
     fn sandbox_gate_allows_review_but_keeps_execution_disabled() {
+        let _test_env_guard = test_env_lock();
         let decision = evaluate_execution_gate(ExecutionGateRequest {
             argv: vec![
                 "codex".to_string(),
@@ -117143,6 +117193,7 @@ sleep 2
 
     #[test]
     fn sandbox_gate_blocks_restricted_tokens() {
+        let _test_env_guard = test_env_lock();
         let decision = evaluate_execution_gate(ExecutionGateRequest {
             argv: vec!["sudo".to_string(), "apt".to_string(), "install".to_string()],
             command_id: Some("system.package_install".to_string()),
@@ -117159,6 +117210,7 @@ sleep 2
 
     #[test]
     fn desktop_environment_snapshot_records_read_only_backend_evidence_without_control() {
+        let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
             "gravity-omega-desktop-env-test-{}-{}",
             std::process::id(),
@@ -117282,6 +117334,7 @@ sleep 2
 
     #[test]
     fn desktop_stage1_capability_snapshot_records_path_prerequisites_without_spawn() {
+        let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
             "gravity-omega-desktop-stage1-test-{}-{}",
             std::process::id(),
@@ -117402,6 +117455,7 @@ sleep 2
 
     #[test]
     fn blocked_task_run_approval_and_artifact_are_persisted_to_xdg_state() {
+        let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
             "gravity-omega-native-test-{}-{}",
             std::process::id(),
