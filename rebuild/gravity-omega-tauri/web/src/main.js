@@ -6342,6 +6342,11 @@ function renderLinuxDesktopControlReadinessDashboard(dashboard) {
     `dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}`,
     `atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}`,
     `ydotool=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}`,
+    `stage1=${dashboard.desktop_read_only_capability_snapshot_ready_count}/${dashboard.desktop_read_only_capability_snapshot_count}`,
+    `tools=${dashboard.latest_desktop_read_only_capability_available_tool_count}/${dashboard.latest_desktop_read_only_capability_tool_count}`,
+    `windows=${dashboard.latest_desktop_read_only_capability_window_inventory_ready}`,
+    `screens=${dashboard.latest_desktop_read_only_capability_screenshot_ready}`,
+    `a11y=${dashboard.latest_desktop_read_only_capability_accessibility_ready}`,
     `foundation=${dashboard.foundation_desktop_ready_count}/${dashboard.foundation_desktop_lane_count}`,
     `queue=${dashboard.work_queue_desktop_ready_count}/${dashboard.work_queue_desktop_lane_count}`,
     `inventory=${dashboard.capability_desktop_ready_count}/${dashboard.capability_desktop_item_count}`,
@@ -6377,6 +6382,9 @@ async function refreshLinuxDesktopControlReadinessDashboard() {
     const invoke = tauriInvoke();
     if (invoke) {
       await invoke("record_desktop_environment_snapshot", {
+        request: { requested_by: "linux-desktop-control-readiness-dashboard" },
+      });
+      await invoke("record_desktop_read_only_capability_snapshot", {
         request: { requested_by: "linux-desktop-control-readiness-dashboard" },
       });
     }
@@ -8551,6 +8559,7 @@ async function loadLinuxDesktopControlReadinessDashboard() {
   const invoke = tauriInvoke();
   if (invoke) {
     await invoke("list_desktop_environment_snapshots").catch(() => []);
+    await invoke("list_desktop_read_only_capability_snapshots").catch(() => []);
     return invoke("linux_desktop_control_readiness_dashboard");
   }
 
@@ -8562,6 +8571,7 @@ async function loadLinuxDesktopControlReadinessDashboard() {
     ["approval-spine-prerequisites", "Approval spine prerequisites", "approval-evidence-spine-dashboard", false, true, false],
     ["desktop-command-surface", "Desktop command surface", "command-manifest", true, false, true],
     ["desktop-environment-snapshot", "Desktop environment snapshot", "desktop-environment-snapshots", true, false, true],
+    ["desktop-read-only-capability-snapshot", "Desktop stage-1 capability snapshot", "desktop-read-only-capability-snapshots", true, false, true],
   ].map(([section_id, title, source_ledger, desktop_evidence, approval_evidence, operator_surface]) => ({
     section_id,
     title,
@@ -8608,6 +8618,16 @@ async function loadLinuxDesktopControlReadinessDashboard() {
     latest_desktop_environment_ydotool_socket_visible: false,
     latest_desktop_environment_ydotool_socket_is_socket: false,
     latest_desktop_environment_backend_status: "desktop_environment_snapshot_browser_preview",
+    desktop_read_only_capability_snapshot_count: 1,
+    desktop_read_only_capability_snapshot_ready_count: 0,
+    latest_desktop_read_only_capability_snapshot_status: "desktop_read_only_capability_snapshot_browser_preview",
+    latest_desktop_read_only_capability_snapshot_record_path: "",
+    latest_desktop_read_only_capability_available_tool_count: 0,
+    latest_desktop_read_only_capability_tool_count: 0,
+    latest_desktop_read_only_capability_window_inventory_ready: false,
+    latest_desktop_read_only_capability_screenshot_ready: false,
+    latest_desktop_read_only_capability_accessibility_ready: false,
+    latest_desktop_read_only_capability_input_helper_ready: false,
     foundation_desktop_lane_count: 0,
     foundation_desktop_ready_count: 0,
     work_queue_desktop_lane_count: 0,
@@ -27945,6 +27965,9 @@ function initOmegaProductShell() {
             await invoke("record_desktop_environment_snapshot", {
               request: { requested_by: "desktop-control-central-surface" },
             });
+            await invoke("record_desktop_read_only_capability_snapshot", {
+              request: { requested_by: "desktop-control-central-surface" },
+            });
           }
           const dashboard = await loadLinuxDesktopControlReadinessDashboard();
           renderLinuxDesktopControlReadinessDashboard(dashboard);
@@ -27959,6 +27982,12 @@ function initOmegaProductShell() {
             `dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}`,
             `atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}`,
             `ydotool_socket=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}`,
+            `stage1=${dashboard.latest_desktop_read_only_capability_snapshot_status}`,
+            `tools=${dashboard.latest_desktop_read_only_capability_available_tool_count}/${dashboard.latest_desktop_read_only_capability_tool_count}`,
+            `window_inventory_ready=${dashboard.latest_desktop_read_only_capability_window_inventory_ready}`,
+            `screenshot_ready=${dashboard.latest_desktop_read_only_capability_screenshot_ready}`,
+            `accessibility_ready=${dashboard.latest_desktop_read_only_capability_accessibility_ready}`,
+            `input_helper_ready=${dashboard.latest_desktop_read_only_capability_input_helper_ready}`,
             `sections=${dashboard.section_count}`,
             `foundation=${dashboard.foundation_desktop_ready_count}/${dashboard.foundation_desktop_lane_count}`,
             `approvals=${dashboard.approval_spine_ready_section_count}/${dashboard.approval_spine_section_count}`,
@@ -27973,6 +28002,8 @@ function initOmegaProductShell() {
             subtitle: dashboard.next_slice ?? "Desktop control remains guarded until explicit release evidence exists.",
             metrics: [
               { label: "env", value: `${dashboard.desktop_environment_snapshot_ready_count ?? 0}/${dashboard.desktop_environment_snapshot_count ?? 0}` },
+              { label: "stage1", value: `${dashboard.desktop_read_only_capability_snapshot_ready_count ?? 0}/${dashboard.desktop_read_only_capability_snapshot_count ?? 0}` },
+              { label: "tools", value: `${dashboard.latest_desktop_read_only_capability_available_tool_count ?? 0}/${dashboard.latest_desktop_read_only_capability_tool_count ?? 0}` },
               { label: "backend", value: dashboard.latest_desktop_environment_graphical_session_visible ? "seen" : "missing" },
               { label: "ydotool", value: dashboard.latest_desktop_environment_ydotool_socket_is_socket ? "seen" : "missing" },
               { label: "sections", value: dashboard.section_count ?? 0 },
@@ -27990,6 +28021,17 @@ function initOmegaProductShell() {
                   panelSurfaceFlag("capture", dashboard.capture_enabled),
                   panelSurfaceFlag("control", dashboard.desktop_control_enabled),
                   panelSurfaceFlag("socket", dashboard.socket_connect_enabled),
+                ],
+              }),
+              panelSurfaceCard({
+                title: "Stage-1 Capability Snapshot",
+                meta: dashboard.latest_desktop_read_only_capability_snapshot_status ?? "snapshot missing",
+                text: `tools=${dashboard.latest_desktop_read_only_capability_available_tool_count}/${dashboard.latest_desktop_read_only_capability_tool_count}; windows=${dashboard.latest_desktop_read_only_capability_window_inventory_ready}; screenshots=${dashboard.latest_desktop_read_only_capability_screenshot_ready}; accessibility=${dashboard.latest_desktop_read_only_capability_accessibility_ready}; input=${dashboard.latest_desktop_read_only_capability_input_helper_ready}.`,
+                state: dashboard.latest_desktop_read_only_capability_window_inventory_ready ? "ready" : "warning",
+                chips: [
+                  panelSurfaceFlag("window", dashboard.latest_desktop_read_only_capability_window_inventory_ready),
+                  panelSurfaceFlag("capture", dashboard.capture_enabled),
+                  panelSurfaceFlag("control", dashboard.desktop_control_enabled),
                 ],
               }),
               ...panelSurfaceSectionCards(dashboard.sections ?? []),

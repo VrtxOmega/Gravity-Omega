@@ -5931,6 +5931,70 @@ pub struct DesktopEnvironmentSnapshotRecord {
     pub next_step: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DesktopReadOnlyCapabilitySnapshotRequest {
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DesktopReadOnlyCapabilityTool {
+    pub tool_id: String,
+    pub title: String,
+    pub category: String,
+    pub command: String,
+    pub path: String,
+    pub found_on_path: bool,
+    pub read_only_prerequisite: bool,
+    pub live_action_enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DesktopReadOnlyCapabilitySnapshotRecord {
+    pub id: String,
+    pub status: String,
+    pub requested_by: String,
+    pub tool_count: usize,
+    pub available_tool_count: usize,
+    pub window_inventory_tool_count: usize,
+    pub available_window_inventory_tool_count: usize,
+    pub screenshot_tool_count: usize,
+    pub available_screenshot_tool_count: usize,
+    pub accessibility_tool_count: usize,
+    pub available_accessibility_tool_count: usize,
+    pub input_helper_tool_count: usize,
+    pub available_input_helper_tool_count: usize,
+    pub tools: Vec<DesktopReadOnlyCapabilityTool>,
+    pub read_only: bool,
+    pub path_probe_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub window_inventory_enabled: bool,
+    pub screenshot_capture_enabled: bool,
+    pub accessibility_tree_read_enabled: bool,
+    pub pointer_injection_enabled: bool,
+    pub keyboard_injection_enabled: bool,
+    pub capture_enabled: bool,
+    pub ocr_enabled: bool,
+    pub target_window_control_enabled: bool,
+    pub element_action_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub socket_connect_enabled: bool,
+    pub terminal_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct LinuxDesktopControlReadinessDashboard {
     pub status: &'static str,
@@ -5950,6 +6014,16 @@ pub struct LinuxDesktopControlReadinessDashboard {
     pub latest_desktop_environment_ydotool_socket_visible: bool,
     pub latest_desktop_environment_ydotool_socket_is_socket: bool,
     pub latest_desktop_environment_backend_status: String,
+    pub desktop_read_only_capability_snapshot_count: usize,
+    pub desktop_read_only_capability_snapshot_ready_count: usize,
+    pub latest_desktop_read_only_capability_snapshot_status: String,
+    pub latest_desktop_read_only_capability_snapshot_record_path: String,
+    pub latest_desktop_read_only_capability_available_tool_count: usize,
+    pub latest_desktop_read_only_capability_tool_count: usize,
+    pub latest_desktop_read_only_capability_window_inventory_ready: bool,
+    pub latest_desktop_read_only_capability_screenshot_ready: bool,
+    pub latest_desktop_read_only_capability_accessibility_ready: bool,
+    pub latest_desktop_read_only_capability_input_helper_ready: bool,
     pub foundation_desktop_lane_count: usize,
     pub foundation_desktop_ready_count: usize,
     pub work_queue_desktop_lane_count: usize,
@@ -21968,6 +22042,10 @@ fn desktop_environment_snapshots_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("desktop-environment-snapshots"))
 }
 
+fn desktop_read_only_capability_snapshots_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("desktop-read-only-capability-snapshots"))
+}
+
 fn codex_lead_orchestrations_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("codex-lead-orchestrations"))
 }
@@ -32445,8 +32523,8 @@ pub fn command_manifest() -> Vec<CommandGroup> {
             title: "Codex-grade agent loop",
             safety: "safe-gated-restricted",
             phase: "phase-3",
-            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, desktop environment snapshots, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
-            command_count: 104,
+            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, desktop environment snapshots, desktop stage-1 capability snapshots, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
+            command_count: 106,
         },
         CommandGroup {
             id: "threads",
@@ -46281,6 +46359,18 @@ fn product_evidence_title_detail(
                 format!("{status}; wayland={wayland}; x11={x11}; ydotool_socket={ydotool}; control_disabled=true"),
             )
         }
+        "desktop-stage1-capability" => {
+            let status = json_string(value, "status").unwrap_or_else(|| "desktop_stage1_capability_snapshot".to_string());
+            let available = json_u64(value, "available_tool_count").unwrap_or(0);
+            let tools = json_u64(value, "tool_count").unwrap_or(0);
+            let windows = json_u64(value, "available_window_inventory_tool_count").unwrap_or(0);
+            let screenshots = json_u64(value, "available_screenshot_tool_count").unwrap_or(0);
+            let accessibility = json_u64(value, "available_accessibility_tool_count").unwrap_or(0);
+            (
+                "Desktop stage-1 capability snapshot".to_string(),
+                format!("{status}; available={available}/{tools}; windows={windows}; screenshots={screenshots}; accessibility={accessibility}; process_spawn=false"),
+            )
+        }
         "codex-orchestration" => {
             let status = json_string(value, "status").unwrap_or_else(|| "orchestration".to_string());
             let delegations = json_u64(value, "delegation_count").unwrap_or(0);
@@ -46410,6 +46500,7 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
     push_product_evidence_history_dir(&mut items, "runtime-depth", runtime_depth_probes_dir()?)?;
     push_product_evidence_history_dir(&mut items, "runtime-sidecar-process", runtime_sidecar_process_snapshots_dir()?)?;
     push_product_evidence_history_dir(&mut items, "desktop-environment", desktop_environment_snapshots_dir()?)?;
+    push_product_evidence_history_dir(&mut items, "desktop-stage1-capability", desktop_read_only_capability_snapshots_dir()?)?;
     push_product_evidence_history_dir(&mut items, "codex-orchestration", codex_lead_orchestrations_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-inventory", hermes_kimi_capability_inventories_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-assist", hermes_kimi_assist_briefs_dir()?)?;
@@ -102463,6 +102554,274 @@ fn desktop_environment_snapshot_ready(record: &DesktopEnvironmentSnapshotRecord)
         && !record.execution_enabled
 }
 
+fn command_path_status(command: &str) -> (bool, String) {
+    if command.contains(std::path::MAIN_SEPARATOR) {
+        let path = PathBuf::from(command);
+        return (path.is_file(), command.to_string());
+    }
+
+    env::var_os("PATH")
+        .and_then(|paths| {
+            env::split_paths(&paths)
+                .map(|dir| dir.join(command))
+                .find(|candidate| candidate.is_file())
+        })
+        .map(|path| (true, path.display().to_string()))
+        .unwrap_or_else(|| (false, command.to_string()))
+}
+
+fn desktop_read_only_capability_targets() -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
+    vec![
+        ("window-gdbus", "GNOME/COSMIC DBus window bridge", "window-inventory", "gdbus"),
+        ("window-busctl", "DBus window/process introspection helper", "window-inventory", "busctl"),
+        ("window-wmctrl", "X11 window inventory helper", "window-inventory", "wmctrl"),
+        ("window-xprop", "X11 window property helper", "window-inventory", "xprop"),
+        ("screenshot-grim", "Wayland screenshot helper", "screenshot", "grim"),
+        ("screenshot-gnome", "GNOME screenshot helper", "screenshot", "gnome-screenshot"),
+        ("screenshot-spectacle", "KDE Spectacle screenshot helper", "screenshot", "spectacle"),
+        ("accessibility-gdbus", "AT-SPI DBus accessibility helper", "accessibility", "gdbus"),
+        ("accessibility-busctl", "AT-SPI busctl accessibility helper", "accessibility", "busctl"),
+        ("input-ydotool", "Wayland input helper", "input-helper", "ydotool"),
+        ("input-xdotool", "X11 input helper", "input-helper", "xdotool"),
+    ]
+}
+
+fn desktop_read_only_capability_snapshot_ready(
+    record: &DesktopReadOnlyCapabilitySnapshotRecord,
+) -> bool {
+    record.read_only
+        && record.path_probe_enabled
+        && !record.process_spawn_enabled
+        && !record.window_inventory_enabled
+        && !record.screenshot_capture_enabled
+        && !record.accessibility_tree_read_enabled
+        && !record.pointer_injection_enabled
+        && !record.keyboard_injection_enabled
+        && !record.capture_enabled
+        && !record.ocr_enabled
+        && !record.target_window_control_enabled
+        && !record.element_action_enabled
+        && !record.desktop_control_enabled
+        && !record.socket_connect_enabled
+        && !record.terminal_enabled
+        && !record.file_write_enabled
+        && !record.patch_apply_enabled
+        && !record.live_mcp_call_enabled
+        && !record.config_read_enabled
+        && !record.export_enabled
+        && !record.memory_write_enabled
+        && !record.writes_allowed
+        && !record.execution_enabled
+}
+
+#[tauri::command]
+pub fn record_desktop_read_only_capability_snapshot(
+    request: DesktopReadOnlyCapabilitySnapshotRequest,
+) -> Result<DesktopReadOnlyCapabilitySnapshotRecord, String> {
+    let timestamp = now_ms()?;
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "desktop-stage1-read-only".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "desktop-stage1-read-only".to_string()
+    } else {
+        requested_by
+    };
+    let id = format!(
+        "desktop-read-only-capability-snapshot-{}-{}",
+        timestamp,
+        std::process::id()
+    );
+    let dir = desktop_read_only_capability_snapshots_dir()?;
+    fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "failed to create desktop read-only capability snapshots directory {}: {error}",
+            dir.display()
+        )
+    })?;
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+    let tools = desktop_read_only_capability_targets()
+        .into_iter()
+        .map(|(tool_id, title, category, command)| {
+            let (found_on_path, path) = command_path_status(command);
+            DesktopReadOnlyCapabilityTool {
+                tool_id: tool_id.to_string(),
+                title: title.to_string(),
+                category: category.to_string(),
+                command: command.to_string(),
+                path,
+                found_on_path,
+                read_only_prerequisite: true,
+                live_action_enabled: false,
+            }
+        })
+        .collect::<Vec<_>>();
+    let count_by_category = |category: &str| {
+        tools
+            .iter()
+            .filter(|tool| tool.category == category)
+            .count()
+    };
+    let available_by_category = |category: &str| {
+        tools
+            .iter()
+            .filter(|tool| tool.category == category && tool.found_on_path)
+            .count()
+    };
+    let tool_count = tools.len();
+    let available_tool_count = tools.iter().filter(|tool| tool.found_on_path).count();
+    let window_inventory_tool_count = count_by_category("window-inventory");
+    let available_window_inventory_tool_count = available_by_category("window-inventory");
+    let screenshot_tool_count = count_by_category("screenshot");
+    let available_screenshot_tool_count = available_by_category("screenshot");
+    let accessibility_tool_count = count_by_category("accessibility");
+    let available_accessibility_tool_count = available_by_category("accessibility");
+    let input_helper_tool_count = count_by_category("input-helper");
+    let available_input_helper_tool_count = available_by_category("input-helper");
+
+    let mut blockers = Vec::new();
+    if available_window_inventory_tool_count == 0 {
+        blockers.push("no window-inventory helper was found on PATH".to_string());
+    }
+    if available_screenshot_tool_count == 0 {
+        blockers.push("no screenshot helper was found on PATH".to_string());
+    }
+    if available_accessibility_tool_count == 0 {
+        blockers.push("no accessibility DBus helper was found on PATH".to_string());
+    }
+    if available_input_helper_tool_count == 0 {
+        blockers.push("no input helper was found on PATH; pointer/keyboard actions stay blocked".to_string());
+    }
+    let status = if blockers.is_empty() {
+        "desktop_read_only_capability_snapshot_recorded_prerequisites_visible"
+    } else {
+        "desktop_read_only_capability_snapshot_recorded_with_missing_prerequisites"
+    }
+    .to_string();
+    let record_path_display = record_path.display().to_string();
+    let log_path_display = log_path.display().to_string();
+    let record = DesktopReadOnlyCapabilitySnapshotRecord {
+        id: id.clone(),
+        status: status.clone(),
+        requested_by,
+        tool_count,
+        available_tool_count,
+        window_inventory_tool_count,
+        available_window_inventory_tool_count,
+        screenshot_tool_count,
+        available_screenshot_tool_count,
+        accessibility_tool_count,
+        available_accessibility_tool_count,
+        input_helper_tool_count,
+        available_input_helper_tool_count,
+        tools,
+        read_only: true,
+        path_probe_enabled: true,
+        process_spawn_enabled: false,
+        window_inventory_enabled: false,
+        screenshot_capture_enabled: false,
+        accessibility_tree_read_enabled: false,
+        pointer_injection_enabled: false,
+        keyboard_injection_enabled: false,
+        capture_enabled: false,
+        ocr_enabled: false,
+        target_window_control_enabled: false,
+        element_action_enabled: false,
+        desktop_control_enabled: false,
+        socket_connect_enabled: false,
+        terminal_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path_display.clone(),
+        log_path: log_path_display.clone(),
+        blockers,
+        next_step: "Use this PATH-only prerequisite snapshot to choose the first safe read-only desktop probe; helper binaries were not launched and all capture, accessibility, socket, input, focus, window-control, write, and execution gates remain disabled.".to_string(),
+    };
+    let json = serde_json::to_string_pretty(&record)
+        .map_err(|error| format!("failed to serialize desktop read-only capability snapshot: {error}"))?;
+    fs::write(&record_path, json).map_err(|error| {
+        format!(
+            "failed to write desktop read-only capability snapshot {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "event": "desktop_read_only_capability_snapshot_recorded",
+            "id": &record.id,
+            "status": &record.status,
+            "tool_count": record.tool_count,
+            "available_tool_count": record.available_tool_count,
+            "available_window_inventory_tool_count": record.available_window_inventory_tool_count,
+            "available_screenshot_tool_count": record.available_screenshot_tool_count,
+            "available_accessibility_tool_count": record.available_accessibility_tool_count,
+            "available_input_helper_tool_count": record.available_input_helper_tool_count,
+            "path_probe_enabled": true,
+            "process_spawn_enabled": false,
+            "window_inventory_enabled": false,
+            "screenshot_capture_enabled": false,
+            "accessibility_tree_read_enabled": false,
+            "pointer_injection_enabled": false,
+            "keyboard_injection_enabled": false,
+            "capture_enabled": false,
+            "desktop_control_enabled": false,
+            "socket_connect_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": timestamp
+        }),
+    )?;
+    Ok(record)
+}
+
+#[tauri::command]
+pub fn list_desktop_read_only_capability_snapshots(
+) -> Result<Vec<DesktopReadOnlyCapabilitySnapshotRecord>, String> {
+    let dir = desktop_read_only_capability_snapshots_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read desktop read-only capability snapshots directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry =
+            entry.map_err(|error| format!("failed to read desktop read-only capability snapshot entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<DesktopReadOnlyCapabilitySnapshotRecord>(&content) {
+            records.push(record);
+        }
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(40);
+    Ok(records)
+}
+
 #[tauri::command]
 pub fn record_desktop_environment_snapshot(
     request: DesktopEnvironmentSnapshotRequest,
@@ -102762,6 +103121,49 @@ pub fn linux_desktop_control_readiness_dashboard(
     let latest_desktop_environment_backend_status = latest_desktop_environment_snapshot
         .map(|record| record.backend_status.clone())
         .unwrap_or_else(|| "desktop_environment_snapshot_missing".to_string());
+    let desktop_read_only_capability_snapshots =
+        list_desktop_read_only_capability_snapshots().unwrap_or_default();
+    let desktop_read_only_capability_snapshot_count =
+        desktop_read_only_capability_snapshots.len();
+    let desktop_read_only_capability_snapshot_ready_count =
+        desktop_read_only_capability_snapshots
+            .iter()
+            .filter(|record| desktop_read_only_capability_snapshot_ready(record))
+            .count();
+    let latest_desktop_read_only_capability_snapshot =
+        desktop_read_only_capability_snapshots.first();
+    let latest_desktop_read_only_capability_snapshot_status =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.status.clone())
+            .unwrap_or_else(|| "desktop_read_only_capability_snapshot_missing".to_string());
+    let latest_desktop_read_only_capability_snapshot_record_path =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.record_path.clone())
+            .unwrap_or_default();
+    let latest_desktop_read_only_capability_available_tool_count =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_tool_count)
+            .unwrap_or(0);
+    let latest_desktop_read_only_capability_tool_count =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.tool_count)
+            .unwrap_or(0);
+    let latest_desktop_read_only_capability_window_inventory_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_window_inventory_tool_count > 0)
+            .unwrap_or(false);
+    let latest_desktop_read_only_capability_screenshot_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_screenshot_tool_count > 0)
+            .unwrap_or(false);
+    let latest_desktop_read_only_capability_accessibility_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_accessibility_tool_count > 0)
+            .unwrap_or(false);
+    let latest_desktop_read_only_capability_input_helper_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_input_helper_tool_count > 0)
+            .unwrap_or(false);
 
     let foundation_desktop_lanes = foundation
         .items
@@ -102908,6 +103310,20 @@ pub fn linux_desktop_control_readiness_dashboard(
             true,
         ));
     }
+    if desktop_read_only_capability_snapshot_count > 0 {
+        sections.push(linux_desktop_control_readiness_dashboard_section(
+            "desktop-read-only-capability-snapshot",
+            "Desktop stage-1 capability snapshot",
+            "desktop-read-only-capability-snapshots",
+            desktop_read_only_capability_snapshot_count,
+            desktop_read_only_capability_snapshot_ready_count,
+            "desktop_stage1_capability_snapshot_recorded_actions_disabled",
+            "Use the latest PATH-only stage-1 capability snapshot to decide which read-only window, screenshot, accessibility, or input prerequisite needs repair before any desktop action gate can open.",
+            true,
+            false,
+            true,
+        ));
+    }
 
     let disabled_gate_count = sections
         .iter()
@@ -102948,6 +103364,16 @@ pub fn linux_desktop_control_readiness_dashboard(
         latest_desktop_environment_ydotool_socket_visible,
         latest_desktop_environment_ydotool_socket_is_socket,
         latest_desktop_environment_backend_status,
+        desktop_read_only_capability_snapshot_count,
+        desktop_read_only_capability_snapshot_ready_count,
+        latest_desktop_read_only_capability_snapshot_status,
+        latest_desktop_read_only_capability_snapshot_record_path,
+        latest_desktop_read_only_capability_available_tool_count,
+        latest_desktop_read_only_capability_tool_count,
+        latest_desktop_read_only_capability_window_inventory_ready,
+        latest_desktop_read_only_capability_screenshot_ready,
+        latest_desktop_read_only_capability_accessibility_ready,
+        latest_desktop_read_only_capability_input_helper_ready,
         foundation_desktop_lane_count,
         foundation_desktop_ready_count,
         work_queue_desktop_lane_count,
@@ -116476,6 +116902,126 @@ sleep 2
             } else {
                 env::remove_var(key);
             }
+        }
+    }
+
+    #[test]
+    fn desktop_stage1_capability_snapshot_records_path_prerequisites_without_spawn() {
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-desktop-stage1-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        let fake_bin = test_root.join("bin");
+        fs::create_dir_all(&fake_bin).expect("fake bin dir");
+        for command in ["gdbus", "busctl", "grim", "ydotool"] {
+            fs::write(fake_bin.join(command), b"").expect("fake desktop helper");
+        }
+        let saved_state = env::var_os("XDG_STATE_HOME");
+        let saved_path = env::var_os("PATH");
+        env::set_var("XDG_STATE_HOME", &test_root);
+        env::set_var("PATH", &fake_bin);
+
+        let record = record_desktop_read_only_capability_snapshot(
+            DesktopReadOnlyCapabilitySnapshotRequest {
+                requested_by: Some("rust-test".to_string()),
+            },
+        )
+        .expect("desktop stage-1 capability snapshot records");
+        assert_eq!(record.requested_by, "rust-test");
+        assert_eq!(
+            record.status,
+            "desktop_read_only_capability_snapshot_recorded_prerequisites_visible"
+        );
+        assert_eq!(record.tool_count, 11);
+        assert_eq!(record.available_tool_count, 6);
+        assert_eq!(record.window_inventory_tool_count, 4);
+        assert_eq!(record.available_window_inventory_tool_count, 2);
+        assert_eq!(record.screenshot_tool_count, 3);
+        assert_eq!(record.available_screenshot_tool_count, 1);
+        assert_eq!(record.accessibility_tool_count, 2);
+        assert_eq!(record.available_accessibility_tool_count, 2);
+        assert_eq!(record.input_helper_tool_count, 2);
+        assert_eq!(record.available_input_helper_tool_count, 1);
+        assert!(record.tools.iter().any(|tool| {
+            tool.command == "gdbus"
+                && tool.found_on_path
+                && tool.read_only_prerequisite
+                && !tool.live_action_enabled
+        }));
+        assert!(record.read_only);
+        assert!(record.path_probe_enabled);
+        assert!(!record.process_spawn_enabled);
+        assert!(!record.window_inventory_enabled);
+        assert!(!record.screenshot_capture_enabled);
+        assert!(!record.accessibility_tree_read_enabled);
+        assert!(!record.pointer_injection_enabled);
+        assert!(!record.keyboard_injection_enabled);
+        assert!(!record.capture_enabled);
+        assert!(!record.desktop_control_enabled);
+        assert!(!record.socket_connect_enabled);
+        assert!(!record.writes_allowed);
+        assert!(!record.execution_enabled);
+        assert!(record.blockers.is_empty());
+        assert!(fs::metadata(&record.record_path).is_ok());
+        assert!(fs::metadata(&record.log_path).is_ok());
+
+        let listed = list_desktop_read_only_capability_snapshots()
+            .expect("desktop stage-1 capability snapshot list reads");
+        assert!(listed.iter().any(|item| item.id == record.id));
+
+        let dashboard = linux_desktop_control_readiness_dashboard()
+            .expect("desktop readiness dashboard includes stage-1 capability snapshot");
+        assert_eq!(dashboard.desktop_read_only_capability_snapshot_count, 1);
+        assert_eq!(dashboard.desktop_read_only_capability_snapshot_ready_count, 1);
+        assert_eq!(
+            dashboard.latest_desktop_read_only_capability_snapshot_status,
+            record.status
+        );
+        assert_eq!(
+            dashboard.latest_desktop_read_only_capability_available_tool_count,
+            record.available_tool_count
+        );
+        assert_eq!(
+            dashboard.latest_desktop_read_only_capability_tool_count,
+            record.tool_count
+        );
+        assert!(dashboard.latest_desktop_read_only_capability_window_inventory_ready);
+        assert!(dashboard.latest_desktop_read_only_capability_screenshot_ready);
+        assert!(dashboard.latest_desktop_read_only_capability_accessibility_ready);
+        assert!(dashboard.latest_desktop_read_only_capability_input_helper_ready);
+        assert!(!dashboard.capture_enabled);
+        assert!(!dashboard.desktop_control_enabled);
+        assert!(!dashboard.socket_connect_enabled);
+        assert!(!dashboard.execution_enabled);
+        assert!(dashboard.sections.iter().any(|section| {
+            section.section_id == "desktop-read-only-capability-snapshot"
+                && section.source_ledger == "desktop-read-only-capability-snapshots"
+                && section.record_count == 1
+                && section.ready_count == 1
+                && section.desktop_evidence
+                && section.operator_surface
+                && !section.process_spawn_enabled
+                && !section.capture_enabled
+                && !section.desktop_control_enabled
+                && !section.execution_enabled
+        }));
+
+        let history = product_evidence_history().expect("product evidence history loads");
+        assert!(history.items.iter().any(|item| {
+            item.category == "desktop-stage1-capability" && item.record_path == record.record_path
+        }));
+
+        let _ = fs::remove_dir_all(&test_root);
+        if let Some(value) = saved_state {
+            env::set_var("XDG_STATE_HOME", value);
+        } else {
+            env::remove_var("XDG_STATE_HOME");
+        }
+        if let Some(value) = saved_path {
+            env::set_var("PATH", value);
+        } else {
+            env::remove_var("PATH");
         }
     }
 

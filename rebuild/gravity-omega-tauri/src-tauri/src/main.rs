@@ -185,6 +185,8 @@ fn main() {
             commands::approval_evidence_spine_dashboard,
             commands::record_desktop_environment_snapshot,
             commands::list_desktop_environment_snapshots,
+            commands::record_desktop_read_only_capability_snapshot,
+            commands::list_desktop_read_only_capability_snapshots,
             commands::linux_desktop_control_readiness_dashboard,
             commands::desktop_capture_action_approval_policy_dashboard,
             commands::desktop_capture_action_approval_records,

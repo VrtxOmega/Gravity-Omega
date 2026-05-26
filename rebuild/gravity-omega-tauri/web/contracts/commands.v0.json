@@ -166,6 +166,8 @@
         {"id": "approval_evidence_spine_dashboard", "safety": "safe"},
         {"id": "desktop_environment_snapshot_record", "safety": "safe"},
         {"id": "desktop_environment_snapshot_list", "safety": "safe"},
+        {"id": "desktop_read_only_capability_snapshot_record", "safety": "safe"},
+        {"id": "desktop_read_only_capability_snapshot_list", "safety": "safe"},
         {"id": "linux_desktop_control_readiness_dashboard", "safety": "safe"},
         {"id": "desktop_capture_action_approval_policy_dashboard", "safety": "safe"},
         {"id": "desktop_capture_action_approval_records", "safety": "safe"},
