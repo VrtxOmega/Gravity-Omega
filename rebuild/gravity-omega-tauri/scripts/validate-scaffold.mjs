@@ -220,6 +220,25 @@ if (productTerminalProcessBody.includes("wait_with_output")) {
   throw new Error("Product terminal command runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
 }
 
+const productTerminalStreamStart = rustCommandsSource.indexOf("pub fn run_product_terminal_command_stream");
+const productTerminalStreamEnd = rustCommandsSource.indexOf("fn write_product_terminal_command_result", productTerminalStreamStart);
+if (productTerminalStreamStart < 0 || productTerminalStreamEnd < productTerminalStreamStart) {
+  throw new Error("Product terminal stream runner body is missing.");
+}
+const productTerminalStreamBody = rustCommandsSource.slice(productTerminalStreamStart, productTerminalStreamEnd);
+for (const terminalStreamNeedle of [
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+  "timeout_ms",
+]) {
+  if (!productTerminalStreamBody.includes(terminalStreamNeedle)) {
+    throw new Error(`Product terminal stream runner must persist lifecycle evidence field ${terminalStreamNeedle}.`);
+  }
+}
+
 for (const unlockedUiNeedle of [
   "run-unlocked-codex-agent-btn",
   "run-unlocked-hermes-agent-btn",
@@ -708,6 +727,11 @@ for (const productBridgeNeedle of [
   "wait_after_kill_ms",
   "partial_output_captured",
   "pipeReaders=",
+  "activeTerminalStreamRun",
+  "recordTerminalStreamLifecycleEvent",
+  "tickTerminalStreamWatchdog",
+  "data-terminal-stream-session",
+  "terminal stream stale warning",
   "Terminal session:",
   "Terminal replay:",
   "Blocked terminal command:",

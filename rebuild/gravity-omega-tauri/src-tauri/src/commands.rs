@@ -2675,6 +2675,12 @@ pub struct ProductTerminalStreamEvent {
     pub line: String,
     pub status: String,
     pub exit_code: Option<i32>,
+    pub duration_ms: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
     pub record_path: String,
     pub log_path: String,
     pub created_at_ms: u64,
@@ -2694,6 +2700,9 @@ pub struct ProductTerminalStreamStartResult {
     pub stderr_transcript_path: String,
     pub created_at_ms: u64,
     pub stream_event_name: &'static str,
+    pub stdout_pipe_reader_expected: bool,
+    pub stderr_pipe_reader_expected: bool,
+    pub timeout_ms: u64,
     pub stream_enabled: bool,
     pub process_spawn_enabled: bool,
     pub transcript_capture_enabled: bool,
@@ -42703,7 +42712,14 @@ fn emit_product_terminal_stream_event(
             "line": event.line,
             "status": event.status,
             "exit_code": event.exit_code,
+            "duration_ms": event.duration_ms,
+            "stdout_pipe_reader_enabled": event.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": event.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": event.timeout_kill_sent,
+            "wait_after_kill_ms": event.wait_after_kill_ms,
+            "partial_output_captured": event.partial_output_captured,
             "record_path": event.record_path,
+            "log_path": event.log_path,
             "created_at_ms": event.created_at_ms
         }),
     );
@@ -42735,6 +42751,12 @@ fn read_product_terminal_stream<R: Read + Send + 'static>(
                 line,
                 status: "product_terminal_stream_output".to_string(),
                 exit_code: None,
+                duration_ms: 0,
+                stdout_pipe_reader_enabled: true,
+                stderr_pipe_reader_enabled: true,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: true,
                 record_path: record_path.clone(),
                 log_path: log_path.display().to_string(),
                 created_at_ms,
@@ -42796,6 +42818,9 @@ pub fn run_product_terminal_command_stream(
         stderr_transcript_path: stderr_transcript_path.display().to_string(),
         created_at_ms: timestamp,
         stream_event_name: PRODUCT_TERMINAL_STREAM_EVENT,
+        stdout_pipe_reader_expected: true,
+        stderr_pipe_reader_expected: true,
+        timeout_ms,
         stream_enabled: true,
         process_spawn_enabled: true,
         transcript_capture_enabled: true,
@@ -42814,6 +42839,12 @@ pub fn run_product_terminal_command_stream(
             "stream_event_name": PRODUCT_TERMINAL_STREAM_EVENT,
             "stdout_transcript_path": result.stdout_transcript_path,
             "stderr_transcript_path": result.stderr_transcript_path,
+            "stdout_pipe_reader_enabled": true,
+            "stderr_pipe_reader_enabled": true,
+            "timeout_kill_sent": false,
+            "wait_after_kill_ms": 0,
+            "partial_output_captured": false,
+            "timeout_ms": timeout_ms,
             "stream_enabled": true,
             "process_spawn_enabled": true,
             "transcript_capture_enabled": true,
@@ -42840,6 +42871,12 @@ pub fn run_product_terminal_command_stream(
             line: format!("started {}", result.command),
             status: "product_terminal_stream_started".to_string(),
             exit_code: None,
+            duration_ms: 0,
+            stdout_pipe_reader_enabled: true,
+            stderr_pipe_reader_enabled: true,
+            timeout_kill_sent: false,
+            wait_after_kill_ms: 0,
+            partial_output_captured: false,
             record_path: result.record_path.clone(),
             log_path: result.log_path.clone(),
             created_at_ms: timestamp,
@@ -42884,6 +42921,12 @@ pub fn run_product_terminal_command_stream(
                         "exit_code": null,
                         "timed_out": false,
                         "duration_ms": started.elapsed().as_millis() as u64,
+                        "stdout_pipe_reader_enabled": false,
+                        "stderr_pipe_reader_enabled": false,
+                        "timeout_kill_sent": false,
+                        "wait_after_kill_ms": 0,
+                        "partial_output_captured": true,
+                        "timeout_ms": timeout_ms,
                         "stdout_transcript_path": thread_stdout_path.display().to_string(),
                         "stderr_transcript_path": thread_stderr_path.display().to_string(),
                         "stream_enabled": true,
@@ -42905,6 +42948,12 @@ pub fn run_product_terminal_command_stream(
                         line,
                         status,
                         exit_code: None,
+                        duration_ms: started.elapsed().as_millis() as u64,
+                        stdout_pipe_reader_enabled: false,
+                        stderr_pipe_reader_enabled: false,
+                        timeout_kill_sent: false,
+                        wait_after_kill_ms: 0,
+                        partial_output_captured: true,
                         record_path: thread_record_path_display,
                         log_path: thread_log_path.display().to_string(),
                         created_at_ms: timestamp,
@@ -42952,18 +43001,35 @@ pub fn run_product_terminal_command_stream(
         });
 
         let mut timed_out = false;
+        let stdout_pipe_reader_enabled = stdout_handle.is_some();
+        let stderr_pipe_reader_enabled = stderr_handle.is_some();
+        let mut timeout_kill_sent = false;
+        let mut wait_after_kill_ms = 0;
+        let exit_code;
+        let mut wait_failed = false;
         loop {
             match child.try_wait() {
-                Ok(Some(_status)) => break,
+                Ok(Some(status)) => {
+                    exit_code = status.code();
+                    break;
+                }
                 Ok(None) => {
                     if started.elapsed() >= Duration::from_millis(timeout_ms) {
                         timed_out = true;
-                        let _ = child.kill();
+                        let kill_started = Instant::now();
+                        timeout_kill_sent = child.kill().is_ok();
+                        exit_code = child.wait().ok().and_then(|status| status.code());
+                        wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(50));
                 }
                 Err(error) => {
+                    wait_failed = true;
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    exit_code = child.wait().ok().and_then(|status| status.code());
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                     emit_product_terminal_stream_event(
                         &thread_app,
                         &thread_log_path,
@@ -42973,6 +43039,12 @@ pub fn run_product_terminal_command_stream(
                             line: format!("wait failed: {error}"),
                             status: "product_terminal_stream_wait_failed".to_string(),
                             exit_code: None,
+                            duration_ms: started.elapsed().as_millis() as u64,
+                            stdout_pipe_reader_enabled,
+                            stderr_pipe_reader_enabled,
+                            timeout_kill_sent,
+                            wait_after_kill_ms,
+                            partial_output_captured: false,
                             record_path: thread_record_path_display.clone(),
                             log_path: thread_log_path.display().to_string(),
                             created_at_ms: timestamp,
@@ -42983,18 +43055,19 @@ pub fn run_product_terminal_command_stream(
             }
         }
 
-        let output_status = child.wait().ok();
-        let exit_code = output_status.and_then(|status| status.code());
         let stdout = stdout_handle
             .and_then(|handle| handle.join().ok())
             .unwrap_or_default();
         let stderr = stderr_handle
             .and_then(|handle| handle.join().ok())
             .unwrap_or_default();
+        let partial_output_captured = !stdout.is_empty() || !stderr.is_empty();
         let _ = fs::write(&thread_stdout_path, &stdout);
         let _ = fs::write(&thread_stderr_path, &stderr);
         let status = if timed_out {
             "product_terminal_stream_timed_out"
+        } else if wait_failed {
+            "product_terminal_stream_wait_failed"
         } else if exit_code == Some(0) {
             "product_terminal_stream_succeeded"
         } else {
@@ -43013,6 +43086,12 @@ pub fn run_product_terminal_command_stream(
                 "exit_code": exit_code,
                 "timed_out": timed_out,
                 "duration_ms": duration_ms,
+                "stdout_pipe_reader_enabled": stdout_pipe_reader_enabled,
+                "stderr_pipe_reader_enabled": stderr_pipe_reader_enabled,
+                "timeout_kill_sent": timeout_kill_sent,
+                "wait_after_kill_ms": wait_after_kill_ms,
+                "partial_output_captured": partial_output_captured,
+                "timeout_ms": timeout_ms,
                 "stdout_transcript_path": thread_stdout_path.display().to_string(),
                 "stderr_transcript_path": thread_stderr_path.display().to_string(),
                 "stream_enabled": true,
@@ -43034,6 +43113,12 @@ pub fn run_product_terminal_command_stream(
                 line: format!("{status} exit={exit_code:?} duration={duration_ms}ms"),
                 status,
                 exit_code,
+                duration_ms,
+                stdout_pipe_reader_enabled,
+                stderr_pipe_reader_enabled,
+                timeout_kill_sent,
+                wait_after_kill_ms,
+                partial_output_captured,
                 record_path: thread_record_path_display,
                 log_path: thread_log_path.display().to_string(),
                 created_at_ms: timestamp,
@@ -112471,6 +112556,69 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn product_terminal_stream_record_summary_preserves_lifecycle_evidence() {
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-terminal-stream-summary-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create stream summary dir");
+        let record_path = test_root.join("product-terminal-stream-test.json");
+        let stdout_path = test_root.join("product-terminal-stream-test.stdout.txt");
+        let stderr_path = test_root.join("product-terminal-stream-test.stderr.txt");
+        fs::write(&stdout_path, "stream stdout ready\n").expect("write stdout transcript");
+        fs::write(&stderr_path, "stream stderr ready\n").expect("write stderr transcript");
+        let value = serde_json::json!({
+            "session_id": "product-terminal-stream-test",
+            "status": "product_terminal_stream_timed_out",
+            "command": "npm run validate",
+            "cwd": rebuild_workspace_root().display().to_string(),
+            "exit_code": null,
+            "timed_out": true,
+            "duration_ms": 1234,
+            "stdout_pipe_reader_enabled": true,
+            "stderr_pipe_reader_enabled": true,
+            "timeout_kill_sent": true,
+            "wait_after_kill_ms": 17,
+            "partial_output_captured": true,
+            "timeout_ms": 100,
+            "stdout_transcript_path": stdout_path.display().to_string(),
+            "stderr_transcript_path": stderr_path.display().to_string(),
+            "stream_enabled": true,
+            "process_spawn_enabled": true,
+            "transcript_capture_enabled": true,
+            "command_runner_enabled": true,
+            "writes_allowed": false,
+            "execution_enabled": true,
+            "created_at_ms": 99
+        });
+        let summary = terminal_session_summary_from_record(record_path, value);
+        assert_eq!(summary.session_id, "product-terminal-stream-test");
+        assert_eq!(summary.status, "product_terminal_stream_timed_out");
+        assert_eq!(summary.command, "npm run validate");
+        assert!(summary.timed_out);
+        assert!(summary.source_stream_enabled);
+        assert!(summary.source_process_spawn_enabled);
+        assert!(summary.source_transcript_capture_enabled);
+        assert!(summary.source_command_runner_enabled);
+        assert!(summary.source_execution_enabled);
+        assert!(!summary.source_writes_allowed);
+        assert!(summary.stdout_pipe_reader_enabled);
+        assert!(summary.stderr_pipe_reader_enabled);
+        assert!(summary.timeout_kill_sent);
+        assert_eq!(summary.wait_after_kill_ms, 17);
+        assert!(summary.partial_output_captured);
+        assert!(summary.stdout_size_bytes > 0);
+        assert!(summary.stderr_size_bytes > 0);
+        assert!(!summary.terminal_write_enabled);
+        assert!(!summary.live_tail_enabled);
+        assert!(!summary.process_control_enabled);
+        assert!(!summary.writes_allowed);
+        assert!(!summary.execution_enabled);
+        let _ = fs::remove_dir_all(&test_root);
     }
 
     #[cfg(unix)]

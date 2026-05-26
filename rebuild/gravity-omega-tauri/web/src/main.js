@@ -25415,6 +25415,8 @@ function initOmegaProductShell() {
   let activeSearchMode = "current";
   let activeProductPanel = "explorer";
   let activeTerminalStreamId = "";
+  let activeTerminalStreamRun = null;
+  let terminalStreamWatchdogTimer = 0;
   let activeAgentStreamId = "";
   let activeAgentRun = null;
   let agentRunWatchdogTimer = 0;
@@ -25460,6 +25462,11 @@ function initOmegaProductShell() {
     stdoutTranscriptPath: "",
     stderrTranscriptPath: "",
     replayRecordPath: "",
+    stdoutPipeReaderEnabled: false,
+    stderrPipeReaderEnabled: false,
+    timeoutKillSent: false,
+    waitAfterKillMs: 0,
+    partialOutputCaptured: false,
   };
   let openEditorTabs = [
     {
@@ -26161,6 +26168,77 @@ function initOmegaProductShell() {
     return status || "idle";
   };
 
+  const terminalStreamStaleMs = 45_000;
+
+  const syncTerminalStreamDataset = () => {
+    if (!productShell) return;
+    productShell.setAttribute("data-terminal-stream-session", activeTerminalStreamRun?.sessionId || "");
+    productShell.setAttribute("data-terminal-stream-status", activeTerminalStreamRun?.status || "idle");
+    productShell.setAttribute("data-terminal-stream-last-event", activeTerminalStreamRun?.lastEventName || "none");
+    productShell.setAttribute("data-terminal-stream-stale-warnings", String(activeTerminalStreamRun?.staleWarningCount ?? 0));
+  };
+
+  const recordTerminalStreamLifecycleEvent = (eventName, patch = {}, options = {}) => {
+    if (!activeTerminalStreamRun && patch.sessionId) {
+      activeTerminalStreamRun = {
+        sessionId: patch.sessionId,
+        command: patch.command || "",
+        status: "starting",
+        phase: "starting",
+        recordPath: patch.recordPath || "",
+        logPath: patch.logPath || "",
+        startedAt: Date.now(),
+        lastEventAt: Date.now(),
+        lastEventName: eventName,
+        staleWarningCount: 0,
+      };
+    }
+    if (!activeTerminalStreamRun) return;
+    activeTerminalStreamRun = {
+      ...activeTerminalStreamRun,
+      ...patch,
+      lastEventAt: Date.now(),
+      lastEventName: eventName,
+    };
+    syncTerminalStreamDataset();
+    if (!options.silent) {
+      appendEvidenceText(`terminal-stream ${eventName}: ${activeTerminalStreamRun.status || "running"} ${activeTerminalStreamRun.recordPath || ""}`.trim());
+    }
+  };
+
+  const clearTerminalStreamRun = () => {
+    activeTerminalStreamRun = null;
+    if (terminalStreamWatchdogTimer) {
+      window.clearInterval(terminalStreamWatchdogTimer);
+      terminalStreamWatchdogTimer = 0;
+    }
+    syncTerminalStreamDataset();
+  };
+
+  const tickTerminalStreamWatchdog = () => {
+    if (!activeTerminalStreamRun) return;
+    const quietMs = Date.now() - (activeTerminalStreamRun.lastEventAt || activeTerminalStreamRun.startedAt || Date.now());
+    if (quietMs < terminalStreamStaleMs) return;
+    activeTerminalStreamRun.staleWarningCount = (activeTerminalStreamRun.staleWarningCount ?? 0) + 1;
+    activeTerminalStreamRun.lastEventAt = Date.now();
+    syncTerminalStreamDataset();
+    terminalWrite(`[terminal_watchdog] quiet for ${quietMs}ms; stream still active (${activeTerminalStreamRun.sessionId || "pending"})`);
+    appendEvidenceText(`terminal stream stale warning ${activeTerminalStreamRun.staleWarningCount}: ${activeTerminalStreamRun.recordPath || "no record yet"}`);
+    setPetCompanionRuntimeState({
+      state: "warning",
+      source: "terminal-stream-watchdog",
+      message: `Terminal stream is quiet for ${Math.round(quietMs / 1000)}s.`,
+      progress: 70,
+      relatedRecordPath: activeTerminalStreamRun.recordPath || "",
+    }, { record: true });
+    setProductStatus("Terminal stream is still running but has been quiet.", "warning");
+  };
+
+  const startTerminalStreamWatchdog = () => {
+    if (terminalStreamWatchdogTimer) return;
+    terminalStreamWatchdogTimer = window.setInterval(tickTerminalStreamWatchdog, 10_000);
+  };
+
   const parseTerminalDurationMs = (line = "") => {
     const match = String(line).match(/duration=(\d+)ms/);
     return match ? Number.parseInt(match[1], 10) : undefined;
@@ -26202,6 +26280,10 @@ function initOmegaProductShell() {
         `log=${lastTerminalSession.logPath || "none"}`,
         `stdout=${lastTerminalSession.stdoutTranscriptPath || "none"}`,
         `stderr=${lastTerminalSession.stderrTranscriptPath || "none"}`,
+        `pipeReaders=${Boolean(lastTerminalSession.stdoutPipeReaderEnabled)}/${Boolean(lastTerminalSession.stderrPipeReaderEnabled)}`,
+        `timeoutKill=${Boolean(lastTerminalSession.timeoutKillSent)}`,
+        `waitAfterKillMs=${lastTerminalSession.waitAfterKillMs ?? 0}`,
+        `partialOutput=${Boolean(lastTerminalSession.partialOutputCaptured)}`,
         `replay=${lastTerminalSession.replayRecordPath || "none"}`,
       ].join("\n");
     }
@@ -26278,6 +26360,8 @@ function initOmegaProductShell() {
       `cwd=${lastTerminalSession.cwd || "rebuild workspace"}`,
       `exit=${lastTerminalSession.exitCode ?? "none"}`,
       `duration=${lastTerminalSession.durationMs ?? 0}ms`,
+      `pipeReaders=${Boolean(lastTerminalSession.stdoutPipeReaderEnabled)}/${Boolean(lastTerminalSession.stderrPipeReaderEnabled)}`,
+      `timeoutKill=${Boolean(lastTerminalSession.timeoutKillSent)} waitAfterKill=${lastTerminalSession.waitAfterKillMs ?? 0}ms partial=${Boolean(lastTerminalSession.partialOutputCaptured)}`,
       `record=${lastTerminalSession.recordPath || "none"}`,
       `log=${lastTerminalSession.logPath || "none"}`,
       `stdout=${lastTerminalSession.stdoutTranscriptPath || "none"}`,
@@ -30378,17 +30462,37 @@ footer {
       const payload = event?.payload ?? {};
       if (activeTerminalStreamId && payload.session_id !== activeTerminalStreamId) return;
       if (payload.kind === "stdout" || payload.kind === "stderr") {
+        recordTerminalStreamLifecycleEvent(`stream-${payload.kind}`, {
+          sessionId: payload.session_id || activeTerminalStreamId,
+          status: payload.status || "product_terminal_stream_output",
+          phase: "streaming",
+          recordPath: payload.record_path || lastTerminalSession.recordPath,
+          logPath: payload.log_path || lastTerminalSession.logPath,
+        }, { silent: true });
         terminalWrite(payload.line ?? "");
         return;
       }
       if (payload.kind === "error") {
+        recordTerminalStreamLifecycleEvent("stream-error", {
+          sessionId: payload.session_id || activeTerminalStreamId,
+          status: payload.status || "product_terminal_stream_failed",
+          phase: "error",
+          recordPath: payload.record_path || lastTerminalSession.recordPath,
+          logPath: payload.log_path || lastTerminalSession.logPath,
+        });
         updateTerminalSessionHud({
           sessionId: payload.session_id || activeTerminalStreamId,
           status: payload.status || "product_terminal_stream_failed",
           state: "error",
           exitCode: payload.exit_code ?? "none",
+          durationMs: payload.duration_ms ?? lastTerminalSession.durationMs,
           recordPath: payload.record_path || lastTerminalSession.recordPath,
           logPath: payload.log_path || lastTerminalSession.logPath,
+          stdoutPipeReaderEnabled: payload.stdout_pipe_reader_enabled ?? lastTerminalSession.stdoutPipeReaderEnabled,
+          stderrPipeReaderEnabled: payload.stderr_pipe_reader_enabled ?? lastTerminalSession.stderrPipeReaderEnabled,
+          timeoutKillSent: payload.timeout_kill_sent ?? lastTerminalSession.timeoutKillSent,
+          waitAfterKillMs: payload.wait_after_kill_ms ?? lastTerminalSession.waitAfterKillMs,
+          partialOutputCaptured: payload.partial_output_captured ?? lastTerminalSession.partialOutputCaptured,
         });
         terminalWrite(`stream error: ${payload.line ?? payload.status}`);
         setPetCompanionRuntimeState({
@@ -30401,17 +30505,35 @@ footer {
         setProblemText(`Terminal stream error: ${payload.line ?? payload.status}`);
         setProductStatus(`Terminal stream failed: ${payload.status}`, "error");
         terminalRunBtn?.removeAttribute("disabled");
+        activeTerminalStreamId = "";
+        clearTerminalStreamRun();
         return;
       }
       if (payload.kind === "lifecycle") {
+        recordTerminalStreamLifecycleEvent(
+          payload.status === "product_terminal_stream_started" ? "stream-started" : "stream-finished",
+          {
+            sessionId: payload.session_id || activeTerminalStreamId,
+            status: payload.status || lastTerminalSession.status,
+            phase: payload.status === "product_terminal_stream_started" ? "streaming" : "finished",
+            recordPath: payload.record_path || lastTerminalSession.recordPath,
+            logPath: payload.log_path || lastTerminalSession.logPath,
+          },
+          payload.status === "product_terminal_stream_started" ? { silent: true } : {}
+        );
         updateTerminalSessionHud({
           sessionId: payload.session_id || activeTerminalStreamId,
           status: payload.status || lastTerminalSession.status,
           state: terminalStateFromStatus(payload.status || ""),
           exitCode: payload.exit_code ?? lastTerminalSession.exitCode ?? "none",
-          durationMs: parseTerminalDurationMs(payload.line) ?? lastTerminalSession.durationMs,
+          durationMs: payload.duration_ms ?? parseTerminalDurationMs(payload.line) ?? lastTerminalSession.durationMs,
           recordPath: payload.record_path || lastTerminalSession.recordPath,
           logPath: payload.log_path || lastTerminalSession.logPath,
+          stdoutPipeReaderEnabled: payload.stdout_pipe_reader_enabled ?? lastTerminalSession.stdoutPipeReaderEnabled,
+          stderrPipeReaderEnabled: payload.stderr_pipe_reader_enabled ?? lastTerminalSession.stderrPipeReaderEnabled,
+          timeoutKillSent: payload.timeout_kill_sent ?? lastTerminalSession.timeoutKillSent,
+          waitAfterKillMs: payload.wait_after_kill_ms ?? lastTerminalSession.waitAfterKillMs,
+          partialOutputCaptured: payload.partial_output_captured ?? lastTerminalSession.partialOutputCaptured,
         });
         terminalWrite(`[${payload.status}] ${payload.line ?? ""}`);
         if (payload.status === "product_terminal_stream_started") {
@@ -30460,6 +30582,7 @@ footer {
           }
           terminalRunBtn?.removeAttribute("disabled");
           activeTerminalStreamId = "";
+          clearTerminalStreamRun();
         }
       }
     }).catch((error) => {
@@ -30635,6 +30758,20 @@ footer {
           },
         });
         activeTerminalStreamId = started.session_id;
+        activeTerminalStreamRun = {
+          sessionId: started.session_id,
+          command: started.command || trimmed,
+          status: started.status,
+          phase: "accepted",
+          recordPath: started.record_path,
+          logPath: started.log_path,
+          startedAt: Date.now(),
+          lastEventAt: Date.now(),
+          lastEventName: "stream-accepted",
+          staleWarningCount: 0,
+        };
+        syncTerminalStreamDataset();
+        startTerminalStreamWatchdog();
         updateTerminalSessionHud({
           command: started.command || trimmed,
           sessionId: started.session_id,
@@ -30647,6 +30784,11 @@ footer {
           logPath: started.log_path,
           stdoutTranscriptPath: started.stdout_transcript_path,
           stderrTranscriptPath: started.stderr_transcript_path,
+          stdoutPipeReaderEnabled: started.stdout_pipe_reader_expected ?? true,
+          stderrPipeReaderEnabled: started.stderr_pipe_reader_expected ?? true,
+          timeoutKillSent: false,
+          waitAfterKillMs: 0,
+          partialOutputCaptured: false,
         });
         terminalWrite(`[${started.status}] session=${started.session_id}`);
         setOutputText(`${trimmed}\n${started.status}\nStreaming events on ${started.stream_event_name}\nEvidence: ${started.record_path}`);
@@ -30673,6 +30815,11 @@ footer {
         logPath: result.log_path,
         stdoutTranscriptPath: result.stdout_transcript_path,
         stderrTranscriptPath: result.stderr_transcript_path,
+        stdoutPipeReaderEnabled: result.stdout_pipe_reader_enabled,
+        stderrPipeReaderEnabled: result.stderr_pipe_reader_enabled,
+        timeoutKillSent: result.timeout_kill_sent,
+        waitAfterKillMs: result.wait_after_kill_ms,
+        partialOutputCaptured: result.partial_output_captured,
       });
       if (result.stdout) {
         terminalWrite(result.stdout.trimEnd());
