@@ -25536,6 +25536,7 @@ function initOmegaProductShell() {
   let productTerminal = null;
   let activeFilePath = defaultScratchPath;
   let activeMainSurface = "";
+  let parkedEditorSessionReason = "";
   let activeSearchMode = "current";
   let activeProductPanel = "explorer";
   let activeTerminalStreamId = "";
@@ -25603,6 +25604,7 @@ function initOmegaProductShell() {
   const productLayoutStorageKey = "gravity-omega.product-layout.v5";
   const productSidebarStorageKey = "gravity-omega.sidebar-collapsed.v1";
   const editorSessionStorageKey = "gravity-omega.editor-session.v5";
+  const editorSessionRecoveryStorageKey = "gravity-omega.editor-session-recovery.v1";
   const promptContextStorageKey = "gravity-omega.prompt-context.v1";
   const agentRunModeStorageKey = "gravity-omega.agent-run-mode.v1";
   const terminalHistoryStorageKey = "gravity-omega.terminal-history.v1";
@@ -26825,9 +26827,37 @@ function initOmegaProductShell() {
     });
   };
 
+  const isGeneratedStartupPath = (path) => {
+    const normalized = String(path ?? "").trim();
+    return normalized === agentWorkArtifactPath || normalized.startsWith("web/omega-draft-");
+  };
+
+  const isGeneratedStartupEditorSession = (stored) => {
+    const tabs = Array.isArray(stored?.tabs) ? stored.tabs : [];
+    const paths = [stored?.activeFilePath, ...tabs.map((tab) => tab?.path)];
+    return paths.some((path) => isGeneratedStartupPath(path));
+  };
+
+  const parkGeneratedEditorSession = (stored, reason) => {
+    const existing = readStoredJson(editorSessionRecoveryStorageKey, []);
+    const recoveryEntries = Array.isArray(existing) ? existing : [];
+    recoveryEntries.unshift({
+      reason,
+      parkedAt: new Date().toISOString(),
+      activeFilePath: stored?.activeFilePath ?? "",
+      tabs: Array.isArray(stored?.tabs) ? stored.tabs.slice(0, 16) : [],
+    });
+    writeStoredJson(editorSessionRecoveryStorageKey, recoveryEntries.slice(0, 8));
+  };
+
   const restoreEditorSession = () => {
     const stored = readStoredJson(editorSessionStorageKey, null);
     if (!stored || !Array.isArray(stored.tabs) || stored.tabs.length === 0) {
+      return false;
+    }
+    if (isGeneratedStartupEditorSession(stored)) {
+      parkGeneratedEditorSession(stored, "generated-agent-work-startup");
+      parkedEditorSessionReason = "Previous generated agent/editor session parked for recovery.";
       return false;
     }
     const restoredTabs = stored.tabs
@@ -30777,7 +30807,11 @@ footer {
     if (tab && (tab.dirty || tab.untitled || !invoke)) {
       setActiveFileUi(tab.path);
       setEditorValue(tab.content, tab.path, { dirty: tab.dirty });
-      setEditorStatus(`${tab.dirty ? "Restored unsaved" : "Restored"} ${tab.path}.`);
+      setEditorStatus(parkedEditorSessionReason || `${tab.dirty ? "Restored unsaved" : "Restored"} ${tab.path}.`);
+      if (parkedEditorSessionReason) {
+        setProductStatus("Started clean on Omega Scratch; previous generated agent work was parked for recovery.", "ready");
+        appendEvidenceText("default launch parked generated Omega Agent Work/editor session for recovery");
+      }
       monacoEditor?.focus();
       return;
     }

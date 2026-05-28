@@ -189,6 +189,27 @@ async function main() {
     await cdp.send("Page.enable");
     await cdp.send("Page.navigate", { url: targetUrl });
     await new Promise((resolve) => setTimeout(resolve, 2500));
+    const staleGeneratedEditorSession = JSON.stringify({
+      activeFilePath: "Omega Agent Work.md",
+      updatedAt: "2026-05-28T00:00:00.000Z",
+      tabs: [
+        {
+          path: "Omega Agent Work.md",
+          content: "# Omega Agent Work\n\nstale generated QA session",
+          dirty: true,
+          untitled: false,
+        },
+        {
+          path: "web/omega-draft-202605280000.md",
+          content: "# Omega Draft 202605280000\n\nstale generated draft",
+          dirty: true,
+          untitled: true,
+        },
+      ],
+    });
+    await evaluate(cdp, `localStorage.setItem("gravity-omega.editor-session.v5", ${JSON.stringify(staleGeneratedEditorSession)})`);
+    await cdp.send("Page.reload", { ignoreCache: true });
+    await new Promise((resolve) => setTimeout(resolve, 2500));
 
     const qaResult = await evaluate(cdp, `(${workbenchQa.toString()})()`);
     const screenshot = await cdp.send("Page.captureScreenshot", { format: "png", fromSurface: true });
@@ -290,6 +311,13 @@ async function workbenchQa() {
   assert(visible(document.querySelector("#omega-activity-bar")), "left activity rail is visible");
   assert(visible(document.querySelector("#omega-chat-panel-product")), "chat rail is visible");
   assert(visible(document.querySelector("#omega-monaco-frame")), "main Monaco frame is visible");
+  assert(text("#omega-editor-tabs").includes("Omega Scratch.md"), "Default launch starts on Omega Scratch.md");
+  assert(!text("#omega-editor-tabs").includes("Omega Agent Work"), "Default launch does not restore stale Omega Agent Work tabs");
+  assert(!text("#omega-editor-tabs").includes("omega-draft-202605280000"), "Default launch does not restore stale generated draft tabs");
+  assert(
+    text(".omega-editor-toolbar-status").includes("parked for recovery") || text("#omega-product-status-detail").includes("Ready"),
+    "Generated startup session is either parked visibly or the workbench remains ready"
+  );
 
   const panels = ["explorer", "search", "omega", "vault", "security", "tools", "media", "settings"];
   for (const panel of panels) {
