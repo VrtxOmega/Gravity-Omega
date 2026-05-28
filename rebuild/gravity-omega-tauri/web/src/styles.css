@@ -2493,6 +2493,10 @@ textarea:focus-visible,
   min-height: 0;
 }
 
+.omega-computer-main-shell {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
 .omega-computer-main-header,
 .omega-computer-main-controls,
 .omega-panel-main-header,
@@ -2604,7 +2608,7 @@ textarea:focus-visible,
 .omega-computer-main-actions,
 .omega-panel-main-actions {
   display: grid;
-  grid-template-columns: repeat(5, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
 }
 
@@ -2637,6 +2641,12 @@ textarea:focus-visible,
 .omega-computer-main-actions button[data-omega-computer-action="main"],
 .omega-panel-main-actions button[data-panel-primary-action] {
   background: linear-gradient(180deg, rgba(246, 197, 79, 0.26), rgba(246, 197, 79, 0.1));
+}
+
+.omega-computer-main-actions button[data-omega-computer-action="packet"] {
+  border-color: rgba(111, 244, 255, 0.42);
+  background: linear-gradient(180deg, rgba(111, 244, 255, 0.13), rgba(111, 244, 255, 0.045));
+  color: #bdf9ff;
 }
 
 .omega-computer-main-terminal {
@@ -2953,6 +2963,131 @@ textarea:focus-visible,
   font-family: var(--mono-font);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.omega-computer-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.omega-computer-detail-block {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgba(111, 244, 255, 0.2);
+  background: rgba(111, 244, 255, 0.045);
+}
+
+.omega-computer-detail-block.blocked {
+  border-color: rgba(224, 160, 64, 0.32);
+  background: rgba(224, 160, 64, 0.055);
+}
+
+.omega-computer-detail-block strong {
+  color: #6ff4ff;
+  font-family: var(--mono-font);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.omega-computer-detail-block ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  color: rgba(247, 231, 168, 0.74);
+  font-family: var(--mono-font);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.omega-computer-stage-rail {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(246, 197, 79, 0.2);
+  background: rgba(10, 9, 8, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 194, 0.035);
+}
+
+.omega-computer-session-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  font-family: var(--mono-font);
+  font-size: 10px;
+}
+
+.omega-computer-session-strip strong {
+  color: var(--gold-bright);
+  text-transform: uppercase;
+}
+
+.omega-computer-session-strip span {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(247, 231, 168, 0.66);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omega-computer-stage-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.omega-computer-stage-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 86px;
+  padding: 8px;
+  border: 1px solid rgba(246, 197, 79, 0.22);
+  background:
+    linear-gradient(180deg, rgba(246, 197, 79, 0.07), rgba(246, 197, 79, 0.025)),
+    rgba(6, 6, 5, 0.78);
+}
+
+.omega-computer-stage-card[data-state="blocked"] {
+  border-color: rgba(224, 160, 64, 0.4);
+  background:
+    linear-gradient(180deg, rgba(224, 160, 64, 0.085), rgba(224, 160, 64, 0.028)),
+    rgba(6, 6, 5, 0.84);
+}
+
+.omega-computer-stage-id,
+.omega-computer-stage-status {
+  min-width: 0;
+  overflow: hidden;
+  color: #6ff4ff;
+  font-family: var(--mono-font);
+  font-size: 9px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.omega-computer-stage-card strong {
+  min-width: 0;
+  color: var(--gold-bright);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.omega-computer-stage-card p {
+  margin: 0;
+  color: rgba(247, 231, 168, 0.68);
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .omega-computer-worker-rail {
@@ -3341,6 +3476,94 @@ textarea:focus-visible,
   cursor: pointer;
   font-size: 10px;
   font-weight: 700;
+}
+
+.omega-runtime-evidence-spine {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid rgba(212, 168, 67, 0.22);
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(242, 201, 92, 0.08), transparent 42%),
+    #0c0b09;
+}
+
+.omega-runtime-evidence-spine-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.omega-runtime-evidence-spine-header div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.omega-runtime-evidence-spine-header strong {
+  color: var(--accent-gold);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.omega-runtime-evidence-spine-header span,
+.omega-runtime-evidence-spine-gates {
+  color: var(--text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
+  font-size: 10px;
+}
+
+.omega-runtime-evidence-spine-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 7px;
+}
+
+.omega-runtime-evidence-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(212, 168, 67, 0.16);
+  border-radius: 5px;
+  background: rgba(12, 12, 15, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 225, 139, 0.04);
+}
+
+.omega-runtime-evidence-card[data-state="ready"] {
+  border-color: rgba(93, 223, 139, 0.34);
+}
+
+.omega-runtime-evidence-card[data-state="warning"] {
+  border-color: rgba(242, 201, 92, 0.42);
+}
+
+.omega-runtime-evidence-card[data-state="blocked"] {
+  border-color: rgba(233, 88, 88, 0.32);
+}
+
+.omega-runtime-evidence-card strong {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.omega-runtime-evidence-card span,
+.omega-runtime-evidence-card code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omega-runtime-evidence-card code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Consolas, monospace;
 }
 
 .omega-evidence-history-list {

@@ -324,6 +324,17 @@
                   <span id="omega-evidence-history-status">Evidence paths will appear after saves and terminal runs.</span>
                   <button id="omega-evidence-history-refresh" type="button">Refresh Evidence</button>
                 </div>
+                <section class="omega-runtime-evidence-spine" aria-label="Runtime evidence spine">
+                  <div class="omega-runtime-evidence-spine-header">
+                    <div>
+                      <strong>Runtime Evidence Spine</strong>
+                      <span id="omega-runtime-evidence-spine-status">Waiting for runtime evidence refresh.</span>
+                    </div>
+                    <span><span id="omega-runtime-evidence-spine-count">0</span> lanes</span>
+                  </div>
+                  <div id="omega-runtime-evidence-spine-gates" class="omega-runtime-evidence-spine-gates">execution=false / writes=false / export=false</div>
+                  <div id="omega-runtime-evidence-spine-list" class="omega-runtime-evidence-spine-list"></div>
+                </section>
                 <div id="omega-evidence-history-list" class="omega-evidence-history-list"></div>
               </div>
               <div id="omega-product-status-detail">Ready for prompt input.</div>
@@ -1422,7 +1433,17 @@
           <article class="panel">
             <div class="panel-heading">
               <span>Steno Search</span>
-              <span><span id="steno-search-panel-count">0</span> sections</span>
+              <span><span id="steno-search-panel-count">0</span> results</span>
+            </div>
+            <div class="toolbar-search-row">
+              <input
+                id="steno-search-query"
+                class="toolbar-search-input"
+                type="search"
+                autocomplete="off"
+                placeholder="Search transcript and evidence records..."
+              />
+              <button id="steno-search-run-btn" class="panel-mini-btn" type="button">Search</button>
             </div>
             <div id="steno-search-panel-list" class="list"></div>
           </article>
