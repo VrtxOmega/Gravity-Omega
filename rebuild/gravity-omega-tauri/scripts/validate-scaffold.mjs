@@ -83,6 +83,28 @@ for (const deadVisibleNeedle of [
   }
 }
 
+for (const runtimeEvidenceSpineNeedle of [
+  "omega-runtime-evidence-spine",
+  "omega-runtime-evidence-spine-status",
+  "omega-runtime-evidence-spine-gates",
+  "omega-runtime-evidence-spine-list",
+  "Runtime Evidence Spine",
+]) {
+  if (!visibleProductShell.includes(runtimeEvidenceSpineNeedle)) {
+    throw new Error(`Visible product shell missing runtime evidence spine element: ${runtimeEvidenceSpineNeedle}.`);
+  }
+}
+
+for (const runtimeEvidenceStyleNeedle of [
+  ".omega-runtime-evidence-spine",
+  ".omega-runtime-evidence-spine-list",
+  ".omega-runtime-evidence-card",
+]) {
+  if (!styleSource.includes(runtimeEvidenceStyleNeedle)) {
+    throw new Error(`Runtime evidence spine missing style hook: ${runtimeEvidenceStyleNeedle}.`);
+  }
+}
+
 if (frontendSource.includes("/home/rage/apps/gravity-omega-v2")) {
   throw new Error("Visible workbench runtime must target the Rust/Tauri rebuild, not the old Electron app.");
 }
@@ -153,6 +175,15 @@ for (const unlockedNeedle of [
   "HermesKimiAssistBriefRecord",
   "hermes-kimi-assist-briefs",
   "<compact-assist-query>",
+  "spawn_hermes_kimi_pipe_reader",
+  "run_hermes_kimi_assist_process_with_binary",
+  "query_transport",
+  "argv_char_count",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
   "Do not edit files.",
   "Do not run shell commands or call tools.",
   "bounded_execution_performed",
@@ -167,6 +198,114 @@ for (const unlockedNeedle of [
 
 if (/workspace_arg\.clone\(\),\s*prompt\.to_string\(\),/.test(rustCommandsSource)) {
   throw new Error("Codex unlocked prompt targets must not pass full prompt text as argv after -C; use stdin transport.");
+}
+
+const hermesAssistProcessStart = rustCommandsSource.indexOf("fn run_hermes_kimi_assist_process_with_binary");
+const hermesAssistProcessEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn record_hermes_kimi_assist_brief", hermesAssistProcessStart);
+if (hermesAssistProcessStart < 0 || hermesAssistProcessEnd < hermesAssistProcessStart) {
+  throw new Error("Hermes/Kimi assist process runner body is missing.");
+}
+const hermesAssistProcessBody = rustCommandsSource.slice(hermesAssistProcessStart, hermesAssistProcessEnd);
+if (hermesAssistProcessBody.includes("wait_with_output")) {
+  throw new Error("Hermes/Kimi assist runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+}
+
+const productTerminalProcessStart = rustCommandsSource.indexOf("fn run_product_terminal_command_process");
+const productTerminalProcessEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn run_product_terminal_command", productTerminalProcessStart);
+if (productTerminalProcessStart < 0 || productTerminalProcessEnd < productTerminalProcessStart) {
+  throw new Error("Product terminal command process runner body is missing.");
+}
+const productTerminalProcessBody = rustCommandsSource.slice(productTerminalProcessStart, productTerminalProcessEnd);
+if (productTerminalProcessBody.includes("wait_with_output")) {
+  throw new Error("Product terminal command runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+}
+
+const productTerminalStreamStart = rustCommandsSource.indexOf("pub fn run_product_terminal_command_stream");
+const productTerminalStreamEnd = rustCommandsSource.indexOf("fn write_product_terminal_command_result", productTerminalStreamStart);
+if (productTerminalStreamStart < 0 || productTerminalStreamEnd < productTerminalStreamStart) {
+  throw new Error("Product terminal stream runner body is missing.");
+}
+const productTerminalStreamBody = rustCommandsSource.slice(productTerminalStreamStart, productTerminalStreamEnd);
+for (const terminalStreamNeedle of [
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+  "timeout_ms",
+]) {
+  if (!productTerminalStreamBody.includes(terminalStreamNeedle)) {
+    throw new Error(`Product terminal stream runner must persist lifecycle evidence field ${terminalStreamNeedle}.`);
+  }
+}
+
+const sswpRegistryCommandStart = rustCommandsSource.indexOf("fn run_sswp_registry_command");
+const sswpRegistryCommandEnd = rustCommandsSource.indexOf("fn parse_sswp_registry_nodes", sswpRegistryCommandStart);
+if (sswpRegistryCommandStart < 0 || sswpRegistryCommandEnd < sswpRegistryCommandStart) {
+  throw new Error("SSWP registry command runner body is missing.");
+}
+const sswpRegistryCommandBody = rustCommandsSource.slice(sswpRegistryCommandStart, sswpRegistryCommandEnd);
+if (sswpRegistryCommandBody.includes("wait_with_output")) {
+  throw new Error("SSWP registry runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+}
+for (const sswpProbeNeedle of [
+  "spawn_sswp_registry_pipe_reader",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+]) {
+  if (!sswpRegistryCommandBody.includes(sswpProbeNeedle)) {
+    throw new Error(`SSWP registry runner missing pipe-drain evidence field ${sswpProbeNeedle}.`);
+  }
+}
+
+const agentTranscriptRunnerStart = rustCommandsSource.indexOf("fn run_agent_transcript_target_with_binary");
+const agentTranscriptRunnerEnd = rustCommandsSource.indexOf("#[allow(clippy::too_many_arguments)]", agentTranscriptRunnerStart);
+if (agentTranscriptRunnerStart < 0 || agentTranscriptRunnerEnd < agentTranscriptRunnerStart) {
+  throw new Error("Agent transcript runner body is missing.");
+}
+const agentTranscriptRunnerBody = rustCommandsSource.slice(agentTranscriptRunnerStart, agentTranscriptRunnerEnd);
+if (agentTranscriptRunnerBody.includes("wait_with_output")) {
+  throw new Error("Agent transcript runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+}
+for (const agentTranscriptNeedle of [
+  "spawn_agent_transcript_pipe_reader",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+]) {
+  if (!agentTranscriptRunnerBody.includes(agentTranscriptNeedle)) {
+    throw new Error(`Agent transcript runner missing pipe-drain evidence field ${agentTranscriptNeedle}.`);
+  }
+}
+
+const runtimeSidecarSnapshotStart = rustCommandsSource.indexOf("pub fn record_runtime_sidecar_process_snapshot");
+const runtimeSidecarSnapshotEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn list_runtime_sidecar_process_snapshots", runtimeSidecarSnapshotStart);
+if (runtimeSidecarSnapshotStart < 0 || runtimeSidecarSnapshotEnd < runtimeSidecarSnapshotStart) {
+  throw new Error("Runtime sidecar process snapshot runner body is missing.");
+}
+const runtimeSidecarSnapshotBody = rustCommandsSource.slice(runtimeSidecarSnapshotStart, runtimeSidecarSnapshotEnd);
+if (runtimeSidecarSnapshotBody.includes(".output()")) {
+  throw new Error("Runtime sidecar process snapshot must drain stdout/stderr pipes with a timeout, not Command::output.");
+}
+for (const runtimeSnapshotNeedle of [
+  "run_runtime_sidecar_process_list_command",
+  "spawn_runtime_sidecar_process_pipe_reader",
+  "process_list_timeout_ms",
+  "process_list_timed_out",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "process_list_timeout_kill_sent",
+  "process_list_wait_after_kill_ms",
+  "process_list_partial_output_captured",
+]) {
+  if (!rustCommandsSource.includes(runtimeSnapshotNeedle)) {
+    throw new Error(`Runtime sidecar process snapshot missing bounded pipe-drain evidence field ${runtimeSnapshotNeedle}.`);
+  }
 }
 
 for (const unlockedUiNeedle of [
@@ -426,6 +565,9 @@ for (const productBridgeNeedle of [
   "waitForProductPaint",
   "agentRunStartingText",
   "agentRunAcceptedText",
+  "agentRunFinalSummaryText",
+  "codexLeadAssistTimeoutMs",
+  "updateCodexLeadPreparationStatus",
   "is starting now.",
   "Run accepted. Watching stream for readable output.",
   "Agent work artifact opens in Monaco",
@@ -434,6 +576,10 @@ for (const productBridgeNeedle of [
   "runPrimaryAgentWork",
   "createComparisonSummary",
   "compareExistingAgentEvidence",
+  "isAgentRunStatusFollowup",
+  "runLatestAgentRunStatusRecap",
+  "Latest Omega Computer recap",
+  "mode=local-evidence-recap",
   "Compare reads existing Codex/Hermes evidence only; it does not launch live agents.",
   "codex-hermes-compare-preview",
   "compare does not launch live agents",
@@ -444,8 +590,13 @@ for (const productBridgeNeedle of [
   "clearProductTerminal",
   "showTerminalEvidence",
   "recordTerminalTranscriptReplay",
+  "captureTerminalTranscriptReplay",
   "loadTerminalTranscriptReplays",
   "formatTerminalReplay",
+  "terminal-stream-completion",
+  "terminal-sync-completion",
+  "replayRecordPath",
+  "[terminal_replay]",
   "lastTerminalSession",
   "terminal-session-hud",
   "refreshProductExplorer",
@@ -526,11 +677,21 @@ for (const productBridgeNeedle of [
   "data-action-selected",
   "Omega Computer control surface ready",
   "Desktop Control opened as a central surface",
+  "record_desktop_environment_snapshot",
+  "record_desktop_read_only_capability_snapshot",
+  "record_evidence_durability_manifest",
+  "evidence-durability",
+  "latest_desktop_environment_ydotool_socket_is_socket",
+  "latest_desktop_read_only_capability_window_inventory_ready",
+  "manifest_hash",
   "Security Shield opened as a central surface",
   "Ship Readiness opened as a central surface",
   "MCP lanes=${mcp.lane_count",
   "Approval Evidence Spine",
   "SSWP Registry",
+  "probePipes=",
+  "registry_list_pipe_reader_enabled",
+  "registry_risky_pipe_reader_enabled",
   "Sidecar Launch + Probe",
   "providers.providers",
   "ship.items",
@@ -553,8 +714,22 @@ for (const productBridgeNeedle of [
   "recordUnlockedAgentPromptSession(runtime)",
   "codex-workspace-write",
   "hermes-chat",
+  "omega-runtime-evidence-spine-status",
+  "renderRuntimeEvidenceSpine",
+  "refreshRuntimeEvidenceSpine",
+  "loadProductEvidenceHistory",
+  "loadTerminalTranscriptReplays",
+  "loadAgentTranscriptSessions",
+  "loadUnlockedAgentPromptSessions",
+  "bounded_process_capture",
   "agentRunModeStorageKey",
   "restoreAgentRunMode",
+  "activeAgentRun",
+  "beginAgentRunGate",
+  "updateAgentRunGate",
+  "clearAgentRunGate",
+  "describeActiveAgentRun",
+  "data-agent-run-gate",
   "runAgentEvidenceComparison",
   "runCodexLeadDualExecution",
   "productCommandFeedback",
@@ -574,6 +749,34 @@ for (const productBridgeNeedle of [
   "recordHermesKimiCapabilityInventory",
   "recordHermesKimiAssistBrief",
   "formatHermesKimiAssistBrief",
+  "describeCodexHermesRunViewEvidence",
+  "agent-run-postmortem",
+  "agent_session_failure_count",
+  "latest_agent_postmortem_status",
+  "assist_postmortems=",
+  "assist_timeouts=",
+  "postmortems=",
+  "postmortem-failures",
+  "failure_postmortem_count",
+  "postmortem-timeouts",
+  "timeout_postmortem_count",
+  "unlocked-agent-prompt-sessions",
+  "transcript_evidence_ready",
+  "stdout_transcript_found",
+  "stderr_transcript_line_count",
+  "stdout_preview_source",
+  "transcripts ready=",
+  "evidence_summaries",
+  "codex_orchestration_count",
+  "hermes_inventory_count",
+  "hermes_assist_count",
+  "hermes_assist_failure_count",
+  "hermes_assist_timeout_count",
+  "latest_hermes_assist_status",
+  "latest_hermes_assist_postmortem_status",
+  "record_process_spawn_enabled",
+  'source_id: "hermes-kimi-assist"',
+  "stderr_preview_source",
   "Hermes/Kimi Live Capability Inventory",
   "Hermes/Kimi Assist Brief",
   "runtimeInventory",
@@ -591,6 +794,33 @@ for (const productBridgeNeedle of [
   "Kimi/Moonshot",
   "omega-stenographer",
   "sswp",
+  "recent_pet_runtime_signals",
+  "Pet signal:",
+  "recent_pet_attention_items",
+  "Pet attention:",
+  "attention=",
+  "recent_terminal_sessions",
+  "recent_terminal_replays",
+  "recent_blocked_terminal_commands",
+  "blocked_terminal_command_count",
+  "recent_process_control_policies",
+  "recent_process_exit_summaries",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+  "pipeReaders=",
+  "activeTerminalStreamRun",
+  "recordTerminalStreamLifecycleEvent",
+  "tickTerminalStreamWatchdog",
+  "data-terminal-stream-session",
+  "terminal stream stale warning",
+  "Terminal session:",
+  "Terminal replay:",
+  "Blocked terminal command:",
+  "Process control:",
+  "Process exit:",
 ]) {
   if (!frontendSource.includes(productBridgeNeedle)) {
     throw new Error(`Visible workbench prompt bridge missing ${productBridgeNeedle}.`);
@@ -643,6 +873,11 @@ if (!primaryFunctionMatch) {
   throw new Error("Primary agent work function could not be found.");
 }
 
+const primaryFunctionBody = primaryFunctionMatch[0];
+if (!primaryFunctionBody.includes("isAgentRunStatusFollowup(prompt)") || !primaryFunctionBody.includes("runLatestAgentRunStatusRecap(prompt)")) {
+  throw new Error("Primary agent work must answer status/recap follow-ups from existing evidence instead of launching a new run.");
+}
+
 const sendHandlerMatch = frontendSource.match(/sendBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*?\n  \}\);\n\n  const runVisibleAgent/);
 if (!sendHandlerMatch || !sendHandlerMatch[0].includes("runPrimaryAgentWork")) {
   throw new Error("Primary composer Send button must run the Codex Lead + Hermes/Kimi main work path.");
@@ -660,6 +895,34 @@ if (!codexLeadFunctionMatch) {
 const codexLeadFunctionBody = codexLeadFunctionMatch[0];
 if (!codexLeadFunctionBody.includes("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
   throw new Error("Run Dual must start a responsive codex-workspace-write stream.");
+}
+
+if (!codexLeadFunctionBody.includes("beginAgentRunGate({")) {
+  throw new Error("Run Dual must acquire the shared agent run gate before runtime preflight/stream work.");
+}
+
+if (!frontendSource.includes("const recordAgentRunLifecycleEvent = (eventName") || !frontendSource.includes("const tickAgentRunWatchdog = () => {")) {
+  throw new Error("Agent runs must record lifecycle telemetry and include a stale-stream watchdog.");
+}
+
+if (!frontendSource.includes("agentRunStaleEventThresholdMs") || !frontendSource.includes("stale-stream-warning")) {
+  throw new Error("Agent run watchdog must emit explicit stale-stream warnings without clearing the run gate.");
+}
+
+if (!frontendSource.includes("Omega Agent Work is still being updated in Monaco.")) {
+  throw new Error("Agent run watchdog must update the visible chat answer when a stream goes quiet.");
+}
+
+if (!frontendSource.includes("agentRunFinalSummaryText({ label, runtime, payload, readback, loaded })")) {
+  throw new Error("Agent stream completion must replace the running chat bubble with a final evidence summary.");
+}
+
+if (!codexLeadFunctionBody.includes("updateAgentRunGate({")) {
+  throw new Error("Run Dual must update the shared agent run gate after the stream is accepted.");
+}
+
+if (!codexLeadFunctionBody.includes("promptChars: prompt.length") || !codexLeadFunctionBody.includes("recordAgentRunLifecycleEvent(\"stream-accepted\"")) {
+  throw new Error("Run Dual must track prompt size and accepted-stream lifecycle evidence.");
 }
 
 if (codexLeadFunctionBody.includes("runBlockingAgentStage(") || codexLeadFunctionBody.includes("runUnlockedAgentPromptSession(")) {
@@ -686,6 +949,29 @@ if (codexLeadFunctionBody.includes("Waiting for readable stream output")) {
   throw new Error("Run Dual must not overwrite the immediate chat preamble with a generic waiting message after stream acceptance.");
 }
 
+for (const prepNeedle of [
+  "await updateCodexLeadPreparationStatus(\"Codex Lead recording orchestration\"",
+  "await updateCodexLeadPreparationStatus(\"Codex Lead orchestration recorded\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory running\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory recorded\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi assist running\"",
+  "timeoutMs: codexLeadAssistTimeoutMs",
+  "await updateCodexLeadPreparationStatus(\"Codex Lead stream handoff\"",
+]) {
+  if (!codexLeadFunctionBody.includes(prepNeedle)) {
+    throw new Error(`Run Dual missing visible preparation status step: ${prepNeedle}`);
+  }
+}
+
+if (!frontendSource.includes("const codexLeadAssistTimeoutMs = 15000")) {
+  throw new Error("Run Dual must use an explicit shorter renderer-side Hermes/Kimi assist timeout.");
+}
+
+const assistBriefFunctionMatch = frontendSource.match(/async function recordHermesKimiAssistBrief\(\{[\s\S]*?\n\}/);
+if (!assistBriefFunctionMatch?.[0]?.includes("timeoutMs = 15000") || !assistBriefFunctionMatch[0].includes("timeout_ms: timeoutMs")) {
+  throw new Error("Hermes/Kimi assist helper must accept and forward an explicit timeoutMs value.");
+}
+
 if (!codexLeadFunctionBody.includes("createCodexLeadOrchestrationRecord(prompt)")) {
   throw new Error("Run Dual must record a Codex Lead orchestration packet before starting the stream.");
 }
@@ -702,11 +988,11 @@ if (codexLeadFunctionBody.indexOf("recordHermesKimiCapabilityInventory(prompt)")
   throw new Error("Hermes/Kimi capability inventory evidence must be created before the responsive stream starts.");
 }
 
-if (!codexLeadFunctionBody.includes("recordHermesKimiAssistBrief({ prompt, orchestration, hermesInventory })")) {
+if (!codexLeadFunctionBody.includes("recordHermesKimiAssistBrief({") || !codexLeadFunctionBody.includes("timeoutMs: codexLeadAssistTimeoutMs")) {
   throw new Error("Run Dual must run a bounded Hermes/Kimi assist brief before starting the stream.");
 }
 
-if (codexLeadFunctionBody.indexOf("recordHermesKimiAssistBrief({ prompt, orchestration, hermesInventory })") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
+if (codexLeadFunctionBody.indexOf("recordHermesKimiAssistBrief({") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
   throw new Error("Hermes/Kimi assist evidence must be created before the responsive Codex stream starts.");
 }
 
@@ -726,6 +1012,37 @@ if (!visibleAgentFunctionBody.includes("await waitForProductPaint();")) {
 
 if (visibleAgentFunctionBody.indexOf("await waitForProductPaint();") > visibleAgentFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(runtime, promptWithContext)")) {
   throw new Error("Single-agent paint yield must happen before the long streaming invoke starts.");
+}
+
+if (!visibleAgentFunctionBody.includes("beginAgentRunGate({")) {
+  throw new Error("Single-agent runs must acquire the shared agent run gate before starting.");
+}
+
+if (!visibleAgentFunctionBody.includes("updateAgentRunGate({")) {
+  throw new Error("Single-agent runs must update the shared agent run gate after stream acceptance.");
+}
+
+if (!visibleAgentFunctionBody.includes("promptChars: prompt.length") || !visibleAgentFunctionBody.includes("recordAgentRunLifecycleEvent(\"stream-accepted\"")) {
+  throw new Error("Single-agent runs must track prompt size and accepted-stream lifecycle evidence.");
+}
+
+if (!visibleAgentFunctionBody.includes("activeAgentRun?.phase !== \"streaming\"")) {
+  throw new Error("Single-agent runs must keep controls locked while an accepted stream is still running.");
+}
+
+for (const streamLifecycleNeedle of [
+  "recordAgentRunLifecycleEvent(`stream-${payload.kind}`",
+  "recordAgentRunLifecycleEvent(\"stream-error\"",
+  "recordAgentRunLifecycleEvent(\"stream-started\"",
+  "recordAgentRunLifecycleEvent(\"stream-finished\"",
+]) {
+  if (!frontendSource.includes(streamLifecycleNeedle)) {
+    throw new Error(`Agent stream listener missing lifecycle telemetry: ${streamLifecycleNeedle}`);
+  }
+}
+
+if (visibleAgentFunctionBody.includes("finally {\n      sendBtn?.removeAttribute(\"disabled\")")) {
+  throw new Error("Single-agent runs must not unconditionally re-enable buttons in finally after stream acceptance.");
 }
 
 for (const productStyleNeedle of [
@@ -1075,6 +1392,12 @@ for (const command of [
   "terminal_process_lane_dashboard",
   "terminal_toggle",
   "approval_evidence_spine_dashboard",
+  "record_desktop_environment_snapshot",
+  "list_desktop_environment_snapshots",
+  "record_desktop_read_only_capability_snapshot",
+  "list_desktop_read_only_capability_snapshots",
+  "record_evidence_durability_manifest",
+  "list_evidence_durability_manifests",
   "linux_desktop_control_readiness_dashboard",
   "desktop_capture_action_approval_policy_dashboard",
   "desktop_capture_action_approval_records",
@@ -1428,6 +1751,16 @@ for (const stateNeedle of [
   "transcript-protection-policies",
   "AgentTranscriptSessionRecord",
   "agent-transcript-sessions",
+  "PetRuntimeAttentionItem",
+  "recent_pet_runtime_signals",
+  "recent_pet_attention_items",
+  "ProductTerminalSessionSummary",
+  "ProductTerminalBlockedCommandRecord",
+  "recent_terminal_sessions",
+  "recent_terminal_replays",
+  "recent_blocked_terminal_commands",
+  "recent_process_control_policies",
+  "recent_process_exit_summaries",
   "LocalMcpLaneCapabilityContractRecord",
   "local-mcp-lane-capability-contracts",
   "LocalMcpHealthPreflightRecord",
@@ -1589,6 +1922,37 @@ for (const stateNeedle of [
   "ui_ux_test_matrix_read_only",
   "CodexHermesRunViewDashboard",
   "codex_hermes_run_view_dashboard_read_only",
+  "postmortem-failures",
+  "failure_postmortem_count",
+  "postmortem-timeouts",
+  "timeout_postmortem_count",
+  "CodexHermesRunViewEvidenceSummary",
+  "list_codex_lead_orchestration_records",
+  "codex_orchestration_count",
+  "hermes_inventory_count",
+  "hermes_assist_count",
+  "hermes_assist_failure_count",
+  "hermes_assist_timeout_count",
+  "latest_hermes_assist_status",
+  "latest_hermes_assist_postmortem_status",
+  "agent_session_failure_count",
+  "latest_agent_postmortem_status",
+  "unlocked_agent_session_run_view_summary",
+  "unlocked_agent_session_is_postmortem",
+  "hermes_assist_is_postmortem",
+  "transcript_evidence_preview",
+  "stdout_transcript_found",
+  "stderr_transcript_line_count",
+  "transcript_evidence_ready",
+  "stdout_preview_source",
+  "stderr_preview_source",
+  "agent_run_postmortem_waiting",
+  "evidence_summary_count",
+  "evidence_summaries",
+  "codex_orchestration_run_view_summary",
+  "hermes_inventory_run_view_summary",
+  "hermes_assist_run_view_summary",
+  "record_process_spawn_enabled",
   "CodexHermesRunDetailTimeline",
   "codex_hermes_run_detail_timeline_read_only",
   "CodexHermesRunSelectionComparison",
@@ -1615,6 +1979,20 @@ for (const stateNeedle of [
   "terminal_process_lane_dashboard_read_only",
   "ApprovalEvidenceSpineDashboard",
   "approval_evidence_spine_dashboard_read_only",
+  "DesktopEnvironmentSnapshotRecord",
+  "desktop_environment_snapshot_recorded",
+  "desktop_environment_snapshots_dir",
+  "DesktopReadOnlyCapabilitySnapshotRecord",
+  "desktop_read_only_capability_snapshot_recorded",
+  "desktop_read_only_capability_snapshots_dir",
+  "EvidenceDurabilityManifestRecord",
+  "evidence_durability_manifest_recorded",
+  "evidence_durability_manifests_dir",
+  "stable_local_evidence_hash",
+  "path_probe_enabled: true",
+  "latest_desktop_environment_snapshot_fresh",
+  "latest_desktop_environment_ydotool_socket_is_socket",
+  "latest_desktop_read_only_capability_window_inventory_ready",
   "LinuxDesktopControlReadinessDashboard",
   "linux_desktop_control_readiness_dashboard_read_only",
   "DesktopCaptureActionApprovalPolicyDashboard",
@@ -1665,8 +2043,18 @@ for (const stateNeedle of [
   "terminal_toggle_panel_visible_read_only",
   "EditorFindPanel",
   "editor_find_panel_read_only",
+  "StenoSearchRequest",
+  "StenoSearchResult",
   "StenoSearchPanel",
   "steno_search_panel_read_only",
+  "steno_search_dirs",
+  "steno_search_file_allowed",
+  "steno_search_snippet",
+  "steno_recent_postmortem_results",
+  "steno_recent_postmortem_read_only",
+  "agent-postmortem",
+  "hermes-assist-postmortem",
+  "steno_search_reads_approved_evidence_records_without_live_mcp",
   "ToolbarActionReadinessPanel",
   "toolbar_action_blocked_readiness",
   "FirstClassIntegrationLaunchpad",
@@ -2320,6 +2708,8 @@ for (const elementId of [
   "refresh-steno-search-panel-btn",
   "steno-search-panel-summary",
   "steno-search-panel-count",
+  "steno-search-query",
+  "steno-search-run-btn",
   "steno-search-panel-list",
   "run-agent-transcript-session-btn",
   "agent-transcript-session-summary",
@@ -2344,6 +2734,13 @@ for (const frontendNeedle of [
   "loadFindPanel",
   "loadSswpStatusPanel",
   "loadStenoSearchPanel",
+  "invoke(\"steno_search\", {",
+  "results = panel.results ?? []",
+  "postmortems = panel.recent_postmortem_results ?? []",
+  "Recent Codex/Hermes postmortems",
+  "postmortems=",
+  "stenoSearchQueryInput",
+  "stenoSearchRunBtn",
   "loadToolbarActionReadiness",
   "loadFirstClassIntegrationLaunchpad",
   "loadGatedActionReleaseBoard",
@@ -2362,6 +2759,12 @@ for (const frontendNeedle of [
   "renderSidecarLaunchPolicyManifest",
   "loadSidecarHealthPacketConsole",
   "recordRuntimeSidecarProcessSnapshot",
+  "recordRuntimeSidecarProcessSnapshot(\"gravity-omega-first-class-mcp-dashboard\")",
+  "Runtime process:",
+  "runtime_target_id",
+  "runtime_process_snapshot_count",
+  "running_runtime_lane_count",
+  "mcp_runtime_process_count",
   "loadRuntimeSidecarProcessSnapshots",
   "renderSidecarHealthPacketConsole",
   "loadRuntimeProbeBoard",
@@ -2409,6 +2812,9 @@ for (const frontendNeedle of [
   "loadAgentTranscriptSessions",
   "renderAgentTranscriptSessionLedger",
   "recordAgentTranscriptSession",
+  "Agent transcript:",
+  "agent_transcript_pipe_reader_ready_count",
+  "recent_agent_transcript_sessions",
   "run_agent_transcript_session",
   "list_agent_transcript_sessions",
   "loadWorkspaceExplorerSnapshot",
@@ -2417,6 +2823,9 @@ for (const frontendNeedle of [
   "loadWorkspaceEditFamily",
   "renderWorkspaceEditFamily",
   "recordTerminalTranscriptReplay",
+  "captureTerminalTranscriptReplay",
+  "terminal-stream-completion",
+  "terminal-sync-completion",
   "inferSurfaceArea",
   "applyRailArea",
   "aria-pressed",
@@ -2436,6 +2845,8 @@ for (const frontendNeedle of [
   "restoreBottomDockHeight",
   "renderBottomEvidenceDock",
   "refreshBottomEvidenceDock",
+  "omega-runtime-evidence-spine-list",
+  "omega-runtime-evidence-card",
   "toolbar-search-input",
   "toolbar-search-summary",
   "filterToolbarCommands",
@@ -2485,16 +2896,45 @@ for (const runtimeDepthNeedle of [
   "runtime-sidecar-process-snapshots",
   "runtime_sidecar_process_snapshot_recorded",
   "runtime_sidecar_process_targets",
+  "first_class_mcp_runtime_target",
+  "runtime_target_id",
+  "runtime_process_snapshot_count",
+  "runtime_process_snapshot_freshness_threshold_ms",
+  "latest_runtime_process_snapshot_freshness_status",
+  "latest_runtime_process_snapshot_pipe_reader_ready",
+  "runtime_snapshot_freshness_status",
+  "runtime_snapshot_pipe_reader_ready",
+  "runtime_snapshot_partial_output_captured",
+  "runtime_snapshot_timed_out",
+  "runtime_process_snapshot_waiting",
+  "running_runtime_lane_count",
+  "mcp_runtime_process_count",
   "pid=,args=",
   "process_control_enabled: false",
   "sidecar_launch_enabled: false",
   "terminal_execution_enabled: false",
   "push_product_evidence_history_dir(&mut items, \"runtime-sidecar-process\"",
   "ProductTerminalTranscriptReplayRecord",
+  "product_terminal_blocked_commands_dir",
+  "record_product_terminal_blocked_command",
+  "list_product_terminal_blocked_commands",
+  "product_terminal_command_blocked",
   "record_product_terminal_transcript_replay",
   "list_product_terminal_transcript_replays",
   "product-terminal-transcript-replays",
   "product_terminal_transcript_replay_recorded",
+  "ProductTerminalCommandProcessOutput",
+  "spawn_product_terminal_pipe_reader",
+  "run_product_terminal_command_process",
+  "stdout_pipe_reader_enabled",
+  "stderr_pipe_reader_enabled",
+  "timeout_kill_sent",
+  "wait_after_kill_ms",
+  "partial_output_captured",
+  "recent_process_control_policies",
+  "recent_process_exit_summaries",
+  "\"terminal-blocked\"",
+  "process_spawn_enabled: false",
   "terminal_write_enabled: false",
   "live_tail_enabled: false",
   "process_control_enabled: false",
@@ -2544,6 +2984,9 @@ for (const runtimeDepthNeedle of [
   "record_hermes_kimi_assist_brief",
   "hermes-kimi-assist-briefs",
   "hermes_kimi_assist_brief_recorded",
+  "hermes_assist_is_postmortem",
+  "hermes-kimi-assist-postmortem",
+  "Latest failed/timed-out Hermes/Kimi assist brief",
   "compact_hermes_kimi_assist_query",
   "run_hermes_kimi_assist_process",
   "push_product_evidence_history_dir(&mut items, \"hermes-assist\"",
@@ -2565,6 +3008,15 @@ for (const runtimeDepthNeedle of [
   "build_codex_lead_delegations",
   "push_product_evidence_history_dir(&mut items, \"codex-orchestration\"",
   "PetRuntimeSignalRecord",
+  "PetRuntimeAttentionItem",
+  "pet_attention_item_count",
+  "latest_pet_attention_state",
+  "pet_runtime_attention_items",
+  "codex-agent-postmortem",
+  "hermes-kimi-postmortem",
+  "terminal-blocked",
+  "process-control-policy",
+  "process-exit-summary",
   "record_pet_runtime_signal",
   "record_pet_runtime_snapshot_signal",
   "pet_runtime_signal_recorded",

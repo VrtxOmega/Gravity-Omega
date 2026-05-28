@@ -161,6 +161,8 @@ const refreshStenoPetCompanionDashboardBtn = document.querySelector("#refresh-st
 const stenoSearchPanelList = document.querySelector("#steno-search-panel-list");
 const stenoSearchPanelCount = document.querySelector("#steno-search-panel-count");
 const stenoSearchPanelSummary = document.querySelector("#steno-search-panel-summary");
+const stenoSearchQueryInput = document.querySelector("#steno-search-query");
+const stenoSearchRunBtn = document.querySelector("#steno-search-run-btn");
 const refreshStenoSearchPanelBtn = document.querySelector("#refresh-steno-search-panel-btn");
 const terminalProcessLaneDashboardList = document.querySelector("#terminal-process-lane-dashboard-list");
 const terminalProcessLaneDashboardCount = document.querySelector("#terminal-process-lane-dashboard-count");
@@ -239,6 +241,10 @@ const runAgentTranscriptSessionBtn = document.querySelector("#run-agent-transcri
 const agentTranscriptSessionSummary = document.querySelector("#agent-transcript-session-summary");
 const agentTranscriptSessionLedger = document.querySelector("#agent-transcript-session-ledger");
 const agentTranscriptSessionCount = document.querySelector("#agent-transcript-session-count");
+const runtimeEvidenceSpineStatus = document.querySelector("#omega-runtime-evidence-spine-status");
+const runtimeEvidenceSpineCount = document.querySelector("#omega-runtime-evidence-spine-count");
+const runtimeEvidenceSpineGates = document.querySelector("#omega-runtime-evidence-spine-gates");
+const runtimeEvidenceSpineList = document.querySelector("#omega-runtime-evidence-spine-list");
 const runUnlockedCodexAgentBtn = document.querySelector("#run-unlocked-codex-agent-btn");
 const runUnlockedHermesAgentBtn = document.querySelector("#run-unlocked-hermes-agent-btn");
 const unlockedAgentPromptSummary = document.querySelector("#unlocked-agent-prompt-summary");
@@ -1114,7 +1120,7 @@ async function loadReplacementFoundationWorkQueue() {
     ready_count: 8,
     first_class_count: 8,
     read_only_count: 8,
-    disabled_gate_count: 8,
+    disabled_gate_count: 9,
     top_priority_lane: "workspace-editor",
     execution_enabled: false,
     writes_allowed: false,
@@ -3504,6 +3510,41 @@ function describeCodexHermesRunViewSection(record) {
   };
 }
 
+function describeCodexHermesRunViewEvidence(record) {
+  const stdout = String(record.stdout_preview || "").trim();
+  const stderr = String(record.stderr_preview || "").trim();
+  const status = String(record.status || "");
+  const hasTranscriptEvidence = record.stdout_transcript_path || record.stderr_transcript_path || typeof record.transcript_evidence_ready === "boolean";
+  const transcriptText = hasTranscriptEvidence
+    ? [
+        `transcripts: ready=${Boolean(record.transcript_evidence_ready)}`,
+        `stdout=${record.stdout_transcript_found ? "found" : "missing"} ${record.stdout_transcript_line_count ?? 0}l/${record.stdout_transcript_size_bytes ?? 0}b`,
+        `stderr=${record.stderr_transcript_found ? "found" : "missing"} ${record.stderr_transcript_line_count ?? 0}l/${record.stderr_transcript_size_bytes ?? 0}b`,
+        `preview=${record.stdout_preview_source ?? "record-inline"}/${record.stderr_preview_source ?? "record-inline"}`,
+      ].join(" ")
+    : "";
+  const preview = [
+    record.detail,
+    transcriptText,
+    stdout ? `stdout: ${stdout}` : "",
+    stderr ? `stderr: ${stderr}` : "",
+    (record.blockers ?? []).length ? `blockers: ${(record.blockers ?? []).slice(0, 4).join("; ")}` : "blockers: none",
+    `record=${record.record_path || "none"}`,
+  ].filter(Boolean).join(" ");
+  return {
+    title: record.title,
+    meta: `${record.source_id} / ${record.primary_metric} / ${record.secondary_metric}`,
+    text: `${record.status}. ${preview}`,
+    state: record.source_id === "agent-run-postmortem" && (status.includes("failed") || status.includes("timed_out"))
+      ? "error"
+      : record.blocker_count > 0
+      ? "warning"
+      : record.record_execution_enabled || record.record_process_spawn_enabled
+        ? "review"
+        : "disabled",
+  };
+}
+
 function describeCodexHermesRunDetailTimelineItem(record) {
   return {
     title: record.title,
@@ -3607,10 +3648,15 @@ function describeCodexHermesRunEvidenceOperatorConfirmationDryRunItem(record) {
 
 function describeFirstClassMcpDashboardLane(record) {
   const commands = (record.expected_command_ids ?? []).slice(0, 4).join(", ") || "commands pending";
+  const runtimeCount = record.runtime_process_count ?? 0;
+  const runtimeStatus = record.runtime_health_status ?? "runtime_process_snapshot_waiting";
+  const runtimeTarget = record.runtime_target_id ?? "unknown-mcp-runtime";
+  const runtimeFreshness = record.runtime_snapshot_freshness_status ?? "runtime_process_snapshot_waiting";
+  const runtimeAge = record.runtime_snapshot_age_ms == null ? "unknown" : `${record.runtime_snapshot_age_ms}ms`;
   return {
     title: `${record.display_name} / ${record.lane_role}`,
-    meta: `${record.ready_evidence_count}/${record.evidence_record_count} evidence / ${record.command_count} commands`,
-    text: `${record.status}. ${commands}. ${record.next_action}`,
+    meta: `${record.ready_evidence_count}/${record.evidence_record_count} evidence / ${record.command_count} commands / runtime=${runtimeCount} / ${runtimeFreshness}`,
+    text: `${record.status}. ${commands}. runtime=${runtimeStatus}; target=${runtimeTarget}; running=${Boolean(record.runtime_running)}; age=${runtimeAge}; fresh=${Boolean(record.runtime_snapshot_fresh)}; stale=${Boolean(record.runtime_snapshot_stale)}; pipes=${Boolean(record.runtime_snapshot_pipe_reader_ready)}; timedOut=${Boolean(record.runtime_snapshot_timed_out)}; partial=${Boolean(record.runtime_snapshot_partial_output_captured)}; pattern=${record.runtime_expected_pattern ?? "unknown"}; record=${record.runtime_record_path ?? "none"}. ${record.next_action}`,
     state: record.execution_enabled || record.writes_allowed || record.live_call_enabled || record.config_read_enabled || record.socket_connect_enabled || record.capture_enabled || record.export_enabled ? "gated" : "disabled",
   };
 }
@@ -3643,10 +3689,13 @@ function describeApprovalEvidenceSpineSection(record) {
 }
 
 function describeLinuxDesktopControlReadinessSection(record) {
+  const environmentText = record.section_id === "desktop-environment-snapshot"
+    ? " Read-only environment snapshot evidence is recorded before any screenshot, accessibility, socket, pointer, keyboard, focus, or window-control gate can open."
+    : "";
   return {
     title: record.title,
     meta: `${record.ready_count}/${record.record_count} ready via #${record.source_ledger}`,
-    text: `${record.status}. desktop=${record.desktop_evidence}; approval=${record.approval_evidence}; surface=${record.operator_surface}; capture=${record.capture_enabled}; control=${record.desktop_control_enabled}. ${record.next_action}`,
+    text: `${record.status}. desktop=${record.desktop_evidence}; approval=${record.approval_evidence}; surface=${record.operator_surface}; capture=${record.capture_enabled}; control=${record.desktop_control_enabled}.${environmentText} ${record.next_action}`,
     state: record.execution_enabled || record.writes_allowed || record.desktop_control_enabled || record.capture_enabled || record.socket_connect_enabled || record.process_spawn_enabled || record.terminal_enabled || record.file_write_enabled || record.patch_apply_enabled || record.live_mcp_call_enabled || record.config_read_enabled || record.export_enabled || record.memory_write_enabled ? "gated" : "disabled",
   };
 }
@@ -4839,6 +4888,15 @@ function renderCodexHermesRunView(dashboard) {
     dashboard.status,
     `active=${dashboard.active_task_run_id}`,
     `runs=${dashboard.run_count}`,
+    `orchestrations=${dashboard.codex_orchestration_count ?? 0}`,
+    `inventories=${dashboard.hermes_inventory_count ?? 0}`,
+    `assists=${dashboard.hermes_assist_count ?? 0}`,
+    `assist_postmortems=${dashboard.hermes_assist_failure_count ?? 0}`,
+    `assist_timeouts=${dashboard.hermes_assist_timeout_count ?? 0}`,
+    `agent_sessions=${dashboard.agent_session_count ?? 0}`,
+    `postmortems=${dashboard.agent_session_failure_count ?? 0}`,
+    `timeouts=${dashboard.agent_session_timeout_count ?? 0}`,
+    `summaries=${dashboard.evidence_summary_count ?? 0}`,
     `approvals=${dashboard.resolved_approval_count}/${dashboard.approval_count}`,
     `runners=${dashboard.runner_ready_count}/${dashboard.runner_count}`,
     `plans=${dashboard.joint_plan_count}`,
@@ -4850,11 +4908,19 @@ function renderCodexHermesRunView(dashboard) {
 
   clearList(codexHermesRunViewList);
   const sections = dashboard.sections ?? [];
-  codexHermesRunViewCount.textContent = String(sections.length);
+  const evidenceSummaries = dashboard.evidence_summaries ?? [];
+  codexHermesRunViewCount.textContent = String(sections.length + evidenceSummaries.length);
 
-  if (sections.length === 0) {
-    codexHermesRunViewList.append(item("No Codex/Hermes run view sections", "empty", "Refresh the read-only run view."));
+  if (sections.length === 0 && evidenceSummaries.length === 0) {
+    codexHermesRunViewList.append(item("No Codex/Hermes run view evidence", "empty", "Refresh the read-only run view after a Codex Lead or Hermes/Kimi run."));
     return;
+  }
+
+  for (const record of evidenceSummaries) {
+    const view = describeCodexHermesRunViewEvidence(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    codexHermesRunViewList.append(node);
   }
 
   for (const record of sections) {
@@ -5427,6 +5493,13 @@ function renderFirstClassMcpDashboard(dashboard) {
     `omega=${dashboard.omega_brain_evidence_count}`,
     `sswp=${dashboard.sswp_evidence_count}`,
     `steno=${dashboard.steno_evidence_count}`,
+    `runtime=${dashboard.running_runtime_lane_count ?? 0}/${dashboard.lane_count ?? 0}`,
+    `mcp_processes=${dashboard.mcp_runtime_process_count ?? 0}`,
+    `runtime_snapshots=${dashboard.runtime_process_snapshot_count ?? 0}`,
+    `runtime_fresh=${dashboard.latest_runtime_process_snapshot_fresh ?? false}`,
+    `runtime_age=${dashboard.latest_runtime_process_snapshot_age_ms ?? "unknown"}`,
+    `runtime_pipes=${dashboard.latest_runtime_process_snapshot_pipe_reader_ready ?? false}`,
+    `runtime_partial=${dashboard.latest_runtime_process_snapshot_partial_output_captured ?? false}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `live_call=${dashboard.live_call_enabled}`,
     `config=${dashboard.config_read_enabled}`,
@@ -5443,6 +5516,14 @@ function renderFirstClassMcpDashboard(dashboard) {
   }
 
   for (const record of lanes) {
+    const runtimeNode = item(
+      `Runtime process: ${record.display_name}`,
+      `${record.runtime_health_status ?? "runtime_process_snapshot_waiting"} / running=${Boolean(record.runtime_running)} / ${record.runtime_snapshot_freshness_status ?? dashboard.latest_runtime_process_snapshot_freshness_status ?? "runtime_process_snapshot_waiting"}`,
+      `target=${record.runtime_target_id ?? "unknown-mcp-runtime"}; pattern=${record.runtime_expected_pattern ?? "unknown"}; processes=${record.runtime_process_count ?? 0}; age=${record.runtime_snapshot_age_ms ?? dashboard.latest_runtime_process_snapshot_age_ms ?? "unknown"}; pipes=${Boolean(record.runtime_snapshot_pipe_reader_ready ?? dashboard.latest_runtime_process_snapshot_pipe_reader_ready)}; timedOut=${Boolean(record.runtime_snapshot_timed_out ?? dashboard.latest_runtime_process_snapshot_timed_out)}; partial=${Boolean(record.runtime_snapshot_partial_output_captured ?? dashboard.latest_runtime_process_snapshot_partial_output_captured)}; snapshot=${record.runtime_record_path ?? dashboard.latest_runtime_process_snapshot_path ?? "none"}; dashboardExec=${dashboard.execution_enabled}`,
+    );
+    runtimeNode.dataset.state = record.runtime_running ? "ready" : "disabled";
+    firstClassMcpDashboardList.append(runtimeNode);
+
     const view = describeFirstClassMcpDashboardLane(record);
     const node = item(view.title, view.meta, view.text);
     node.dataset.state = view.state;
@@ -5453,6 +5534,11 @@ function renderFirstClassMcpDashboard(dashboard) {
 async function refreshFirstClassMcpDashboard() {
   refreshFirstClassMcpDashboardBtn.disabled = true;
   try {
+    try {
+      await recordRuntimeSidecarProcessSnapshot("gravity-omega-first-class-mcp-dashboard");
+    } catch (error) {
+      setProblemText(`First-class MCP runtime process snapshot failed: ${error.message}`);
+    }
     const dashboard = await loadFirstClassMcpDashboard();
     renderFirstClassMcpDashboard(dashboard);
     return dashboard;
@@ -5644,6 +5730,10 @@ function renderSswpStatusPanel(panel) {
     `registry=${panel.registry_node_count ?? 0}/${panel.registry_snapshot_count ?? 0}`,
     `risky=${panel.risky_node_count ?? 0}`,
     `high=${highRisk}%`,
+    `probePipes=${Boolean(panel.registry_list_pipe_reader_enabled)}/${Boolean(panel.registry_risky_pipe_reader_enabled)}`,
+    `probePartial=${Boolean(panel.registry_list_partial_output_captured)}/${Boolean(panel.registry_risky_partial_output_captured)}`,
+    `runtime=${panel.runtime_process_count ?? 0}`,
+    `running=${Boolean(panel.runtime_running)}`,
     `commands=${panel.command_count}`,
     `disabled_gates=${panel.disabled_gate_count}`,
     `live_probe=${panel.live_probe_enabled}`,
@@ -5664,8 +5754,14 @@ function renderSswpStatusPanel(panel) {
     {
       title: "Registry Snapshot",
       meta: `${panel.registry_node_count ?? 0} node(s) / ${panel.risky_node_count ?? 0} risky`,
-      text: `${panel.latest_registry_snapshot_status ?? "waiting"}; highest=${highRisk}%; record=${panel.latest_registry_snapshot_path ?? "none"}; witness=false; verify=false`,
+      text: `${panel.latest_registry_snapshot_status ?? "waiting"}; list=${panel.registry_list_status ?? "waiting"} pipes=${Boolean(panel.registry_list_pipe_reader_enabled)} partial=${Boolean(panel.registry_list_partial_output_captured)} kill=${Boolean(panel.registry_list_timeout_kill_sent)}; risky=${panel.registry_risky_status ?? "waiting"} pipes=${Boolean(panel.registry_risky_pipe_reader_enabled)} partial=${Boolean(panel.registry_risky_partial_output_captured)} kill=${Boolean(panel.registry_risky_timeout_kill_sent)}; highest=${highRisk}%; record=${panel.latest_registry_snapshot_path ?? "none"}; witness=false; verify=false`,
       state: panel.risky_node_count > 0 ? "gated" : "ready",
+    },
+    {
+      title: "Runtime Process Evidence",
+      meta: `${panel.runtime_health_status ?? "runtime_process_snapshot_waiting"} / running=${Boolean(panel.runtime_running)}`,
+      text: `target=${panel.runtime_target_id ?? "sswp-mcp"}; pattern=${panel.runtime_expected_pattern ?? "mcp-servers/sswp"}; processes=${panel.runtime_process_count ?? 0}; snapshot=${panel.latest_runtime_process_snapshot_path ?? "none"}; liveCall=${panel.live_call_enabled}; exec=${panel.execution_enabled}`,
+      state: panel.runtime_running ? "ready" : "disabled",
     },
     {
       title: "Disabled Gates",
@@ -5691,6 +5787,11 @@ async function refreshSswpStatusPanel() {
     } catch (error) {
       setProblemText(`SSWP registry snapshot failed: ${error.message}`);
     }
+    try {
+      await recordRuntimeSidecarProcessSnapshot("gravity-omega-sswp-panel");
+    } catch (error) {
+      setProblemText(`SSWP runtime process snapshot failed: ${error.message}`);
+    }
     const panel = await loadSswpStatusPanel();
     renderSswpStatusPanel(panel);
     return panel;
@@ -5709,6 +5810,9 @@ function renderStenoPetCompanionDashboard(dashboard) {
 
   stenoPetCompanionDashboardSummary.textContent = [
     dashboard.status,
+    `agentTranscripts=${dashboard.agent_transcript_ready_count ?? 0}/${dashboard.agent_transcript_session_count ?? 0}`,
+    `transcriptPipes=${dashboard.agent_transcript_pipe_reader_ready_count ?? 0}`,
+    `transcriptPartial=${dashboard.agent_transcript_partial_output_count ?? 0}`,
     `transcripts=${dashboard.transcript_bundle_ready_count}/${dashboard.transcript_bundle_count}`,
     `exports=${dashboard.transcript_export_policy_ready_count}/${dashboard.transcript_export_policy_count}`,
     `protection=${dashboard.transcript_protection_policy_ready_count}/${dashboard.transcript_protection_policy_count}`,
@@ -5718,6 +5822,8 @@ function renderStenoPetCompanionDashboard(dashboard) {
     `stenoProc=${dashboard.steno_runtime_process_count ?? 0}`,
     `sswpProc=${dashboard.sswp_runtime_process_count ?? 0}`,
     `hermesProc=${dashboard.hermes_runtime_process_count ?? 0}`,
+    `attention=${dashboard.pet_attention_item_count ?? 0}`,
+    `attentionState=${dashboard.latest_pet_attention_state ?? "idle"}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `capture=${dashboard.capture_enabled}`,
     `export=${dashboard.export_enabled}`,
@@ -5726,7 +5832,12 @@ function renderStenoPetCompanionDashboard(dashboard) {
 
   clearList(stenoPetCompanionDashboardList);
   const sections = dashboard.sections ?? [];
-  stenoPetCompanionDashboardCount.textContent = String(sections.length);
+  const recentAgentTranscripts = dashboard.recent_agent_transcript_sessions ?? [];
+  const petAttentionItems = dashboard.recent_pet_attention_items ?? [];
+  const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
+  stenoPetCompanionDashboardCount.textContent = String(
+    sections.length + recentAgentTranscripts.length + petAttentionItems.length + recentPetSignals.length + 1,
+  );
 
   const runtimeNode = item(
     "Live runtime processes",
@@ -5735,6 +5846,48 @@ function renderStenoPetCompanionDashboard(dashboard) {
   );
   runtimeNode.dataset.state = (dashboard.running_runtime_target_count ?? 0) > 0 ? "ok" : "warning";
   stenoPetCompanionDashboardList.append(runtimeNode);
+
+  for (const record of recentAgentTranscripts.slice(0, 6)) {
+    const transcriptNode = item(
+      `Agent transcript: ${record.title ?? record.target ?? "Codex/Hermes"}`,
+      `${record.status ?? "read-only"} / ${record.runtime ?? "agent"} / ${record.session_kind ?? "session"}`,
+      [
+        `pipes=${Boolean(record.stdout_pipe_reader_enabled)}/${Boolean(record.stderr_pipe_reader_enabled)}`,
+        `partial=${Boolean(record.partial_output_captured)}`,
+        `timeout=${Boolean(record.timed_out)} kill=${Boolean(record.timeout_kill_sent)} wait=${record.wait_after_kill_ms ?? 0}ms`,
+        `stdout=${record.stdout_size_bytes ?? 0}b stderr=${record.stderr_size_bytes ?? 0}b`,
+        record.record_path ?? "",
+      ].join("; "),
+    );
+    transcriptNode.dataset.state = record.status === "agent_transcript_session_succeeded"
+      ? "ok"
+      : record.timed_out ? "warning" : "ready";
+    stenoPetCompanionDashboardList.append(transcriptNode);
+  }
+
+  for (const attention of petAttentionItems.slice(0, 8)) {
+    const attentionNode = item(
+      `Pet attention: ${attention.title ?? "Runtime evidence"}`,
+      `${attention.state ?? "idle"} / ${attention.source ?? "runtime"} / ${attention.progress ?? 0}%`,
+      `${attention.message ?? "Runtime attention item recorded."}\n${attention.related_record_path ?? ""}`,
+    );
+    attentionNode.dataset.state = attention.state === "error"
+      ? "error"
+      : attention.state === "warning" || attention.state === "reminder"
+        ? "warning"
+        : attention.state === "success" ? "ok" : "ready";
+    stenoPetCompanionDashboardList.append(attentionNode);
+  }
+
+  for (const signal of recentPetSignals.slice(0, 6)) {
+    const signalNode = item(
+      `Pet signal: ${signal.state ?? "idle"}`,
+      `${signal.progress ?? 0}% / ${signal.source ?? "runtime"}`,
+      `${signal.message ?? "Pet runtime signal recorded."}\n${signal.record_path ?? ""}`,
+    );
+    signalNode.dataset.state = signal.state === "success" ? "ok" : signal.state === "error" ? "error" : signal.state === "warning" || signal.state === "reminder" ? "warning" : "ready";
+    stenoPetCompanionDashboardList.append(signalNode);
+  }
 
   if (sections.length === 0) {
     stenoPetCompanionDashboardList.append(item("No Steno pet companion sections", "empty", "Refresh the read-only Steno/pet dashboard."));
@@ -5778,6 +5931,10 @@ function renderStenoSearchPanel(panel) {
     panel.status,
     `query="${panel.query}"`,
     `results=${panel.result_count}`,
+    `postmortems=${panel.postmortem_result_count ?? 0}`,
+    `matched=${panel.matched_file_count ?? 0}`,
+    `searched=${panel.searched_file_count ?? 0}`,
+    `limit=${panel.max_results ?? 0}`,
     `transcripts=${panel.transcript_bundle_ready_count}/${panel.transcript_bundle_count}`,
     `protection=${panel.transcript_protection_policy_ready_count}/${panel.transcript_protection_policy_count}`,
     `steno=${panel.steno_mcp_ready_count}/${panel.steno_mcp_evidence_count}`,
@@ -5790,12 +5947,63 @@ function renderStenoSearchPanel(panel) {
   ].join(" | ");
 
   clearList(stenoSearchPanelList);
+  const results = panel.results ?? [];
+  const postmortems = panel.recent_postmortem_results ?? [];
   const sections = panel.sections ?? [];
-  stenoSearchPanelCount.textContent = String(sections.length);
+  stenoSearchPanelCount.textContent = String(results.length + postmortems.length);
+
+  if (postmortems.length > 0) {
+    stenoSearchPanelList.append(
+      item(
+        "Recent Codex/Hermes postmortems",
+        `${postmortems.length} read-only records`,
+        "Failure and timeout recovery evidence appears here before query results; no runtime is launched.",
+      ),
+    );
+  }
+
+  for (const result of postmortems) {
+    const title = result.title || "Recent postmortem";
+    const meta = [
+      result.category || "postmortem",
+      result.status || "read-only",
+    ].filter(Boolean).join(" / ");
+    const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
+    node.dataset.state = "warning";
+    stenoSearchPanelList.append(node);
+  }
+
+  if ((panel.query ?? "").trim() && results.length === 0) {
+    stenoSearchPanelList.append(
+      item(
+        "No Steno matches",
+        `searched ${panel.searched_file_count ?? 0} approved files`,
+        "Try a term from Omega Agent Work, terminal output, runtime evidence, pet signals, or Codex/Hermes run records.",
+      ),
+    );
+  }
+
+  for (const result of results) {
+    const title = result.title || "Steno evidence match";
+    const meta = [
+      result.category || "evidence",
+      result.line_number ? `line ${result.line_number}` : "",
+      result.status || "read-only",
+    ].filter(Boolean).join(" / ");
+    const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
+    node.dataset.state = "ready";
+    stenoSearchPanelList.append(node);
+  }
 
   if (sections.length === 0) {
-    stenoSearchPanelList.append(item("No Steno search readiness sections", "empty", "Refresh the read-only Steno search panel."));
+    if (results.length === 0 && postmortems.length === 0) {
+      stenoSearchPanelList.append(item("No Steno search readiness sections", "empty", "Refresh the read-only Steno search panel."));
+    }
     return;
+  }
+
+  if (results.length > 0 || postmortems.length > 0) {
+    stenoSearchPanelList.append(item("Read-only Steno readiness", `${sections.length} sections`, "Search results above are local evidence/transcript records; capture/export/live MCP remain disabled."));
   }
 
   for (const record of sections) {
@@ -5806,15 +6014,64 @@ function renderStenoSearchPanel(panel) {
   }
 }
 
-async function refreshStenoSearchPanel() {
-  refreshStenoSearchPanelBtn.disabled = true;
+async function refreshStenoSearchPanel(query = stenoSearchQueryInput?.value ?? "") {
+  if (refreshStenoSearchPanelBtn) refreshStenoSearchPanelBtn.disabled = true;
+  if (stenoSearchRunBtn) stenoSearchRunBtn.disabled = true;
   try {
-    const panel = await loadStenoSearchPanel();
+    const panel = await loadStenoSearchPanel(query);
     renderStenoSearchPanel(panel);
     return panel;
   } finally {
-    refreshStenoSearchPanelBtn.disabled = false;
+    if (refreshStenoSearchPanelBtn) refreshStenoSearchPanelBtn.disabled = false;
+    if (stenoSearchRunBtn) stenoSearchRunBtn.disabled = false;
   }
+}
+
+function describeTerminalSessionSummary(record) {
+  const status = record.status ?? "terminal_session_unknown";
+  const command = record.command ?? "none";
+  const exit = record.exit_code ?? "none";
+  const duration = record.duration_ms ?? 0;
+  const stdoutBytes = record.stdout_size_bytes ?? 0;
+  const stderrBytes = record.stderr_size_bytes ?? 0;
+  const pipeReaders = `${Boolean(record.stdout_pipe_reader_enabled)}/${Boolean(record.stderr_pipe_reader_enabled)}`;
+  const timeoutEvidence = `kill=${Boolean(record.timeout_kill_sent)} wait=${record.wait_after_kill_ms ?? 0}ms partial=${Boolean(record.partial_output_captured)}`;
+  return {
+    title: `Terminal session: ${command}`,
+    meta: `${status} / exit=${exit} / ${duration}ms`,
+    text: `stdout=${stdoutBytes}b; stderr=${stderrBytes}b; pipeReaders=${pipeReaders}; timeout=${timeoutEvidence}; stream=${record.source_stream_enabled ?? false}; sourceExec=${record.source_execution_enabled ?? false}; dashboardExec=${record.execution_enabled ?? false}; record=${record.record_path ?? "none"}`,
+    state: record.timed_out ? "warning" : exit === 0 ? "ok" : status.includes("failed") ? "error" : "ready",
+  };
+}
+
+function describeTerminalReplaySummary(record) {
+  const status = record.status ?? "terminal_replay_unknown";
+  const command = record.command ?? "none";
+  const exit = record.exit_code ?? "none";
+  const duration = record.duration_ms ?? 0;
+  const stdoutLines = record.stdout_line_count ?? 0;
+  const stderrLines = record.stderr_line_count ?? 0;
+  const blockers = (record.blockers ?? []).length ? ` blockers=${record.blockers.join("; ")}` : "";
+  return {
+    title: `Terminal replay: ${command}`,
+    meta: `${status} / exit=${exit} / ${duration}ms`,
+    text: `stdoutLines=${stdoutLines}; stderrLines=${stderrLines}; transcriptRead=${record.transcript_read_enabled ?? false}; liveTail=${record.live_tail_enabled ?? false}; record=${record.record_path ?? "none"}${blockers}`,
+    state: (record.blockers ?? []).length ? "warning" : "ready",
+  };
+}
+
+function describeTerminalBlockedCommand(record) {
+  const status = record.status ?? "product_terminal_command_blocked";
+  const mode = record.requested_mode ?? "terminal";
+  const blockClass = record.block_class ?? "allowlist-denied";
+  const preview = record.command_preview ?? "none";
+  const size = record.command_size_bytes ?? 0;
+  return {
+    title: `Blocked terminal command: ${mode}`,
+    meta: `${status} / ${blockClass} / ${size}b`,
+    text: `${preview}; reason=${record.denied_reason ?? "denied"}; allowlist=${record.allowlist_enforced ?? true}; spawn=${record.process_spawn_enabled ?? false}; runner=${record.command_runner_enabled ?? false}; exec=${record.execution_enabled ?? false}; record=${record.record_path ?? "none"}`,
+    state: "warning",
+  };
 }
 
 function renderTerminalProcessLaneDashboard(dashboard) {
@@ -5831,8 +6088,13 @@ function renderTerminalProcessLaneDashboard(dashboard) {
     `adapters=${dashboard.runner_adapter_ready_count}/${dashboard.runner_adapter_count}`,
     `plans=${dashboard.process_command_plan_ready_count}/${dashboard.process_command_plan_count}`,
     `streams=${dashboard.process_stream_init_ready_count}/${dashboard.process_stream_init_count}`,
+    `control=${dashboard.process_control_policy_ready_count}/${dashboard.process_control_policy_count}`,
     `supervisor=${dashboard.process_supervisor_preflight_ready_count}/${dashboard.process_supervisor_preflight_count}`,
+    `exits=${dashboard.process_supervisor_exit_summary_ready_count}/${dashboard.process_supervisor_exit_summary_count}`,
     `tails=${dashboard.process_output_tail_summary_ready_count}/${dashboard.process_output_tail_summary_count}`,
+    `sessions=${dashboard.recent_terminal_session_count ?? 0}`,
+    `replays=${dashboard.recent_terminal_replay_count ?? 0}`,
+    `blocked=${dashboard.blocked_terminal_command_count ?? 0}`,
     `disabled_gates=${dashboard.disabled_gate_count}`,
     `terminal=${dashboard.terminal_enabled}`,
     `spawn=${dashboard.process_spawn_enabled}`,
@@ -5841,10 +6103,50 @@ function renderTerminalProcessLaneDashboard(dashboard) {
 
   clearList(terminalProcessLaneDashboardList);
   const sections = dashboard.sections ?? [];
-  terminalProcessLaneDashboardCount.textContent = String(sections.length);
+  const recentSessions = dashboard.recent_terminal_sessions ?? [];
+  const recentReplays = dashboard.recent_terminal_replays ?? [];
+  const recentBlockedCommands = dashboard.recent_blocked_terminal_commands ?? [];
+  const recentControlPolicies = dashboard.recent_process_control_policies ?? [];
+  const recentExitSummaries = dashboard.recent_process_exit_summaries ?? [];
+  terminalProcessLaneDashboardCount.textContent = String(sections.length + recentSessions.length + recentReplays.length + recentBlockedCommands.length + recentControlPolicies.length + recentExitSummaries.length);
 
-  if (sections.length === 0) {
-    terminalProcessLaneDashboardList.append(item("No terminal/process lane sections", "empty", "Refresh the read-only terminal/process dashboard."));
+  for (const record of recentSessions.slice(0, 6)) {
+    const view = describeTerminalSessionSummary(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  for (const record of recentReplays.slice(0, 6)) {
+    const view = describeTerminalReplaySummary(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  for (const record of recentControlPolicies.slice(0, 6)) {
+    const view = describeControlPolicy(record);
+    const node = item(`Process control: ${view.title}`, view.meta, view.text);
+    node.dataset.state = "warning";
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  for (const record of recentExitSummaries.slice(0, 6)) {
+    const view = describeSupervisorExitSummary(record);
+    const node = item(`Process exit: ${view.title}`, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  for (const record of recentBlockedCommands.slice(0, 6)) {
+    const view = describeTerminalBlockedCommand(record);
+    const node = item(view.title, view.meta, view.text);
+    node.dataset.state = view.state;
+    terminalProcessLaneDashboardList.append(node);
+  }
+
+  if (sections.length === 0 && recentSessions.length === 0 && recentReplays.length === 0 && recentBlockedCommands.length === 0 && recentControlPolicies.length === 0 && recentExitSummaries.length === 0) {
+    terminalProcessLaneDashboardList.append(item("No terminal/process lane records", "empty", "Run an allowed terminal command, then refresh the read-only terminal/process dashboard."));
     return;
   }
 
@@ -6032,6 +6334,19 @@ function renderLinuxDesktopControlReadinessDashboard(dashboard) {
 
   linuxDesktopControlReadinessDashboardSummary.textContent = [
     dashboard.status,
+    `env=${dashboard.desktop_environment_snapshot_ready_count}/${dashboard.desktop_environment_snapshot_count}`,
+    `envStatus=${dashboard.latest_desktop_environment_snapshot_status}`,
+    `envFresh=${dashboard.latest_desktop_environment_snapshot_fresh}`,
+    `wayland=${dashboard.latest_desktop_environment_wayland_display_present}`,
+    `x11=${dashboard.latest_desktop_environment_display_present}`,
+    `dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}`,
+    `atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}`,
+    `ydotool=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}`,
+    `stage1=${dashboard.desktop_read_only_capability_snapshot_ready_count}/${dashboard.desktop_read_only_capability_snapshot_count}`,
+    `tools=${dashboard.latest_desktop_read_only_capability_available_tool_count}/${dashboard.latest_desktop_read_only_capability_tool_count}`,
+    `windows=${dashboard.latest_desktop_read_only_capability_window_inventory_ready}`,
+    `screens=${dashboard.latest_desktop_read_only_capability_screenshot_ready}`,
+    `a11y=${dashboard.latest_desktop_read_only_capability_accessibility_ready}`,
     `foundation=${dashboard.foundation_desktop_ready_count}/${dashboard.foundation_desktop_lane_count}`,
     `queue=${dashboard.work_queue_desktop_ready_count}/${dashboard.work_queue_desktop_lane_count}`,
     `inventory=${dashboard.capability_desktop_ready_count}/${dashboard.capability_desktop_item_count}`,
@@ -6064,6 +6379,15 @@ function renderLinuxDesktopControlReadinessDashboard(dashboard) {
 async function refreshLinuxDesktopControlReadinessDashboard() {
   refreshLinuxDesktopControlReadinessDashboardBtn.disabled = true;
   try {
+    const invoke = tauriInvoke();
+    if (invoke) {
+      await invoke("record_desktop_environment_snapshot", {
+        request: { requested_by: "linux-desktop-control-readiness-dashboard" },
+      });
+      await invoke("record_desktop_read_only_capability_snapshot", {
+        request: { requested_by: "linux-desktop-control-readiness-dashboard" },
+      });
+    }
     const dashboard = await loadLinuxDesktopControlReadinessDashboard();
     renderLinuxDesktopControlReadinessDashboard(dashboard);
     return dashboard;
@@ -6402,7 +6726,7 @@ async function loadCodexHermesRunViewDashboard() {
 
   return {
     status: "codex_hermes_run_view_dashboard_browser_preview",
-    section_count: 8,
+    section_count: 9,
     run_count: 0,
     approval_count: 0,
     resolved_approval_count: 0,
@@ -6415,6 +6739,23 @@ async function loadCodexHermesRunViewDashboard() {
     transcript_protection_policy_count: 0,
     typed_event_log_count: 0,
     typed_event_count: 0,
+    codex_orchestration_count: 0,
+    hermes_inventory_count: 0,
+    hermes_assist_count: 0,
+    hermes_assist_failure_count: 0,
+    hermes_assist_timeout_count: 0,
+    latest_hermes_assist_status: "hermes_kimi_assist_brief_waiting",
+    latest_hermes_assist_record_path: null,
+    latest_hermes_assist_postmortem_status: "hermes_kimi_assist_postmortem_waiting",
+    latest_hermes_assist_postmortem_record_path: null,
+    agent_session_count: 0,
+    agent_session_failure_count: 0,
+    agent_session_timeout_count: 0,
+    latest_agent_session_status: "unlocked_agent_prompt_session_waiting",
+    latest_agent_session_record_path: null,
+    latest_agent_postmortem_status: "agent_run_postmortem_waiting",
+    latest_agent_postmortem_record_path: null,
+    evidence_summary_count: 4,
     active_task_run_id: "none",
     read_only: true,
     disabled_gate_count: 8,
@@ -6433,6 +6774,141 @@ async function loadCodexHermesRunViewDashboard() {
     reasons: [
       "Static preview groups Codex/Hermes evidence while every live gate remains disabled.",
     ],
+    evidence_summaries: [
+      {
+        source_id: "agent-run-postmortem",
+        title: "Latest failed/timed-out agent session",
+        record_id: "browser-preview-agent-postmortem",
+        status: "agent_run_postmortem_waiting",
+        record_path: "Open Tauri to load real unlocked agent session records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "runtime=none exit=none timeout=false duration=0ms",
+        secondary_metric: "stdout=0b stderr=0b prompt=0b",
+        detail: "Static preview placeholder for failed or timed-out Codex/Hermes session postmortems.",
+        stdout_preview: "",
+        stderr_preview: "",
+        stdout_preview_source: "record-inline",
+        stderr_preview_source: "record-inline",
+        stdout_transcript_path: null,
+        stderr_transcript_path: null,
+        stdout_transcript_found: false,
+        stderr_transcript_found: false,
+        stdout_transcript_line_count: 0,
+        stderr_transcript_line_count: 0,
+        stdout_transcript_size_bytes: 0,
+        stderr_transcript_size_bytes: 0,
+        stdout_transcript_truncated: false,
+        stderr_transcript_truncated: false,
+        transcript_evidence_ready: false,
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
+      {
+        source_id: "codex-lead-orchestration",
+        title: "Latest Codex Lead orchestration",
+        record_id: "browser-preview-codex",
+        status: "browser_preview_read_only",
+        record_path: "Open Tauri to load real Codex Lead records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "0 lanes",
+        secondary_metric: "skills=0 mcp=0 hooks=0",
+        detail: "Static preview placeholder for the latest Codex Lead orchestration record.",
+        stdout_preview: "",
+        stderr_preview: "",
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
+      {
+        source_id: "hermes-kimi-inventory",
+        title: "Latest Hermes/Kimi capability inventory",
+        record_id: "browser-preview-inventory",
+        status: "browser_preview_read_only",
+        record_path: "Open Tauri to load real Hermes/Kimi inventory records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "skills=0 filesystem=0",
+        secondary_metric: "mcp=0 hooks=0 focus=none",
+        detail: "Static preview placeholder for the latest Hermes/Kimi skills, MCP, and hooks inventory.",
+        stdout_preview: "",
+        stderr_preview: "",
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
+      {
+        source_id: "hermes-kimi-assist",
+        title: "Latest Hermes/Kimi assist brief",
+        record_id: "browser-preview-assist",
+        status: "browser_preview_read_only",
+        record_path: "Open Tauri to load real Hermes/Kimi assist records.",
+        log_path: "",
+        created_at_ms: 0,
+        primary_metric: "exit=none timeout=false duration=0ms",
+        secondary_metric: "stdout=0b stderr=0b",
+        detail: "Static preview placeholder for the latest bounded Hermes/Kimi assist brief.",
+        stdout_preview: "",
+        stderr_preview: "",
+        blocker_count: 0,
+        blockers: [],
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled: false,
+        record_execution_enabled: false,
+      },
+    ],
     sections: [
       ["task-runs", "Task runs", "task-run-ledger"],
       ["approvals", "Approvals", "approval-ledger"],
@@ -6441,6 +6917,7 @@ async function loadCodexHermesRunViewDashboard() {
       ["artifacts", "Artifacts", "artifact-preview"],
       ["transcripts", "Transcript bundles", "transcript-bundle-ledger"],
       ["evidence-policies", "Transcript export and protection", "export-policy-ledger + protection-policy-ledger"],
+      ["agent-sessions", "Agent sessions", "unlocked-agent-prompt-sessions"],
       ["typed-events", "Typed event logs", "agent-event-preview"],
     ].map(([section_id, title, source_ledger]) => ({
       section_id,
@@ -6688,6 +7165,7 @@ async function loadCodexHermesRunEvidenceDiffBoard() {
   }
 
   const comparison = await loadCodexHermesRunSelectionComparison();
+  const runView = await loadCodexHermesRunViewDashboard();
   const laneFor = (runtime) => (comparison.runtime_lanes ?? []).find((lane) => lane.runtime === runtime) ?? {};
   const codex = laneFor("codex");
   const hermes = laneFor("hermes");
@@ -6701,6 +7179,8 @@ async function loadCodexHermesRunEvidenceDiffBoard() {
     ["export-policies", "Export policies", "export_policy_ready_count", codex.export_policy_ready_count ?? 0, hermes.export_policy_ready_count ?? 0, "Keep export disabled until both runtimes have consent and destination policy evidence."],
     ["protection-policies", "Protection policies", "protection_policy_ready_count", codex.protection_policy_ready_count ?? 0, hermes.protection_policy_ready_count ?? 0, "Keep redaction, retention, deletion, clipboard, share, and export actions disabled until both runtimes have protection policy evidence."],
     ["total-ready-evidence", "Total ready evidence", "ready_evidence_count", codex.ready_evidence_count ?? 0, hermes.ready_evidence_count ?? 0, "Use Gravity Omega reconciliation to close evidence gaps before live execution or mutation gates open."],
+    ["postmortem-failures", "Postmortem failures", "failure_postmortem_count", runView.agent_session_failure_count ?? 0, runView.hermes_assist_failure_count ?? 0, "Compare Codex agent failures against Hermes/Kimi assist failures before retrying or delegating."],
+    ["postmortem-timeouts", "Postmortem timeouts", "timeout_postmortem_count", runView.agent_session_timeout_count ?? 0, runView.hermes_assist_timeout_count ?? 0, "Compare timeout pressure across Codex and Hermes/Kimi before launching another long run."],
   ];
   const diffs = diffSource.map(([diff_id, title, metric, source_count, target_count, recommendation]) => {
     const delta = source_count - target_count;
@@ -6759,7 +7239,7 @@ async function loadCodexHermesRunEvidenceDiffBoard() {
     execution_enabled: false,
     diffs,
     reasons: [
-      "Static preview exposes Codex/Hermes evidence diffs while every live gate remains disabled.",
+      "Static preview exposes Codex/Hermes evidence and postmortem diffs while every live gate remains disabled.",
     ],
     next_slice: "Resolve through Rust inside Tauri.",
   };
@@ -7405,11 +7885,19 @@ async function loadFirstClassMcpDashboard() {
     return invoke("first_class_mcp_dashboard");
   }
 
+  const runtimeTargetForSubsystem = (subsystem) => ({
+    omega_brain: ["omega-brain-mcp", "omega-brain"],
+    sswp: ["sswp-mcp", "mcp-servers/sswp"],
+    omega_stenographer: ["omega-stenographer-mcp", "omega-stenographer"],
+  }[subsystem] ?? ["unknown-mcp-runtime", "unknown"]);
+
   const lanes = [
     ["omega_brain", "Omega Brain", "memory, search, citation, and memory-policy lane", ["omega_brain_status", "omega_brain_search", "omega_brain_cite", "omega_brain_memory_policy"]],
     ["sswp", "SSWP", "sovereign workflow protocol lane", ["sswp_status", "sswp_capabilities", "sswp_plan", "sswp_call_policy"]],
     ["omega_stenographer", "Omega Stenographer", "capture, transcript, search, and export lane", ["steno_status", "steno_capture_policy", "steno_search", "steno_export_policy"]],
-  ].map(([subsystem, display_name, lane_role, expected_command_ids]) => ({
+  ].map(([subsystem, display_name, lane_role, expected_command_ids]) => {
+    const [runtime_target_id, runtime_expected_pattern] = runtimeTargetForSubsystem(subsystem);
+    return {
     subsystem,
     display_name,
     lane_role,
@@ -7433,6 +7921,20 @@ async function loadFirstClassMcpDashboard() {
     typed_command_contract_count: 0,
     status_probe_preflight_count: 0,
     config_lookup_preflight_count: 0,
+    runtime_target_id,
+    runtime_process_count: 0,
+    runtime_running: false,
+    runtime_health_status: "runtime_process_snapshot_browser_preview",
+    runtime_expected_pattern,
+    runtime_record_path: null,
+    runtime_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
+    runtime_snapshot_age_ms: null,
+    runtime_snapshot_freshness_status: "runtime_process_snapshot_waiting",
+    runtime_snapshot_fresh: false,
+    runtime_snapshot_stale: true,
+    runtime_snapshot_pipe_reader_ready: false,
+    runtime_snapshot_partial_output_captured: false,
+    runtime_snapshot_timed_out: false,
     first_class: true,
     read_only: true,
     live_probe_enabled: false,
@@ -7451,7 +7953,8 @@ async function loadFirstClassMcpDashboard() {
     writes_allowed: false,
     execution_enabled: false,
     next_action: "Open the Tauri app to resolve first-class MCP evidence through Rust.",
-  }));
+    };
+  });
 
   return {
     status: "first_class_mcp_dashboard_browser_preview",
@@ -7463,6 +7966,19 @@ async function loadFirstClassMcpDashboard() {
     omega_brain_evidence_count: 0,
     sswp_evidence_count: 0,
     steno_evidence_count: 0,
+    runtime_process_snapshot_count: 0,
+    latest_runtime_process_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
+    latest_runtime_process_snapshot_path: null,
+    runtime_process_snapshot_freshness_threshold_ms: 120000,
+    latest_runtime_process_snapshot_age_ms: null,
+    latest_runtime_process_snapshot_freshness_status: "runtime_process_snapshot_waiting",
+    latest_runtime_process_snapshot_fresh: false,
+    latest_runtime_process_snapshot_stale: true,
+    latest_runtime_process_snapshot_pipe_reader_ready: false,
+    latest_runtime_process_snapshot_partial_output_captured: false,
+    latest_runtime_process_snapshot_timed_out: false,
+    running_runtime_lane_count: 0,
+    mcp_runtime_process_count: 0,
     disabled_gate_count: 3,
     read_only: true,
     live_probe_enabled: false,
@@ -7519,6 +8035,20 @@ async function loadSswpStatusPanel() {
     typed_command_contract_count: 0,
     status_probe_preflight_count: 0,
     config_lookup_preflight_count: 0,
+    runtime_target_id: "sswp-mcp",
+    runtime_process_count: 0,
+    runtime_running: false,
+    runtime_health_status: "runtime_process_snapshot_browser_preview",
+    runtime_expected_pattern: "mcp-servers/sswp",
+    runtime_record_path: null,
+    runtime_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
+    runtime_snapshot_age_ms: null,
+    runtime_snapshot_freshness_status: "runtime_process_snapshot_waiting",
+    runtime_snapshot_fresh: false,
+    runtime_snapshot_stale: true,
+    runtime_snapshot_pipe_reader_ready: false,
+    runtime_snapshot_partial_output_captured: false,
+    runtime_snapshot_timed_out: false,
     first_class: true,
     read_only: true,
     live_probe_enabled: false,
@@ -7554,6 +8084,22 @@ async function loadSswpStatusPanel() {
     registry_node_count: 0,
     risky_node_count: 0,
     highest_risk_percent: 0,
+    registry_list_status: "browser_preview",
+    registry_risky_status: "browser_preview",
+    registry_list_pipe_reader_enabled: false,
+    registry_risky_pipe_reader_enabled: false,
+    registry_list_timeout_kill_sent: false,
+    registry_risky_timeout_kill_sent: false,
+    registry_list_partial_output_captured: false,
+    registry_risky_partial_output_captured: false,
+    runtime_process_snapshot_count: dashboard.runtime_process_snapshot_count ?? 0,
+    latest_runtime_process_snapshot_status: dashboard.latest_runtime_process_snapshot_status ?? "runtime_sidecar_process_snapshot_browser_preview",
+    latest_runtime_process_snapshot_path: dashboard.latest_runtime_process_snapshot_path ?? null,
+    runtime_target_id: lane.runtime_target_id ?? "sswp-mcp",
+    runtime_process_count: lane.runtime_process_count ?? 0,
+    runtime_running: Boolean(lane.runtime_running),
+    runtime_health_status: lane.runtime_health_status ?? "runtime_process_snapshot_browser_preview",
+    runtime_expected_pattern: lane.runtime_expected_pattern ?? "mcp-servers/sswp",
     command_count: lane.command_count,
     disabled_gate_count: lane.read_only && !lane.live_call_enabled && !lane.config_read_enabled && !lane.execution_enabled ? 1 : 0,
     read_only: lane.read_only,
@@ -7653,6 +8199,12 @@ async function loadStenoPetCompanionDashboard() {
     transcript_export_policy_ready_count: 0,
     transcript_protection_policy_count: 0,
     transcript_protection_policy_ready_count: 0,
+    agent_transcript_session_count: 0,
+    agent_transcript_ready_count: 0,
+    agent_transcript_pipe_reader_ready_count: 0,
+    agent_transcript_timed_out_count: 0,
+    agent_transcript_partial_output_count: 0,
+    recent_agent_transcript_sessions: [],
     steno_mcp_evidence_count: 0,
     steno_mcp_ready_count: 0,
     pet_inventory_count: 0,
@@ -7662,6 +8214,10 @@ async function loadStenoPetCompanionDashboard() {
     pet_runtime_signal_count: 0,
     latest_pet_state: "idle",
     latest_pet_signal_status: "pet_runtime_signal_waiting",
+    recent_pet_runtime_signals: [],
+    pet_attention_item_count: 0,
+    latest_pet_attention_state: "idle",
+    recent_pet_attention_items: [],
     runtime_process_snapshot_count: 0,
     latest_runtime_process_snapshot_status: "runtime_sidecar_process_snapshot_browser_preview",
     latest_runtime_process_snapshot_path: null,
@@ -7696,10 +8252,17 @@ async function loadStenoPetCompanionDashboard() {
   };
 }
 
-async function loadStenoSearchPanel() {
+async function loadStenoSearchPanel(query = "") {
+  const normalizedQuery = String(query ?? "").trim();
   const invoke = tauriInvoke();
   if (invoke) {
-    return invoke("steno_search");
+    return invoke("steno_search", {
+      request: {
+        query: normalizedQuery,
+        max_results: 18,
+        max_file_bytes: 262144,
+      },
+    });
   }
 
   const dashboard = await loadStenoPetCompanionDashboard();
@@ -7707,8 +8270,13 @@ async function loadStenoSearchPanel() {
     status: "steno_search_panel_browser_preview",
     panel_id: "steno-search-panel",
     panel_title: "Steno Search",
-    query: "",
+    query: normalizedQuery,
     result_count: 0,
+    searched_file_count: 0,
+    matched_file_count: 0,
+    postmortem_result_count: 0,
+    max_results: 18,
+    max_file_bytes: 262144,
     transcript_bundle_count: dashboard.transcript_bundle_count,
     transcript_bundle_ready_count: dashboard.transcript_bundle_ready_count,
     transcript_protection_policy_count: dashboard.transcript_protection_policy_count,
@@ -7720,7 +8288,7 @@ async function loadStenoSearchPanel() {
     read_only: dashboard.read_only,
     transcript_read_enabled: false,
     transcript_index_enabled: false,
-    query_binding_enabled: false,
+    query_binding_enabled: true,
     capture_enabled: dashboard.capture_enabled,
     export_enabled: dashboard.export_enabled,
     live_mcp_call_enabled: dashboard.live_mcp_call_enabled,
@@ -7734,9 +8302,11 @@ async function loadStenoSearchPanel() {
     patch_apply_enabled: dashboard.patch_apply_enabled,
     writes_allowed: dashboard.writes_allowed,
     execution_enabled: dashboard.execution_enabled,
+    results: [],
+    recent_postmortem_results: [],
     sections: dashboard.sections,
     reasons: [
-      "Static preview exposes Steno search readiness without transcript reads or indexing.",
+      "Static preview binds the Steno query but defers local record reads to the Tauri runtime.",
       "Capture, export, live MCP calls, config reads, sockets, writes, and execution remain disabled.",
     ],
     next_slice: "Resolve through Rust inside Tauri.",
@@ -7813,6 +8383,11 @@ async function loadTerminalProcessLaneDashboard() {
     process_supervisor_exit_summary_ready_count: 0,
     process_output_tail_summary_count: 0,
     process_output_tail_summary_ready_count: 0,
+    recent_terminal_session_count: 0,
+    recent_terminal_replay_count: 0,
+    blocked_terminal_command_count: 0,
+    recent_process_control_policy_count: 0,
+    recent_process_exit_summary_count: 0,
     disabled_gate_count: sections.length,
     read_only: true,
     terminal_process_visible: false,
@@ -7832,6 +8407,11 @@ async function loadTerminalProcessLaneDashboard() {
     memory_write_enabled: false,
     writes_allowed: false,
     execution_enabled: false,
+    recent_terminal_sessions: [],
+    recent_terminal_replays: [],
+    recent_blocked_terminal_commands: [],
+    recent_process_control_policies: [],
+    recent_process_exit_summaries: [],
     sections,
     reasons: [
       "Static preview groups terminal and process evidence while terminal writes, process spawn, stream readers, and execution remain disabled.",
@@ -7978,6 +8558,8 @@ async function loadApprovalEvidenceSpineDashboard() {
 async function loadLinuxDesktopControlReadinessDashboard() {
   const invoke = tauriInvoke();
   if (invoke) {
+    await invoke("list_desktop_environment_snapshots").catch(() => []);
+    await invoke("list_desktop_read_only_capability_snapshots").catch(() => []);
     return invoke("linux_desktop_control_readiness_dashboard");
   }
 
@@ -7988,6 +8570,8 @@ async function loadLinuxDesktopControlReadinessDashboard() {
     ["desktop-integration-readiness", "Desktop integration readiness", "first-class-integration-readiness-ledger", true, false, false],
     ["approval-spine-prerequisites", "Approval spine prerequisites", "approval-evidence-spine-dashboard", false, true, false],
     ["desktop-command-surface", "Desktop command surface", "command-manifest", true, false, true],
+    ["desktop-environment-snapshot", "Desktop environment snapshot", "desktop-environment-snapshots", true, false, true],
+    ["desktop-read-only-capability-snapshot", "Desktop stage-1 capability snapshot", "desktop-read-only-capability-snapshots", true, false, true],
   ].map(([section_id, title, source_ledger, desktop_evidence, approval_evidence, operator_surface]) => ({
     section_id,
     title,
@@ -8019,6 +8603,31 @@ async function loadLinuxDesktopControlReadinessDashboard() {
   return {
     status: "linux_desktop_control_readiness_dashboard_browser_preview",
     section_count: sections.length,
+    desktop_environment_snapshot_count: 1,
+    desktop_environment_snapshot_ready_count: 0,
+    desktop_environment_snapshot_freshness_threshold_ms: 120000,
+    latest_desktop_environment_snapshot_status: "desktop_environment_snapshot_browser_preview",
+    latest_desktop_environment_snapshot_record_path: "",
+    latest_desktop_environment_snapshot_age_ms: null,
+    latest_desktop_environment_snapshot_fresh: false,
+    latest_desktop_environment_graphical_session_visible: false,
+    latest_desktop_environment_wayland_display_present: false,
+    latest_desktop_environment_display_present: false,
+    latest_desktop_environment_dbus_session_bus_present: false,
+    latest_desktop_environment_at_spi_bus_present: false,
+    latest_desktop_environment_ydotool_socket_visible: false,
+    latest_desktop_environment_ydotool_socket_is_socket: false,
+    latest_desktop_environment_backend_status: "desktop_environment_snapshot_browser_preview",
+    desktop_read_only_capability_snapshot_count: 1,
+    desktop_read_only_capability_snapshot_ready_count: 0,
+    latest_desktop_read_only_capability_snapshot_status: "desktop_read_only_capability_snapshot_browser_preview",
+    latest_desktop_read_only_capability_snapshot_record_path: "",
+    latest_desktop_read_only_capability_available_tool_count: 0,
+    latest_desktop_read_only_capability_tool_count: 0,
+    latest_desktop_read_only_capability_window_inventory_ready: false,
+    latest_desktop_read_only_capability_screenshot_ready: false,
+    latest_desktop_read_only_capability_accessibility_ready: false,
+    latest_desktop_read_only_capability_input_helper_ready: false,
     foundation_desktop_lane_count: 0,
     foundation_desktop_ready_count: 0,
     work_queue_desktop_lane_count: 0,
@@ -9960,7 +10569,7 @@ async function loadHermesKimiCapabilityInventories() {
   return invoke("list_hermes_kimi_capability_inventories");
 }
 
-async function recordHermesKimiAssistBrief({ prompt = "", orchestration = null, hermesInventory = null } = {}) {
+async function recordHermesKimiAssistBrief({ prompt = "", orchestration = null, hermesInventory = null, timeoutMs = 15000 } = {}) {
   const focusSkills = (hermesInventory?.focus_skills ?? []).slice(0, 18);
   const mcpServers = (hermesInventory?.mcp_servers ?? [])
     .slice(0, 8)
@@ -9993,7 +10602,7 @@ async function recordHermesKimiAssistBrief({ prompt = "", orchestration = null, 
     request: {
       prompt,
       requested_by: "gravity-omega-main-workflow",
-      timeout_ms: 45000,
+      timeout_ms: timeoutMs,
       inventory_record_path: hermesInventory?.record_path || null,
       orchestration_record_path: orchestration?.record_path || null,
       focus_skills: focusSkills,
@@ -16435,6 +17044,9 @@ function renderAgentTranscriptSessionSummary(value) {
     `kind=${value.session_kind}`,
     `exit=${value.exit_code ?? "n/a"}`,
     `pid=${value.pid ?? "n/a"}`,
+    `pipes=${Boolean(value.stdout_pipe_reader_enabled)}/${Boolean(value.stderr_pipe_reader_enabled)}`,
+    `partial=${Boolean(value.partial_output_captured)}`,
+    `timeoutKill=${Boolean(value.timeout_kill_sent)}`,
     `stdout=${value.stdout_size_bytes}b`,
     `stderr=${value.stderr_size_bytes}b`,
     `task_exec=${value.agent_task_execution_enabled}`,
@@ -16455,6 +17067,7 @@ function renderAgentTranscriptSessionLedger(records) {
       `${record.title}: ${record.status}`,
       `runtime=${record.runtime} | kind=${record.session_kind} | exit=${record.exit_code ?? "n/a"} | ${record.duration_ms}ms`,
       [
+        `pipes=${Boolean(record.stdout_pipe_reader_enabled)}/${Boolean(record.stderr_pipe_reader_enabled)}; partial=${Boolean(record.partial_output_captured)}; timeout_kill=${Boolean(record.timeout_kill_sent)}; wait_after_kill=${record.wait_after_kill_ms ?? 0}ms`,
         `stdout=${record.stdout_size_bytes}b ${record.stdout_transcript_path}`,
         `stderr=${record.stderr_size_bytes}b ${record.stderr_transcript_path}`,
         `spawn=${record.process_spawn_enabled}; transcripts=${record.transcript_capture_enabled}; sidecar=${record.sidecar_launch_enabled}; terminal=${record.terminal_enabled}; workspace_read=${record.workspace_read_enabled}; writes=${record.writes_allowed}; task_exec=${record.agent_task_execution_enabled}`,
@@ -16480,6 +17093,7 @@ async function recordAgentTranscriptSession() {
     const records = await loadAgentTranscriptSessions();
     renderAgentTranscriptSessionSummary(result);
     renderAgentTranscriptSessionLedger(records);
+    await refreshRuntimeEvidenceSpine();
     await refreshTerminalProcessLaneDashboard();
     statusEl.textContent = `Agent transcript sessions captured: ${result.succeeded_count}/${result.session_count} passed, task execution disabled`;
     statusEl.classList.remove("error");
@@ -16563,6 +17177,7 @@ async function recordUnlockedAgentPromptSession(runtime) {
     const records = await loadUnlockedAgentPromptSessions();
     renderUnlockedAgentPromptSummary(result);
     renderUnlockedAgentPromptLedger(records);
+    await refreshRuntimeEvidenceSpine();
     await refreshTerminalProcessLaneDashboard();
     statusEl.textContent = `Unlocked agent prompt run: ${result.succeeded_count}/${result.session_count} passed, writes=${result.writes_allowed}`;
     statusEl.classList.toggle("error", result.succeeded_count !== result.session_count);
@@ -23859,6 +24474,22 @@ refreshStenoSearchPanelBtn?.addEventListener("click", () => {
   });
 });
 
+stenoSearchRunBtn?.addEventListener("click", () => {
+  refreshStenoSearchPanel(stenoSearchQueryInput?.value ?? "").catch((error) => {
+    statusEl.textContent = `Steno search failed: ${error.message}`;
+    statusEl.classList.add("error");
+  });
+});
+
+stenoSearchQueryInput?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  refreshStenoSearchPanel(stenoSearchQueryInput.value).catch((error) => {
+    statusEl.textContent = `Steno search failed: ${error.message}`;
+    statusEl.classList.add("error");
+  });
+});
+
 refreshTerminalProcessLaneDashboardBtn?.addEventListener("click", () => {
   refreshTerminalProcessLaneDashboard().catch((error) => {
     statusEl.textContent = `Terminal process lane dashboard failed: ${error.message}`;
@@ -24908,7 +25539,11 @@ function initOmegaProductShell() {
   let activeSearchMode = "current";
   let activeProductPanel = "explorer";
   let activeTerminalStreamId = "";
+  let activeTerminalStreamRun = null;
+  let terminalStreamWatchdogTimer = 0;
   let activeAgentStreamId = "";
+  let activeAgentRun = null;
+  let agentRunWatchdogTimer = 0;
   let suppressEditorDirty = false;
   let activeAgentTranscript = null;
   let activeAgentWorkArtifact = null;
@@ -24950,6 +25585,12 @@ function initOmegaProductShell() {
     logPath: "",
     stdoutTranscriptPath: "",
     stderrTranscriptPath: "",
+    replayRecordPath: "",
+    stdoutPipeReaderEnabled: false,
+    stderrPipeReaderEnabled: false,
+    timeoutKillSent: false,
+    waitAfterKillMs: 0,
+    partialOutputCaptured: false,
   };
   let openEditorTabs = [
     {
@@ -24974,6 +25615,8 @@ function initOmegaProductShell() {
   };
   let promptContextState = { ...defaultPromptContext };
   let agentRunMode = "codex-lead";
+  const agentRunWatchdogIntervalMs = 15000;
+  const agentRunStaleEventThresholdMs = 60000;
 
   const productCommandRegistry = [
     { id: "menu-file", title: "File Menu", keys: "", aliases: ["file", "new", "open", "save", "save as"] },
@@ -25027,6 +25670,161 @@ function initOmegaProductShell() {
     if (productTerminalStatus) {
       productTerminalStatus.textContent = message;
     }
+  };
+
+  const agentRunControlButtons = () => [sendBtn, codexBtn, hermesBtn, compareBtn].filter(Boolean);
+
+  const setAgentRunControlsDisabled = (disabled) => {
+    for (const button of agentRunControlButtons()) {
+      if (disabled) {
+        button.setAttribute("disabled", "disabled");
+      } else {
+        button.removeAttribute("disabled");
+      }
+    }
+  };
+
+  const describeActiveAgentRun = () => {
+    if (!activeAgentRun && !activeAgentStreamId) return "";
+    const label = activeAgentRun?.label || "Agent run";
+    const phase = activeAgentRun?.phase || "streaming";
+    const session = activeAgentRun?.sessionId || activeAgentStreamId || "pending";
+    return `${label} is already ${phase} (session=${session}).`;
+  };
+
+  const syncAgentRunGateDataset = () => {
+    if (!activeAgentRun) return;
+    productShell?.setAttribute("data-agent-run-gate", activeAgentRun.phase || "running");
+    productShell?.setAttribute("data-agent-run-runtime", activeAgentRun.runtime || "agent");
+    productShell?.setAttribute("data-agent-run-label", activeAgentRun.label || "Agent run");
+    productShell?.setAttribute("data-agent-run-session", activeAgentRun.sessionId || activeAgentStreamId || "pending");
+    productShell?.setAttribute("data-agent-run-prompt-chars", String(activeAgentRun.promptChars || 0));
+    productShell?.setAttribute("data-agent-run-last-event", activeAgentRun.lastEvent || "started");
+  };
+
+  const recordAgentRunLifecycleEvent = (eventName, details = {}, options = {}) => {
+    if (!activeAgentRun) return;
+    const now = Date.now();
+    const markFresh = options.markFresh !== false;
+    activeAgentRun = {
+      ...activeAgentRun,
+      ...details,
+      lastEvent: eventName,
+      lastEventAt: markFresh ? now : activeAgentRun.lastEventAt,
+    };
+    syncAgentRunGateDataset();
+    const session = activeAgentRun.sessionId || activeAgentStreamId || "pending";
+    const record = activeAgentRun.recordPath || details.recordPath || "none";
+    const ageMs = Math.max(0, now - (activeAgentRun.startedAt || now));
+    if (!options.silent) {
+      appendEvidenceText(
+        `agent lifecycle ${eventName}: runtime=${activeAgentRun.runtime}; phase=${activeAgentRun.phase}; session=${session}; prompt_chars=${activeAgentRun.promptChars || 0}; age=${ageMs}ms; record=${record}`
+      );
+    }
+  };
+
+  const stopAgentRunWatchdog = () => {
+    if (agentRunWatchdogTimer) {
+      window.clearInterval(agentRunWatchdogTimer);
+      agentRunWatchdogTimer = 0;
+    }
+  };
+
+  const tickAgentRunWatchdog = () => {
+    if (!activeAgentRun) {
+      stopAgentRunWatchdog();
+      return;
+    }
+    const now = Date.now();
+    const lastEventAt = activeAgentRun.lastEventAt || activeAgentRun.startedAt || now;
+    const quietMs = now - lastEventAt;
+    if (quietMs < agentRunStaleEventThresholdMs) return;
+    const lastWarningAt = activeAgentRun.staleWarningIssuedAt || 0;
+    if (lastWarningAt && now - lastWarningAt < agentRunStaleEventThresholdMs) return;
+    activeAgentRun = {
+      ...activeAgentRun,
+      staleWarningIssuedAt: now,
+      staleWarningCount: (activeAgentRun.staleWarningCount || 0) + 1,
+    };
+    const session = activeAgentRun.sessionId || activeAgentStreamId || "pending";
+    const seconds = Math.round(quietMs / 1000);
+    const message = `${activeAgentRun.label || "Agent run"} is still active but has not emitted a stream event for ${seconds}s (session=${session}).`;
+    setProductStatus(message, "warning");
+    updateAgentAnswerMessage(
+      `${activeAgentRun.label || "Agent run"} still working`,
+      [
+        message,
+        "Omega Agent Work is still being updated in Monaco.",
+        activeAgentRun.recordPath ? `Evidence: ${activeAgentRun.recordPath}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
+    appendAgentWorkArtifact("Run Lifecycle Watchdog", message);
+    recordAgentRunLifecycleEvent("stale-stream-warning", { phase: activeAgentRun.phase || "streaming" }, { markFresh: false });
+    setPetCompanionRuntimeState({
+      state: "warning",
+      source: "agent-run-watchdog",
+      message,
+      progress: 80,
+      relatedRecordPath: activeAgentRun.recordPath || "",
+    }, { record: true });
+  };
+
+  const startAgentRunWatchdog = () => {
+    stopAgentRunWatchdog();
+    agentRunWatchdogTimer = window.setInterval(tickAgentRunWatchdog, agentRunWatchdogIntervalMs);
+  };
+
+  const beginAgentRunGate = ({ runtime, label, phase = "preparing", promptChars = 0 } = {}) => {
+    if (activeAgentRun || activeAgentStreamId) {
+      const message = `${describeActiveAgentRun()} Wait for it to finish before starting another run.`;
+      setProductStatus(message, "warning");
+      appendEvidenceText(`agent run blocked by active lifecycle: ${message}`);
+      productShell?.setAttribute("data-agent-run-gate", "blocked");
+      return false;
+    }
+    activeAgentRun = {
+      runtime: runtime || "agent",
+      label: label || "Agent run",
+      phase,
+      sessionId: "",
+      recordPath: "",
+      promptChars,
+      startedAt: Date.now(),
+      lastEventAt: Date.now(),
+      lastEvent: "gate-started",
+      staleWarningIssuedAt: 0,
+      staleWarningCount: 0,
+    };
+    syncAgentRunGateDataset();
+    setAgentRunControlsDisabled(true);
+    startAgentRunWatchdog();
+    recordAgentRunLifecycleEvent("gate-started");
+    return true;
+  };
+
+  const updateAgentRunGate = (patch = {}) => {
+    if (!activeAgentRun) return;
+    activeAgentRun = { ...activeAgentRun, ...patch };
+    if (activeAgentRun.sessionId) {
+      activeAgentStreamId = activeAgentRun.sessionId;
+    }
+    syncAgentRunGateDataset();
+  };
+
+  const clearAgentRunGate = () => {
+    recordAgentRunLifecycleEvent("gate-cleared", { phase: "finished" }, { markFresh: false });
+    activeAgentRun = null;
+    activeAgentStreamId = "";
+    stopAgentRunWatchdog();
+    productShell?.removeAttribute("data-agent-run-gate");
+    productShell?.removeAttribute("data-agent-run-runtime");
+    productShell?.removeAttribute("data-agent-run-label");
+    productShell?.removeAttribute("data-agent-run-session");
+    productShell?.removeAttribute("data-agent-run-prompt-chars");
+    productShell?.removeAttribute("data-agent-run-last-event");
+    setAgentRunControlsDisabled(false);
   };
 
   const readStoredJson = (key, fallback) => {
@@ -25286,6 +26084,8 @@ function initOmegaProductShell() {
       });
     });
 
+  const codexLeadAssistTimeoutMs = 15000;
+
   const agentRunStartingText = (label, contextSummary = "") =>
     [
       `${label} is starting now.`,
@@ -25323,6 +26123,16 @@ function initOmegaProductShell() {
     activeAgentTranscript.message.title.textContent = title;
     activeAgentTranscript.message.body.textContent = text || "Waiting for agent output...";
     scrollProductMessages();
+  };
+
+  const updateCodexLeadPreparationStatus = async (title, lines = []) => {
+    const body = [
+      "Codex Lead is still in control of this run.",
+      ...lines.filter(Boolean),
+    ].join("\n");
+    updateAgentAnswerMessage(title, body);
+    setProductStatus(title, "running");
+    await waitForProductPaint();
   };
 
   const getPrompt = () => productInput.value.trim();
@@ -25492,6 +26302,77 @@ function initOmegaProductShell() {
     return status || "idle";
   };
 
+  const terminalStreamStaleMs = 45_000;
+
+  const syncTerminalStreamDataset = () => {
+    if (!productShell) return;
+    productShell.setAttribute("data-terminal-stream-session", activeTerminalStreamRun?.sessionId || "");
+    productShell.setAttribute("data-terminal-stream-status", activeTerminalStreamRun?.status || "idle");
+    productShell.setAttribute("data-terminal-stream-last-event", activeTerminalStreamRun?.lastEventName || "none");
+    productShell.setAttribute("data-terminal-stream-stale-warnings", String(activeTerminalStreamRun?.staleWarningCount ?? 0));
+  };
+
+  const recordTerminalStreamLifecycleEvent = (eventName, patch = {}, options = {}) => {
+    if (!activeTerminalStreamRun && patch.sessionId) {
+      activeTerminalStreamRun = {
+        sessionId: patch.sessionId,
+        command: patch.command || "",
+        status: "starting",
+        phase: "starting",
+        recordPath: patch.recordPath || "",
+        logPath: patch.logPath || "",
+        startedAt: Date.now(),
+        lastEventAt: Date.now(),
+        lastEventName: eventName,
+        staleWarningCount: 0,
+      };
+    }
+    if (!activeTerminalStreamRun) return;
+    activeTerminalStreamRun = {
+      ...activeTerminalStreamRun,
+      ...patch,
+      lastEventAt: Date.now(),
+      lastEventName: eventName,
+    };
+    syncTerminalStreamDataset();
+    if (!options.silent) {
+      appendEvidenceText(`terminal-stream ${eventName}: ${activeTerminalStreamRun.status || "running"} ${activeTerminalStreamRun.recordPath || ""}`.trim());
+    }
+  };
+
+  const clearTerminalStreamRun = () => {
+    activeTerminalStreamRun = null;
+    if (terminalStreamWatchdogTimer) {
+      window.clearInterval(terminalStreamWatchdogTimer);
+      terminalStreamWatchdogTimer = 0;
+    }
+    syncTerminalStreamDataset();
+  };
+
+  const tickTerminalStreamWatchdog = () => {
+    if (!activeTerminalStreamRun) return;
+    const quietMs = Date.now() - (activeTerminalStreamRun.lastEventAt || activeTerminalStreamRun.startedAt || Date.now());
+    if (quietMs < terminalStreamStaleMs) return;
+    activeTerminalStreamRun.staleWarningCount = (activeTerminalStreamRun.staleWarningCount ?? 0) + 1;
+    activeTerminalStreamRun.lastEventAt = Date.now();
+    syncTerminalStreamDataset();
+    terminalWrite(`[terminal_watchdog] quiet for ${quietMs}ms; stream still active (${activeTerminalStreamRun.sessionId || "pending"})`);
+    appendEvidenceText(`terminal stream stale warning ${activeTerminalStreamRun.staleWarningCount}: ${activeTerminalStreamRun.recordPath || "no record yet"}`);
+    setPetCompanionRuntimeState({
+      state: "warning",
+      source: "terminal-stream-watchdog",
+      message: `Terminal stream is quiet for ${Math.round(quietMs / 1000)}s.`,
+      progress: 70,
+      relatedRecordPath: activeTerminalStreamRun.recordPath || "",
+    }, { record: true });
+    setProductStatus("Terminal stream is still running but has been quiet.", "warning");
+  };
+
+  const startTerminalStreamWatchdog = () => {
+    if (terminalStreamWatchdogTimer) return;
+    terminalStreamWatchdogTimer = window.setInterval(tickTerminalStreamWatchdog, 10_000);
+  };
+
   const parseTerminalDurationMs = (line = "") => {
     const match = String(line).match(/duration=(\d+)ms/);
     return match ? Number.parseInt(match[1], 10) : undefined;
@@ -25533,6 +26414,11 @@ function initOmegaProductShell() {
         `log=${lastTerminalSession.logPath || "none"}`,
         `stdout=${lastTerminalSession.stdoutTranscriptPath || "none"}`,
         `stderr=${lastTerminalSession.stderrTranscriptPath || "none"}`,
+        `pipeReaders=${Boolean(lastTerminalSession.stdoutPipeReaderEnabled)}/${Boolean(lastTerminalSession.stderrPipeReaderEnabled)}`,
+        `timeoutKill=${Boolean(lastTerminalSession.timeoutKillSent)}`,
+        `waitAfterKillMs=${lastTerminalSession.waitAfterKillMs ?? 0}`,
+        `partialOutput=${Boolean(lastTerminalSession.partialOutputCaptured)}`,
+        `replay=${lastTerminalSession.replayRecordPath || "none"}`,
       ].join("\n");
     }
   };
@@ -25557,6 +26443,20 @@ function initOmegaProductShell() {
         tail_lines: 80,
       },
     });
+  };
+
+  const captureTerminalTranscriptReplay = async (sourceRecordPath = "", requestedBy = "terminal-auto-replay") => {
+    try {
+      const replay = await recordTerminalTranscriptReplay(sourceRecordPath, requestedBy);
+      if (replay?.record_path) {
+        updateTerminalSessionHud({ replayRecordPath: replay.record_path });
+        appendEvidenceText(`terminal replay captured: ${replay.record_path}`);
+      }
+      return replay;
+    } catch (error) {
+      setProblemText(`Terminal transcript replay capture failed: ${error.message}`);
+      return null;
+    }
   };
 
   const loadTerminalTranscriptReplays = async () => {
@@ -25586,11 +26486,7 @@ function initOmegaProductShell() {
   const showTerminalEvidence = async () => {
     switchBottomView("evidence");
     let replay = null;
-    try {
-      replay = await recordTerminalTranscriptReplay(lastTerminalSession.recordPath || "", "terminal-evidence-button");
-    } catch (error) {
-      setProblemText(`Terminal transcript replay failed: ${error.message}`);
-    }
+    replay = await captureTerminalTranscriptReplay(lastTerminalSession.recordPath || "", "terminal-evidence-button");
     const lines = [
       `Terminal command: ${lastTerminalSession.command || "none"}`,
       `status=${lastTerminalSession.status || "idle"}`,
@@ -25598,6 +26494,8 @@ function initOmegaProductShell() {
       `cwd=${lastTerminalSession.cwd || "rebuild workspace"}`,
       `exit=${lastTerminalSession.exitCode ?? "none"}`,
       `duration=${lastTerminalSession.durationMs ?? 0}ms`,
+      `pipeReaders=${Boolean(lastTerminalSession.stdoutPipeReaderEnabled)}/${Boolean(lastTerminalSession.stderrPipeReaderEnabled)}`,
+      `timeoutKill=${Boolean(lastTerminalSession.timeoutKillSent)} waitAfterKill=${lastTerminalSession.waitAfterKillMs ?? 0}ms partial=${Boolean(lastTerminalSession.partialOutputCaptured)}`,
       `record=${lastTerminalSession.recordPath || "none"}`,
       `log=${lastTerminalSession.logPath || "none"}`,
       `stdout=${lastTerminalSession.stdoutTranscriptPath || "none"}`,
@@ -25662,6 +26560,28 @@ function initOmegaProductShell() {
       value.slice(0, max),
       "",
       `[long prompt clipped in ${surface}: ${value.length} chars total, ${value.length - max} hidden here. Full request is sent to the agent runner; detailed evidence belongs in Omega Agent Work and run records.]`,
+    ].join("\n");
+  };
+
+  const agentRunFinalSummaryText = ({ label = "Agent run", runtime = "agent", payload = {}, readback = {}, loaded = [] } = {}) => {
+    const record = readback.record ?? {};
+    const answer = String(readback.answer ?? "").trim();
+    const recordPath = payload.record_path || record.record_path || "none";
+    const durationMs = record.duration_ms ?? payload.duration_ms ?? "n/a";
+    const durationLine = Number.isFinite(Number(durationMs)) ? `${durationMs}ms` : String(durationMs);
+    return [
+      `${label} finished${payload.exit_code === 0 ? " successfully" : " with an issue"}.`,
+      `Runtime: ${runtime}`,
+      `Status: ${payload.status || record.status || "unknown"}`,
+      `Exit: ${payload.exit_code ?? record.exit_code ?? "none"}`,
+      `Duration: ${durationLine}`,
+      `Evidence: ${recordPath}`,
+      "Omega Agent Work: updated in Monaco with plan, files, commands, warnings, and verification evidence.",
+      loaded.length ? `Generated/changed tabs loaded: ${loaded.join(", ")}` : "Generated/changed tabs loaded: none detected from stream text.",
+      "",
+      answer
+        ? `Readable answer:\n${limitText(answer, 1800)}`
+        : "No readable final answer was captured in the chat stream; use Omega Agent Work and the evidence record above.",
     ].join("\n");
   };
 
@@ -27072,12 +27992,34 @@ function initOmegaProductShell() {
           completionMessage = "SSWP Lane opened as a central surface.";
           break;
         case "desktop": {
+          const invoke = tauriInvoke();
+          if (invoke) {
+            await invoke("record_desktop_environment_snapshot", {
+              request: { requested_by: "desktop-control-central-surface" },
+            });
+            await invoke("record_desktop_read_only_capability_snapshot", {
+              request: { requested_by: "desktop-control-central-surface" },
+            });
+          }
           const dashboard = await loadLinuxDesktopControlReadinessDashboard();
           renderLinuxDesktopControlReadinessDashboard(dashboard);
           switchBottomView("output");
           const output = [
             "Desktop readiness card",
             `status=${dashboard.status}`,
+            `environment=${dashboard.latest_desktop_environment_snapshot_status}`,
+            `environment_fresh=${dashboard.latest_desktop_environment_snapshot_fresh}`,
+            `wayland=${dashboard.latest_desktop_environment_wayland_display_present}`,
+            `x11=${dashboard.latest_desktop_environment_display_present}`,
+            `dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}`,
+            `atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}`,
+            `ydotool_socket=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}`,
+            `stage1=${dashboard.latest_desktop_read_only_capability_snapshot_status}`,
+            `tools=${dashboard.latest_desktop_read_only_capability_available_tool_count}/${dashboard.latest_desktop_read_only_capability_tool_count}`,
+            `window_inventory_ready=${dashboard.latest_desktop_read_only_capability_window_inventory_ready}`,
+            `screenshot_ready=${dashboard.latest_desktop_read_only_capability_screenshot_ready}`,
+            `accessibility_ready=${dashboard.latest_desktop_read_only_capability_accessibility_ready}`,
+            `input_helper_ready=${dashboard.latest_desktop_read_only_capability_input_helper_ready}`,
             `sections=${dashboard.section_count}`,
             `foundation=${dashboard.foundation_desktop_ready_count}/${dashboard.foundation_desktop_lane_count}`,
             `approvals=${dashboard.approval_spine_ready_section_count}/${dashboard.approval_spine_section_count}`,
@@ -27091,12 +28033,39 @@ function initOmegaProductShell() {
             kicker: "Linux Desktop Readiness",
             subtitle: dashboard.next_slice ?? "Desktop control remains guarded until explicit release evidence exists.",
             metrics: [
+              { label: "env", value: `${dashboard.desktop_environment_snapshot_ready_count ?? 0}/${dashboard.desktop_environment_snapshot_count ?? 0}` },
+              { label: "stage1", value: `${dashboard.desktop_read_only_capability_snapshot_ready_count ?? 0}/${dashboard.desktop_read_only_capability_snapshot_count ?? 0}` },
+              { label: "tools", value: `${dashboard.latest_desktop_read_only_capability_available_tool_count ?? 0}/${dashboard.latest_desktop_read_only_capability_tool_count ?? 0}` },
+              { label: "backend", value: dashboard.latest_desktop_environment_graphical_session_visible ? "seen" : "missing" },
+              { label: "ydotool", value: dashboard.latest_desktop_environment_ydotool_socket_is_socket ? "seen" : "missing" },
               { label: "sections", value: dashboard.section_count ?? 0 },
               { label: "capture", value: dashboard.capture_enabled ? "ON" : "OFF" },
               { label: "desktop", value: dashboard.desktop_control_enabled ? "ON" : "OFF" },
               { label: "exec", value: dashboard.execution_enabled ? "ON" : "OFF" },
             ],
             cards: [
+              panelSurfaceCard({
+                title: "Desktop Environment",
+                meta: dashboard.latest_desktop_environment_backend_status ?? "snapshot missing",
+                text: `fresh=${dashboard.latest_desktop_environment_snapshot_fresh}; wayland=${dashboard.latest_desktop_environment_wayland_display_present}; x11=${dashboard.latest_desktop_environment_display_present}; dbus=${dashboard.latest_desktop_environment_dbus_session_bus_present}; atspi=${dashboard.latest_desktop_environment_at_spi_bus_present}; ydotool_socket=${dashboard.latest_desktop_environment_ydotool_socket_is_socket}.`,
+                state: dashboard.latest_desktop_environment_graphical_session_visible ? "ready" : "warning",
+                chips: [
+                  panelSurfaceFlag("capture", dashboard.capture_enabled),
+                  panelSurfaceFlag("control", dashboard.desktop_control_enabled),
+                  panelSurfaceFlag("socket", dashboard.socket_connect_enabled),
+                ],
+              }),
+              panelSurfaceCard({
+                title: "Stage-1 Capability Snapshot",
+                meta: dashboard.latest_desktop_read_only_capability_snapshot_status ?? "snapshot missing",
+                text: `tools=${dashboard.latest_desktop_read_only_capability_available_tool_count}/${dashboard.latest_desktop_read_only_capability_tool_count}; windows=${dashboard.latest_desktop_read_only_capability_window_inventory_ready}; screenshots=${dashboard.latest_desktop_read_only_capability_screenshot_ready}; accessibility=${dashboard.latest_desktop_read_only_capability_accessibility_ready}; input=${dashboard.latest_desktop_read_only_capability_input_helper_ready}.`,
+                state: dashboard.latest_desktop_read_only_capability_window_inventory_ready ? "ready" : "warning",
+                chips: [
+                  panelSurfaceFlag("window", dashboard.latest_desktop_read_only_capability_window_inventory_ready),
+                  panelSurfaceFlag("capture", dashboard.capture_enabled),
+                  panelSurfaceFlag("control", dashboard.desktop_control_enabled),
+                ],
+              }),
               ...panelSurfaceSectionCards(dashboard.sections ?? []),
               panelSurfaceCard({
                 title: "Current Gates",
@@ -28894,9 +29863,223 @@ footer {
     evidenceView.append(node);
   };
 
+  const emptyProductEvidenceHistory = () => ({
+    status: invoke ? "product_evidence_history_empty" : "product_evidence_history_static_preview",
+    item_count: 0,
+    category_count: 0,
+    categories: [],
+    items: [],
+    history_enabled: Boolean(invoke),
+    evidence_read_enabled: Boolean(invoke),
+    file_write_enabled: false,
+    process_spawn_enabled: false,
+    live_mcp_call_enabled: false,
+    writes_allowed: false,
+    execution_enabled: false,
+  });
+
+  const loadProductEvidenceHistory = async () => {
+    if (!invoke) return emptyProductEvidenceHistory();
+    await invoke("list_evidence_durability_manifests").catch(() => []);
+    return invoke("product_evidence_history");
+  };
+
+  const recordEvidenceDurabilityManifest = async (requestedBy) => {
+    if (!invoke) return null;
+    return invoke("record_evidence_durability_manifest", {
+      request: { requested_by: requestedBy },
+    });
+  };
+
+  const runtimeEvidenceState = (ready, warning = false) => {
+    if (ready) return "ready";
+    return warning ? "warning" : "blocked";
+  };
+
+  const runtimeEvidenceCard = ({ title, meta, detail, path = "", state = "blocked" }) => {
+    const node = document.createElement("article");
+    node.className = "omega-runtime-evidence-card";
+    node.dataset.state = state;
+    const heading = document.createElement("strong");
+    heading.textContent = title;
+    const metaNode = document.createElement("span");
+    metaNode.textContent = meta || "waiting";
+    const detailNode = document.createElement("span");
+    detailNode.textContent = detail || "No runtime evidence recorded yet.";
+    const pathNode = document.createElement("code");
+    pathNode.textContent = compactPath(path || "none");
+    pathNode.title = path || "";
+    node.append(heading, metaNode, detailNode, pathNode);
+    return node;
+  };
+
+  const renderRuntimeEvidenceSpine = ({ history, agentSessions, terminalReplays, unlockedRuns, errors }) => {
+    if (!runtimeEvidenceSpineList) return;
+
+    const productHistory = history ?? emptyProductEvidenceHistory();
+    const transcriptRows = agentSessions ?? [];
+    const terminalRows = terminalReplays ?? [];
+    const unlockedRows = unlockedRuns ?? [];
+    const latestTranscript = transcriptRows[0] ?? null;
+    const latestTerminalReplay = terminalRows[0] ?? null;
+    const latestUnlockedRun = unlockedRows[0] ?? null;
+    const historyItems = productHistory.items ?? [];
+    const latestDurabilityManifest = historyItems.find((item) => item.category === "evidence-durability") ?? null;
+    const destructiveWriteEnabled = Boolean(
+      productHistory.writes_allowed
+      || latestTranscript?.writes_allowed
+      || latestTerminalReplay?.writes_allowed
+      || latestUnlockedRun?.writes_allowed
+      || latestTerminalReplay?.terminal_write_enabled
+      || latestTerminalReplay?.file_write_enabled
+      || latestTerminalReplay?.patch_apply_enabled
+    );
+    const destructiveExecutionEnabled = Boolean(
+      productHistory.execution_enabled
+      || latestTranscript?.execution_enabled
+      || latestTerminalReplay?.execution_enabled
+      || latestUnlockedRun?.execution_enabled
+      || latestTerminalReplay?.process_control_enabled
+    );
+    const exportEnabled = Boolean(
+      latestTranscript?.export_enabled
+      || latestTerminalReplay?.export_enabled
+      || latestUnlockedRun?.export_enabled
+    );
+    const liveMcpEnabled = Boolean(latestTranscript?.live_mcp_call_enabled || latestUnlockedRun?.live_mcp_call_enabled);
+    const boundedProcessCapture = Boolean(
+      latestTranscript?.process_spawn_enabled
+      || latestUnlockedRun?.process_spawn_enabled
+      || productHistory.process_spawn_enabled
+    );
+    const laneCount = 6;
+
+    if (runtimeEvidenceSpineStatus) {
+      const errorText = errors?.length ? `; ${errors.length} refresh issue(s)` : "";
+      runtimeEvidenceSpineStatus.textContent = [
+        `${productHistory.item_count ?? historyItems.length} product record(s)`,
+        `${transcriptRows.length} Codex/Hermes transcript(s)`,
+        `${terminalRows.length} terminal replay(s)`,
+        `${unlockedRows.length} unlocked run(s)${errorText}`,
+      ].join(" / ");
+    }
+    if (runtimeEvidenceSpineCount) {
+      runtimeEvidenceSpineCount.textContent = String(laneCount);
+    }
+    if (runtimeEvidenceSpineGates) {
+      runtimeEvidenceSpineGates.textContent = [
+        `bounded_process_capture=${boundedProcessCapture}`,
+        `terminal_write=${Boolean(latestTerminalReplay?.terminal_write_enabled)}`,
+        `writes=${destructiveWriteEnabled}`,
+        `process_control=${Boolean(latestTerminalReplay?.process_control_enabled)}`,
+        `export=${exportEnabled}`,
+        `live_mcp=${liveMcpEnabled}`,
+        `execution=${destructiveExecutionEnabled}`,
+      ].join(" / ");
+    }
+
+    clearList(runtimeEvidenceSpineList);
+    runtimeEvidenceSpineList.append(
+      runtimeEvidenceCard({
+        title: "Product Evidence",
+        meta: `${productHistory.status}; categories=${productHistory.category_count ?? 0}`,
+        detail: historyItems[0]
+          ? `${historyItems[0].category}: ${historyItems[0].title}`
+          : "No product evidence files found yet.",
+        path: historyItems[0]?.record_path,
+        state: runtimeEvidenceState((productHistory.item_count ?? 0) > 0),
+      }),
+      runtimeEvidenceCard({
+        title: "Codex/Hermes Discovery",
+        meta: latestTranscript
+          ? `${latestTranscript.runtime}/${latestTranscript.session_kind}; ${latestTranscript.status}`
+          : "no transcript session",
+        detail: latestTranscript
+          ? `stdout=${latestTranscript.stdout_size_bytes ?? 0}b; stderr=${latestTranscript.stderr_size_bytes ?? 0}b; task_exec=${latestTranscript.agent_task_execution_enabled}`
+          : "Run fixed version/help sessions to prove CLI capability before task execution.",
+        path: latestTranscript?.record_path,
+        state: runtimeEvidenceState(
+          latestTranscript?.status === "agent_transcript_session_succeeded",
+          transcriptRows.length > 0,
+        ),
+      }),
+      runtimeEvidenceCard({
+        title: "Terminal Replay",
+        meta: latestTerminalReplay
+          ? `${latestTerminalReplay.source_session_id}; ${latestTerminalReplay.status}`
+          : "no terminal replay",
+        detail: latestTerminalReplay
+          ? `stdout=${latestTerminalReplay.stdout_line_count ?? 0} lines; stderr=${latestTerminalReplay.stderr_line_count ?? 0} lines; blockers=${latestTerminalReplay.blockers?.length ?? 0}`
+          : "Use Terminal Evidence to capture a read-only replay tail from the latest terminal session.",
+        path: latestTerminalReplay?.record_path,
+        state: runtimeEvidenceState(
+          latestTerminalReplay?.status === "product_terminal_transcript_replay_recorded",
+          terminalRows.length > 0,
+        ),
+      }),
+      runtimeEvidenceCard({
+        title: "Unlocked Agent Run",
+        meta: latestUnlockedRun
+          ? `${latestUnlockedRun.runtime}; ${latestUnlockedRun.status}`
+          : "no unlocked run",
+        detail: latestUnlockedRun
+          ? `exit=${latestUnlockedRun.exit_code ?? "n/a"}; stdout=${latestUnlockedRun.stdout_size_bytes ?? 0}b; writes=${latestUnlockedRun.writes_allowed}`
+          : "Run Main, Codex Only, or Hermes Only to create an inspectable agent run record.",
+        path: latestUnlockedRun?.record_path,
+        state: runtimeEvidenceState(
+          latestUnlockedRun?.status === "unlocked_agent_prompt_session_succeeded",
+          unlockedRows.length > 0,
+        ),
+      }),
+      runtimeEvidenceCard({
+        title: "Evidence Durability",
+        meta: latestDurabilityManifest
+          ? latestDurabilityManifest.status
+          : "no manifest",
+        detail: latestDurabilityManifest
+          ? latestDurabilityManifest.detail
+          : "Refresh product evidence to record a local manifest/seal of readable evidence paths.",
+        path: latestDurabilityManifest?.record_path,
+        state: runtimeEvidenceState(Boolean(latestDurabilityManifest), historyItems.length > 0),
+      }),
+      runtimeEvidenceCard({
+        title: "Safety Gates",
+        meta: destructiveExecutionEnabled || destructiveWriteEnabled ? "attention required" : "destructive gates disabled",
+        detail: `bounded_agent=${Boolean(latestUnlockedRun?.agent_prompt_execution_enabled)}; process_capture=${boundedProcessCapture}; export=${exportEnabled}; live_mcp=${liveMcpEnabled}`,
+        path: errors?.join(" / ") || "no refresh errors",
+        state: destructiveExecutionEnabled || destructiveWriteEnabled || exportEnabled || liveMcpEnabled ? "warning" : "ready",
+      }),
+    );
+  };
+
+  const refreshRuntimeEvidenceSpine = async (seedHistory = null) => {
+    const errors = [];
+    const capture = (label, fallback) => (result) => {
+      if (result.status === "fulfilled") return result.value;
+      errors.push(`${label}: ${result.reason?.message ?? result.reason ?? "failed"}`);
+      return fallback;
+    };
+    const [historyResult, agentResult, terminalResult, unlockedResult] = await Promise.allSettled([
+      seedHistory ? Promise.resolve(seedHistory) : loadProductEvidenceHistory(),
+      loadAgentTranscriptSessions(),
+      loadTerminalTranscriptReplays(),
+      loadUnlockedAgentPromptSessions(),
+    ]);
+    const spine = {
+      history: capture("product evidence", emptyProductEvidenceHistory())(historyResult),
+      agentSessions: capture("agent transcripts", [])(agentResult),
+      terminalReplays: capture("terminal replays", [])(terminalResult),
+      unlockedRuns: capture("unlocked runs", [])(unlockedResult),
+      errors,
+    };
+    renderRuntimeEvidenceSpine(spine);
+    return spine;
+  };
+
   const renderProductEvidenceHistory = (history) => {
+    const durabilityItem = history.items?.find((item) => item.category === "evidence-durability") ?? null;
     if (evidenceHistoryStatus) {
-      evidenceHistoryStatus.textContent = `${history.status}; ${history.item_count ?? 0} records across ${history.category_count ?? 0} categories`;
+      evidenceHistoryStatus.textContent = `${history.status}; ${history.item_count ?? 0} records across ${history.category_count ?? 0} categories; durability=${durabilityItem?.status ?? "missing"}`;
     }
     if (!evidenceHistoryList) return;
     evidenceHistoryList.innerHTML = "";
@@ -28920,10 +30103,18 @@ footer {
   };
 
   const refreshProductEvidenceHistory = async () => {
-    if (!invoke || (!evidenceHistoryStatus && !evidenceHistoryList)) return;
+    if (!evidenceHistoryStatus && !evidenceHistoryList && !runtimeEvidenceSpineList) return;
     try {
-      const history = await invoke("product_evidence_history");
+      const manifest = await recordEvidenceDurabilityManifest("product-evidence-history-refresh").catch((error) => {
+        setProblemText(`Evidence durability manifest failed: ${error.message}`);
+        return null;
+      });
+      if (manifest) {
+        appendEvidenceText(`Evidence durability manifest recorded: ${manifest.manifest_hash}`);
+      }
+      const history = await loadProductEvidenceHistory();
       renderProductEvidenceHistory(history);
+      await refreshRuntimeEvidenceSpine(history);
     } catch (error) {
       if (evidenceHistoryStatus) {
         evidenceHistoryStatus.textContent = `Evidence history failed: ${error.message}`;
@@ -29073,25 +30264,35 @@ footer {
     }
   };
 
-  const renderProductAgentRunCenter = ({ sessions = [], plans = [], packets = [] } = {}) => {
+  const renderProductAgentRunCenter = ({ sessions = [], plans = [], packets = [], runView = null } = {}) => {
+    const postmortems = sessions.filter((session) => {
+      const status = String(session.status ?? "");
+      return session.timed_out === true || status.includes("failed") || status.includes("timed_out");
+    });
+    const transcriptEvidenceBySession = new Map(
+      (runView?.evidence_summaries ?? [])
+        .filter((summary) => summary?.source_id === "agent-run-postmortem")
+        .map((summary) => [summary.record_id, summary])
+    );
     if (productUnlockedSessionCount) productUnlockedSessionCount.textContent = String(sessions.length);
     if (productJointPlanCount) productJointPlanCount.textContent = String(plans.length);
     if (productJointPacketCount) productJointPacketCount.textContent = String(packets.length);
     if (productAgentRunCompact) {
       const latestStatus = sessions[0]?.status ? ` / latest ${sessions[0].status}` : "";
-      productAgentRunCompact.textContent = `${sessions.length} sessions / ${plans.length} plans / ${packets.length} packets${latestStatus}`;
+      const postmortemStatus = postmortems.length ? ` / postmortems ${postmortems.length}` : "";
+      productAgentRunCompact.textContent = `${sessions.length} sessions / ${plans.length} plans / ${packets.length} packets${postmortemStatus}${latestStatus}`;
     }
     productAgentRunDetails?.setAttribute("data-has-runs", sessions.length > 0 || plans.length > 0 || packets.length > 0 ? "true" : "false");
     if (productAgentRunSummary) {
       const latestSession = sessions[0];
       const latestPacket = packets[0];
       productAgentRunSummary.textContent = latestSession
-        ? `Latest ${latestSession.runtime}: ${latestSession.status}, exit=${latestSession.exit_code ?? "n/a"}, ${latestSession.duration_ms ?? 0}ms. Joint packets=${packets.length}.`
+        ? `Latest ${latestSession.runtime}: ${latestSession.status}, exit=${latestSession.exit_code ?? "n/a"}, timed_out=${Boolean(latestSession.timed_out)}, ${latestSession.duration_ms ?? 0}ms. Postmortems=${postmortems.length}; joint packets=${packets.length}.`
         : `No Codex/Hermes run captured yet. Joint plans=${plans.length}; packets=${packets.length}.`;
     }
     if (!productAgentRunList) return;
     productAgentRunList.innerHTML = "";
-    const recentSessions = sessions.slice(0, 4);
+    const recentSessions = [...postmortems, ...sessions.filter((session) => !postmortems.includes(session))].slice(0, 4);
     if (recentSessions.length === 0) {
       productAgentRunList.textContent = "No agent sessions yet. Use Codex Write or Hermes after typing a prompt.";
       return;
@@ -29102,9 +30303,16 @@ footer {
       const title = document.createElement("strong");
       title.textContent = `${session.runtime} / ${session.status}`;
       const meta = document.createElement("span");
-      meta.textContent = `exit=${session.exit_code ?? "n/a"} duration=${session.duration_ms ?? 0}ms stdout=${session.stdout_size_bytes ?? 0}b stderr=${session.stderr_size_bytes ?? 0}b`;
+      const transcriptEvidence = transcriptEvidenceBySession.get(session.id);
+      const transcriptMeta = transcriptEvidence
+        ? `transcripts ready=${Boolean(transcriptEvidence.transcript_evidence_ready)} stdout=${transcriptEvidence.stdout_transcript_found ? "found" : "missing"} ${transcriptEvidence.stdout_transcript_line_count ?? 0}l/${transcriptEvidence.stdout_transcript_size_bytes ?? 0}b stderr=${transcriptEvidence.stderr_transcript_found ? "found" : "missing"} ${transcriptEvidence.stderr_transcript_line_count ?? 0}l/${transcriptEvidence.stderr_transcript_size_bytes ?? 0}b preview=${transcriptEvidence.stdout_preview_source ?? "record-inline"}/${transcriptEvidence.stderr_preview_source ?? "record-inline"}`
+        : `transcripts paths stdout=${session.stdout_transcript_path ? "recorded" : "missing"} stderr=${session.stderr_transcript_path ? "recorded" : "missing"}`;
+      meta.textContent = `exit=${session.exit_code ?? "n/a"} timed_out=${Boolean(session.timed_out)} duration=${session.duration_ms ?? 0}ms stdout=${session.stdout_size_bytes ?? 0}b stderr=${session.stderr_size_bytes ?? 0}b ${transcriptMeta} record=${session.record_path ?? "none"}`;
       const prompt = document.createElement("span");
       prompt.textContent = session.prompt_preview || session.next_step || "transcript captured";
+      if (postmortems.includes(session)) {
+        node.dataset.state = "error";
+      }
       node.append(title, meta, prompt);
       productAgentRunList.append(node);
     }
@@ -29118,7 +30326,8 @@ footer {
         loadJointPlanLedger(),
         loadJointRuntimeRunPackets(),
       ]);
-      renderProductAgentRunCenter({ sessions, plans, packets });
+      const runView = await loadCodexHermesRunViewDashboard().catch(() => null);
+      renderProductAgentRunCenter({ sessions, plans, packets, runView });
       appendEvidenceText(`agent run center refresh: sessions=${sessions.length}, plans=${plans.length}, packets=${packets.length}`);
     } catch (error) {
       if (productAgentRunSummary) {
@@ -29486,17 +30695,37 @@ footer {
       const payload = event?.payload ?? {};
       if (activeTerminalStreamId && payload.session_id !== activeTerminalStreamId) return;
       if (payload.kind === "stdout" || payload.kind === "stderr") {
+        recordTerminalStreamLifecycleEvent(`stream-${payload.kind}`, {
+          sessionId: payload.session_id || activeTerminalStreamId,
+          status: payload.status || "product_terminal_stream_output",
+          phase: "streaming",
+          recordPath: payload.record_path || lastTerminalSession.recordPath,
+          logPath: payload.log_path || lastTerminalSession.logPath,
+        }, { silent: true });
         terminalWrite(payload.line ?? "");
         return;
       }
       if (payload.kind === "error") {
+        recordTerminalStreamLifecycleEvent("stream-error", {
+          sessionId: payload.session_id || activeTerminalStreamId,
+          status: payload.status || "product_terminal_stream_failed",
+          phase: "error",
+          recordPath: payload.record_path || lastTerminalSession.recordPath,
+          logPath: payload.log_path || lastTerminalSession.logPath,
+        });
         updateTerminalSessionHud({
           sessionId: payload.session_id || activeTerminalStreamId,
           status: payload.status || "product_terminal_stream_failed",
           state: "error",
           exitCode: payload.exit_code ?? "none",
+          durationMs: payload.duration_ms ?? lastTerminalSession.durationMs,
           recordPath: payload.record_path || lastTerminalSession.recordPath,
           logPath: payload.log_path || lastTerminalSession.logPath,
+          stdoutPipeReaderEnabled: payload.stdout_pipe_reader_enabled ?? lastTerminalSession.stdoutPipeReaderEnabled,
+          stderrPipeReaderEnabled: payload.stderr_pipe_reader_enabled ?? lastTerminalSession.stderrPipeReaderEnabled,
+          timeoutKillSent: payload.timeout_kill_sent ?? lastTerminalSession.timeoutKillSent,
+          waitAfterKillMs: payload.wait_after_kill_ms ?? lastTerminalSession.waitAfterKillMs,
+          partialOutputCaptured: payload.partial_output_captured ?? lastTerminalSession.partialOutputCaptured,
         });
         terminalWrite(`stream error: ${payload.line ?? payload.status}`);
         setPetCompanionRuntimeState({
@@ -29509,17 +30738,35 @@ footer {
         setProblemText(`Terminal stream error: ${payload.line ?? payload.status}`);
         setProductStatus(`Terminal stream failed: ${payload.status}`, "error");
         terminalRunBtn?.removeAttribute("disabled");
+        activeTerminalStreamId = "";
+        clearTerminalStreamRun();
         return;
       }
       if (payload.kind === "lifecycle") {
+        recordTerminalStreamLifecycleEvent(
+          payload.status === "product_terminal_stream_started" ? "stream-started" : "stream-finished",
+          {
+            sessionId: payload.session_id || activeTerminalStreamId,
+            status: payload.status || lastTerminalSession.status,
+            phase: payload.status === "product_terminal_stream_started" ? "streaming" : "finished",
+            recordPath: payload.record_path || lastTerminalSession.recordPath,
+            logPath: payload.log_path || lastTerminalSession.logPath,
+          },
+          payload.status === "product_terminal_stream_started" ? { silent: true } : {}
+        );
         updateTerminalSessionHud({
           sessionId: payload.session_id || activeTerminalStreamId,
           status: payload.status || lastTerminalSession.status,
           state: terminalStateFromStatus(payload.status || ""),
           exitCode: payload.exit_code ?? lastTerminalSession.exitCode ?? "none",
-          durationMs: parseTerminalDurationMs(payload.line) ?? lastTerminalSession.durationMs,
+          durationMs: payload.duration_ms ?? parseTerminalDurationMs(payload.line) ?? lastTerminalSession.durationMs,
           recordPath: payload.record_path || lastTerminalSession.recordPath,
           logPath: payload.log_path || lastTerminalSession.logPath,
+          stdoutPipeReaderEnabled: payload.stdout_pipe_reader_enabled ?? lastTerminalSession.stdoutPipeReaderEnabled,
+          stderrPipeReaderEnabled: payload.stderr_pipe_reader_enabled ?? lastTerminalSession.stderrPipeReaderEnabled,
+          timeoutKillSent: payload.timeout_kill_sent ?? lastTerminalSession.timeoutKillSent,
+          waitAfterKillMs: payload.wait_after_kill_ms ?? lastTerminalSession.waitAfterKillMs,
+          partialOutputCaptured: payload.partial_output_captured ?? lastTerminalSession.partialOutputCaptured,
         });
         terminalWrite(`[${payload.status}] ${payload.line ?? ""}`);
         if (payload.status === "product_terminal_stream_started") {
@@ -29534,6 +30781,17 @@ footer {
         if (payload.status && payload.status !== "product_terminal_stream_started") {
           setOutputText(`${payload.status}\n${payload.line ?? ""}\nEvidence: ${payload.record_path}`);
           appendEvidenceText(`terminal stream ${payload.status}: ${payload.record_path}`);
+          captureTerminalTranscriptReplay(
+            payload.record_path || lastTerminalSession.recordPath || "",
+            "terminal-stream-completion",
+          ).then((replay) => {
+            if (replay?.record_path) {
+              terminalWrite(`[terminal_replay] ${replay.record_path}`);
+            }
+            return refreshProductEvidenceHistory();
+          }).catch((error) => {
+            setProblemText(`Terminal replay refresh failed: ${error.message}`);
+          });
           if (payload.exit_code === 0) {
             setPetCompanionRuntimeState({
               state: "success",
@@ -29557,9 +30815,7 @@ footer {
           }
           terminalRunBtn?.removeAttribute("disabled");
           activeTerminalStreamId = "";
-          refreshProductEvidenceHistory().catch((error) => {
-            setProblemText(`Evidence refresh failed after terminal stream: ${error.message}`);
-          });
+          clearTerminalStreamRun();
         }
       }
     }).catch((error) => {
@@ -29574,6 +30830,12 @@ footer {
       if (activeAgentStreamId && payload.session_id !== activeAgentStreamId) return;
       const runtime = payload.runtime || "agent";
       if (payload.kind === "stdout" || payload.kind === "stderr") {
+        recordAgentRunLifecycleEvent(`stream-${payload.kind}`, {
+          runtime,
+          phase: "streaming",
+          sessionId: payload.session_id || activeAgentStreamId,
+          recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+        }, { silent: true });
         terminalWrite(`[${runtime} ${payload.kind}] ${payload.line ?? ""}`);
         if (activeAgentTranscript) {
           const bucket = payload.kind === "stdout" ? activeAgentTranscript.stdoutLines : activeAgentTranscript.stderrLines;
@@ -29592,6 +30854,12 @@ footer {
         return;
       }
       if (payload.kind === "error") {
+        recordAgentRunLifecycleEvent("stream-error", {
+          runtime,
+          phase: "error",
+          sessionId: payload.session_id || activeAgentStreamId,
+          recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+        });
         terminalWrite(`[${runtime} error] ${payload.line ?? payload.status}`);
         setPetCompanionRuntimeState({
           state: "error",
@@ -29604,15 +30872,24 @@ footer {
         appendAgentWorkArtifact("Run Issue", agentStreamIssueSummary(runtime, payload));
         setProblemText(`${runtime} stream failed: ${payload.line ?? payload.status}`);
         setProductStatus(`${runtime} stream failed: ${payload.status}`, "error");
-        sendBtn?.removeAttribute("disabled");
-        codexBtn?.removeAttribute("disabled");
-        hermesBtn?.removeAttribute("disabled");
-        compareBtn?.removeAttribute("disabled");
+        clearAgentRunGate();
         return;
       }
       if (payload.kind === "lifecycle") {
         terminalWrite(`[${runtime} ${payload.status}] ${payload.line ?? ""}`);
         if (payload.status === "unlocked_agent_prompt_stream_started") {
+          updateAgentRunGate({
+            runtime,
+            phase: "streaming",
+            sessionId: payload.session_id || activeAgentStreamId,
+            recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+          });
+          recordAgentRunLifecycleEvent("stream-started", {
+            runtime,
+            phase: "streaming",
+            sessionId: payload.session_id || activeAgentStreamId,
+            recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+          });
           setPetCompanionRuntimeState({
             state: "working",
             source: "agent-stream",
@@ -29622,6 +30899,12 @@ footer {
           }, { record: true });
         }
         if (payload.status && payload.status !== "unlocked_agent_prompt_stream_started") {
+          recordAgentRunLifecycleEvent("stream-finished", {
+            runtime,
+            phase: payload.exit_code === 0 ? "succeeded" : "failed",
+            sessionId: payload.session_id || activeAgentStreamId,
+            recordPath: payload.record_path || activeAgentRun?.recordPath || "",
+          });
           setOutputText(`${runtime}\n${payload.status}\n${payload.line ?? ""}\nEvidence: ${payload.record_path}`);
           appendEvidenceText(`${runtime} agent stream ${payload.status}: ${payload.record_path}`);
           const label = activeAgentTranscript?.label ?? runtime;
@@ -29635,7 +30918,11 @@ footer {
               `answer_readback=${readback.answer ? "captured" : "empty"}`,
             ].join("\n")
           );
-          await hydrateAgentWorkFileCandidates();
+          const loaded = await hydrateAgentWorkFileCandidates();
+          updateAgentAnswerMessage(
+            payload.exit_code === 0 ? `${label} finished` : `${label} finished with issue`,
+            agentRunFinalSummaryText({ label, runtime, payload, readback, loaded })
+          );
           if (payload.exit_code === 0) {
             setPetCompanionRuntimeState({
               state: "success",
@@ -29657,17 +30944,13 @@ footer {
             setProblemText(agentStreamIssueSummary(runtime, payload));
             setProductStatus(`${runtime} stream finished: ${payload.status}.`, "error");
           }
-          sendBtn?.removeAttribute("disabled");
-          codexBtn?.removeAttribute("disabled");
-          hermesBtn?.removeAttribute("disabled");
-          compareBtn?.removeAttribute("disabled");
           Promise.allSettled([
             refreshProductAgentRunCenter(),
             refreshProductEvidenceHistory(),
           ]).catch((error) => {
             setProblemText(`Agent stream refresh failed: ${error.message}`);
           });
-          activeAgentStreamId = "";
+          clearAgentRunGate();
         }
       }
     }).catch((error) => {
@@ -29712,6 +30995,20 @@ footer {
           },
         });
         activeTerminalStreamId = started.session_id;
+        activeTerminalStreamRun = {
+          sessionId: started.session_id,
+          command: started.command || trimmed,
+          status: started.status,
+          phase: "accepted",
+          recordPath: started.record_path,
+          logPath: started.log_path,
+          startedAt: Date.now(),
+          lastEventAt: Date.now(),
+          lastEventName: "stream-accepted",
+          staleWarningCount: 0,
+        };
+        syncTerminalStreamDataset();
+        startTerminalStreamWatchdog();
         updateTerminalSessionHud({
           command: started.command || trimmed,
           sessionId: started.session_id,
@@ -29724,6 +31021,11 @@ footer {
           logPath: started.log_path,
           stdoutTranscriptPath: started.stdout_transcript_path,
           stderrTranscriptPath: started.stderr_transcript_path,
+          stdoutPipeReaderEnabled: started.stdout_pipe_reader_expected ?? true,
+          stderrPipeReaderEnabled: started.stderr_pipe_reader_expected ?? true,
+          timeoutKillSent: false,
+          waitAfterKillMs: 0,
+          partialOutputCaptured: false,
         });
         terminalWrite(`[${started.status}] session=${started.session_id}`);
         setOutputText(`${trimmed}\n${started.status}\nStreaming events on ${started.stream_event_name}\nEvidence: ${started.record_path}`);
@@ -29750,6 +31052,11 @@ footer {
         logPath: result.log_path,
         stdoutTranscriptPath: result.stdout_transcript_path,
         stderrTranscriptPath: result.stderr_transcript_path,
+        stdoutPipeReaderEnabled: result.stdout_pipe_reader_enabled,
+        stderrPipeReaderEnabled: result.stderr_pipe_reader_enabled,
+        timeoutKillSent: result.timeout_kill_sent,
+        waitAfterKillMs: result.wait_after_kill_ms,
+        partialOutputCaptured: result.partial_output_captured,
       });
       if (result.stdout) {
         terminalWrite(result.stdout.trimEnd());
@@ -29760,6 +31067,10 @@ footer {
       terminalWrite(`[${result.status}] exit=${result.exit_code ?? "none"} duration=${result.duration_ms}ms evidence=${result.record_path}`);
       setOutputText(`${trimmed}\n${result.status}\nexit=${result.exit_code ?? "none"} duration=${result.duration_ms}ms\nEvidence: ${result.record_path}`);
       appendEvidenceText(`terminal ${trimmed}: ${result.record_path}`);
+      const replay = await captureTerminalTranscriptReplay(result.record_path || "", "terminal-sync-completion");
+      if (replay?.record_path) {
+        terminalWrite(`[terminal_replay] ${replay.record_path}`);
+      }
       if (result.exit_code !== 0) {
         setProblemText(`${trimmed} returned exit=${result.exit_code ?? "none"}; stderr=${result.stderr.slice(0, 240)}`);
       } else {
@@ -29772,6 +31083,10 @@ footer {
       terminalWrite(`blocked: ${error.message}`);
       setProblemText(`Terminal command blocked: ${error.message}`);
       setProductStatus(`Terminal command blocked: ${error.message}`, "error");
+      await Promise.allSettled([
+        refreshTerminalProcessLaneDashboard(),
+        refreshProductEvidenceHistory(),
+      ]);
     } finally {
       if (!listen) {
         terminalRunBtn?.removeAttribute("disabled");
@@ -29884,6 +31199,10 @@ footer {
       dashboard.status,
       `lanes=${dashboard.first_class_lane_count ?? lanes.length}/${dashboard.lane_count ?? lanes.length}`,
       `evidence=${dashboard.ready_evidence_count ?? 0}/${dashboard.evidence_record_count ?? 0}`,
+      `runtime=${dashboard.running_runtime_lane_count ?? 0}/${dashboard.lane_count ?? lanes.length}`,
+      `fresh=${dashboard.latest_runtime_process_snapshot_fresh ?? false}`,
+      `age=${dashboard.latest_runtime_process_snapshot_age_ms ?? "unknown"}`,
+      `pipes=${dashboard.latest_runtime_process_snapshot_pipe_reader_ready ?? false}`,
       `disabled=${dashboard.disabled_gate_count ?? 0}`,
     ]);
 
@@ -29966,9 +31285,35 @@ footer {
       `transcripts=${dashboard.transcript_bundle_ready_count ?? 0}/${dashboard.transcript_bundle_count ?? 0}`,
       `pet=${dashboard.pet_readiness_ready_count ?? 0}/${dashboard.pet_readiness_count ?? 0}`,
       `runtime=${dashboard.latest_pet_state ?? petCompanionRuntimeState.state}`,
+      `signals=${dashboard.pet_runtime_signal_count ?? 0}`,
+      `attention=${dashboard.pet_attention_item_count ?? 0}`,
       `disabled=${dashboard.disabled_gate_count ?? 0}`,
     ]);
     renderPetRuntimeCard();
+
+    const petAttentionItems = dashboard.recent_pet_attention_items ?? [];
+    for (const attention of petAttentionItems.slice(0, 8)) {
+      appendProductDashboardCard(
+        stenoPetDashboardList,
+        `Pet attention: ${attention.title ?? "Runtime evidence"}`,
+        `${attention.state ?? "idle"} / ${attention.source ?? "runtime"} / ${attention.progress ?? 0}%`,
+        `${attention.message ?? "Runtime attention item recorded."}${attention.related_record_path ? ` Evidence: ${compactPath(attention.related_record_path)}` : ""}`,
+        attention.state === "error"
+          ? "error"
+          : attention.state === "warning" || attention.state === "reminder" ? "gated" : "ready"
+      );
+    }
+
+    const recentPetSignals = dashboard.recent_pet_runtime_signals ?? [];
+    for (const signal of recentPetSignals.slice(0, 6)) {
+      appendProductDashboardCard(
+        stenoPetDashboardList,
+        `Pet signal: ${petStateLabel(signal.state ?? "idle")}`,
+        `${signal.progress ?? 0}% / ${signal.source ?? "runtime"}`,
+        `${signal.message ?? "Pet runtime signal recorded."}${signal.record_path ? ` Evidence: ${compactPath(signal.record_path)}` : ""}`,
+        signal.state === "success" ? "ready" : signal.state === "error" ? "error" : signal.state === "warning" || signal.state === "reminder" ? "gated" : "disabled"
+      );
+    }
 
     if (sections.length === 0) {
       appendProductDashboardCard(stenoPetDashboardList, "No Steno/Pet sections", "empty", dashboard.next_slice ?? "Refresh the companion dashboard.");
@@ -30648,10 +31993,106 @@ footer {
     return { sessions, codex, hermes, summary };
   };
 
+  const isAgentRunStatusFollowup = (prompt = "") => {
+    const text = String(prompt ?? "").trim().toLowerCase();
+    if (!text || text.length > 600) return false;
+    return /\b(how'?s it going|how did it go|how was everything|what happened|what did you do|did it finish|status|progress|recap|summary|where are we|how did everything go)\b/.test(text);
+  };
+
+  const latestAgentSession = (sessions = []) =>
+    sessions
+      .filter((session) => session?.record_path || session?.id || session?.status)
+      .sort((left, right) => Number(right?.created_at_ms ?? 0) - Number(left?.created_at_ms ?? 0))[0] ?? null;
+
+  const latestAgentWorkExcerpt = () => {
+    const tab = openEditorTabs.find((item) => item.path === agentWorkArtifactPath);
+    const content = String(
+      activeAgentWorkArtifact?.content ||
+        tab?.content ||
+        (activeFilePath === agentWorkArtifactPath ? getEditorValue() : "") ||
+        ""
+    );
+    if (!content.trim()) {
+      return "Omega Agent Work is not currently loaded in the editor session.";
+    }
+    const markers = ["### Verification Results", "## Run Result", "## Generated/Changed File Tabs", "## Issues, warnings, and next actions"];
+    const markerIndex = markers
+      .map((marker) => content.lastIndexOf(marker))
+      .filter((index) => index >= 0)
+      .sort((left, right) => right - left)[0];
+    const excerpt = markerIndex >= 0 ? content.slice(markerIndex) : content.slice(Math.max(0, content.length - 1800));
+    return limitText(excerpt.trim(), 1800);
+  };
+
+  const runLatestAgentRunStatusRecap = async (prompt = "") => {
+    if (activeAgentRun || activeAgentStreamId) {
+      setProductStatus(`Status recap waits for the active run to finish. ${describeActiveAgentRun()}`, "warning");
+      return;
+    }
+    appendPromptMessage("user", prompt);
+    productInput.value = "";
+    const recapMessage = createAgentAnswerMessage("Latest Omega Computer recap", "Reading latest captured run evidence. This does not launch a new agent.");
+    const updateRecap = (title, text) => {
+      recapMessage.title.textContent = title;
+      recapMessage.body.textContent = text;
+      scrollProductMessages();
+    };
+
+    setAgentRunControlsDisabled(true);
+    setProductStatus("Reading latest Omega Computer run evidence without launching agents.", "running");
+    await waitForProductPaint();
+    try {
+      const sessions = await loadUnlockedAgentPromptSessions().catch((error) => {
+        setProblemText(`Latest run recap read failed: ${error.message}`);
+        return [];
+      });
+      const latest = latestAgentSession(sessions);
+      const codex = comparisonRecordFromSession(latestAgentSessionForComparison(sessions, "codex"), "Codex");
+      const hermes = comparisonRecordFromSession(latestAgentSessionForComparison(sessions, "hermes"), "Hermes/Kimi");
+      const latestRecord = comparisonRecordFromSession(latest, "Latest run");
+      const summaryLines = [
+        "Latest Omega Computer recap.",
+        "No live Codex/Hermes/Kimi execution was launched for this status question.",
+        `Evidence scanned: ${sessions.length} captured session(s).`,
+        latestRecord ? formatComparisonEvidenceLine(latestRecord) : "Latest run: missing",
+        formatComparisonEvidenceLine(codex),
+        formatComparisonEvidenceLine(hermes),
+        "",
+        "Latest readable output:",
+        latest ? limitText(displayTextFromAgentRecord(latest), 1400) : "No unlocked agent session records were found.",
+        "",
+        "Omega Agent Work excerpt:",
+        latestAgentWorkExcerpt(),
+      ];
+      const summary = summaryLines.join("\n");
+      updateRecap("Latest Omega Computer recap", summary);
+      setOutputText(summary);
+      appendAgentWorkArtifact(
+        "Latest Run Recap",
+        [
+          `prompt=${compactMultilineForAgentWork(prompt || "(status follow-up)", 500)}`,
+          "mode=local-evidence-recap",
+          latestRecord ? formatComparisonEvidenceLine(latestRecord) : "latest=missing",
+          formatComparisonEvidenceLine(codex),
+          formatComparisonEvidenceLine(hermes),
+        ].join("\n")
+      );
+      appendEvidenceText(`latest Omega Computer recap read from existing evidence; sessions=${sessions.length}; latest=${latest?.record_path || "missing"}`);
+      await Promise.allSettled([refreshProductAgentRunCenter(), refreshProductEvidenceHistory()]);
+      setProductStatus("Latest Omega Computer recap posted from existing evidence.", latest ? "done" : "warning");
+    } catch (error) {
+      updateRecap("Latest Omega Computer recap failed", error.message);
+      setProblemText(`Latest Omega Computer recap failed: ${error.message}`);
+      setProductStatus(`Latest Omega Computer recap failed: ${error.message}`, "error");
+    } finally {
+      setAgentRunControlsDisabled(false);
+    }
+  };
+
   const runAgentEvidenceComparison = async () => {
     const prompt = getPrompt();
-    if (activeAgentStreamId) {
-      setProductStatus("Evidence Compare waits for the active Codex/Hermes stream to finish.", "warning");
+    if (activeAgentRun || activeAgentStreamId) {
+      setProductStatus(`Evidence Compare waits for the active Codex/Hermes run to finish. ${describeActiveAgentRun()}`, "warning");
       return;
     }
     if (!invoke) {
@@ -30895,6 +32336,8 @@ footer {
       `- status: ${assist.status ?? "unknown"}`,
       `- exit: ${assist.exit_code ?? "none"}; timed_out=${Boolean(assist.timed_out)}; duration=${assist.duration_ms ?? 0}ms`,
       `- stdout_bytes: ${assist.stdout_size_bytes ?? 0}; stderr_bytes=${assist.stderr_size_bytes ?? 0}`,
+      `- transport: ${assist.query_transport ?? "unknown"}; argv_chars=${assist.argv_char_count ?? 0}; pipe_readers=${Boolean(assist.stdout_pipe_reader_enabled)}/${Boolean(assist.stderr_pipe_reader_enabled)}`,
+      `- timeout: kill_sent=${Boolean(assist.timeout_kill_sent)}; wait_after_kill=${assist.wait_after_kill_ms ?? 0}ms; partial_output=${Boolean(assist.partial_output_captured)}`,
       `- focus_skills: ${(assist.focus_skills ?? []).slice(0, 12).join(", ") || "none"}`,
       `- blockers: ${(assist.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
       "",
@@ -31064,12 +32507,16 @@ footer {
       setProductStatus("Type a prompt before running Codex Lead dual mode.", "warning");
       return;
     }
-    if (activeAgentStreamId) {
-      setProductStatus("Codex Lead waits for the active agent stream to finish.", "warning");
-      return;
-    }
     if (!invoke) {
       setProductStatus("Codex Lead dual mode requires the Tauri runtime.", "warning");
+      return;
+    }
+    if (!beginAgentRunGate({
+      runtime: "codex-lead-dual",
+      label: "Codex Lead + Hermes/Kimi",
+      phase: "preparing",
+      promptChars: prompt.length,
+    })) {
       return;
     }
 
@@ -31111,6 +32558,10 @@ footer {
       let hermesInventory = null;
       let hermesAssist = null;
       try {
+        await updateCodexLeadPreparationStatus("Codex Lead recording orchestration", [
+          "Creating the Codex-owned run plan and delegation evidence before the stream starts.",
+          "This should be quick; if it fails, Codex Lead will continue with the gap recorded.",
+        ]);
         orchestration = await createCodexLeadOrchestrationRecord(prompt);
         appendEvidenceText(`Codex Lead orchestration recorded: ${orchestration.record_path || orchestration.status || "no-record"}`);
         appendAgentWorkArtifact(
@@ -31139,12 +32590,24 @@ footer {
           ].join("\n")
         );
         setProductStatus("Codex Lead orchestration recorded. Starting responsive stream next.", "running");
+        await updateCodexLeadPreparationStatus("Codex Lead orchestration recorded", [
+          `Record: ${orchestration.record_path || orchestration.status || "no-record"}`,
+          `Delegation lanes: ${orchestration.delegation_count ?? 0} (${orchestration.codex_owned_count ?? 0} Codex / ${orchestration.hermes_assist_count ?? 0} Hermes-Kimi).`,
+        ]);
       } catch (orchestrationError) {
         appendAgentWorkArtifact("Codex Lead Orchestration Warning", orchestrationError.message);
         appendEvidenceText(`Codex Lead orchestration failed before stream: ${orchestrationError.message}`);
         setProblemText(`Codex Lead orchestration failed before stream: ${orchestrationError.message}`);
+        await updateCodexLeadPreparationStatus("Codex Lead orchestration warning", [
+          orchestrationError.message,
+          "The stream will continue with the orchestration gap recorded.",
+        ]);
       }
       try {
+        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory running", [
+          "Reading local Hermes/Kimi skills, MCP awareness, and hooks for delegation context.",
+          "Hermes/Kimi is advisory here; Codex Lead remains the execution owner.",
+        ]);
         hermesInventory = await recordHermesKimiCapabilityInventory(prompt);
         appendEvidenceText(`Hermes/Kimi capability inventory recorded: ${hermesInventory.record_path || hermesInventory.status || "no-record"}`);
         appendAgentWorkArtifact(
@@ -31160,14 +32623,31 @@ footer {
             `blockers=${(hermesInventory.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
           ].join("\n")
         );
+        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory recorded", [
+          `Record: ${hermesInventory.record_path || hermesInventory.status || "no-record"}`,
+          `Skills: ${hermesInventory.enabled_skill_count ?? 0}; MCP: ${hermesInventory.mcp_server_count ?? 0}; hooks: ${hermesInventory.hook_count ?? 0}.`,
+        ]);
       } catch (inventoryError) {
         appendAgentWorkArtifact("Hermes/Kimi Capability Inventory Warning", inventoryError.message);
         appendEvidenceText(`Hermes/Kimi capability inventory failed before stream: ${inventoryError.message}`);
         setProblemText(`Hermes/Kimi capability inventory failed before stream: ${inventoryError.message}`);
+        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory warning", [
+          inventoryError.message,
+          "Codex Lead will continue with compact built-in Hermes/Kimi awareness.",
+        ]);
       }
       try {
         setProductStatus("Hermes/Kimi assist brief is running with a bounded no-write policy.", "running");
-        hermesAssist = await recordHermesKimiAssistBrief({ prompt, orchestration, hermesInventory });
+        await updateCodexLeadPreparationStatus("Hermes/Kimi assist running", [
+          `Bounded secondary assist timeout: ${codexLeadAssistTimeoutMs}ms.`,
+          "The assist cannot edit, patch, run shell commands, call live MCP tools, or write memory.",
+        ]);
+        hermesAssist = await recordHermesKimiAssistBrief({
+          prompt,
+          orchestration,
+          hermesInventory,
+          timeoutMs: codexLeadAssistTimeoutMs,
+        });
         appendEvidenceText(`Hermes/Kimi assist brief recorded: ${hermesAssist.record_path || hermesAssist.status || "no-record"}`);
         appendAgentWorkArtifact(
           "Hermes/Kimi Assist Brief",
@@ -31189,13 +32669,31 @@ footer {
           setProblemText(`Hermes/Kimi assist brief returned ${hermesAssist.status}; Codex Lead will continue with recorded warning.`);
         }
         setProductStatus("Hermes/Kimi assist brief recorded. Starting Codex Lead stream.", "running");
+        await updateCodexLeadPreparationStatus(
+          hermesAssist.status === "hermes_kimi_assist_brief_succeeded"
+            ? "Hermes/Kimi assist recorded"
+            : "Hermes/Kimi assist recorded with warning",
+          [
+            `Status: ${hermesAssist.status ?? "unknown"}; exit=${hermesAssist.exit_code ?? "none"}; timed_out=${Boolean(hermesAssist.timed_out)}; duration=${hermesAssist.duration_ms ?? 0}ms.`,
+            `Record: ${hermesAssist.record_path || "none"}`,
+            "Codex Lead is starting the implementation stream next.",
+          ]
+        );
       } catch (assistError) {
         appendAgentWorkArtifact("Hermes/Kimi Assist Brief Warning", assistError.message);
         appendEvidenceText(`Hermes/Kimi assist brief failed before stream: ${assistError.message}`);
         setProblemText(`Hermes/Kimi assist brief failed before stream: ${assistError.message}`);
+        await updateCodexLeadPreparationStatus("Hermes/Kimi assist warning", [
+          assistError.message,
+          "Codex Lead will start the implementation stream without blocking on the secondary assist.",
+        ]);
       }
       const promptWithContext = buildAgentPrompt(codexLeadStreamingPrompt({ prompt, orchestration, hermesInventory, hermesAssist }), "codex-workspace-write");
       mirrorPromptToRuntimeComposer(promptWithContext);
+      await updateCodexLeadPreparationStatus("Codex Lead stream handoff", [
+        "Preparation evidence is recorded.",
+        "Starting the responsive Codex-owned implementation stream now.",
+      ]);
       const started = await runUnlockedAgentPromptSessionStream("codex-workspace-write", promptWithContext);
       if (!started.accepted) {
         const blockers = (started.blockers ?? []).join("; ") || started.next_step || "stream rejected";
@@ -31210,13 +32708,21 @@ footer {
           progress: 100,
           relatedRecordPath: started.record_path || "",
         }, { record: true });
-        sendBtn?.removeAttribute("disabled");
-        codexBtn?.removeAttribute("disabled");
-        hermesBtn?.removeAttribute("disabled");
-        compareBtn?.removeAttribute("disabled");
+        clearAgentRunGate();
         return;
       }
-      activeAgentStreamId = started.session_id;
+      updateAgentRunGate({
+        runtime: started.runtime,
+        phase: "streaming",
+        sessionId: started.session_id,
+        recordPath: started.record_path || "",
+      });
+      recordAgentRunLifecycleEvent("stream-accepted", {
+        runtime: started.runtime,
+        phase: "streaming",
+        sessionId: started.session_id,
+        recordPath: started.record_path || "",
+      });
       activeAgentTranscript.sessionId = started.session_id;
       activeAgentTranscript.runtime = started.runtime;
       terminalWrite(`[${started.runtime}] Codex Lead responsive stream started session=${started.session_id}`);
@@ -31252,10 +32758,7 @@ footer {
         message: `Codex Lead failed before stream completion: ${error.message}`,
         progress: 100,
       }, { record: true });
-      sendBtn?.removeAttribute("disabled");
-      codexBtn?.removeAttribute("disabled");
-      hermesBtn?.removeAttribute("disabled");
-      compareBtn?.removeAttribute("disabled");
+      clearAgentRunGate();
     }
   };
 
@@ -31268,6 +32771,11 @@ footer {
   };
 
   const runPrimaryAgentWork = async () => {
+    const prompt = getPrompt();
+    if (isAgentRunStatusFollowup(prompt)) {
+      await runLatestAgentRunStatusRecap(prompt);
+      return;
+    }
     await runAgentComparison();
   };
 
@@ -31282,6 +32790,14 @@ footer {
     if (!prompt) {
       productInput.focus();
       setProductStatus(`Type a prompt before running ${label}.`, "warning");
+      return;
+    }
+    if (!beginAgentRunGate({
+      runtime,
+      label,
+      phase: "preparing",
+      promptChars: prompt.length,
+    })) {
       return;
     }
     const promptWithContext = buildAgentPrompt(prompt, runtime);
@@ -31331,13 +32847,23 @@ footer {
             progress: 100,
             relatedRecordPath: started.record_path || "",
           }, { record: true });
-          sendBtn?.removeAttribute("disabled");
-          codexBtn?.removeAttribute("disabled");
-          hermesBtn?.removeAttribute("disabled");
-          compareBtn?.removeAttribute("disabled");
+          clearAgentRunGate();
           return;
         }
-        activeAgentStreamId = started.session_id;
+        updateAgentRunGate({
+          runtime: started.runtime,
+          label,
+          phase: "streaming",
+          sessionId: started.session_id,
+          recordPath: started.record_path || "",
+        });
+        recordAgentRunLifecycleEvent("stream-accepted", {
+          runtime: started.runtime,
+          label,
+          phase: "streaming",
+          sessionId: started.session_id,
+          recordPath: started.record_path || "",
+        });
         activeAgentTranscript.sessionId = started.session_id;
         activeAgentTranscript.runtime = started.runtime;
         terminalWrite(`[${started.runtime}] stream started session=${started.session_id}`);
@@ -31411,10 +32937,9 @@ footer {
         progress: 100,
       }, { record: true });
     } finally {
-      sendBtn?.removeAttribute("disabled");
-      codexBtn?.removeAttribute("disabled");
-      hermesBtn?.removeAttribute("disabled");
-      compareBtn?.removeAttribute("disabled");
+      if (activeAgentRun?.phase !== "streaming") {
+        clearAgentRunGate();
+      }
     }
   };
 

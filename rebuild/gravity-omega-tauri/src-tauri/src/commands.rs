@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     env,
     fs::{self, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
+    os::unix::fs::FileTypeExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
@@ -833,6 +835,20 @@ pub struct RuntimeSidecarProcessSnapshotRecord {
     pub process_list_stdout_size_bytes: usize,
     pub process_list_stderr_preview: String,
     pub process_list_duration_ms: u64,
+    #[serde(default)]
+    pub process_list_timeout_ms: u64,
+    #[serde(default)]
+    pub process_list_timed_out: bool,
+    #[serde(default)]
+    pub stdout_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub stderr_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub process_list_timeout_kill_sent: bool,
+    #[serde(default)]
+    pub process_list_wait_after_kill_ms: u64,
+    #[serde(default)]
+    pub process_list_partial_output_captured: bool,
     pub target_count: usize,
     pub running_target_count: usize,
     pub missing_target_count: usize,
@@ -1011,7 +1027,7 @@ pub struct CodexLeadOrchestrationRequest {
     pub force_runtime_depth_refresh: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CodexLeadDelegationLane {
     pub id: String,
     pub title: String,
@@ -1033,7 +1049,7 @@ pub struct CodexLeadDelegationLane {
     pub next_step: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CodexLeadOrchestrationRecord {
     pub id: String,
     pub status: String,
@@ -1203,6 +1219,20 @@ pub struct HermesKimiAssistBriefRecord {
     pub stderr: String,
     pub stdout_size_bytes: u64,
     pub stderr_size_bytes: u64,
+    #[serde(default)]
+    pub query_transport: String,
+    #[serde(default)]
+    pub argv_char_count: u64,
+    #[serde(default)]
+    pub stdout_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub stderr_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub timeout_kill_sent: bool,
+    #[serde(default)]
+    pub wait_after_kill_ms: u64,
+    #[serde(default)]
+    pub partial_output_captured: bool,
     pub stdout_transcript_path: String,
     pub stderr_transcript_path: String,
     pub inventory_record_path: Option<String>,
@@ -1537,6 +1567,16 @@ pub struct AgentTranscriptSessionRecord {
     pub exit_code: Option<i32>,
     pub timed_out: bool,
     pub duration_ms: u64,
+    #[serde(default)]
+    pub stdout_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub stderr_pipe_reader_enabled: bool,
+    #[serde(default)]
+    pub timeout_kill_sent: bool,
+    #[serde(default)]
+    pub wait_after_kill_ms: u64,
+    #[serde(default)]
+    pub partial_output_captured: bool,
     pub stdout: String,
     pub stderr: String,
     pub stdout_size_bytes: u64,
@@ -2636,6 +2676,11 @@ pub struct ProductTerminalCommandResult {
     pub exit_code: Option<i32>,
     pub timed_out: bool,
     pub duration_ms: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
     pub stdout: String,
     pub stderr: String,
     pub stdout_transcript_path: String,
@@ -2656,6 +2701,12 @@ pub struct ProductTerminalStreamEvent {
     pub line: String,
     pub status: String,
     pub exit_code: Option<i32>,
+    pub duration_ms: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
     pub record_path: String,
     pub log_path: String,
     pub created_at_ms: u64,
@@ -2675,6 +2726,9 @@ pub struct ProductTerminalStreamStartResult {
     pub stderr_transcript_path: String,
     pub created_at_ms: u64,
     pub stream_event_name: &'static str,
+    pub stdout_pipe_reader_expected: bool,
+    pub stderr_pipe_reader_expected: bool,
+    pub timeout_ms: u64,
     pub stream_enabled: bool,
     pub process_spawn_enabled: bool,
     pub transcript_capture_enabled: bool,
@@ -2730,6 +2784,80 @@ pub struct ProductTerminalTranscriptReplayRecord {
     pub record_path: String,
     pub log_path: String,
     pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ProductTerminalSessionSummary {
+    pub session_id: String,
+    pub status: String,
+    pub command: String,
+    pub cwd: String,
+    pub exit_code: Option<i32>,
+    pub timed_out: bool,
+    pub duration_ms: u64,
+    pub stdout_transcript_path: String,
+    pub stderr_transcript_path: String,
+    pub stdout_size_bytes: u64,
+    pub stderr_size_bytes: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
+    pub source_stream_enabled: bool,
+    pub source_process_spawn_enabled: bool,
+    pub source_transcript_capture_enabled: bool,
+    pub source_command_runner_enabled: bool,
+    pub source_writes_allowed: bool,
+    pub source_execution_enabled: bool,
+    pub terminal_write_enabled: bool,
+    pub live_tail_enabled: bool,
+    pub process_control_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ProductTerminalBlockedCommandRecord {
+    pub id: String,
+    pub status: String,
+    pub command_preview: String,
+    pub command_size_bytes: u64,
+    pub requested_mode: String,
+    pub denied_reason: String,
+    pub block_class: String,
+    pub allowlist_enforced: bool,
+    pub process_spawn_enabled: bool,
+    pub transcript_capture_enabled: bool,
+    pub command_runner_enabled: bool,
+    pub terminal_write_enabled: bool,
+    pub live_tail_enabled: bool,
+    pub process_control_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
     pub next_step: String,
 }
 
@@ -2904,6 +3032,65 @@ pub struct ProductEvidenceHistory {
     pub live_mcp_call_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EvidenceDurabilityManifestRequest {
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EvidenceDurabilityManifestCategory {
+    pub category: String,
+    pub record_count: usize,
+    pub readable_record_count: usize,
+    pub missing_record_count: usize,
+    pub latest_created_at_ms: u64,
+    pub latest_record_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EvidenceDurabilityManifestRecord {
+    pub id: String,
+    pub status: String,
+    pub requested_by: String,
+    pub source_history_status: String,
+    pub source_history_item_count: usize,
+    pub category_count: usize,
+    pub evidence_record_count: usize,
+    pub readable_record_count: usize,
+    pub missing_record_count: usize,
+    pub manifest_input_bytes: usize,
+    pub manifest_hash: String,
+    pub latest_evidence_category: String,
+    pub latest_evidence_id: String,
+    pub latest_evidence_status: String,
+    pub latest_evidence_title: String,
+    pub latest_evidence_record_path: String,
+    pub latest_evidence_created_at_ms: u64,
+    pub categories: Vec<EvidenceDurabilityManifestCategory>,
+    pub local_manifest_recorded: bool,
+    pub read_only: bool,
+    pub history_enabled: bool,
+    pub evidence_read_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub terminal_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub capture_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub export_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+    pub blockers: Vec<String>,
+    pub next_step: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -4251,6 +4438,51 @@ pub struct CodexHermesRunViewSection {
 }
 
 #[derive(Debug, Serialize)]
+pub struct CodexHermesRunViewEvidenceSummary {
+    pub source_id: &'static str,
+    pub title: &'static str,
+    pub record_id: String,
+    pub status: String,
+    pub record_path: String,
+    pub log_path: String,
+    pub created_at_ms: u64,
+    pub primary_metric: String,
+    pub secondary_metric: String,
+    pub detail: String,
+    pub stdout_preview: Option<String>,
+    pub stderr_preview: Option<String>,
+    pub stdout_preview_source: String,
+    pub stderr_preview_source: String,
+    pub stdout_transcript_path: Option<String>,
+    pub stderr_transcript_path: Option<String>,
+    pub stdout_transcript_found: bool,
+    pub stderr_transcript_found: bool,
+    pub stdout_transcript_line_count: usize,
+    pub stderr_transcript_line_count: usize,
+    pub stdout_transcript_size_bytes: u64,
+    pub stderr_transcript_size_bytes: u64,
+    pub stdout_transcript_truncated: bool,
+    pub stderr_transcript_truncated: bool,
+    pub transcript_evidence_ready: bool,
+    pub blocker_count: usize,
+    pub blockers: Vec<String>,
+    pub read_only: bool,
+    pub process_spawn_enabled: bool,
+    pub terminal_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub dashboard_execution_enabled: bool,
+    pub record_process_spawn_enabled: bool,
+    pub record_execution_enabled: bool,
+}
+
+#[derive(Debug, Serialize)]
 pub struct CodexHermesRunViewDashboard {
     pub status: &'static str,
     pub section_count: usize,
@@ -4266,6 +4498,23 @@ pub struct CodexHermesRunViewDashboard {
     pub transcript_protection_policy_count: usize,
     pub typed_event_log_count: usize,
     pub typed_event_count: usize,
+    pub codex_orchestration_count: usize,
+    pub hermes_inventory_count: usize,
+    pub hermes_assist_count: usize,
+    pub hermes_assist_failure_count: usize,
+    pub hermes_assist_timeout_count: usize,
+    pub latest_hermes_assist_status: String,
+    pub latest_hermes_assist_record_path: Option<String>,
+    pub latest_hermes_assist_postmortem_status: String,
+    pub latest_hermes_assist_postmortem_record_path: Option<String>,
+    pub agent_session_count: usize,
+    pub agent_session_failure_count: usize,
+    pub agent_session_timeout_count: usize,
+    pub latest_agent_session_status: String,
+    pub latest_agent_session_record_path: Option<String>,
+    pub latest_agent_postmortem_status: String,
+    pub latest_agent_postmortem_record_path: Option<String>,
+    pub evidence_summary_count: usize,
     pub active_task_run_id: String,
     pub read_only: bool,
     pub disabled_gate_count: usize,
@@ -4280,6 +4529,7 @@ pub struct CodexHermesRunViewDashboard {
     pub memory_write_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub evidence_summaries: Vec<CodexHermesRunViewEvidenceSummary>,
     pub sections: Vec<CodexHermesRunViewSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -5037,6 +5287,20 @@ pub struct FirstClassMcpDashboardLane {
     pub typed_command_contract_count: usize,
     pub status_probe_preflight_count: usize,
     pub config_lookup_preflight_count: usize,
+    pub runtime_target_id: &'static str,
+    pub runtime_process_count: usize,
+    pub runtime_running: bool,
+    pub runtime_health_status: String,
+    pub runtime_expected_pattern: String,
+    pub runtime_record_path: Option<String>,
+    pub runtime_snapshot_status: String,
+    pub runtime_snapshot_age_ms: Option<u64>,
+    pub runtime_snapshot_freshness_status: String,
+    pub runtime_snapshot_fresh: bool,
+    pub runtime_snapshot_stale: bool,
+    pub runtime_snapshot_pipe_reader_ready: bool,
+    pub runtime_snapshot_partial_output_captured: bool,
+    pub runtime_snapshot_timed_out: bool,
     pub first_class: bool,
     pub read_only: bool,
     pub live_probe_enabled: bool,
@@ -5068,6 +5332,19 @@ pub struct FirstClassMcpDashboard {
     pub omega_brain_evidence_count: usize,
     pub sswp_evidence_count: usize,
     pub steno_evidence_count: usize,
+    pub runtime_process_snapshot_count: usize,
+    pub latest_runtime_process_snapshot_status: String,
+    pub latest_runtime_process_snapshot_path: Option<String>,
+    pub runtime_process_snapshot_freshness_threshold_ms: u64,
+    pub latest_runtime_process_snapshot_age_ms: Option<u64>,
+    pub latest_runtime_process_snapshot_freshness_status: String,
+    pub latest_runtime_process_snapshot_fresh: bool,
+    pub latest_runtime_process_snapshot_stale: bool,
+    pub latest_runtime_process_snapshot_pipe_reader_ready: bool,
+    pub latest_runtime_process_snapshot_partial_output_captured: bool,
+    pub latest_runtime_process_snapshot_timed_out: bool,
+    pub running_runtime_lane_count: usize,
+    pub mcp_runtime_process_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
     pub live_probe_enabled: bool,
@@ -5106,6 +5383,22 @@ pub struct SswpStatusPanel {
     pub registry_node_count: usize,
     pub risky_node_count: usize,
     pub highest_risk_percent: f64,
+    pub registry_list_status: String,
+    pub registry_risky_status: String,
+    pub registry_list_pipe_reader_enabled: bool,
+    pub registry_risky_pipe_reader_enabled: bool,
+    pub registry_list_timeout_kill_sent: bool,
+    pub registry_risky_timeout_kill_sent: bool,
+    pub registry_list_partial_output_captured: bool,
+    pub registry_risky_partial_output_captured: bool,
+    pub runtime_process_snapshot_count: usize,
+    pub latest_runtime_process_snapshot_status: String,
+    pub latest_runtime_process_snapshot_path: Option<String>,
+    pub runtime_target_id: &'static str,
+    pub runtime_process_count: usize,
+    pub runtime_running: bool,
+    pub runtime_health_status: String,
+    pub runtime_expected_pattern: String,
     pub command_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
@@ -5156,6 +5449,11 @@ pub struct SswpRegistryCommandCapture {
     pub exit_code: Option<i32>,
     pub timed_out: bool,
     pub duration_ms: u64,
+    pub stdout_pipe_reader_enabled: bool,
+    pub stderr_pipe_reader_enabled: bool,
+    pub timeout_kill_sent: bool,
+    pub wait_after_kill_ms: u64,
+    pub partial_output_captured: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -5220,6 +5518,30 @@ pub struct StenoPetCompanionDashboardSection {
     pub execution_enabled: bool,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct PetRuntimeAttentionItem {
+    pub item_id: String,
+    pub state: String,
+    pub source: String,
+    pub title: String,
+    pub message: String,
+    pub severity: String,
+    pub progress: u8,
+    pub related_record_path: Option<String>,
+    pub created_at_ms: u64,
+    pub read_only: bool,
+    pub steno_write_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub terminal_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+}
+
 #[derive(Debug, Serialize)]
 pub struct StenoPetCompanionDashboard {
     pub status: &'static str,
@@ -5230,6 +5552,12 @@ pub struct StenoPetCompanionDashboard {
     pub transcript_export_policy_ready_count: usize,
     pub transcript_protection_policy_count: usize,
     pub transcript_protection_policy_ready_count: usize,
+    pub agent_transcript_session_count: usize,
+    pub agent_transcript_ready_count: usize,
+    pub agent_transcript_pipe_reader_ready_count: usize,
+    pub agent_transcript_timed_out_count: usize,
+    pub agent_transcript_partial_output_count: usize,
+    pub recent_agent_transcript_sessions: Vec<AgentTranscriptSessionRecord>,
     pub steno_mcp_evidence_count: usize,
     pub steno_mcp_ready_count: usize,
     pub pet_inventory_count: usize,
@@ -5239,6 +5567,10 @@ pub struct StenoPetCompanionDashboard {
     pub pet_runtime_signal_count: usize,
     pub latest_pet_state: String,
     pub latest_pet_signal_status: String,
+    pub recent_pet_runtime_signals: Vec<PetRuntimeSignalRecord>,
+    pub pet_attention_item_count: usize,
+    pub latest_pet_attention_state: String,
+    pub recent_pet_attention_items: Vec<PetRuntimeAttentionItem>,
     pub runtime_process_snapshot_count: usize,
     pub latest_runtime_process_snapshot_status: String,
     pub latest_runtime_process_snapshot_path: Option<String>,
@@ -5317,12 +5649,38 @@ pub struct PetRuntimeSignalRecord {
 }
 
 #[derive(Debug, Serialize)]
+pub struct StenoSearchResult {
+    pub title: String,
+    pub category: String,
+    pub record_path: String,
+    pub snippet: String,
+    pub line_number: usize,
+    pub created_at_ms: u64,
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StenoSearchRequest {
+    #[serde(default)]
+    pub query: Option<String>,
+    #[serde(default)]
+    pub max_results: Option<usize>,
+    #[serde(default)]
+    pub max_file_bytes: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct StenoSearchPanel {
     pub status: &'static str,
     pub panel_id: &'static str,
     pub panel_title: &'static str,
-    pub query: &'static str,
+    pub query: String,
     pub result_count: usize,
+    pub searched_file_count: usize,
+    pub matched_file_count: usize,
+    pub postmortem_result_count: usize,
+    pub max_results: usize,
+    pub max_file_bytes: u64,
     pub transcript_bundle_count: usize,
     pub transcript_bundle_ready_count: usize,
     pub transcript_protection_policy_count: usize,
@@ -5348,6 +5706,8 @@ pub struct StenoSearchPanel {
     pub patch_apply_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub results: Vec<StenoSearchResult>,
+    pub recent_postmortem_results: Vec<StenoSearchResult>,
     pub sections: Vec<StenoPetCompanionDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -5408,6 +5768,11 @@ pub struct TerminalProcessLaneDashboard {
     pub process_supervisor_exit_summary_ready_count: usize,
     pub process_output_tail_summary_count: usize,
     pub process_output_tail_summary_ready_count: usize,
+    pub recent_terminal_session_count: usize,
+    pub recent_terminal_replay_count: usize,
+    pub blocked_terminal_command_count: usize,
+    pub recent_process_control_policy_count: usize,
+    pub recent_process_exit_summary_count: usize,
     pub disabled_gate_count: usize,
     pub read_only: bool,
     pub terminal_process_visible: bool,
@@ -5427,6 +5792,11 @@ pub struct TerminalProcessLaneDashboard {
     pub memory_write_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub recent_terminal_sessions: Vec<ProductTerminalSessionSummary>,
+    pub recent_terminal_replays: Vec<ProductTerminalTranscriptReplayRecord>,
+    pub recent_blocked_terminal_commands: Vec<ProductTerminalBlockedCommandRecord>,
+    pub recent_process_control_policies: Vec<ProcessControlPolicyRecord>,
+    pub recent_process_exit_summaries: Vec<ProcessSupervisorExitSummaryRecord>,
     pub sections: Vec<TerminalProcessLaneDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -5569,10 +5939,151 @@ pub struct LinuxDesktopControlReadinessDashboardSection {
     pub execution_enabled: bool,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DesktopEnvironmentSnapshotRequest {
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DesktopEnvironmentSnapshotRecord {
+    pub id: String,
+    pub status: String,
+    pub requested_by: String,
+    pub session_type: String,
+    pub current_desktop: String,
+    pub desktop_session: String,
+    pub wayland_display: String,
+    pub wayland_display_present: bool,
+    pub display: String,
+    pub display_present: bool,
+    pub graphical_session_visible: bool,
+    pub dbus_session_bus_present: bool,
+    pub dbus_session_bus_preview: String,
+    pub at_spi_bus_present: bool,
+    pub ydotool_socket_path: String,
+    pub ydotool_socket_metadata_checked: bool,
+    pub ydotool_socket_visible: bool,
+    pub ydotool_socket_is_socket: bool,
+    pub backend_status: String,
+    pub read_only: bool,
+    pub environment_probe_enabled: bool,
+    pub capture_enabled: bool,
+    pub ocr_enabled: bool,
+    pub target_window_control_enabled: bool,
+    pub element_action_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub socket_connect_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub terminal_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DesktopReadOnlyCapabilitySnapshotRequest {
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DesktopReadOnlyCapabilityTool {
+    pub tool_id: String,
+    pub title: String,
+    pub category: String,
+    pub command: String,
+    pub path: String,
+    pub found_on_path: bool,
+    pub read_only_prerequisite: bool,
+    pub live_action_enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DesktopReadOnlyCapabilitySnapshotRecord {
+    pub id: String,
+    pub status: String,
+    pub requested_by: String,
+    pub tool_count: usize,
+    pub available_tool_count: usize,
+    pub window_inventory_tool_count: usize,
+    pub available_window_inventory_tool_count: usize,
+    pub screenshot_tool_count: usize,
+    pub available_screenshot_tool_count: usize,
+    pub accessibility_tool_count: usize,
+    pub available_accessibility_tool_count: usize,
+    pub input_helper_tool_count: usize,
+    pub available_input_helper_tool_count: usize,
+    pub tools: Vec<DesktopReadOnlyCapabilityTool>,
+    pub read_only: bool,
+    pub path_probe_enabled: bool,
+    pub process_spawn_enabled: bool,
+    pub window_inventory_enabled: bool,
+    pub screenshot_capture_enabled: bool,
+    pub accessibility_tree_read_enabled: bool,
+    pub pointer_injection_enabled: bool,
+    pub keyboard_injection_enabled: bool,
+    pub capture_enabled: bool,
+    pub ocr_enabled: bool,
+    pub target_window_control_enabled: bool,
+    pub element_action_enabled: bool,
+    pub desktop_control_enabled: bool,
+    pub socket_connect_enabled: bool,
+    pub terminal_enabled: bool,
+    pub file_write_enabled: bool,
+    pub patch_apply_enabled: bool,
+    pub live_mcp_call_enabled: bool,
+    pub config_read_enabled: bool,
+    pub export_enabled: bool,
+    pub memory_write_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub record_path: String,
+    pub log_path: String,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct LinuxDesktopControlReadinessDashboard {
     pub status: &'static str,
     pub section_count: usize,
+    pub desktop_environment_snapshot_count: usize,
+    pub desktop_environment_snapshot_ready_count: usize,
+    pub desktop_environment_snapshot_freshness_threshold_ms: u64,
+    pub latest_desktop_environment_snapshot_status: String,
+    pub latest_desktop_environment_snapshot_record_path: String,
+    pub latest_desktop_environment_snapshot_age_ms: Option<u64>,
+    pub latest_desktop_environment_snapshot_fresh: bool,
+    pub latest_desktop_environment_graphical_session_visible: bool,
+    pub latest_desktop_environment_wayland_display_present: bool,
+    pub latest_desktop_environment_display_present: bool,
+    pub latest_desktop_environment_dbus_session_bus_present: bool,
+    pub latest_desktop_environment_at_spi_bus_present: bool,
+    pub latest_desktop_environment_ydotool_socket_visible: bool,
+    pub latest_desktop_environment_ydotool_socket_is_socket: bool,
+    pub latest_desktop_environment_backend_status: String,
+    pub desktop_read_only_capability_snapshot_count: usize,
+    pub desktop_read_only_capability_snapshot_ready_count: usize,
+    pub latest_desktop_read_only_capability_snapshot_status: String,
+    pub latest_desktop_read_only_capability_snapshot_record_path: String,
+    pub latest_desktop_read_only_capability_available_tool_count: usize,
+    pub latest_desktop_read_only_capability_tool_count: usize,
+    pub latest_desktop_read_only_capability_window_inventory_ready: bool,
+    pub latest_desktop_read_only_capability_screenshot_ready: bool,
+    pub latest_desktop_read_only_capability_accessibility_ready: bool,
+    pub latest_desktop_read_only_capability_input_helper_ready: bool,
     pub foundation_desktop_lane_count: usize,
     pub foundation_desktop_ready_count: usize,
     pub work_queue_desktop_lane_count: usize,
@@ -21411,6 +21922,10 @@ fn product_terminal_sessions_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("product-terminal-sessions"))
 }
 
+fn product_terminal_blocked_commands_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("product-terminal-blocked-commands"))
+}
+
 fn product_terminal_transcript_replays_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("product-terminal-transcript-replays"))
 }
@@ -21581,6 +22096,18 @@ fn runtime_depth_probes_dir() -> Result<PathBuf, String> {
 
 fn runtime_sidecar_process_snapshots_dir() -> Result<PathBuf, String> {
     Ok(state_root()?.join("runtime-sidecar-process-snapshots"))
+}
+
+fn desktop_environment_snapshots_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("desktop-environment-snapshots"))
+}
+
+fn desktop_read_only_capability_snapshots_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("desktop-read-only-capability-snapshots"))
+}
+
+fn evidence_durability_manifests_dir() -> Result<PathBuf, String> {
+    Ok(state_root()?.join("evidence-durability-manifests"))
 }
 
 fn codex_lead_orchestrations_dir() -> Result<PathBuf, String> {
@@ -32060,8 +32587,8 @@ pub fn command_manifest() -> Vec<CommandGroup> {
             title: "Codex-grade agent loop",
             safety: "safe-gated-restricted",
             phase: "phase-3",
-            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
-            command_count: 102,
+            summary: "Planning, patch discipline, bundled Docs/About panels, live read-only command palette, toolbar action readiness center, first-class integration launchpad, gated action release board, gated adapter release queue, durable gated adapter release packets, command-surface collapse board, replacement-app ship readiness, product workbench smoke evidence and history, evidence durability manifests, sidecar readiness board, sidecar launch policy manifest, sidecar health packet console, UI/UX test matrix, native shell pairing workbench, command registry dry-runs, replacement-app foundation scorecards, read-only work queues, Codex/Hermes run view dashboards, Codex/Hermes run detail timelines, Codex/Hermes run selection comparisons, Codex/Hermes evidence diff boards, Codex/Hermes reconciliation checklists, Codex/Hermes reconciliation action plans, Codex/Hermes evidence attachment previews, Codex/Hermes evidence attachment approval packets, Codex/Hermes evidence intake workbenches, Codex/Hermes evidence validation summaries, Codex/Hermes evidence operator confirmation dry-runs, Steno/pet companion dashboards, live read-only Steno search panel, terminal/process lane dashboards, approval/evidence spine dashboards, desktop environment snapshots, desktop stage-1 capability snapshots, Linux desktop control readiness dashboards, desktop capture/action approval policy dashboards, desktop capture/action approval records, desktop operator-confirmation dry-runs, desktop final pre-action dry-runs, desktop action safety summaries, Linux desktop readiness release checklists, sandbox policy gates, task-run records, approval ledger records, artifact previews, disabled runner invocations, joint Codex/Hermes coordinator plans, typed event logs, workspace leases, read-only runner adapters, read-only Codex/Hermes/MCP capability inventories, first-class integration readiness records, process command plans, stream initialization, disabled process lifecycles, disabled process control policies, disabled supervisor preflights, disabled supervisor heartbeats, disabled supervisor exit summaries, disabled output tail summaries, transcript bundles, unlocked Codex/Hermes prompt sessions, disabled transcript export policies, disabled transcript protection policies, checks, and evidence reporting.",
+            command_count: 108,
         },
         CommandGroup {
             id: "threads",
@@ -33796,6 +34323,26 @@ struct RuntimeProcessLine {
     command: String,
 }
 
+const RUNTIME_SIDECAR_PROCESS_LIST_TIMEOUT_MS: u64 = 2_500;
+const RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS: u64 = 120_000;
+
+#[derive(Debug)]
+struct RuntimeSidecarProcessListCapture {
+    command: Vec<String>,
+    exit_code: Option<i32>,
+    status: String,
+    stdout: String,
+    stderr_preview: String,
+    duration_ms: u64,
+    timeout_ms: u64,
+    timed_out: bool,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
+}
+
 fn runtime_sidecar_process_targets() -> Vec<RuntimeSidecarProcessTarget> {
     vec![
         RuntimeSidecarProcessTarget {
@@ -33901,6 +34448,124 @@ fn parse_runtime_process_lines(stdout: &str) -> Vec<RuntimeProcessLine> {
         .collect()
 }
 
+fn spawn_runtime_sidecar_process_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_runtime_sidecar_process_list_command(timeout_ms: u64) -> RuntimeSidecarProcessListCapture {
+    let command = vec![
+        "ps".to_string(),
+        "-eo".to_string(),
+        "pid=,args=".to_string(),
+    ];
+    let start = Instant::now();
+    let mut child = match Command::new("ps")
+        .args(["-eo", "pid=,args="])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => {
+            return RuntimeSidecarProcessListCapture {
+                command,
+                exit_code: None,
+                status: "process_list_spawn_failed".to_string(),
+                stdout: String::new(),
+                stderr_preview: prompt_preview(&error.to_string(), 1200),
+                duration_ms: start.elapsed().as_millis() as u64,
+                timeout_ms,
+                timed_out: false,
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
+            };
+        }
+    };
+
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_runtime_sidecar_process_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_runtime_sidecar_process_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
+    let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let exit_code;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
+            }
+            Ok(None) => {
+                if start.elapsed() >= Duration::from_millis(timeout_ms) {
+                    timed_out = true;
+                    timeout_kill_sent = child.kill().is_ok();
+                    let wait_start = Instant::now();
+                    let _ = child.wait();
+                    wait_after_kill_ms = wait_start.elapsed().as_millis() as u64;
+                    exit_code = None;
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => {
+                exit_code = None;
+                break;
+            }
+        }
+    }
+
+    let stdout = stdout_reader
+        .and_then(|reader| reader.join().ok())
+        .unwrap_or_default();
+    let stderr = stderr_reader
+        .and_then(|reader| reader.join().ok())
+        .unwrap_or_default();
+    let stdout = String::from_utf8_lossy(&stdout).to_string();
+    let stderr_preview = trim_probe_text(&stderr);
+    let partial_output_captured = timed_out && (!stdout.is_empty() || !stderr_preview.is_empty());
+    let status = if timed_out {
+        "process_list_timed_out"
+    } else if exit_code == Some(0) {
+        "process_list_succeeded"
+    } else {
+        "process_list_failed"
+    };
+
+    RuntimeSidecarProcessListCapture {
+        command,
+        exit_code,
+        status: status.to_string(),
+        stdout,
+        stderr_preview,
+        duration_ms: start.elapsed().as_millis() as u64,
+        timeout_ms,
+        timed_out,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
+    }
+}
+
 fn runtime_process_matches(target: &RuntimeSidecarProcessTarget, process: &RuntimeProcessLine) -> bool {
     let command = process.command.to_lowercase();
     target
@@ -33985,40 +34650,23 @@ pub fn record_runtime_sidecar_process_snapshot(
     })?;
     let record_path = dir.join(format!("{id}.json"));
     let log_path = dir.join(format!("{id}.jsonl"));
-    let process_list_command = vec![
-        "ps".to_string(),
-        "-eo".to_string(),
-        "pid=,args=".to_string(),
-    ];
-    let started = Instant::now();
-    let ps_output = Command::new("ps")
-        .args(["-eo", "pid=,args="])
-        .output();
-    let process_list_duration_ms = started.elapsed().as_millis() as u64;
     let mut blockers = Vec::new();
-    let (process_list_exit_code, process_list_status, stdout, stderr_preview) = match ps_output {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr_preview = trim_probe_text(&output.stderr);
-            let status = if output.status.success() {
-                "process_list_succeeded".to_string()
-            } else {
-                blockers.push("bounded ps process list returned a non-zero exit status".to_string());
-                "process_list_failed".to_string()
-            };
-            (output.status.code(), status, stdout, stderr_preview)
-        }
-        Err(error) => {
-            blockers.push(format!("bounded ps process list failed to spawn: {error}"));
-            (
-                None,
-                "process_list_spawn_failed".to_string(),
-                String::new(),
-                error.to_string(),
-            )
-        }
-    };
-    let processes = parse_runtime_process_lines(&stdout);
+    let process_list_capture =
+        run_runtime_sidecar_process_list_command(RUNTIME_SIDECAR_PROCESS_LIST_TIMEOUT_MS);
+    if process_list_capture.status == "process_list_spawn_failed" {
+        blockers.push(format!(
+            "bounded ps process list failed to spawn: {}",
+            process_list_capture.stderr_preview
+        ));
+    } else if process_list_capture.timed_out {
+        blockers.push(format!(
+            "bounded ps process list timed out after {}ms",
+            process_list_capture.timeout_ms
+        ));
+    } else if process_list_capture.status != "process_list_succeeded" {
+        blockers.push("bounded ps process list returned a non-zero exit status".to_string());
+    }
+    let processes = parse_runtime_process_lines(&process_list_capture.stdout);
     let targets = runtime_sidecar_process_targets()
         .iter()
         .map(|target| build_runtime_sidecar_target_snapshot(target, &processes))
@@ -34034,23 +34682,31 @@ pub fn record_runtime_sidecar_process_snapshot(
     let running_target_count = targets.iter().filter(|target| target.running).count();
     let missing_target_count = targets.len().saturating_sub(running_target_count);
     let process_count = targets.iter().map(|target| target.process_count).sum::<usize>();
-    let status = if process_list_status == "process_list_succeeded" && missing_target_count == 0 {
-        "runtime_sidecar_process_snapshot_recorded_ready"
-    } else {
-        "runtime_sidecar_process_snapshot_recorded_with_gaps"
-    };
+    let status =
+        if process_list_capture.status == "process_list_succeeded" && missing_target_count == 0 {
+            "runtime_sidecar_process_snapshot_recorded_ready"
+        } else {
+            "runtime_sidecar_process_snapshot_recorded_with_gaps"
+        };
     let record_path_display = record_path.display().to_string();
     let log_path_display = log_path.display().to_string();
     let record = RuntimeSidecarProcessSnapshotRecord {
         id: id.clone(),
         status: status.to_string(),
         requested_by,
-        process_list_command,
-        process_list_exit_code,
-        process_list_status,
-        process_list_stdout_size_bytes: stdout.len(),
-        process_list_stderr_preview: stderr_preview,
-        process_list_duration_ms,
+        process_list_command: process_list_capture.command,
+        process_list_exit_code: process_list_capture.exit_code,
+        process_list_status: process_list_capture.status,
+        process_list_stdout_size_bytes: process_list_capture.stdout.len(),
+        process_list_stderr_preview: process_list_capture.stderr_preview,
+        process_list_duration_ms: process_list_capture.duration_ms,
+        process_list_timeout_ms: process_list_capture.timeout_ms,
+        process_list_timed_out: process_list_capture.timed_out,
+        stdout_pipe_reader_enabled: process_list_capture.stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled: process_list_capture.stderr_pipe_reader_enabled,
+        process_list_timeout_kill_sent: process_list_capture.timeout_kill_sent,
+        process_list_wait_after_kill_ms: process_list_capture.wait_after_kill_ms,
+        process_list_partial_output_captured: process_list_capture.partial_output_captured,
         target_count: targets.len(),
         running_target_count,
         missing_target_count,
@@ -34099,6 +34755,14 @@ pub fn record_runtime_sidecar_process_snapshot(
             "event": "runtime_sidecar_process_snapshot_recorded",
             "id": &record.id,
             "status": &record.status,
+            "process_list_status": &record.process_list_status,
+            "process_list_timeout_ms": record.process_list_timeout_ms,
+            "process_list_timed_out": record.process_list_timed_out,
+            "stdout_pipe_reader_enabled": record.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": record.stderr_pipe_reader_enabled,
+            "process_list_timeout_kill_sent": record.process_list_timeout_kill_sent,
+            "process_list_wait_after_kill_ms": record.process_list_wait_after_kill_ms,
+            "process_list_partial_output_captured": record.process_list_partial_output_captured,
             "target_count": record.target_count,
             "running_target_count": record.running_target_count,
             "missing_target_count": record.missing_target_count,
@@ -35361,6 +36025,39 @@ pub fn create_codex_lead_orchestration_record(
     Ok(record)
 }
 
+#[tauri::command]
+pub fn list_codex_lead_orchestration_records() -> Result<Vec<CodexLeadOrchestrationRecord>, String> {
+    let dir = codex_lead_orchestrations_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read codex-lead-orchestrations directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry = entry.map_err(|error| {
+            format!("failed to read Codex Lead orchestration entry: {error}")
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<CodexLeadOrchestrationRecord>(&content) {
+            records.push(record);
+        }
+    }
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(20);
+    Ok(records)
+}
+
 #[derive(Debug)]
 struct HermesKimiCommandCapture {
     stdout_full: String,
@@ -35979,14 +36676,52 @@ struct HermesKimiAssistProcessOutput {
     stderr_bytes: Vec<u8>,
     status: String,
     bounded_execution_performed: bool,
+    query_transport: String,
+    argv_char_count: u64,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
+}
+
+fn spawn_hermes_kimi_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
 }
 
 fn run_hermes_kimi_assist_process(
     compact_query: &str,
     timeout_ms: u64,
 ) -> HermesKimiAssistProcessOutput {
+    run_hermes_kimi_assist_process_with_binary("hermes", compact_query, timeout_ms)
+}
+
+fn run_hermes_kimi_assist_process_with_binary(
+    hermes_binary: &str,
+    compact_query: &str,
+    timeout_ms: u64,
+) -> HermesKimiAssistProcessOutput {
     let started = Instant::now();
-    let mut child = match Command::new("hermes")
+    let argv_char_count = [
+        "chat",
+        "-Q",
+        "--max-turns",
+        "1",
+        "--source",
+        "gravity-omega-native",
+        "--query",
+        compact_query,
+    ]
+    .iter()
+    .map(|value| value.chars().count() as u64)
+    .sum();
+    let mut child = match Command::new(hermes_binary)
         .args([
             "chat",
             "-Q",
@@ -36013,66 +36748,143 @@ fn run_hermes_kimi_assist_process(
                 stderr_bytes: error.to_string().into_bytes(),
                 status: "hermes_kimi_assist_brief_spawn_failed".to_string(),
                 bounded_execution_performed: false,
+                query_transport: "argv-compact-query".to_string(),
+                argv_char_count,
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
             };
         }
     };
 
     let pid = Some(child.id());
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_hermes_kimi_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_hermes_kimi_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
     let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let mut wait_error: Option<String> = None;
+    let exit_code;
     loop {
         match child.try_wait() {
-            Ok(Some(_status)) => break,
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
+            }
             Ok(None) => {
                 if started.elapsed() >= Duration::from_millis(timeout_ms) {
                     timed_out = true;
-                    let _ = child.kill();
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    match child.wait() {
+                        Ok(status) => {
+                            exit_code = status.code();
+                        }
+                        Err(error) => {
+                            exit_code = None;
+                            wait_error = Some(error.to_string());
+                        }
+                    }
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                     break;
                 }
                 std::thread::sleep(Duration::from_millis(50));
             }
             Err(error) => {
+                let stdout_bytes = stdout_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                let mut stderr_bytes = stderr_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                if stderr_bytes.is_empty() {
+                    stderr_bytes = error.to_string().into_bytes();
+                }
+                let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
                 return HermesKimiAssistProcessOutput {
                     pid,
                     exit_code: None,
                     timed_out: false,
                     duration_ms: started.elapsed().as_millis() as u64,
-                    stdout_bytes: Vec::new(),
-                    stderr_bytes: error.to_string().into_bytes(),
+                    stdout_bytes,
+                    stderr_bytes,
                     status: "hermes_kimi_assist_brief_wait_failed".to_string(),
                     bounded_execution_performed: true,
+                    query_transport: "argv-compact-query".to_string(),
+                    argv_char_count,
+                    stdout_pipe_reader_enabled,
+                    stderr_pipe_reader_enabled,
+                    timeout_kill_sent: false,
+                    wait_after_kill_ms: 0,
+                    partial_output_captured,
                 };
             }
         }
     }
 
-    match child.wait_with_output() {
-        Ok(output) => HermesKimiAssistProcessOutput {
+    let stdout_bytes = stdout_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let mut stderr_bytes = stderr_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+    if let Some(error) = wait_error {
+        if stderr_bytes.is_empty() {
+            stderr_bytes = error.into_bytes();
+        }
+        return HermesKimiAssistProcessOutput {
             pid,
-            exit_code: output.status.code(),
+            exit_code,
             timed_out,
             duration_ms: started.elapsed().as_millis() as u64,
-            stdout_bytes: output.stdout,
-            stderr_bytes: output.stderr,
-            status: if timed_out {
-                "hermes_kimi_assist_brief_timed_out"
-            } else if output.status.success() {
-                "hermes_kimi_assist_brief_succeeded"
-            } else {
-                "hermes_kimi_assist_brief_failed"
-            }
-            .to_string(),
+            stdout_bytes,
+            stderr_bytes,
+            status: "hermes_kimi_assist_brief_wait_failed".to_string(),
             bounded_execution_performed: true,
-        },
-        Err(error) => HermesKimiAssistProcessOutput {
-            pid,
-            exit_code: None,
-            timed_out,
-            duration_ms: started.elapsed().as_millis() as u64,
-            stdout_bytes: Vec::new(),
-            stderr_bytes: error.to_string().into_bytes(),
-            status: "hermes_kimi_assist_brief_collect_failed".to_string(),
-            bounded_execution_performed: true,
-        },
+            query_transport: "argv-compact-query".to_string(),
+            argv_char_count,
+            stdout_pipe_reader_enabled,
+            stderr_pipe_reader_enabled,
+            timeout_kill_sent,
+            wait_after_kill_ms,
+            partial_output_captured,
+        };
+    }
+
+    HermesKimiAssistProcessOutput {
+        pid,
+        exit_code,
+        timed_out,
+        duration_ms: started.elapsed().as_millis() as u64,
+        stdout_bytes,
+        stderr_bytes,
+        status: if timed_out {
+            "hermes_kimi_assist_brief_timed_out"
+        } else if exit_code == Some(0) {
+            "hermes_kimi_assist_brief_succeeded"
+        } else {
+            "hermes_kimi_assist_brief_failed"
+        }
+        .to_string(),
+        bounded_execution_performed: true,
+        query_transport: "argv-compact-query".to_string(),
+        argv_char_count,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
     }
 }
 
@@ -36146,6 +36958,13 @@ pub fn record_hermes_kimi_assist_brief(
         stderr_bytes: Vec::new(),
         status: "hermes_kimi_assist_brief_not_started".to_string(),
         bounded_execution_performed: false,
+        query_transport: "not-started".to_string(),
+        argv_char_count: 0,
+        stdout_pipe_reader_enabled: false,
+        stderr_pipe_reader_enabled: false,
+        timeout_kill_sent: false,
+        wait_after_kill_ms: 0,
+        partial_output_captured: false,
     };
 
     if prompt_trimmed.is_empty() {
@@ -36230,6 +37049,13 @@ pub fn record_hermes_kimi_assist_brief(
         stderr: trim_probe_text(&output.stderr_bytes),
         stdout_size_bytes: output.stdout_bytes.len() as u64,
         stderr_size_bytes: output.stderr_bytes.len() as u64,
+        query_transport: output.query_transport.clone(),
+        argv_char_count: output.argv_char_count,
+        stdout_pipe_reader_enabled: output.stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled: output.stderr_pipe_reader_enabled,
+        timeout_kill_sent: output.timeout_kill_sent,
+        wait_after_kill_ms: output.wait_after_kill_ms,
+        partial_output_captured: output.partial_output_captured,
         stdout_transcript_path: stdout_transcript_display.clone(),
         stderr_transcript_path: stderr_transcript_display.clone(),
         inventory_record_path,
@@ -36283,6 +37109,13 @@ pub fn record_hermes_kimi_assist_brief(
             "duration_ms": record.duration_ms,
             "stdout_size_bytes": record.stdout_size_bytes,
             "stderr_size_bytes": record.stderr_size_bytes,
+            "query_transport": &record.query_transport,
+            "argv_char_count": record.argv_char_count,
+            "stdout_pipe_reader_enabled": record.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": record.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": record.timeout_kill_sent,
+            "wait_after_kill_ms": record.wait_after_kill_ms,
+            "partial_output_captured": record.partial_output_captured,
             "focus_skill_count": record.focus_skills.len(),
             "mcp_focus_count": record.mcp_servers.len(),
             "hook_focus_count": record.hooks.len(),
@@ -37649,8 +38482,19 @@ fn agent_transcript_targets() -> Vec<AgentTranscriptTarget> {
     ]
 }
 
-fn run_agent_transcript_target(
+fn spawn_agent_transcript_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_agent_transcript_target_with_binary(
     target: &AgentTranscriptTarget,
+    binary: &str,
     requested_by: &str,
     timeout_ms: u64,
     timestamp: u64,
@@ -37689,7 +38533,13 @@ fn run_agent_transcript_target(
     let stderr_bytes: Vec<u8>;
     let status: String;
 
-    match Command::new(target.binary)
+    let mut stdout_pipe_reader_enabled = false;
+    let mut stderr_pipe_reader_enabled = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let partial_output_captured: bool;
+
+    match Command::new(binary)
         .args(&target.args)
         .current_dir(dir)
         .stdin(Stdio::null())
@@ -37699,20 +38549,53 @@ fn run_agent_transcript_target(
     {
         Ok(mut child) => {
             pid = Some(child.id());
+            let stdout_reader = child
+                .stdout
+                .take()
+                .map(spawn_agent_transcript_pipe_reader);
+            let stderr_reader = child
+                .stderr
+                .take()
+                .map(spawn_agent_transcript_pipe_reader);
+            stdout_pipe_reader_enabled = stdout_reader.is_some();
+            stderr_pipe_reader_enabled = stderr_reader.is_some();
+
             loop {
                 match child.try_wait() {
-                    Ok(Some(_status)) => break,
+                    Ok(Some(status_value)) => {
+                        exit_code = status_value.code();
+                        break;
+                    }
                     Ok(None) => {
                         if started.elapsed() >= Duration::from_millis(timeout_ms) {
                             timed_out = true;
-                            let _ = child.kill();
+                            let kill_started = Instant::now();
+                            timeout_kill_sent = child.kill().is_ok();
+                            exit_code = child.wait().ok().and_then(|status_value| status_value.code());
+                            wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                             break;
                         }
                         std::thread::sleep(Duration::from_millis(20));
                     }
                     Err(error) => {
-                        stdout_bytes = Vec::new();
-                        stderr_bytes = error.to_string().into_bytes();
+                        let kill_started = Instant::now();
+                        timeout_kill_sent = child.kill().is_ok();
+                        exit_code = child.wait().ok().and_then(|status_value| status_value.code());
+                        wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                        let mut stderr_existing = error.to_string().into_bytes();
+                        if let Some(handle) = stderr_reader {
+                            if let Ok(mut existing) = handle.join() {
+                                existing.extend_from_slice(b"\n");
+                                existing.extend(stderr_existing);
+                                stderr_existing = existing;
+                            }
+                        }
+                        stdout_bytes = stdout_reader
+                            .and_then(|handle| handle.join().ok())
+                            .unwrap_or_default();
+                        stderr_bytes = stderr_existing;
+                        partial_output_captured =
+                            !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
                         status = "agent_transcript_session_wait_failed".to_string();
                         return write_agent_transcript_session_record(
                             target,
@@ -37720,8 +38603,13 @@ fn run_agent_transcript_target(
                             timestamp,
                             started.elapsed().as_millis() as u64,
                             pid,
-                            None,
+                            exit_code,
                             false,
+                            stdout_pipe_reader_enabled,
+                            stderr_pipe_reader_enabled,
+                            timeout_kill_sent,
+                            wait_after_kill_ms,
+                            partial_output_captured,
                             stdout_bytes,
                             stderr_bytes,
                             status,
@@ -37734,18 +38622,16 @@ fn run_agent_transcript_target(
                 }
             }
 
-            let output = child.wait_with_output().map_err(|error| {
-                format!(
-                    "failed to collect agent transcript session output for {}: {error}",
-                    target.target
-                )
-            })?;
-            exit_code = output.status.code();
-            stdout_bytes = output.stdout;
-            stderr_bytes = output.stderr;
+            stdout_bytes = stdout_reader
+                .and_then(|handle| handle.join().ok())
+                .unwrap_or_default();
+            stderr_bytes = stderr_reader
+                .and_then(|handle| handle.join().ok())
+                .unwrap_or_default();
+            partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
             status = if timed_out {
                 "agent_transcript_session_timed_out"
-            } else if output.status.success() {
+            } else if exit_code == Some(0) {
                 "agent_transcript_session_succeeded"
             } else {
                 "agent_transcript_session_failed"
@@ -37756,6 +38642,7 @@ fn run_agent_transcript_target(
             stdout_bytes = Vec::new();
             stderr_bytes = error.to_string().into_bytes();
             status = "agent_transcript_session_spawn_failed".to_string();
+            partial_output_captured = !stderr_bytes.is_empty();
         }
     }
 
@@ -37767,6 +38654,11 @@ fn run_agent_transcript_target(
         pid,
         exit_code,
         timed_out,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
         stdout_bytes,
         stderr_bytes,
         status,
@@ -37774,6 +38666,23 @@ fn run_agent_transcript_target(
         log_path,
         stdout_transcript_path,
         stderr_transcript_path,
+    )
+}
+
+fn run_agent_transcript_target(
+    target: &AgentTranscriptTarget,
+    requested_by: &str,
+    timeout_ms: u64,
+    timestamp: u64,
+    dir: &Path,
+) -> Result<AgentTranscriptSessionRecord, String> {
+    run_agent_transcript_target_with_binary(
+        target,
+        target.binary,
+        requested_by,
+        timeout_ms,
+        timestamp,
+        dir,
     )
 }
 
@@ -37786,6 +38695,11 @@ fn write_agent_transcript_session_record(
     pid: Option<u32>,
     exit_code: Option<i32>,
     timed_out: bool,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
     stdout_bytes: Vec<u8>,
     stderr_bytes: Vec<u8>,
     status: String,
@@ -37833,6 +38747,11 @@ fn write_agent_transcript_session_record(
         exit_code,
         timed_out,
         duration_ms,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
         stdout: trim_probe_text(&stdout_bytes),
         stderr: trim_probe_text(&stderr_bytes),
         stdout_size_bytes: stdout_bytes.len() as u64,
@@ -37886,6 +38805,11 @@ fn write_agent_transcript_session_record(
             "exit_code": exit_code,
             "timed_out": timed_out,
             "duration_ms": duration_ms,
+            "stdout_pipe_reader_enabled": record.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": record.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": record.timeout_kill_sent,
+            "wait_after_kill_ms": record.wait_after_kill_ms,
+            "partial_output_captured": record.partial_output_captured,
             "stdout_size_bytes": record.stdout_size_bytes,
             "stderr_size_bytes": record.stderr_size_bytes,
             "process_spawn_enabled": true,
@@ -41964,12 +42888,262 @@ fn product_terminal_allowed_argv(command: &str) -> Result<Vec<String>, String> {
     Ok(argv.iter().map(|value| value.to_string()).collect())
 }
 
+fn product_terminal_block_class(denied_reason: &str) -> String {
+    if denied_reason.contains("blocked shell pattern") {
+        "blocked-shell-pattern".to_string()
+    } else if denied_reason.contains("cannot be empty") {
+        "empty-command".to_string()
+    } else {
+        "allowlist-denied".to_string()
+    }
+}
+
+fn record_product_terminal_blocked_command(
+    command: &str,
+    requested_mode: &str,
+    denied_reason: &str,
+) -> Result<ProductTerminalBlockedCommandRecord, String> {
+    let timestamp = now_ms()?;
+    let dir = product_terminal_blocked_commands_dir()?;
+    fs::create_dir_all(&dir)
+        .map_err(|error| format!("failed to create blocked terminal command dir: {error}"))?;
+    let id = format!(
+        "product-terminal-blocked-command-{}-{}-{}",
+        timestamp,
+        std::process::id(),
+        slug_limit(requested_mode, 32)
+    );
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+    let record = ProductTerminalBlockedCommandRecord {
+        id,
+        status: "product_terminal_command_blocked".to_string(),
+        command_preview: prompt_preview(command, 240),
+        command_size_bytes: command.len() as u64,
+        requested_mode: requested_mode.to_string(),
+        denied_reason: denied_reason.to_string(),
+        block_class: product_terminal_block_class(denied_reason),
+        allowlist_enforced: true,
+        process_spawn_enabled: false,
+        transcript_capture_enabled: false,
+        command_runner_enabled: false,
+        terminal_write_enabled: false,
+        live_tail_enabled: false,
+        process_control_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path.display().to_string(),
+        log_path: log_path.display().to_string(),
+        next_step: "Review the denied command evidence and choose an already allowed product terminal command."
+            .to_string(),
+    };
+
+    fs::write(
+        &record_path,
+        serde_json::to_string_pretty(&record).map_err(|error| {
+            format!("failed to serialize blocked terminal command record: {error}")
+        })?,
+    )
+    .map_err(|error| {
+        format!(
+            "failed to write blocked terminal command record {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "id": &record.id,
+            "status": &record.status,
+            "requested_mode": &record.requested_mode,
+            "denied_reason": &record.denied_reason,
+            "block_class": &record.block_class,
+            "allowlist_enforced": record.allowlist_enforced,
+            "process_spawn_enabled": false,
+            "command_runner_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": record.created_at_ms
+        }),
+    )?;
+
+    Ok(record)
+}
+
+struct ProductTerminalCommandProcessOutput {
+    pid: Option<u32>,
+    exit_code: Option<i32>,
+    timed_out: bool,
+    duration_ms: u64,
+    stdout_bytes: Vec<u8>,
+    stderr_bytes: Vec<u8>,
+    status: String,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
+}
+
+fn spawn_product_terminal_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_product_terminal_command_process(
+    binary: &str,
+    args: &[String],
+    workspace_root: &Path,
+    timeout_ms: u64,
+) -> ProductTerminalCommandProcessOutput {
+    let started = Instant::now();
+    let mut child = match Command::new(binary)
+        .args(args)
+        .current_dir(workspace_root)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(error) => {
+            return ProductTerminalCommandProcessOutput {
+                pid: None,
+                exit_code: None,
+                timed_out: false,
+                duration_ms: started.elapsed().as_millis() as u64,
+                stdout_bytes: Vec::new(),
+                stderr_bytes: error.to_string().into_bytes(),
+                status: "product_terminal_command_spawn_failed".to_string(),
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
+            };
+        }
+    };
+
+    let pid = Some(child.id());
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_product_terminal_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_product_terminal_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
+    let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let exit_code;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
+            }
+            Ok(None) => {
+                if started.elapsed() >= Duration::from_millis(timeout_ms) {
+                    timed_out = true;
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    exit_code = child.wait().ok().and_then(|status| status.code());
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(error) => {
+                let stdout_bytes = stdout_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                let mut stderr_bytes = stderr_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                if stderr_bytes.is_empty() {
+                    stderr_bytes = error.to_string().into_bytes();
+                }
+                let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+                return ProductTerminalCommandProcessOutput {
+                    pid,
+                    exit_code: None,
+                    timed_out: false,
+                    duration_ms: started.elapsed().as_millis() as u64,
+                    stdout_bytes,
+                    stderr_bytes,
+                    status: "product_terminal_command_wait_failed".to_string(),
+                    stdout_pipe_reader_enabled,
+                    stderr_pipe_reader_enabled,
+                    timeout_kill_sent: false,
+                    wait_after_kill_ms: 0,
+                    partial_output_captured,
+                };
+            }
+        }
+    }
+
+    let stdout_bytes = stdout_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let stderr_bytes = stderr_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+    let status = if timed_out {
+        "product_terminal_command_timed_out"
+    } else if exit_code == Some(0) {
+        "product_terminal_command_succeeded"
+    } else {
+        "product_terminal_command_failed"
+    }
+    .to_string();
+
+    ProductTerminalCommandProcessOutput {
+        pid,
+        exit_code,
+        timed_out,
+        duration_ms: started.elapsed().as_millis() as u64,
+        stdout_bytes,
+        stderr_bytes,
+        status,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
+    }
+}
+
 #[tauri::command]
 pub fn run_product_terminal_command(
     request: ProductTerminalCommandRequest,
 ) -> Result<ProductTerminalCommandResult, String> {
     let command = request.command.trim().to_string();
-    let argv = product_terminal_allowed_argv(&command)?;
+    let argv = match product_terminal_allowed_argv(&command) {
+        Ok(argv) => argv,
+        Err(error) => {
+            let _ = record_product_terminal_blocked_command(&command, "sync", &error);
+            return Err(error);
+        }
+    };
     let binary = argv
         .first()
         .ok_or_else(|| "terminal command allowlist produced no binary".to_string())?
@@ -41996,94 +43170,25 @@ pub fn run_product_terminal_command(
     let log_path = dir.join(format!("{id}.jsonl"));
     let stdout_transcript_path = dir.join(format!("{id}.stdout.txt"));
     let stderr_transcript_path = dir.join(format!("{id}.stderr.txt"));
-    let started = Instant::now();
-    let mut pid = None;
-    let mut exit_code = None;
-    let mut timed_out = false;
-    let stdout_bytes: Vec<u8>;
-    let stderr_bytes: Vec<u8>;
-    let status: String;
-
-    match Command::new(&binary)
-        .args(&args)
-        .current_dir(&workspace_root)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
-        Ok(mut child) => {
-            pid = Some(child.id());
-            loop {
-                match child.try_wait() {
-                    Ok(Some(_status)) => break,
-                    Ok(None) => {
-                        if started.elapsed() >= Duration::from_millis(timeout_ms) {
-                            timed_out = true;
-                            let _ = child.kill();
-                            break;
-                        }
-                        std::thread::sleep(Duration::from_millis(50));
-                    }
-                    Err(error) => {
-                        stdout_bytes = Vec::new();
-                        stderr_bytes = error.to_string().into_bytes();
-                        status = "product_terminal_command_wait_failed".to_string();
-                        return write_product_terminal_command_result(
-                            command,
-                            argv,
-                            workspace_root,
-                            timestamp,
-                            started.elapsed().as_millis() as u64,
-                            pid,
-                            None,
-                            false,
-                            stdout_bytes,
-                            stderr_bytes,
-                            status,
-                            record_path,
-                            log_path,
-                            stdout_transcript_path,
-                            stderr_transcript_path,
-                        );
-                    }
-                }
-            }
-
-            let output = child.wait_with_output().map_err(|error| {
-                format!("failed to collect product terminal command output: {error}")
-            })?;
-            exit_code = output.status.code();
-            stdout_bytes = output.stdout;
-            stderr_bytes = output.stderr;
-            status = if timed_out {
-                "product_terminal_command_timed_out"
-            } else if output.status.success() {
-                "product_terminal_command_succeeded"
-            } else {
-                "product_terminal_command_failed"
-            }
-            .to_string();
-        }
-        Err(error) => {
-            stdout_bytes = Vec::new();
-            stderr_bytes = error.to_string().into_bytes();
-            status = "product_terminal_command_spawn_failed".to_string();
-        }
-    }
+    let output = run_product_terminal_command_process(&binary, &args, &workspace_root, timeout_ms);
 
     write_product_terminal_command_result(
         command,
         argv,
         workspace_root,
         timestamp,
-        started.elapsed().as_millis() as u64,
-        pid,
-        exit_code,
-        timed_out,
-        stdout_bytes,
-        stderr_bytes,
-        status,
+        output.duration_ms,
+        output.pid,
+        output.exit_code,
+        output.timed_out,
+        output.stdout_bytes,
+        output.stderr_bytes,
+        output.status,
+        output.stdout_pipe_reader_enabled,
+        output.stderr_pipe_reader_enabled,
+        output.timeout_kill_sent,
+        output.wait_after_kill_ms,
+        output.partial_output_captured,
         record_path,
         log_path,
         stdout_transcript_path,
@@ -42107,7 +43212,14 @@ fn emit_product_terminal_stream_event(
             "line": event.line,
             "status": event.status,
             "exit_code": event.exit_code,
+            "duration_ms": event.duration_ms,
+            "stdout_pipe_reader_enabled": event.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": event.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": event.timeout_kill_sent,
+            "wait_after_kill_ms": event.wait_after_kill_ms,
+            "partial_output_captured": event.partial_output_captured,
             "record_path": event.record_path,
+            "log_path": event.log_path,
             "created_at_ms": event.created_at_ms
         }),
     );
@@ -42139,6 +43251,12 @@ fn read_product_terminal_stream<R: Read + Send + 'static>(
                 line,
                 status: "product_terminal_stream_output".to_string(),
                 exit_code: None,
+                duration_ms: 0,
+                stdout_pipe_reader_enabled: true,
+                stderr_pipe_reader_enabled: true,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: true,
                 record_path: record_path.clone(),
                 log_path: log_path.display().to_string(),
                 created_at_ms,
@@ -42154,7 +43272,13 @@ pub fn run_product_terminal_command_stream(
     request: ProductTerminalCommandRequest,
 ) -> Result<ProductTerminalStreamStartResult, String> {
     let command = request.command.trim().to_string();
-    let argv = product_terminal_allowed_argv(&command)?;
+    let argv = match product_terminal_allowed_argv(&command) {
+        Ok(argv) => argv,
+        Err(error) => {
+            let _ = record_product_terminal_blocked_command(&command, "stream", &error);
+            return Err(error);
+        }
+    };
     let binary = argv
         .first()
         .ok_or_else(|| "terminal command allowlist produced no binary".to_string())?
@@ -42194,6 +43318,9 @@ pub fn run_product_terminal_command_stream(
         stderr_transcript_path: stderr_transcript_path.display().to_string(),
         created_at_ms: timestamp,
         stream_event_name: PRODUCT_TERMINAL_STREAM_EVENT,
+        stdout_pipe_reader_expected: true,
+        stderr_pipe_reader_expected: true,
+        timeout_ms,
         stream_enabled: true,
         process_spawn_enabled: true,
         transcript_capture_enabled: true,
@@ -42212,6 +43339,12 @@ pub fn run_product_terminal_command_stream(
             "stream_event_name": PRODUCT_TERMINAL_STREAM_EVENT,
             "stdout_transcript_path": result.stdout_transcript_path,
             "stderr_transcript_path": result.stderr_transcript_path,
+            "stdout_pipe_reader_enabled": true,
+            "stderr_pipe_reader_enabled": true,
+            "timeout_kill_sent": false,
+            "wait_after_kill_ms": 0,
+            "partial_output_captured": false,
+            "timeout_ms": timeout_ms,
             "stream_enabled": true,
             "process_spawn_enabled": true,
             "transcript_capture_enabled": true,
@@ -42238,6 +43371,12 @@ pub fn run_product_terminal_command_stream(
             line: format!("started {}", result.command),
             status: "product_terminal_stream_started".to_string(),
             exit_code: None,
+            duration_ms: 0,
+            stdout_pipe_reader_enabled: true,
+            stderr_pipe_reader_enabled: true,
+            timeout_kill_sent: false,
+            wait_after_kill_ms: 0,
+            partial_output_captured: false,
             record_path: result.record_path.clone(),
             log_path: result.log_path.clone(),
             created_at_ms: timestamp,
@@ -42282,6 +43421,12 @@ pub fn run_product_terminal_command_stream(
                         "exit_code": null,
                         "timed_out": false,
                         "duration_ms": started.elapsed().as_millis() as u64,
+                        "stdout_pipe_reader_enabled": false,
+                        "stderr_pipe_reader_enabled": false,
+                        "timeout_kill_sent": false,
+                        "wait_after_kill_ms": 0,
+                        "partial_output_captured": true,
+                        "timeout_ms": timeout_ms,
                         "stdout_transcript_path": thread_stdout_path.display().to_string(),
                         "stderr_transcript_path": thread_stderr_path.display().to_string(),
                         "stream_enabled": true,
@@ -42303,6 +43448,12 @@ pub fn run_product_terminal_command_stream(
                         line,
                         status,
                         exit_code: None,
+                        duration_ms: started.elapsed().as_millis() as u64,
+                        stdout_pipe_reader_enabled: false,
+                        stderr_pipe_reader_enabled: false,
+                        timeout_kill_sent: false,
+                        wait_after_kill_ms: 0,
+                        partial_output_captured: true,
                         record_path: thread_record_path_display,
                         log_path: thread_log_path.display().to_string(),
                         created_at_ms: timestamp,
@@ -42350,18 +43501,35 @@ pub fn run_product_terminal_command_stream(
         });
 
         let mut timed_out = false;
+        let stdout_pipe_reader_enabled = stdout_handle.is_some();
+        let stderr_pipe_reader_enabled = stderr_handle.is_some();
+        let mut timeout_kill_sent = false;
+        let mut wait_after_kill_ms = 0;
+        let exit_code;
+        let mut wait_failed = false;
         loop {
             match child.try_wait() {
-                Ok(Some(_status)) => break,
+                Ok(Some(status)) => {
+                    exit_code = status.code();
+                    break;
+                }
                 Ok(None) => {
                     if started.elapsed() >= Duration::from_millis(timeout_ms) {
                         timed_out = true;
-                        let _ = child.kill();
+                        let kill_started = Instant::now();
+                        timeout_kill_sent = child.kill().is_ok();
+                        exit_code = child.wait().ok().and_then(|status| status.code());
+                        wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                         break;
                     }
                     std::thread::sleep(Duration::from_millis(50));
                 }
                 Err(error) => {
+                    wait_failed = true;
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    exit_code = child.wait().ok().and_then(|status| status.code());
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
                     emit_product_terminal_stream_event(
                         &thread_app,
                         &thread_log_path,
@@ -42371,6 +43539,12 @@ pub fn run_product_terminal_command_stream(
                             line: format!("wait failed: {error}"),
                             status: "product_terminal_stream_wait_failed".to_string(),
                             exit_code: None,
+                            duration_ms: started.elapsed().as_millis() as u64,
+                            stdout_pipe_reader_enabled,
+                            stderr_pipe_reader_enabled,
+                            timeout_kill_sent,
+                            wait_after_kill_ms,
+                            partial_output_captured: false,
                             record_path: thread_record_path_display.clone(),
                             log_path: thread_log_path.display().to_string(),
                             created_at_ms: timestamp,
@@ -42381,18 +43555,19 @@ pub fn run_product_terminal_command_stream(
             }
         }
 
-        let output_status = child.wait().ok();
-        let exit_code = output_status.and_then(|status| status.code());
         let stdout = stdout_handle
             .and_then(|handle| handle.join().ok())
             .unwrap_or_default();
         let stderr = stderr_handle
             .and_then(|handle| handle.join().ok())
             .unwrap_or_default();
+        let partial_output_captured = !stdout.is_empty() || !stderr.is_empty();
         let _ = fs::write(&thread_stdout_path, &stdout);
         let _ = fs::write(&thread_stderr_path, &stderr);
         let status = if timed_out {
             "product_terminal_stream_timed_out"
+        } else if wait_failed {
+            "product_terminal_stream_wait_failed"
         } else if exit_code == Some(0) {
             "product_terminal_stream_succeeded"
         } else {
@@ -42411,6 +43586,12 @@ pub fn run_product_terminal_command_stream(
                 "exit_code": exit_code,
                 "timed_out": timed_out,
                 "duration_ms": duration_ms,
+                "stdout_pipe_reader_enabled": stdout_pipe_reader_enabled,
+                "stderr_pipe_reader_enabled": stderr_pipe_reader_enabled,
+                "timeout_kill_sent": timeout_kill_sent,
+                "wait_after_kill_ms": wait_after_kill_ms,
+                "partial_output_captured": partial_output_captured,
+                "timeout_ms": timeout_ms,
                 "stdout_transcript_path": thread_stdout_path.display().to_string(),
                 "stderr_transcript_path": thread_stderr_path.display().to_string(),
                 "stream_enabled": true,
@@ -42432,6 +43613,12 @@ pub fn run_product_terminal_command_stream(
                 line: format!("{status} exit={exit_code:?} duration={duration_ms}ms"),
                 status,
                 exit_code,
+                duration_ms,
+                stdout_pipe_reader_enabled,
+                stderr_pipe_reader_enabled,
+                timeout_kill_sent,
+                wait_after_kill_ms,
+                partial_output_captured,
                 record_path: thread_record_path_display,
                 log_path: thread_log_path.display().to_string(),
                 created_at_ms: timestamp,
@@ -42454,6 +43641,11 @@ fn write_product_terminal_command_result(
     stdout_bytes: Vec<u8>,
     stderr_bytes: Vec<u8>,
     status: String,
+    stdout_pipe_reader_enabled: bool,
+    stderr_pipe_reader_enabled: bool,
+    timeout_kill_sent: bool,
+    wait_after_kill_ms: u64,
+    partial_output_captured: bool,
     record_path: PathBuf,
     log_path: PathBuf,
     stdout_transcript_path: PathBuf,
@@ -42475,6 +43667,11 @@ fn write_product_terminal_command_result(
         exit_code,
         timed_out,
         duration_ms,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
         stdout,
         stderr,
         stdout_transcript_path: stdout_transcript_path.display().to_string(),
@@ -42496,6 +43693,11 @@ fn write_product_terminal_command_result(
         "exit_code": result.exit_code,
         "timed_out": result.timed_out,
         "duration_ms": result.duration_ms,
+        "stdout_pipe_reader_enabled": result.stdout_pipe_reader_enabled,
+        "stderr_pipe_reader_enabled": result.stderr_pipe_reader_enabled,
+        "timeout_kill_sent": result.timeout_kill_sent,
+        "wait_after_kill_ms": result.wait_after_kill_ms,
+        "partial_output_captured": result.partial_output_captured,
         "stdout_transcript_path": result.stdout_transcript_path,
         "stderr_transcript_path": result.stderr_transcript_path,
         "process_spawn_enabled": true,
@@ -42524,6 +43726,11 @@ fn write_product_terminal_command_result(
             "exit_code": result.exit_code,
             "timed_out": result.timed_out,
             "duration_ms": result.duration_ms,
+            "stdout_pipe_reader_enabled": result.stdout_pipe_reader_enabled,
+            "stderr_pipe_reader_enabled": result.stderr_pipe_reader_enabled,
+            "timeout_kill_sent": result.timeout_kill_sent,
+            "wait_after_kill_ms": result.wait_after_kill_ms,
+            "partial_output_captured": result.partial_output_captured,
             "created_at_ms": timestamp
         }),
     )?;
@@ -42536,6 +43743,173 @@ fn terminal_record_created_at(value: &serde_json::Value) -> u64 {
         .get("created_at_ms")
         .and_then(|inner| inner.as_u64())
         .unwrap_or(0)
+}
+
+fn terminal_record_string(value: &serde_json::Value, key: &str, fallback: &str) -> String {
+    value
+        .get(key)
+        .and_then(|inner| inner.as_str())
+        .map(|inner| inner.to_string())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn terminal_record_bool(value: &serde_json::Value, key: &str) -> bool {
+    value
+        .get(key)
+        .and_then(|inner| inner.as_bool())
+        .unwrap_or(false)
+}
+
+fn terminal_record_u64(value: &serde_json::Value, key: &str) -> u64 {
+    value.get(key).and_then(|inner| inner.as_u64()).unwrap_or(0)
+}
+
+fn terminal_record_i32(value: &serde_json::Value, key: &str) -> Option<i32> {
+    value
+        .get(key)
+        .and_then(|inner| inner.as_i64())
+        .map(|inner| inner as i32)
+}
+
+fn terminal_transcript_size(path: &str) -> u64 {
+    if path.trim().is_empty() || path == "none" {
+        return 0;
+    }
+    fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0)
+}
+
+fn terminal_session_summary_from_record(
+    path: PathBuf,
+    value: serde_json::Value,
+) -> ProductTerminalSessionSummary {
+    let created_at_ms = terminal_record_created_at(&value);
+    let session_id = terminal_record_string(&value, "session_id", "").trim().to_string();
+    let session_id = if session_id.is_empty() {
+        path.file_stem()
+            .and_then(|inner| inner.to_str())
+            .unwrap_or("unknown-terminal-session")
+            .to_string()
+    } else {
+        session_id
+    };
+    let log_path = path.with_extension("jsonl").display().to_string();
+    let stdout_transcript_path = terminal_record_string(&value, "stdout_transcript_path", "none");
+    let stderr_transcript_path = terminal_record_string(&value, "stderr_transcript_path", "none");
+
+    ProductTerminalSessionSummary {
+        session_id,
+        status: terminal_record_string(&value, "status", "unknown"),
+        command: terminal_record_string(&value, "command", "none"),
+        cwd: terminal_record_string(&value, "cwd", "none"),
+        exit_code: terminal_record_i32(&value, "exit_code"),
+        timed_out: terminal_record_bool(&value, "timed_out"),
+        duration_ms: terminal_record_u64(&value, "duration_ms"),
+        stdout_size_bytes: terminal_transcript_size(&stdout_transcript_path),
+        stderr_size_bytes: terminal_transcript_size(&stderr_transcript_path),
+        stdout_pipe_reader_enabled: terminal_record_bool(&value, "stdout_pipe_reader_enabled"),
+        stderr_pipe_reader_enabled: terminal_record_bool(&value, "stderr_pipe_reader_enabled"),
+        timeout_kill_sent: terminal_record_bool(&value, "timeout_kill_sent"),
+        wait_after_kill_ms: terminal_record_u64(&value, "wait_after_kill_ms"),
+        partial_output_captured: terminal_record_bool(&value, "partial_output_captured"),
+        stdout_transcript_path,
+        stderr_transcript_path,
+        source_stream_enabled: terminal_record_bool(&value, "stream_enabled"),
+        source_process_spawn_enabled: terminal_record_bool(&value, "process_spawn_enabled"),
+        source_transcript_capture_enabled: terminal_record_bool(&value, "transcript_capture_enabled"),
+        source_command_runner_enabled: terminal_record_bool(&value, "command_runner_enabled"),
+        source_writes_allowed: terminal_record_bool(&value, "writes_allowed"),
+        source_execution_enabled: terminal_record_bool(&value, "execution_enabled"),
+        terminal_write_enabled: false,
+        live_tail_enabled: false,
+        process_control_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms,
+        record_path: path.display().to_string(),
+        log_path,
+    }
+}
+
+fn list_recent_product_terminal_session_summaries(
+    limit: usize,
+) -> Result<Vec<ProductTerminalSessionSummary>, String> {
+    let dir = product_terminal_sessions_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir)
+        .map_err(|error| format!("failed to read terminal session directory: {error}"))?
+    {
+        let entry = entry.map_err(|error| format!("failed to read terminal session entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let value = match serde_json::from_str::<serde_json::Value>(&content) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        records.push(terminal_session_summary_from_record(path, value));
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(limit);
+    Ok(records)
+}
+
+fn list_product_terminal_blocked_commands(
+    limit: usize,
+) -> Result<Vec<ProductTerminalBlockedCommandRecord>, String> {
+    let dir = product_terminal_blocked_commands_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir)
+        .map_err(|error| format!("failed to read blocked terminal command directory: {error}"))?
+    {
+        let entry = entry.map_err(|error| {
+            format!("failed to read blocked terminal command directory entry: {error}")
+        })?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let mut record = match serde_json::from_str::<ProductTerminalBlockedCommandRecord>(&content) {
+            Ok(record) => record,
+            Err(_) => continue,
+        };
+        if record.record_path.trim().is_empty() {
+            record.record_path = path.display().to_string();
+        }
+        if record.log_path.trim().is_empty() {
+            record.log_path = path.with_extension("jsonl").display().to_string();
+        }
+        records.push(record);
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(limit);
+    Ok(records)
 }
 
 fn latest_product_terminal_session_record() -> Result<Option<(PathBuf, serde_json::Value)>, String> {
@@ -44939,6 +46313,15 @@ fn product_evidence_title_detail(
             let duration = json_u64(value, "duration_ms").unwrap_or(0);
             (command, format!("exit={exit_code}; duration={duration}ms"))
         }
+        "terminal-blocked" => {
+            let mode = json_string(value, "requested_mode").unwrap_or_else(|| "terminal".to_string());
+            let block_class = json_string(value, "block_class").unwrap_or_else(|| "allowlist-denied".to_string());
+            let preview = json_string(value, "command_preview").unwrap_or_else(|| "blocked command".to_string());
+            (
+                format!("Blocked terminal command: {mode}"),
+                format!("{block_class}; preview={preview}; process_spawn=false; execution=false"),
+            )
+        }
         "terminal-replay" => {
             let command = json_string(value, "command").unwrap_or_else(|| "terminal replay".to_string());
             let stdout_lines = json_u64(value, "stdout_line_count").unwrap_or(0);
@@ -45019,6 +46402,49 @@ fn product_evidence_title_detail(
             (
                 "Runtime sidecar process snapshot".to_string(),
                 format!("running={running}/{targets}; processes={processes}; hermes={hermes}; sswp={sswp}; steno={steno}; control_disabled=true"),
+            )
+        }
+        "desktop-environment" => {
+            let status = json_string(value, "status").unwrap_or_else(|| "desktop_environment_snapshot".to_string());
+            let wayland = value
+                .get("wayland_display_present")
+                .and_then(|inner| inner.as_bool())
+                .unwrap_or(false);
+            let x11 = value
+                .get("display_present")
+                .and_then(|inner| inner.as_bool())
+                .unwrap_or(false);
+            let ydotool = value
+                .get("ydotool_socket_is_socket")
+                .and_then(|inner| inner.as_bool())
+                .unwrap_or(false);
+            (
+                "Desktop environment snapshot".to_string(),
+                format!("{status}; wayland={wayland}; x11={x11}; ydotool_socket={ydotool}; control_disabled=true"),
+            )
+        }
+        "desktop-stage1-capability" => {
+            let status = json_string(value, "status").unwrap_or_else(|| "desktop_stage1_capability_snapshot".to_string());
+            let available = json_u64(value, "available_tool_count").unwrap_or(0);
+            let tools = json_u64(value, "tool_count").unwrap_or(0);
+            let windows = json_u64(value, "available_window_inventory_tool_count").unwrap_or(0);
+            let screenshots = json_u64(value, "available_screenshot_tool_count").unwrap_or(0);
+            let accessibility = json_u64(value, "available_accessibility_tool_count").unwrap_or(0);
+            (
+                "Desktop stage-1 capability snapshot".to_string(),
+                format!("{status}; available={available}/{tools}; windows={windows}; screenshots={screenshots}; accessibility={accessibility}; process_spawn=false"),
+            )
+        }
+        "evidence-durability" => {
+            let status = json_string(value, "status").unwrap_or_else(|| "evidence_durability_manifest".to_string());
+            let readable = json_u64(value, "readable_record_count").unwrap_or(0);
+            let records = json_u64(value, "evidence_record_count").unwrap_or(0);
+            let missing = json_u64(value, "missing_record_count").unwrap_or(0);
+            let categories = json_u64(value, "category_count").unwrap_or(0);
+            let manifest_hash = json_string(value, "manifest_hash").unwrap_or_else(|| "hash-missing".to_string());
+            (
+                "Evidence durability manifest".to_string(),
+                format!("{status}; readable={readable}/{records}; missing={missing}; categories={categories}; seal={manifest_hash}; export=false"),
             )
         }
         "codex-orchestration" => {
@@ -45135,6 +46561,11 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
     let mut items = Vec::new();
     push_product_evidence_history_dir(&mut items, "workspace", product_workspace_events_dir()?)?;
     push_product_evidence_history_dir(&mut items, "terminal", product_terminal_sessions_dir()?)?;
+    push_product_evidence_history_dir(
+        &mut items,
+        "terminal-blocked",
+        product_terminal_blocked_commands_dir()?,
+    )?;
     push_product_evidence_history_dir(&mut items, "terminal-replay", product_terminal_transcript_replays_dir()?)?;
     push_product_evidence_history_dir(&mut items, "sovereign-docs", sovereign_docs_previews_dir()?)?;
     push_product_evidence_history_dir(&mut items, "omega-computer", omega_computer_sessions_dir()?)?;
@@ -45144,6 +46575,9 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
     push_product_evidence_history_dir(&mut items, "runtime-packet", runtime_launch_packets_dir()?)?;
     push_product_evidence_history_dir(&mut items, "runtime-depth", runtime_depth_probes_dir()?)?;
     push_product_evidence_history_dir(&mut items, "runtime-sidecar-process", runtime_sidecar_process_snapshots_dir()?)?;
+    push_product_evidence_history_dir(&mut items, "desktop-environment", desktop_environment_snapshots_dir()?)?;
+    push_product_evidence_history_dir(&mut items, "desktop-stage1-capability", desktop_read_only_capability_snapshots_dir()?)?;
+    push_product_evidence_history_dir(&mut items, "evidence-durability", evidence_durability_manifests_dir()?)?;
     push_product_evidence_history_dir(&mut items, "codex-orchestration", codex_lead_orchestrations_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-inventory", hermes_kimi_capability_inventories_dir()?)?;
     push_product_evidence_history_dir(&mut items, "hermes-assist", hermes_kimi_assist_briefs_dir()?)?;
@@ -45177,6 +46611,229 @@ pub fn product_evidence_history() -> Result<ProductEvidenceHistory, String> {
         writes_allowed: false,
         execution_enabled: false,
     })
+}
+
+fn stable_local_evidence_hash(input: &str) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in input.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("fnv1a64:{hash:016x}")
+}
+
+#[tauri::command]
+pub fn record_evidence_durability_manifest(
+    request: EvidenceDurabilityManifestRequest,
+) -> Result<EvidenceDurabilityManifestRecord, String> {
+    let timestamp = now_ms()?;
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "evidence-durability".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "evidence-durability".to_string()
+    } else {
+        requested_by
+    };
+    let history = product_evidence_history()?;
+    let mut categories = BTreeMap::<String, EvidenceDurabilityManifestCategory>::new();
+    let mut rows = Vec::new();
+    let mut readable_record_count = 0usize;
+    let mut missing_record_count = 0usize;
+
+    for item in &history.items {
+        let read_result = fs::read_to_string(&item.record_path);
+        let (readable, byte_count) = match read_result {
+            Ok(content) => {
+                readable_record_count += 1;
+                (true, content.len())
+            }
+            Err(_) => {
+                missing_record_count += 1;
+                (false, 0usize)
+            }
+        };
+        let category = categories
+            .entry(item.category.clone())
+            .or_insert_with(|| EvidenceDurabilityManifestCategory {
+                category: item.category.clone(),
+                record_count: 0,
+                readable_record_count: 0,
+                missing_record_count: 0,
+                latest_created_at_ms: 0,
+                latest_record_path: String::new(),
+            });
+        category.record_count += 1;
+        if readable {
+            category.readable_record_count += 1;
+        } else {
+            category.missing_record_count += 1;
+        }
+        if item.created_at_ms >= category.latest_created_at_ms {
+            category.latest_created_at_ms = item.created_at_ms;
+            category.latest_record_path = item.record_path.clone();
+        }
+        rows.push(serde_json::json!({
+            "category": &item.category,
+            "id": &item.id,
+            "status": &item.status,
+            "record_path": &item.record_path,
+            "created_at_ms": item.created_at_ms,
+            "readable": readable,
+            "byte_count": byte_count,
+        }));
+    }
+
+    rows.sort_by(|left, right| {
+        serde_json::to_string(left)
+            .unwrap_or_default()
+            .cmp(&serde_json::to_string(right).unwrap_or_default())
+    });
+    let manifest_input = serde_json::to_string(&serde_json::json!({
+        "source_history_status": &history.status,
+        "source_history_item_count": history.item_count,
+        "rows": rows,
+    }))
+    .map_err(|error| format!("failed to serialize evidence manifest input: {error}"))?;
+    let manifest_hash = stable_local_evidence_hash(&manifest_input);
+    let id = format!("evidence-durability-manifest-{}-{}", timestamp, std::process::id());
+    let dir = evidence_durability_manifests_dir()?;
+    fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "failed to create evidence durability manifests directory {}: {error}",
+            dir.display()
+        )
+    })?;
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+    let latest = history.items.first();
+    let blockers = if missing_record_count > 0 {
+        vec![format!(
+            "{missing_record_count} product evidence record path(s) were not readable during manifest creation"
+        )]
+    } else {
+        Vec::new()
+    };
+    let status = if history.items.is_empty() {
+        "evidence_durability_manifest_empty"
+    } else if missing_record_count > 0 {
+        "evidence_durability_manifest_recorded_with_missing_records"
+    } else {
+        "evidence_durability_manifest_recorded"
+    }
+    .to_string();
+    let record_path_display = record_path.display().to_string();
+    let log_path_display = log_path.display().to_string();
+    let record = EvidenceDurabilityManifestRecord {
+        id: id.clone(),
+        status: status.clone(),
+        requested_by,
+        source_history_status: history.status.clone(),
+        source_history_item_count: history.item_count,
+        category_count: history.category_count,
+        evidence_record_count: history.items.len(),
+        readable_record_count,
+        missing_record_count,
+        manifest_input_bytes: manifest_input.len(),
+        manifest_hash: manifest_hash.clone(),
+        latest_evidence_category: latest.map(|item| item.category.clone()).unwrap_or_default(),
+        latest_evidence_id: latest.map(|item| item.id.clone()).unwrap_or_default(),
+        latest_evidence_status: latest.map(|item| item.status.clone()).unwrap_or_default(),
+        latest_evidence_title: latest.map(|item| item.title.clone()).unwrap_or_default(),
+        latest_evidence_record_path: latest.map(|item| item.record_path.clone()).unwrap_or_default(),
+        latest_evidence_created_at_ms: latest.map(|item| item.created_at_ms).unwrap_or(0),
+        categories: categories.into_values().collect(),
+        local_manifest_recorded: true,
+        read_only: true,
+        history_enabled: true,
+        evidence_read_enabled: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        export_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path_display.clone(),
+        log_path: log_path_display.clone(),
+        blockers,
+        next_step: "Use this local manifest to prove evidence continuity before any export, live MCP, terminal/process, desktop, write, patch, or memory gate can open.".to_string(),
+    };
+    let json = serde_json::to_string_pretty(&record)
+        .map_err(|error| format!("failed to serialize evidence durability manifest: {error}"))?;
+    fs::write(&record_path, json).map_err(|error| {
+        format!(
+            "failed to write evidence durability manifest {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "event": "evidence_durability_manifest_recorded",
+            "id": &record.id,
+            "status": &record.status,
+            "evidence_record_count": record.evidence_record_count,
+            "readable_record_count": record.readable_record_count,
+            "missing_record_count": record.missing_record_count,
+            "category_count": record.category_count,
+            "manifest_hash": &record.manifest_hash,
+            "local_manifest_recorded": true,
+            "export_enabled": false,
+            "process_spawn_enabled": false,
+            "terminal_enabled": false,
+            "desktop_control_enabled": false,
+            "live_mcp_call_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": timestamp
+        }),
+    )?;
+    Ok(record)
+}
+
+#[tauri::command]
+pub fn list_evidence_durability_manifests(
+) -> Result<Vec<EvidenceDurabilityManifestRecord>, String> {
+    let dir = evidence_durability_manifests_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read evidence durability manifests directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry = entry.map_err(|error| format!("failed to read evidence durability manifest entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<EvidenceDurabilityManifestRecord>(&content) {
+            records.push(record);
+        }
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(40);
+    Ok(records)
 }
 
 fn inventory_item(
@@ -95014,6 +96671,397 @@ fn codex_hermes_run_view_section(
     }
 }
 
+#[derive(Debug, Clone)]
+struct TranscriptEvidencePreview {
+    path: Option<String>,
+    found: bool,
+    line_count: usize,
+    size_bytes: u64,
+    truncated: bool,
+    preview: Option<String>,
+}
+
+fn transcript_evidence_preview(
+    path: &str,
+    max_bytes: usize,
+    max_preview_chars: usize,
+) -> TranscriptEvidencePreview {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return TranscriptEvidencePreview {
+            path: None,
+            found: false,
+            line_count: 0,
+            size_bytes: 0,
+            truncated: false,
+            preview: None,
+        };
+    }
+
+    let mut preview = TranscriptEvidencePreview {
+        path: Some(trimmed.to_string()),
+        found: false,
+        line_count: 0,
+        size_bytes: 0,
+        truncated: false,
+        preview: None,
+    };
+
+    let Ok(metadata) = fs::metadata(trimmed) else {
+        return preview;
+    };
+    if !metadata.is_file() {
+        return preview;
+    }
+    preview.found = true;
+    preview.size_bytes = metadata.len();
+    preview.truncated = metadata.len() > max_bytes as u64;
+
+    let Ok(mut file) = fs::File::open(trimmed) else {
+        return preview;
+    };
+    let mut bytes = Vec::new();
+    let mut limited = std::io::Read::by_ref(&mut file).take((max_bytes + 1) as u64);
+    if limited.read_to_end(&mut bytes).is_err() {
+        return preview;
+    }
+    if bytes.len() > max_bytes {
+        bytes.truncate(max_bytes);
+        preview.truncated = true;
+    }
+    let content = String::from_utf8_lossy(&bytes).to_string();
+    preview.line_count = if content.is_empty() {
+        0
+    } else {
+        content.lines().count()
+    };
+    let compact = prompt_preview(&content, max_preview_chars);
+    if !compact.trim().is_empty() {
+        preview.preview = Some(compact);
+    }
+    preview
+}
+
+fn codex_hermes_run_view_evidence_summary(
+    source_id: &'static str,
+    title: &'static str,
+    record_id: String,
+    status: String,
+    record_path: String,
+    log_path: String,
+    created_at_ms: u64,
+    primary_metric: String,
+    secondary_metric: String,
+    detail: String,
+    stdout_preview: Option<String>,
+    stderr_preview: Option<String>,
+    blockers: Vec<String>,
+    record_process_spawn_enabled: bool,
+    record_execution_enabled: bool,
+) -> CodexHermesRunViewEvidenceSummary {
+    CodexHermesRunViewEvidenceSummary {
+        source_id,
+        title,
+        record_id,
+        status,
+        record_path,
+        log_path,
+        created_at_ms,
+        primary_metric,
+        secondary_metric,
+        detail,
+        stdout_preview,
+        stderr_preview,
+        stdout_preview_source: "record-inline".to_string(),
+        stderr_preview_source: "record-inline".to_string(),
+        stdout_transcript_path: None,
+        stderr_transcript_path: None,
+        stdout_transcript_found: false,
+        stderr_transcript_found: false,
+        stdout_transcript_line_count: 0,
+        stderr_transcript_line_count: 0,
+        stdout_transcript_size_bytes: 0,
+        stderr_transcript_size_bytes: 0,
+        stdout_transcript_truncated: false,
+        stderr_transcript_truncated: false,
+        transcript_evidence_ready: false,
+        blocker_count: blockers.len(),
+        blockers,
+        read_only: true,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        capture_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        dashboard_execution_enabled: false,
+        record_process_spawn_enabled,
+        record_execution_enabled,
+    }
+}
+
+fn codex_orchestration_run_view_summary(
+    record: &CodexLeadOrchestrationRecord,
+) -> CodexHermesRunViewEvidenceSummary {
+    codex_hermes_run_view_evidence_summary(
+        "codex-lead-orchestration",
+        "Latest Codex Lead orchestration",
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "{} lanes ({} Codex / {} Hermes)",
+            record.delegation_count, record.codex_owned_count, record.hermes_assist_count
+        ),
+        format!(
+            "skills={} mcp={} hooks={}",
+            record.hermes_skill_count, record.hermes_mcp_server_count, record.hermes_hook_count
+        ),
+        format!(
+            "stream={} hermes={} runtime_depth_ready={} codex_ready={} hermes_ready={} sswp_ready={} mcp_ready={} steno_ready={} pet_ready={}",
+            record.stream_runtime,
+            record.hermes_lane_runtime,
+            record.runtime_depth_ready,
+            record.codex_runtime_ready,
+            record.hermes_runtime_ready,
+            record.sswp_runtime_ready,
+            record.mcp_metadata_ready,
+            record.steno_metadata_ready,
+            record.pet_metadata_ready
+        ),
+        None,
+        None,
+        record.blockers.clone(),
+        record.process_spawn_enabled || record.sidecar_launch_enabled,
+        record.execution_enabled,
+    )
+}
+
+fn hermes_inventory_run_view_summary(
+    record: &HermesKimiCapabilityInventoryRecord,
+) -> CodexHermesRunViewEvidenceSummary {
+    let focus = if record.focus_skills.is_empty() {
+        "focus=none".to_string()
+    } else {
+        format!(
+            "focus={}",
+            record
+                .focus_skills
+                .iter()
+                .take(8)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    codex_hermes_run_view_evidence_summary(
+        "hermes-kimi-inventory",
+        "Latest Hermes/Kimi capability inventory",
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "skills={} filesystem={}",
+            record.enabled_skill_count, record.filesystem_skill_count
+        ),
+        format!(
+            "mcp={} hooks={} {}",
+            record.mcp_server_count, record.hook_count, focus
+        ),
+        format!(
+            "skills_exit={:?} mcp_exit={:?} hooks_exit={:?} metadata_only={} skill_content_read={}",
+            record.skills_exit_code,
+            record.mcp_exit_code,
+            record.hooks_exit_code,
+            record.metadata_only,
+            record.skill_content_read_enabled
+        ),
+        None,
+        None,
+        record.blockers.clone(),
+        record.process_spawn_enabled,
+        record.execution_enabled,
+    )
+}
+
+fn hermes_assist_run_view_summary(
+    record: &HermesKimiAssistBriefRecord,
+    source_id: &'static str,
+    title: &'static str,
+) -> CodexHermesRunViewEvidenceSummary {
+    let stdout_transcript =
+        transcript_evidence_preview(&record.stdout_transcript_path, 64 * 1024, 900);
+    let stderr_transcript =
+        transcript_evidence_preview(&record.stderr_transcript_path, 64 * 1024, 480);
+    let stdout_preview = stdout_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stdout, 900)));
+    let stderr_preview = stderr_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stderr, 480)));
+    let mut summary = codex_hermes_run_view_evidence_summary(
+        source_id,
+        title,
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "exit={:?} timeout={} duration={}ms",
+            record.exit_code, record.timed_out, record.duration_ms
+        ),
+        format!(
+            "stdout={}b stderr={}b partial={}",
+            record.stdout_size_bytes, record.stderr_size_bytes, record.partial_output_captured
+        ),
+        format!(
+            "source={} max_turns={} transport={} argv_chars={} pipe_readers={}/{} timeout_kill={} wait_after_kill={}ms stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={}",
+            record.source,
+            record.max_turns,
+            record.query_transport,
+            record.argv_char_count,
+            record.stdout_pipe_reader_enabled,
+            record.stderr_pipe_reader_enabled,
+            record.timeout_kill_sent,
+            record.wait_after_kill_ms,
+            record.stdout_transcript_path,
+            stdout_transcript.found,
+            stdout_transcript.line_count,
+            record.stderr_transcript_path,
+            stderr_transcript.found,
+            stderr_transcript.line_count
+        ),
+        stdout_preview,
+        stderr_preview,
+        record.blockers.clone(),
+        record.process_spawn_enabled,
+        record.execution_enabled,
+    );
+    summary.stdout_preview_source = if stdout_transcript.preview.is_some() {
+        "stdout-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stderr_preview_source = if stderr_transcript.preview.is_some() {
+        "stderr-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stdout_transcript_path = stdout_transcript.path.clone();
+    summary.stderr_transcript_path = stderr_transcript.path.clone();
+    summary.stdout_transcript_found = stdout_transcript.found;
+    summary.stderr_transcript_found = stderr_transcript.found;
+    summary.stdout_transcript_line_count = stdout_transcript.line_count;
+    summary.stderr_transcript_line_count = stderr_transcript.line_count;
+    summary.stdout_transcript_size_bytes = stdout_transcript.size_bytes;
+    summary.stderr_transcript_size_bytes = stderr_transcript.size_bytes;
+    summary.stdout_transcript_truncated = stdout_transcript.truncated;
+    summary.stderr_transcript_truncated = stderr_transcript.truncated;
+    summary.transcript_evidence_ready = stdout_transcript.found && stderr_transcript.found;
+    summary
+}
+
+fn hermes_assist_is_postmortem(record: &HermesKimiAssistBriefRecord) -> bool {
+    record.timed_out
+        || record.status.contains("failed")
+        || record.status.contains("timed_out")
+        || record.status.contains("rejected")
+        || record.exit_code.map(|code| code != 0).unwrap_or(false)
+}
+
+fn unlocked_agent_session_is_postmortem(record: &UnlockedAgentPromptSessionRecord) -> bool {
+    record.timed_out || record.status.contains("failed") || record.status.contains("timed_out")
+}
+
+fn unlocked_agent_session_run_view_summary(
+    record: &UnlockedAgentPromptSessionRecord,
+    title: &'static str,
+) -> CodexHermesRunViewEvidenceSummary {
+    let mut blockers = record.reasons.clone();
+    if unlocked_agent_session_is_postmortem(record) {
+        blockers.push(record.next_step.clone());
+    }
+    let stdout_transcript =
+        transcript_evidence_preview(&record.stdout_transcript_path, 64 * 1024, 900);
+    let stderr_transcript =
+        transcript_evidence_preview(&record.stderr_transcript_path, 64 * 1024, 640);
+    let stdout_preview = stdout_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stdout, 900)));
+    let stderr_preview = stderr_transcript
+        .preview
+        .clone()
+        .or_else(|| Some(prompt_preview(&record.stderr, 640)));
+    let mut summary = codex_hermes_run_view_evidence_summary(
+        "agent-run-postmortem",
+        title,
+        record.id.clone(),
+        record.status.clone(),
+        record.record_path.clone(),
+        record.log_path.clone(),
+        record.created_at_ms,
+        format!(
+            "runtime={} exit={:?} timeout={} duration={}ms",
+            record.runtime, record.exit_code, record.timed_out, record.duration_ms
+        ),
+        format!(
+            "stdout={}b stderr={}b prompt={}b",
+            record.stdout_size_bytes, record.stderr_size_bytes, record.prompt_size_bytes
+        ),
+        format!(
+            "task_run={} found={} stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={} prompt={}",
+            record.task_run_id,
+            record.task_run_found,
+            record.stdout_transcript_path,
+            stdout_transcript.found,
+            stdout_transcript.line_count,
+            record.stderr_transcript_path,
+            stderr_transcript.found,
+            stderr_transcript.line_count,
+            record.prompt_preview
+        ),
+        stdout_preview,
+        stderr_preview,
+        blockers,
+        record.process_spawn_enabled,
+        record.execution_enabled,
+    );
+    summary.stdout_preview_source = if stdout_transcript.preview.is_some() {
+        "stdout-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stderr_preview_source = if stderr_transcript.preview.is_some() {
+        "stderr-transcript".to_string()
+    } else {
+        "record-inline".to_string()
+    };
+    summary.stdout_transcript_path = stdout_transcript.path.clone();
+    summary.stderr_transcript_path = stderr_transcript.path.clone();
+    summary.stdout_transcript_found = stdout_transcript.found;
+    summary.stderr_transcript_found = stderr_transcript.found;
+    summary.stdout_transcript_line_count = stdout_transcript.line_count;
+    summary.stderr_transcript_line_count = stderr_transcript.line_count;
+    summary.stdout_transcript_size_bytes = stdout_transcript.size_bytes;
+    summary.stderr_transcript_size_bytes = stderr_transcript.size_bytes;
+    summary.stdout_transcript_truncated = stdout_transcript.truncated;
+    summary.stderr_transcript_truncated = stderr_transcript.truncated;
+    summary.transcript_evidence_ready = stdout_transcript.found && stderr_transcript.found;
+    summary
+}
+
 #[tauri::command]
 pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, String> {
     let task_runs = list_task_runs()?;
@@ -95023,6 +97071,10 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
     let transcript_bundles = list_run_transcript_bundles()?;
     let transcript_export_policies = list_transcript_export_policies()?;
     let transcript_protection_policies = list_transcript_protection_policies()?;
+    let codex_orchestrations = list_codex_lead_orchestration_records()?;
+    let hermes_inventories = list_hermes_kimi_capability_inventories()?;
+    let hermes_assists = list_hermes_kimi_assist_briefs()?;
+    let agent_sessions = list_unlocked_agent_prompt_sessions()?;
 
     let active_task_run_id = task_runs
         .first()
@@ -95049,6 +97101,87 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         .iter()
         .map(|preview| preview.line_count)
         .sum();
+    let agent_session_failure_count = agent_sessions
+        .iter()
+        .filter(|record| unlocked_agent_session_is_postmortem(record))
+        .count();
+    let agent_session_timeout_count = agent_sessions
+        .iter()
+        .filter(|record| record.timed_out || record.status.contains("timed_out"))
+        .count();
+    let hermes_assist_failure_count = hermes_assists
+        .iter()
+        .filter(|record| hermes_assist_is_postmortem(record))
+        .count();
+    let hermes_assist_timeout_count = hermes_assists
+        .iter()
+        .filter(|record| record.timed_out || record.status.contains("timed_out"))
+        .count();
+    let latest_hermes_assist_status = hermes_assists
+        .first()
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "hermes_kimi_assist_brief_waiting".to_string());
+    let latest_hermes_assist_record_path =
+        hermes_assists.first().map(|record| record.record_path.clone());
+    let latest_hermes_assist_postmortem = hermes_assists
+        .iter()
+        .find(|record| hermes_assist_is_postmortem(record));
+    let latest_hermes_assist_postmortem_status = latest_hermes_assist_postmortem
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "hermes_kimi_assist_postmortem_waiting".to_string());
+    let latest_hermes_assist_postmortem_record_path =
+        latest_hermes_assist_postmortem.map(|record| record.record_path.clone());
+    let latest_agent_session_status = agent_sessions
+        .first()
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "unlocked_agent_prompt_session_waiting".to_string());
+    let latest_agent_session_record_path =
+        agent_sessions.first().map(|record| record.record_path.clone());
+    let latest_agent_postmortem = agent_sessions
+        .iter()
+        .find(|record| unlocked_agent_session_is_postmortem(record));
+    let latest_agent_postmortem_status = latest_agent_postmortem
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "agent_run_postmortem_waiting".to_string());
+    let latest_agent_postmortem_record_path =
+        latest_agent_postmortem.map(|record| record.record_path.clone());
+    let mut evidence_summaries = Vec::new();
+    if let Some(record) = latest_agent_postmortem {
+        evidence_summaries.push(unlocked_agent_session_run_view_summary(
+            record,
+            "Latest failed/timed-out agent session",
+        ));
+    } else if let Some(record) = agent_sessions.first() {
+        evidence_summaries.push(unlocked_agent_session_run_view_summary(
+            record,
+            "Latest agent session",
+        ));
+    }
+    if let Some(record) = codex_orchestrations.first() {
+        evidence_summaries.push(codex_orchestration_run_view_summary(record));
+    }
+    if let Some(record) = hermes_inventories.first() {
+        evidence_summaries.push(hermes_inventory_run_view_summary(record));
+    }
+    if let Some(record) = latest_hermes_assist_postmortem {
+        evidence_summaries.push(hermes_assist_run_view_summary(
+            record,
+            "hermes-kimi-assist-postmortem",
+            "Latest failed/timed-out Hermes/Kimi assist brief",
+        ));
+    }
+    if let Some(record) = hermes_assists.first() {
+        if latest_hermes_assist_postmortem
+            .map(|postmortem| postmortem.id.as_str() != record.id.as_str())
+            .unwrap_or(true)
+        {
+            evidence_summaries.push(hermes_assist_run_view_summary(
+                record,
+                "hermes-kimi-assist",
+                "Latest Hermes/Kimi assist brief",
+            ));
+        }
+    }
 
     let sections = vec![
         codex_hermes_run_view_section(
@@ -95131,6 +97264,19 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
             "Keep export and protection policies disabled until consent, redaction, retention, and export gates exist.",
         ),
         codex_hermes_run_view_section(
+            "agent-sessions",
+            "Agent sessions",
+            "unlocked-agent-prompt-sessions",
+            agent_sessions.len(),
+            agent_sessions
+                .iter()
+                .filter(|record| record.status == "unlocked_agent_prompt_session_succeeded"
+                    || record.status == "unlocked_agent_prompt_stream_succeeded")
+                .count(),
+            "agent_session_postmortems_visible",
+            "Use failed and timed-out agent session records as postmortem evidence before retrying long prompts.",
+        ),
+        codex_hermes_run_view_section(
             "typed-events",
             "Typed event logs",
             "agent-event-preview",
@@ -95174,6 +97320,23 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         transcript_protection_policy_count: transcript_protection_policies.len(),
         typed_event_log_count,
         typed_event_count,
+        codex_orchestration_count: codex_orchestrations.len(),
+        hermes_inventory_count: hermes_inventories.len(),
+        hermes_assist_count: hermes_assists.len(),
+        hermes_assist_failure_count,
+        hermes_assist_timeout_count,
+        latest_hermes_assist_status,
+        latest_hermes_assist_record_path,
+        latest_hermes_assist_postmortem_status,
+        latest_hermes_assist_postmortem_record_path,
+        agent_session_count: agent_sessions.len(),
+        agent_session_failure_count,
+        agent_session_timeout_count,
+        latest_agent_session_status,
+        latest_agent_session_record_path,
+        latest_agent_postmortem_status,
+        latest_agent_postmortem_record_path,
+        evidence_summary_count: evidence_summaries.len(),
         active_task_run_id,
         read_only: true,
         disabled_gate_count,
@@ -95188,13 +97351,16 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         memory_write_enabled: false,
         writes_allowed: false,
         execution_enabled: false,
+        evidence_summaries,
         sections,
         reasons: vec![
             "run view dashboard groups existing Codex/Hermes evidence ledgers into one operator surface",
+            "failed and timed-out unlocked agent sessions are promoted as postmortem evidence before generic ledgers",
+            "latest Codex Lead orchestration, Hermes/Kimi inventory, and Hermes/Kimi assist records are surfaced as read-only evidence summaries when present",
             "dashboard reads existing records only and creates no task, approval, runner, joint plan, artifact, transcript, export, protection, or event records",
             "process spawn, terminal control, live MCP calls, writes, patches, desktop control, capture, export, memory writes, and execution remain disabled",
         ],
-        next_slice: "Use this run view to add a first-class MCP dashboard, then Steno and pet surfaces, while keeping all live gates disabled until approvals and tests exist.",
+        next_slice: "Use these visible run summaries to deepen Hermes/Kimi execution robustness, PTY/process maturity, live MCP/SSWP/Steno behavior, and pet runtime linkage while keeping unsafe live gates explicit.",
     })
 }
 
@@ -96191,6 +98357,7 @@ fn codex_hermes_run_evidence_diff_item(
 pub fn codex_hermes_run_evidence_diff_board(
 ) -> Result<CodexHermesRunEvidenceDiffBoard, String> {
     let comparison = codex_hermes_run_selection_comparison()?;
+    let run_view = codex_hermes_run_view_dashboard()?;
     let codex = comparison
         .runtime_lanes
         .iter()
@@ -96272,6 +98439,22 @@ pub fn codex_hermes_run_evidence_diff_board(
             hermes.ready_evidence_count,
             "Use Gravity Omega reconciliation to close evidence gaps before live execution or mutation gates open.",
         ),
+        codex_hermes_run_evidence_diff_item(
+            "postmortem-failures",
+            "Postmortem failures",
+            "failure_postmortem_count",
+            run_view.agent_session_failure_count,
+            run_view.hermes_assist_failure_count,
+            "Compare Codex agent failures against Hermes/Kimi assist failures before retrying or delegating.",
+        ),
+        codex_hermes_run_evidence_diff_item(
+            "postmortem-timeouts",
+            "Postmortem timeouts",
+            "timeout_postmortem_count",
+            run_view.agent_session_timeout_count,
+            run_view.hermes_assist_timeout_count,
+            "Compare timeout pressure across Codex and Hermes/Kimi before launching another long run.",
+        ),
     ];
 
     let balanced_diff_count = diffs.iter().filter(|diff| diff.balanced).count();
@@ -96319,7 +98502,7 @@ pub fn codex_hermes_run_evidence_diff_board(
         execution_enabled: false,
         diffs,
         reasons: vec![
-            "evidence diff board derives Codex-vs-Hermes parity gaps from the read-only run selection comparison",
+            "evidence diff board derives Codex-vs-Hermes parity gaps from the read-only run selection comparison and postmortem run-view counts",
             "diffs are advisory evidence only and do not create, select, mutate, reorder, delete, export, or execute any run records",
             "process spawn, terminal control, live MCP calls, writes, patches, desktop control, capture, export, memory writes, workspace writes, and execution remain disabled",
         ],
@@ -97438,8 +99621,44 @@ fn first_class_mcp_dashboard_next_action(subsystem: &str) -> &'static str {
     }
 }
 
+fn first_class_mcp_runtime_target_id(subsystem: &str) -> &'static str {
+    match subsystem {
+        "omega_brain" => "omega-brain-mcp",
+        "sswp" => "sswp-mcp",
+        "omega_stenographer" => "omega-stenographer-mcp",
+        _ => "unknown-mcp-runtime",
+    }
+}
+
+fn first_class_mcp_runtime_target<'a>(
+    snapshot: Option<&'a RuntimeSidecarProcessSnapshotRecord>,
+    subsystem: &str,
+) -> Option<&'a RuntimeSidecarProcessTargetSnapshot> {
+    let target_id = first_class_mcp_runtime_target_id(subsystem);
+    snapshot
+        .and_then(|record| record.targets.iter().find(|target| target.target_id == target_id))
+}
+
+fn runtime_snapshot_age_ms(
+    snapshot: Option<&RuntimeSidecarProcessSnapshotRecord>,
+    now_ms: u64,
+) -> Option<u64> {
+    snapshot.map(|record| now_ms.saturating_sub(record.created_at_ms))
+}
+
+fn runtime_snapshot_freshness_status(snapshot_age_ms: Option<u64>) -> String {
+    match snapshot_age_ms {
+        Some(age_ms) if age_ms <= RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS => {
+            "runtime_process_snapshot_fresh".to_string()
+        }
+        Some(_) => "runtime_process_snapshot_stale".to_string(),
+        None => "runtime_process_snapshot_waiting".to_string(),
+    }
+}
+
 #[tauri::command]
 pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
+    let dashboard_generated_at_ms = now_ms()?;
     let contracts = list_local_mcp_lane_capability_contracts()?;
     let health_preflights = list_local_mcp_health_preflights()?;
     let health_records = list_local_mcp_health_records()?;
@@ -97454,6 +99673,34 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
     let typed_command_contracts = list_local_mcp_typed_command_contracts()?;
     let status_probe_preflights = list_local_mcp_status_probe_preflights()?;
     let config_lookup_preflights = list_local_mcp_config_lookup_preflights()?;
+    let runtime_process_snapshots = list_runtime_sidecar_process_snapshots().unwrap_or_default();
+    let latest_runtime_process_snapshot = runtime_process_snapshots.first();
+    let latest_runtime_process_snapshot_status = latest_runtime_process_snapshot
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "runtime_sidecar_process_snapshot_waiting".to_string());
+    let latest_runtime_process_snapshot_path =
+        latest_runtime_process_snapshot.map(|record| record.record_path.clone());
+    let latest_runtime_process_snapshot_age_ms =
+        runtime_snapshot_age_ms(latest_runtime_process_snapshot, dashboard_generated_at_ms);
+    let latest_runtime_process_snapshot_freshness_status =
+        runtime_snapshot_freshness_status(latest_runtime_process_snapshot_age_ms);
+    let latest_runtime_process_snapshot_fresh = matches!(
+        latest_runtime_process_snapshot_freshness_status.as_str(),
+        "runtime_process_snapshot_fresh"
+    );
+    let latest_runtime_process_snapshot_stale = matches!(
+        latest_runtime_process_snapshot_freshness_status.as_str(),
+        "runtime_process_snapshot_stale" | "runtime_process_snapshot_waiting"
+    );
+    let latest_runtime_process_snapshot_pipe_reader_ready = latest_runtime_process_snapshot
+        .map(|record| record.stdout_pipe_reader_enabled && record.stderr_pipe_reader_enabled)
+        .unwrap_or(false);
+    let latest_runtime_process_snapshot_partial_output_captured = latest_runtime_process_snapshot
+        .map(|record| record.process_list_partial_output_captured)
+        .unwrap_or(false);
+    let latest_runtime_process_snapshot_timed_out = latest_runtime_process_snapshot
+        .map(|record| record.process_list_timed_out)
+        .unwrap_or(false);
 
     let lane_specs = [
         (
@@ -97718,6 +99965,23 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
             .collect();
         expected_command_ids.sort();
         expected_command_ids.dedup();
+        let runtime_target_id = first_class_mcp_runtime_target_id(subsystem);
+        let runtime_target =
+            first_class_mcp_runtime_target(latest_runtime_process_snapshot, subsystem);
+        let runtime_process_count = runtime_target.map(|target| target.process_count).unwrap_or(0);
+        let runtime_running = runtime_target.map(|target| target.running).unwrap_or(false);
+        let runtime_health_status = runtime_target
+            .map(|target| target.health_status.clone())
+            .unwrap_or_else(|| "runtime_process_snapshot_waiting".to_string());
+        let runtime_expected_pattern = runtime_target
+            .map(|target| target.expected_pattern.clone())
+            .unwrap_or_else(|| {
+                runtime_sidecar_process_targets()
+                    .into_iter()
+                    .find(|target| target.target_id == runtime_target_id)
+                    .map(|target| target.expected_pattern.to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
+            });
 
         let evidence_record_count = contract_count
             + health_preflight_count
@@ -97787,6 +100051,22 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
             typed_command_contract_count,
             status_probe_preflight_count,
             config_lookup_preflight_count,
+            runtime_target_id,
+            runtime_process_count,
+            runtime_running,
+            runtime_health_status,
+            runtime_expected_pattern,
+            runtime_record_path: latest_runtime_process_snapshot_path.clone(),
+            runtime_snapshot_status: latest_runtime_process_snapshot_status.clone(),
+            runtime_snapshot_age_ms: latest_runtime_process_snapshot_age_ms,
+            runtime_snapshot_freshness_status: latest_runtime_process_snapshot_freshness_status
+                .clone(),
+            runtime_snapshot_fresh: latest_runtime_process_snapshot_fresh,
+            runtime_snapshot_stale: latest_runtime_process_snapshot_stale,
+            runtime_snapshot_pipe_reader_ready: latest_runtime_process_snapshot_pipe_reader_ready,
+            runtime_snapshot_partial_output_captured:
+                latest_runtime_process_snapshot_partial_output_captured,
+            runtime_snapshot_timed_out: latest_runtime_process_snapshot_timed_out,
             first_class: true,
             read_only: true,
             live_probe_enabled: false,
@@ -97849,6 +100129,11 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
         .find(|lane| lane.subsystem == "omega_stenographer")
         .map(|lane| lane.evidence_record_count)
         .unwrap_or(0);
+    let running_runtime_lane_count = lanes.iter().filter(|lane| lane.runtime_running).count();
+    let mcp_runtime_process_count = lanes
+        .iter()
+        .map(|lane| lane.runtime_process_count)
+        .sum();
 
     Ok(FirstClassMcpDashboard {
         status: "first_class_mcp_dashboard_read_only",
@@ -97860,6 +100145,20 @@ pub fn first_class_mcp_dashboard() -> Result<FirstClassMcpDashboard, String> {
         omega_brain_evidence_count,
         sswp_evidence_count,
         steno_evidence_count,
+        runtime_process_snapshot_count: runtime_process_snapshots.len(),
+        latest_runtime_process_snapshot_status,
+        latest_runtime_process_snapshot_path,
+        runtime_process_snapshot_freshness_threshold_ms:
+            RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS,
+        latest_runtime_process_snapshot_age_ms,
+        latest_runtime_process_snapshot_freshness_status,
+        latest_runtime_process_snapshot_fresh,
+        latest_runtime_process_snapshot_stale,
+        latest_runtime_process_snapshot_pipe_reader_ready,
+        latest_runtime_process_snapshot_partial_output_captured,
+        latest_runtime_process_snapshot_timed_out,
+        running_runtime_lane_count,
+        mcp_runtime_process_count,
         disabled_gate_count,
         read_only: true,
         live_probe_enabled: false,
@@ -97902,12 +100201,26 @@ fn command_path_on_env(command: &str) -> String {
         .unwrap_or_else(|| command.to_string())
 }
 
-fn run_sswp_registry_command(args: &[&str], timeout_ms: u64) -> SswpRegistryCommandCapture {
-    let command = std::iter::once("sswp".to_string())
+fn spawn_sswp_registry_pipe_reader<R: Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<Vec<u8>> {
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = reader.read_to_end(&mut bytes);
+        bytes
+    })
+}
+
+fn run_sswp_registry_command_with_binary(
+    binary: &str,
+    args: &[&str],
+    timeout_ms: u64,
+) -> SswpRegistryCommandCapture {
+    let command = std::iter::once(binary.to_string())
         .chain(args.iter().map(|arg| (*arg).to_string()))
         .collect::<Vec<_>>();
     let start = Instant::now();
-    let mut child = match Command::new("sswp")
+    let mut child = match Command::new(binary)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -97924,78 +100237,115 @@ fn run_sswp_registry_command(args: &[&str], timeout_ms: u64) -> SswpRegistryComm
                 exit_code: None,
                 timed_out: false,
                 duration_ms: start.elapsed().as_millis() as u64,
+                stdout_pipe_reader_enabled: false,
+                stderr_pipe_reader_enabled: false,
+                timeout_kill_sent: false,
+                wait_after_kill_ms: 0,
+                partial_output_captured: false,
             };
         }
     };
 
+    let stdout_reader = child
+        .stdout
+        .take()
+        .map(spawn_sswp_registry_pipe_reader);
+    let stderr_reader = child
+        .stderr
+        .take()
+        .map(spawn_sswp_registry_pipe_reader);
+    let stdout_pipe_reader_enabled = stdout_reader.is_some();
+    let stderr_pipe_reader_enabled = stderr_reader.is_some();
+    let mut timed_out = false;
+    let mut timeout_kill_sent = false;
+    let mut wait_after_kill_ms = 0;
+    let exit_code;
+
     loop {
         match child.try_wait() {
-            Ok(Some(_status)) => {
-                return match child.wait_with_output() {
-                    Ok(output) => SswpRegistryCommandCapture {
-                        command,
-                        status: if output.status.success() {
-                            "ready".to_string()
-                        } else {
-                            "failed".to_string()
-                        },
-                        stdout_preview: trim_probe_text(&output.stdout),
-                        stderr_preview: trim_probe_text(&output.stderr),
-                        exit_code: output.status.code(),
-                        timed_out: false,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                    },
-                    Err(error) => SswpRegistryCommandCapture {
-                        command,
-                        status: "collect_failed".to_string(),
-                        stdout_preview: String::new(),
-                        stderr_preview: prompt_preview(&error.to_string(), 1200),
-                        exit_code: None,
-                        timed_out: false,
-                        duration_ms: start.elapsed().as_millis() as u64,
-                    },
-                };
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                break;
             }
             Ok(None) => {
                 if start.elapsed() >= Duration::from_millis(timeout_ms) {
-                    let _ = child.kill();
-                    return match child.wait_with_output() {
-                        Ok(output) => SswpRegistryCommandCapture {
-                            command,
-                            status: "timed_out".to_string(),
-                            stdout_preview: trim_probe_text(&output.stdout),
-                            stderr_preview: trim_probe_text(&output.stderr),
-                            exit_code: output.status.code(),
-                            timed_out: true,
-                            duration_ms: start.elapsed().as_millis() as u64,
-                        },
-                        Err(error) => SswpRegistryCommandCapture {
-                            command,
-                            status: "timed_out_collect_failed".to_string(),
-                            stdout_preview: String::new(),
-                            stderr_preview: prompt_preview(&error.to_string(), 1200),
-                            exit_code: None,
-                            timed_out: true,
-                            duration_ms: start.elapsed().as_millis() as u64,
-                        },
-                    };
+                    timed_out = true;
+                    let kill_started = Instant::now();
+                    timeout_kill_sent = child.kill().is_ok();
+                    exit_code = child.wait().ok().and_then(|status| status.code());
+                    wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                    break;
                 }
                 std::thread::sleep(Duration::from_millis(25));
             }
             Err(error) => {
-                let _ = child.kill();
+                let kill_started = Instant::now();
+                timeout_kill_sent = child.kill().is_ok();
+                exit_code = child.wait().ok().and_then(|status| status.code());
+                wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                let mut stderr_bytes = error.to_string().into_bytes();
+                if let Some(handle) = stderr_reader {
+                    if let Ok(mut existing) = handle.join() {
+                        existing.extend_from_slice(b"\n");
+                        existing.extend(stderr_bytes);
+                        stderr_bytes = existing;
+                    }
+                }
+                let stdout_bytes = stdout_reader
+                    .and_then(|handle| handle.join().ok())
+                    .unwrap_or_default();
+                let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
                 return SswpRegistryCommandCapture {
                     command,
                     status: "wait_failed".to_string(),
-                    stdout_preview: String::new(),
-                    stderr_preview: prompt_preview(&error.to_string(), 1200),
-                    exit_code: None,
+                    stdout_preview: trim_probe_text(&stdout_bytes),
+                    stderr_preview: trim_probe_text(&stderr_bytes),
+                    exit_code,
                     timed_out: false,
                     duration_ms: start.elapsed().as_millis() as u64,
+                    stdout_pipe_reader_enabled,
+                    stderr_pipe_reader_enabled,
+                    timeout_kill_sent,
+                    wait_after_kill_ms,
+                    partial_output_captured,
                 };
             }
         }
     }
+
+    let stdout_bytes = stdout_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let stderr_bytes = stderr_reader
+        .and_then(|handle| handle.join().ok())
+        .unwrap_or_default();
+    let partial_output_captured = !stdout_bytes.is_empty() || !stderr_bytes.is_empty();
+    let status = if timed_out {
+        "timed_out"
+    } else if exit_code == Some(0) {
+        "ready"
+    } else {
+        "failed"
+    };
+
+    SswpRegistryCommandCapture {
+        command,
+        status: status.to_string(),
+        stdout_preview: trim_probe_text(&stdout_bytes),
+        stderr_preview: trim_probe_text(&stderr_bytes),
+        exit_code,
+        timed_out,
+        duration_ms: start.elapsed().as_millis() as u64,
+        stdout_pipe_reader_enabled,
+        stderr_pipe_reader_enabled,
+        timeout_kill_sent,
+        wait_after_kill_ms,
+        partial_output_captured,
+    }
+}
+
+fn run_sswp_registry_command(args: &[&str], timeout_ms: u64) -> SswpRegistryCommandCapture {
+    run_sswp_registry_command_with_binary("sswp", args, timeout_ms)
 }
 
 fn parse_sswp_registry_nodes(stdout: &str) -> Vec<SswpRegistryNodeSnapshot> {
@@ -98143,6 +100493,18 @@ pub fn record_sswp_registry_snapshot(
             "risky_node_count": record.risky_node_count,
             "highest_risk_percent": record.highest_risk_percent,
             "sswp_binary": &record.sswp_binary,
+            "registry_list_pipe_readers": [
+                record.registry_list.stdout_pipe_reader_enabled,
+                record.registry_list.stderr_pipe_reader_enabled
+            ],
+            "registry_risky_pipe_readers": [
+                record.registry_risky.stdout_pipe_reader_enabled,
+                record.registry_risky.stderr_pipe_reader_enabled
+            ],
+            "registry_list_timeout_kill_sent": record.registry_list.timeout_kill_sent,
+            "registry_risky_timeout_kill_sent": record.registry_risky.timeout_kill_sent,
+            "registry_list_partial_output_captured": record.registry_list.partial_output_captured,
+            "registry_risky_partial_output_captured": record.registry_risky.partial_output_captured,
             "registry_probe_enabled": true,
             "witness_enabled": false,
             "verify_enabled": false,
@@ -98198,6 +100560,11 @@ pub fn list_sswp_registry_snapshots() -> Result<Vec<SswpRegistrySnapshotRecord>,
 #[tauri::command]
 pub fn sswp_status() -> Result<SswpStatusPanel, String> {
     let dashboard = first_class_mcp_dashboard()?;
+    let runtime_process_snapshot_count = dashboard.runtime_process_snapshot_count;
+    let latest_runtime_process_snapshot_status =
+        dashboard.latest_runtime_process_snapshot_status.clone();
+    let latest_runtime_process_snapshot_path =
+        dashboard.latest_runtime_process_snapshot_path.clone();
     let lane = dashboard
         .lanes
         .into_iter()
@@ -98249,6 +100616,44 @@ pub fn sswp_status() -> Result<SswpStatusPanel, String> {
         highest_risk_percent: latest_registry_snapshot
             .map(|record| record.highest_risk_percent)
             .unwrap_or(0.0),
+        registry_list_status: latest_registry_snapshot
+            .map(|record| record.registry_list.status.clone())
+            .unwrap_or_else(|| "waiting".to_string()),
+        registry_risky_status: latest_registry_snapshot
+            .map(|record| record.registry_risky.status.clone())
+            .unwrap_or_else(|| "waiting".to_string()),
+        registry_list_pipe_reader_enabled: latest_registry_snapshot
+            .map(|record| {
+                record.registry_list.stdout_pipe_reader_enabled
+                    && record.registry_list.stderr_pipe_reader_enabled
+            })
+            .unwrap_or(false),
+        registry_risky_pipe_reader_enabled: latest_registry_snapshot
+            .map(|record| {
+                record.registry_risky.stdout_pipe_reader_enabled
+                    && record.registry_risky.stderr_pipe_reader_enabled
+            })
+            .unwrap_or(false),
+        registry_list_timeout_kill_sent: latest_registry_snapshot
+            .map(|record| record.registry_list.timeout_kill_sent)
+            .unwrap_or(false),
+        registry_risky_timeout_kill_sent: latest_registry_snapshot
+            .map(|record| record.registry_risky.timeout_kill_sent)
+            .unwrap_or(false),
+        registry_list_partial_output_captured: latest_registry_snapshot
+            .map(|record| record.registry_list.partial_output_captured)
+            .unwrap_or(false),
+        registry_risky_partial_output_captured: latest_registry_snapshot
+            .map(|record| record.registry_risky.partial_output_captured)
+            .unwrap_or(false),
+        runtime_process_snapshot_count,
+        latest_runtime_process_snapshot_status,
+        latest_runtime_process_snapshot_path,
+        runtime_target_id: lane.runtime_target_id,
+        runtime_process_count: lane.runtime_process_count,
+        runtime_running: lane.runtime_running,
+        runtime_health_status: lane.runtime_health_status.clone(),
+        runtime_expected_pattern: lane.runtime_expected_pattern.clone(),
         command_count: lane.command_count,
         disabled_gate_count,
         read_only: lane.read_only,
@@ -98352,6 +100757,164 @@ fn normalize_pet_runtime_severity(value: Option<String>, state: &str) -> String 
             _ => "info".to_string(),
         },
     }
+}
+
+fn pet_runtime_attention_item(
+    source: &'static str,
+    state: &'static str,
+    severity: &'static str,
+    title: &'static str,
+    message: String,
+    progress: u8,
+    related_record_path: Option<String>,
+    created_at_ms: u64,
+) -> PetRuntimeAttentionItem {
+    let path_slug = related_record_path
+        .as_deref()
+        .map(|path| slug_limit(path, 80))
+        .unwrap_or_else(|| "no-record".to_string());
+    PetRuntimeAttentionItem {
+        item_id: format!("{source}-{created_at_ms}-{path_slug}"),
+        state: state.to_string(),
+        source: source.to_string(),
+        title: title.to_string(),
+        message: prompt_preview(&message, 600),
+        severity: severity.to_string(),
+        progress,
+        related_record_path,
+        created_at_ms,
+        read_only: true,
+        steno_write_enabled: false,
+        memory_write_enabled: false,
+        live_mcp_call_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        desktop_control_enabled: false,
+        terminal_enabled: false,
+        process_spawn_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+    }
+}
+
+fn pet_runtime_attention_items(
+    agent_sessions: &[UnlockedAgentPromptSessionRecord],
+    hermes_assists: &[HermesKimiAssistBriefRecord],
+    blocked_terminal_commands: &[ProductTerminalBlockedCommandRecord],
+    process_control_policies: &[ProcessControlPolicyRecord],
+    process_exit_summaries: &[ProcessSupervisorExitSummaryRecord],
+) -> Vec<PetRuntimeAttentionItem> {
+    let mut items = Vec::new();
+
+    for record in agent_sessions
+        .iter()
+        .filter(|record| unlocked_agent_session_is_postmortem(record))
+        .take(4)
+    {
+        items.push(pet_runtime_attention_item(
+            "codex-agent-postmortem",
+            "error",
+            "error",
+            "Codex agent postmortem needs attention",
+            format!(
+                "{}; timed_out={}; exit={:?}; duration={}ms; next={}",
+                record.status,
+                record.timed_out,
+                record.exit_code,
+                record.duration_ms,
+                record.next_step
+            ),
+            100,
+            Some(record.record_path.clone()),
+            record.updated_at_ms.max(record.created_at_ms),
+        ));
+    }
+
+    for record in hermes_assists
+        .iter()
+        .filter(|record| hermes_assist_is_postmortem(record))
+        .take(4)
+    {
+        let blocker = record
+            .blockers
+            .first()
+            .cloned()
+            .unwrap_or_else(|| record.next_step.clone());
+        items.push(pet_runtime_attention_item(
+            "hermes-kimi-postmortem",
+            "warning",
+            "warning",
+            "Hermes/Kimi assist postmortem needs review",
+            format!(
+                "{}; timed_out={}; exit={:?}; duration={}ms; blocker={}",
+                record.status, record.timed_out, record.exit_code, record.duration_ms, blocker
+            ),
+            80,
+            Some(record.record_path.clone()),
+            record.created_at_ms,
+        ));
+    }
+
+    for record in blocked_terminal_commands.iter().take(4) {
+        items.push(pet_runtime_attention_item(
+            "terminal-blocked",
+            "warning",
+            "warning",
+            "Blocked terminal command needs operator review",
+            format!(
+                "{}; mode={}; reason={}; command={}",
+                record.status, record.requested_mode, record.denied_reason, record.command_preview
+            ),
+            65,
+            Some(record.record_path.clone()),
+            record.created_at_ms,
+        ));
+    }
+
+    for record in process_control_policies.iter().take(4) {
+        items.push(pet_runtime_attention_item(
+            "process-control-policy",
+            "reminder",
+            "warning",
+            "Process control policy awaiting release gate",
+            format!(
+                "{} requested for lifecycle {}; signal={}; retry_spawn={}; process_spawn={}; exec={}",
+                record.requested_action,
+                record.process_lifecycle_id,
+                record.signal_enabled,
+                record.retry_spawn_enabled,
+                record.process_spawn_enabled,
+                record.execution_enabled
+            ),
+            35,
+            Some(record.record_path.clone()),
+            record.updated_at_ms.max(record.created_at_ms),
+        ));
+    }
+
+    for record in process_exit_summaries.iter().take(4) {
+        items.push(pet_runtime_attention_item(
+            "process-exit-summary",
+            "reminder",
+            "info",
+            "Process exit summary recorded without live process",
+            format!(
+                "{}; final_state={}; exit_code={:?}; process_started={}; exec={}",
+                record.status,
+                record.final_supervisor_state,
+                record.exit_code,
+                record.process_started,
+                record.execution_enabled
+            ),
+            50,
+            Some(record.record_path.clone()),
+            record.updated_at_ms.max(record.created_at_ms),
+        ));
+    }
+
+    items.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    items.truncate(8);
+    items
 }
 
 #[tauri::command]
@@ -98593,12 +101156,29 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
     let transcript_bundles = list_run_transcript_bundles()?;
     let transcript_export_policies = list_transcript_export_policies()?;
     let transcript_protection_policies = list_transcript_protection_policies()?;
+    let agent_transcript_sessions = list_agent_transcript_sessions().unwrap_or_default();
     let mcp_dashboard = first_class_mcp_dashboard()?;
     let agent_inventories = list_agent_capability_inventories()?;
     let readiness_records = list_first_class_integration_readiness()?;
     let pet_runtime_signals = list_pet_runtime_signals()?;
     let runtime_process_snapshots = list_runtime_sidecar_process_snapshots().unwrap_or_default();
     let latest_runtime_process_snapshot = runtime_process_snapshots.first();
+    let agent_sessions = list_unlocked_agent_prompt_sessions().unwrap_or_default();
+    let hermes_assists = list_hermes_kimi_assist_briefs().unwrap_or_default();
+    let blocked_terminal_commands = list_product_terminal_blocked_commands(6).unwrap_or_default();
+    let process_control_policies = list_process_control_policies().unwrap_or_default();
+    let process_exit_summaries = list_process_supervisor_exit_summaries().unwrap_or_default();
+    let recent_pet_attention_items = pet_runtime_attention_items(
+        &agent_sessions,
+        &hermes_assists,
+        &blocked_terminal_commands,
+        &process_control_policies,
+        &process_exit_summaries,
+    );
+    let latest_pet_attention_state = recent_pet_attention_items
+        .first()
+        .map(|item| item.state.clone())
+        .unwrap_or_else(|| "idle".to_string());
 
     let transcript_bundle_ready_count = transcript_bundles
         .iter()
@@ -98644,6 +101224,45 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
                 && !record.execution_enabled
         })
         .count();
+    let agent_transcript_ready_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| {
+            record.status == "agent_transcript_session_succeeded"
+                && record.process_spawn_enabled
+                && record.transcript_capture_enabled
+                && record.stdout_pipe_reader_enabled
+                && record.stderr_pipe_reader_enabled
+                && !record.agent_task_execution_enabled
+                && !record.sidecar_launch_enabled
+                && !record.terminal_enabled
+                && !record.workspace_read_enabled
+                && !record.workspace_write_enabled
+                && !record.patch_apply_enabled
+                && !record.live_mcp_call_enabled
+                && !record.config_read_enabled
+                && !record.export_enabled
+                && !record.memory_write_enabled
+                && !record.writes_allowed
+                && !record.execution_enabled
+        })
+        .count();
+    let agent_transcript_pipe_reader_ready_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| record.stdout_pipe_reader_enabled && record.stderr_pipe_reader_enabled)
+        .count();
+    let agent_transcript_timed_out_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| record.timed_out)
+        .count();
+    let agent_transcript_partial_output_count = agent_transcript_sessions
+        .iter()
+        .filter(|record| record.partial_output_captured)
+        .count();
+    let recent_agent_transcript_sessions = agent_transcript_sessions
+        .iter()
+        .take(6)
+        .cloned()
+        .collect::<Vec<_>>();
     let steno_lane = mcp_dashboard
         .lanes
         .iter()
@@ -98695,11 +101314,29 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
         .count();
     let pet_first_class = pet_inventory_ready_count > 0 || pet_readiness_ready_count > 0;
     let latest_pet_signal = pet_runtime_signals.first();
+    let recent_pet_runtime_signals = pet_runtime_signals
+        .iter()
+        .take(6)
+        .cloned()
+        .collect::<Vec<_>>();
     let transcript_evidence = transcript_bundle_ready_count > 0
         || transcript_export_policy_ready_count > 0
-        || transcript_protection_policy_ready_count > 0;
+        || transcript_protection_policy_ready_count > 0
+        || agent_transcript_ready_count > 0;
 
     let sections = vec![
+        steno_pet_companion_dashboard_section(
+            "agent-transcript-sessions",
+            "Codex/Hermes agent transcript sessions",
+            "agent-transcript-session-ledger",
+            agent_transcript_sessions.len(),
+            agent_transcript_ready_count,
+            "agent_transcript_sessions_visible_read_only",
+            "Keep fixed Codex/Hermes transcript probes searchable as evidence; prompt execution remains disabled.",
+            steno_first_class,
+            pet_first_class,
+            agent_transcript_ready_count > 0,
+        ),
         steno_pet_companion_dashboard_section(
             "steno-transcript-evidence",
             "Steno transcript evidence",
@@ -98792,6 +101429,12 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
         transcript_export_policy_ready_count,
         transcript_protection_policy_count: transcript_protection_policies.len(),
         transcript_protection_policy_ready_count,
+        agent_transcript_session_count: agent_transcript_sessions.len(),
+        agent_transcript_ready_count,
+        agent_transcript_pipe_reader_ready_count,
+        agent_transcript_timed_out_count,
+        agent_transcript_partial_output_count,
+        recent_agent_transcript_sessions,
         steno_mcp_evidence_count,
         steno_mcp_ready_count,
         pet_inventory_count,
@@ -98805,6 +101448,10 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
         latest_pet_signal_status: latest_pet_signal
             .map(|record| record.status.clone())
             .unwrap_or_else(|| "pet_runtime_signal_waiting".to_string()),
+        recent_pet_runtime_signals,
+        pet_attention_item_count: recent_pet_attention_items.len(),
+        latest_pet_attention_state,
+        recent_pet_attention_items,
         runtime_process_snapshot_count: runtime_process_snapshots.len(),
         latest_runtime_process_snapshot_status: latest_runtime_process_snapshot
             .map(|record| record.status.clone())
@@ -98854,16 +101501,265 @@ pub fn steno_pet_companion_dashboard() -> Result<StenoPetCompanionDashboard, Str
     })
 }
 
+fn steno_search_dirs() -> Result<Vec<(&'static str, PathBuf)>, String> {
+    Ok(vec![
+        ("workspace", product_workspace_events_dir()?),
+        ("terminal-session", product_terminal_sessions_dir()?),
+        (
+            "terminal-blocked",
+            product_terminal_blocked_commands_dir()?,
+        ),
+        ("terminal-replay", product_terminal_transcript_replays_dir()?),
+        ("sovereign-docs", sovereign_docs_previews_dir()?),
+        ("omega-computer", omega_computer_sessions_dir()?),
+        ("smoke", product_workbench_smokes_dir()?),
+        ("agent", unlocked_agent_prompt_sessions_dir()?),
+        ("agent-transcript", agent_transcript_sessions_dir()?),
+        ("run-transcript", run_transcript_bundles_dir()?),
+        ("runtime-depth", runtime_depth_probes_dir()?),
+        (
+            "runtime-sidecar-process",
+            runtime_sidecar_process_snapshots_dir()?,
+        ),
+        ("codex-orchestration", codex_lead_orchestrations_dir()?),
+        (
+            "hermes-inventory",
+            hermes_kimi_capability_inventories_dir()?,
+        ),
+        ("hermes-assist", hermes_kimi_assist_briefs_dir()?),
+        ("sswp-registry", sswp_registry_snapshots_dir()?),
+        ("pet-signal", pet_runtime_signals_dir()?),
+        ("joint-packet", joint_runtime_run_packets_dir()?),
+        ("runner-evidence", runner_evidence_spines_dir()?),
+    ])
+}
+
+fn steno_search_file_allowed(path: &Path) -> bool {
+    let path_text = path.display().to_string().to_ascii_lowercase();
+    if path_text.contains(".sswp") {
+        return false;
+    }
+
+    matches!(
+        path.extension().and_then(|value| value.to_str()),
+        Some("json") | Some("jsonl") | Some("txt") | Some("md") | Some("html")
+    )
+}
+
+fn steno_search_file_created_at(path: &Path) -> u64 {
+    path.metadata()
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn steno_search_snippet(content: &str, query: &str) -> Option<(usize, String)> {
+    let query_lower = query.to_ascii_lowercase();
+    content.lines().enumerate().find_map(|(index, line)| {
+        if line.to_ascii_lowercase().contains(&query_lower) {
+            let snippet = prompt_preview(line, 420);
+            Some((index + 1, snippet))
+        } else {
+            None
+        }
+    })
+}
+
+fn run_steno_search(
+    query: &str,
+    max_results: usize,
+    max_file_bytes: u64,
+) -> Result<(Vec<StenoSearchResult>, usize, usize), String> {
+    let mut results = Vec::new();
+    let mut searched_file_count = 0;
+    let mut matched_file_count = 0;
+
+    for (category, dir) in steno_search_dirs()? {
+        if !dir.exists() {
+            continue;
+        }
+
+        for entry in fs::read_dir(&dir).map_err(|error| {
+            format!(
+                "failed to read Steno search directory {}: {error}",
+                dir.display()
+            )
+        })? {
+            let entry = entry.map_err(|error| {
+                format!(
+                    "failed to read Steno search directory entry {}: {error}",
+                    dir.display()
+                )
+            })?;
+            let path = entry.path();
+            if !path.is_file() || !steno_search_file_allowed(&path) {
+                continue;
+            }
+
+            let metadata = match path.metadata() {
+                Ok(metadata) => metadata,
+                Err(_) => continue,
+            };
+            if metadata.len() > max_file_bytes {
+                continue;
+            }
+
+            searched_file_count += 1;
+            let content = match fs::read_to_string(&path) {
+                Ok(content) => content,
+                Err(_) => continue,
+            };
+
+            let Some((line_number, snippet)) = steno_search_snippet(&content, query) else {
+                continue;
+            };
+
+            matched_file_count += 1;
+            let title = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("Steno evidence record")
+                .to_string();
+            results.push(StenoSearchResult {
+                title,
+                category: category.to_string(),
+                record_path: path.display().to_string(),
+                snippet,
+                line_number,
+                created_at_ms: steno_search_file_created_at(&path),
+                status: "steno_search_result_read_only".to_string(),
+            });
+        }
+    }
+
+    results.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    results.truncate(max_results);
+    Ok((results, searched_file_count, matched_file_count))
+}
+
+fn steno_postmortem_result_from_agent(
+    record: &UnlockedAgentPromptSessionRecord,
+) -> StenoSearchResult {
+    let exit = record
+        .exit_code
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "none".to_string());
+    let snippet = prompt_preview(
+        &format!(
+            "{}; exit={exit}; timeout={}; duration={}ms; prompt={}; next={}",
+            record.status,
+            record.timed_out,
+            record.duration_ms,
+            record.prompt_preview,
+            record.next_step
+        ),
+        420,
+    );
+
+    StenoSearchResult {
+        title: format!("Codex agent postmortem: {}", record.runtime),
+        category: "agent-postmortem".to_string(),
+        record_path: record.record_path.clone(),
+        snippet,
+        line_number: 1,
+        created_at_ms: record.created_at_ms,
+        status: "steno_recent_postmortem_read_only".to_string(),
+    }
+}
+
+fn steno_postmortem_result_from_hermes(
+    record: &HermesKimiAssistBriefRecord,
+) -> StenoSearchResult {
+    let exit = record
+        .exit_code
+        .map(|code| code.to_string())
+        .unwrap_or_else(|| "none".to_string());
+    let blocker = record
+        .blockers
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "no blocker recorded".to_string());
+    let snippet = prompt_preview(
+        &format!(
+            "{}; exit={exit}; timeout={}; duration={}ms; blocker={}; prompt={}",
+            record.status, record.timed_out, record.duration_ms, blocker, record.prompt_preview
+        ),
+        420,
+    );
+
+    StenoSearchResult {
+        title: "Hermes/Kimi assist postmortem".to_string(),
+        category: "hermes-assist-postmortem".to_string(),
+        record_path: record.record_path.clone(),
+        snippet,
+        line_number: 1,
+        created_at_ms: record.created_at_ms,
+        status: "steno_recent_postmortem_read_only".to_string(),
+    }
+}
+
+fn steno_recent_postmortem_results(max_results: usize) -> Result<Vec<StenoSearchResult>, String> {
+    let mut results = Vec::new();
+
+    for record in list_unlocked_agent_prompt_sessions()? {
+        if unlocked_agent_session_is_postmortem(&record) {
+            results.push(steno_postmortem_result_from_agent(&record));
+        }
+    }
+
+    for record in list_hermes_kimi_assist_briefs()? {
+        if hermes_assist_is_postmortem(&record) {
+            results.push(steno_postmortem_result_from_hermes(&record));
+        }
+    }
+
+    results.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    results.truncate(max_results);
+    Ok(results)
+}
+
 #[tauri::command]
-pub fn steno_search() -> Result<StenoSearchPanel, String> {
+pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPanel, String> {
     let dashboard = steno_pet_companion_dashboard()?;
+    let request = request.unwrap_or(StenoSearchRequest {
+        query: None,
+        max_results: None,
+        max_file_bytes: None,
+    });
+    let query = request
+        .query
+        .unwrap_or_default()
+        .trim()
+        .chars()
+        .take(160)
+        .collect::<String>();
+    let max_results = request.max_results.unwrap_or(18).clamp(1, 30);
+    let max_file_bytes = request
+        .max_file_bytes
+        .unwrap_or(262_144)
+        .clamp(4_096, 1_048_576);
+    let (results, searched_file_count, matched_file_count) = if query.is_empty() {
+        (Vec::new(), 0, 0)
+    } else {
+        run_steno_search(&query, max_results, max_file_bytes)?
+    };
+    let search_ran = !query.is_empty();
+    let recent_postmortem_results = steno_recent_postmortem_results(max_results.min(8))?;
+    let postmortem_result_count = recent_postmortem_results.len();
 
     Ok(StenoSearchPanel {
         status: "steno_search_panel_read_only",
         panel_id: "steno-search-panel",
         panel_title: "Steno Search",
-        query: "",
-        result_count: 0,
+        query,
+        result_count: results.len(),
+        searched_file_count,
+        matched_file_count,
+        postmortem_result_count,
+        max_results,
+        max_file_bytes,
         transcript_bundle_count: dashboard.transcript_bundle_count,
         transcript_bundle_ready_count: dashboard.transcript_bundle_ready_count,
         transcript_protection_policy_count: dashboard.transcript_protection_policy_count,
@@ -98873,9 +101769,9 @@ pub fn steno_search() -> Result<StenoSearchPanel, String> {
         section_count: dashboard.section_count,
         disabled_gate_count: dashboard.disabled_gate_count,
         read_only: dashboard.read_only,
-        transcript_read_enabled: false,
-        transcript_index_enabled: false,
-        query_binding_enabled: false,
+        transcript_read_enabled: search_ran,
+        transcript_index_enabled: search_ran,
+        query_binding_enabled: true,
         capture_enabled: dashboard.capture_enabled,
         export_enabled: dashboard.export_enabled,
         live_mcp_call_enabled: dashboard.live_mcp_call_enabled,
@@ -98889,13 +101785,16 @@ pub fn steno_search() -> Result<StenoSearchPanel, String> {
         patch_apply_enabled: dashboard.patch_apply_enabled,
         writes_allowed: dashboard.writes_allowed,
         execution_enabled: dashboard.execution_enabled,
+        results,
+        recent_postmortem_results,
         sections: dashboard.sections,
         reasons: vec![
-            "panel exposes Steno search readiness without reading transcript contents",
-            "panel reuses existing Steno/pet companion evidence and creates no records",
-            "query binding, transcript indexing, capture, export, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
+            "panel searches only approved Gravity Omega evidence and transcript record directories",
+            "panel surfaces recent Codex agent and Hermes/Kimi assist postmortems before query results without launching either runtime",
+            "panel creates no records and never reads old Electron .sswp files",
+            "capture, export, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
         ],
-        next_slice: "Add a read-only Steno capture consent/readiness panel while keeping recording disabled.",
+        next_slice: "Add result-to-Monaco preview and approval-aware Steno export controls after explicit export consent exists.",
     })
 }
 
@@ -98953,6 +101852,14 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
     let process_supervisor_heartbeats = list_process_supervisor_heartbeats()?;
     let process_supervisor_exit_summaries = list_process_supervisor_exit_summaries()?;
     let process_output_tail_summaries = list_process_output_tail_summaries()?;
+    let recent_terminal_sessions = list_recent_product_terminal_session_summaries(6)?;
+    let recent_blocked_terminal_commands = list_product_terminal_blocked_commands(6)?;
+    let mut recent_terminal_replays = list_product_terminal_transcript_replays()?;
+    recent_terminal_replays.truncate(6);
+    let mut recent_process_control_policies = process_control_policies.clone();
+    recent_process_control_policies.truncate(6);
+    let mut recent_process_exit_summaries = process_supervisor_exit_summaries.clone();
+    recent_process_exit_summaries.truncate(6);
 
     let runner_invocation_ready_count = runner_invocations
         .iter()
@@ -99265,7 +102172,12 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         || process_supervisor_preflight_ready_count > 0
         || process_supervisor_heartbeat_ready_count > 0
         || process_supervisor_exit_summary_ready_count > 0
-        || process_output_tail_summary_ready_count > 0;
+        || process_output_tail_summary_ready_count > 0
+        || !recent_terminal_sessions.is_empty()
+        || !recent_process_control_policies.is_empty()
+        || !recent_process_exit_summaries.is_empty()
+        || !recent_blocked_terminal_commands.is_empty()
+        || !recent_terminal_replays.is_empty();
 
     Ok(TerminalProcessLaneDashboard {
         status: "terminal_process_lane_dashboard_read_only",
@@ -99290,6 +102202,11 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         process_supervisor_exit_summary_ready_count,
         process_output_tail_summary_count: process_output_tail_summaries.len(),
         process_output_tail_summary_ready_count,
+        recent_terminal_session_count: recent_terminal_sessions.len(),
+        recent_terminal_replay_count: recent_terminal_replays.len(),
+        blocked_terminal_command_count: recent_blocked_terminal_commands.len(),
+        recent_process_control_policy_count: recent_process_control_policies.len(),
+        recent_process_exit_summary_count: recent_process_exit_summaries.len(),
         disabled_gate_count,
         read_only: true,
         terminal_process_visible,
@@ -99309,10 +102226,15 @@ pub fn terminal_process_lane_dashboard() -> Result<TerminalProcessLaneDashboard,
         memory_write_enabled: false,
         writes_allowed: false,
         execution_enabled: false,
+        recent_terminal_sessions,
+        recent_terminal_replays,
+        recent_blocked_terminal_commands,
+        recent_process_control_policies,
+        recent_process_exit_summaries,
         sections,
         reasons: vec![
             "dashboard groups runner, adapter, command plan, stream, lifecycle, supervisor, exit, and output-tail evidence into one terminal/process lane",
-            "dashboard reads existing runner and process ledgers only and creates no records",
+            "dashboard reads existing runner, process, control policy, exit summary, terminal session, blocked terminal command, and transcript replay ledgers only and creates no records",
             "terminal writes, process spawn, stream reads, live tailing, process control, live MCP calls, config reads, captures, exports, writes, patches, memory writes, and execution remain disabled",
         ],
         next_slice: "Use this terminal/process lane to add approval and evidence spine views before any process, terminal, stream, or control gate is opened.",
@@ -99859,6 +102781,546 @@ fn desktop_command_surface_group(group: &CommandGroup) -> bool {
     desktop_control_signal(&[group.id, group.title])
 }
 
+const DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS: u64 = 120_000;
+const YDOTOOL_SOCKET_PATH: &str = "/tmp/.ydotool_socket";
+
+fn desktop_env_value(key: &str) -> String {
+    env::var(key)
+        .ok()
+        .map(|value| value.trim().chars().take(180).collect::<String>())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "missing".to_string())
+}
+
+fn desktop_env_present(key: &str) -> bool {
+    env::var(key)
+        .ok()
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn dbus_session_bus_preview() -> String {
+    match env::var("DBUS_SESSION_BUS_ADDRESS") {
+        Ok(value) if !value.trim().is_empty() => {
+            let trimmed = value.trim();
+            if trimmed.starts_with("unix:path=") {
+                "unix:path=<redacted>".to_string()
+            } else if trimmed.starts_with("unix:") {
+                "unix:<redacted>".to_string()
+            } else {
+                "present_redacted".to_string()
+            }
+        }
+        _ => "missing".to_string(),
+    }
+}
+
+fn ydotool_socket_status() -> (bool, bool, bool) {
+    match fs::metadata(YDOTOOL_SOCKET_PATH) {
+        Ok(metadata) => (true, true, metadata.file_type().is_socket()),
+        Err(_) => (true, false, false),
+    }
+}
+
+fn latest_desktop_environment_snapshot_age_ms(
+    latest: Option<&DesktopEnvironmentSnapshotRecord>,
+) -> Option<u64> {
+    latest.and_then(|record| {
+        now_ms()
+            .ok()
+            .map(|now| now.saturating_sub(record.created_at_ms))
+    })
+}
+
+fn desktop_environment_snapshot_ready(record: &DesktopEnvironmentSnapshotRecord) -> bool {
+    record.read_only
+        && record.environment_probe_enabled
+        && record.graphical_session_visible
+        && !record.capture_enabled
+        && !record.ocr_enabled
+        && !record.target_window_control_enabled
+        && !record.element_action_enabled
+        && !record.desktop_control_enabled
+        && !record.socket_connect_enabled
+        && !record.process_spawn_enabled
+        && !record.terminal_enabled
+        && !record.file_write_enabled
+        && !record.patch_apply_enabled
+        && !record.live_mcp_call_enabled
+        && !record.config_read_enabled
+        && !record.export_enabled
+        && !record.memory_write_enabled
+        && !record.writes_allowed
+        && !record.execution_enabled
+}
+
+fn command_path_status(command: &str) -> (bool, String) {
+    if command.contains(std::path::MAIN_SEPARATOR) {
+        let path = PathBuf::from(command);
+        return (path.is_file(), command.to_string());
+    }
+
+    env::var_os("PATH")
+        .and_then(|paths| {
+            env::split_paths(&paths)
+                .map(|dir| dir.join(command))
+                .find(|candidate| candidate.is_file())
+        })
+        .map(|path| (true, path.display().to_string()))
+        .unwrap_or_else(|| (false, command.to_string()))
+}
+
+fn desktop_read_only_capability_targets() -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
+    vec![
+        ("window-gdbus", "GNOME/COSMIC DBus window bridge", "window-inventory", "gdbus"),
+        ("window-busctl", "DBus window/process introspection helper", "window-inventory", "busctl"),
+        ("window-wmctrl", "X11 window inventory helper", "window-inventory", "wmctrl"),
+        ("window-xprop", "X11 window property helper", "window-inventory", "xprop"),
+        ("screenshot-grim", "Wayland screenshot helper", "screenshot", "grim"),
+        ("screenshot-gnome", "GNOME screenshot helper", "screenshot", "gnome-screenshot"),
+        ("screenshot-spectacle", "KDE Spectacle screenshot helper", "screenshot", "spectacle"),
+        ("accessibility-gdbus", "AT-SPI DBus accessibility helper", "accessibility", "gdbus"),
+        ("accessibility-busctl", "AT-SPI busctl accessibility helper", "accessibility", "busctl"),
+        ("input-ydotool", "Wayland input helper", "input-helper", "ydotool"),
+        ("input-xdotool", "X11 input helper", "input-helper", "xdotool"),
+    ]
+}
+
+fn desktop_read_only_capability_snapshot_ready(
+    record: &DesktopReadOnlyCapabilitySnapshotRecord,
+) -> bool {
+    record.read_only
+        && record.path_probe_enabled
+        && !record.process_spawn_enabled
+        && !record.window_inventory_enabled
+        && !record.screenshot_capture_enabled
+        && !record.accessibility_tree_read_enabled
+        && !record.pointer_injection_enabled
+        && !record.keyboard_injection_enabled
+        && !record.capture_enabled
+        && !record.ocr_enabled
+        && !record.target_window_control_enabled
+        && !record.element_action_enabled
+        && !record.desktop_control_enabled
+        && !record.socket_connect_enabled
+        && !record.terminal_enabled
+        && !record.file_write_enabled
+        && !record.patch_apply_enabled
+        && !record.live_mcp_call_enabled
+        && !record.config_read_enabled
+        && !record.export_enabled
+        && !record.memory_write_enabled
+        && !record.writes_allowed
+        && !record.execution_enabled
+}
+
+#[tauri::command]
+pub fn record_desktop_read_only_capability_snapshot(
+    request: DesktopReadOnlyCapabilitySnapshotRequest,
+) -> Result<DesktopReadOnlyCapabilitySnapshotRecord, String> {
+    let timestamp = now_ms()?;
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "desktop-stage1-read-only".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "desktop-stage1-read-only".to_string()
+    } else {
+        requested_by
+    };
+    let id = format!(
+        "desktop-read-only-capability-snapshot-{}-{}",
+        timestamp,
+        std::process::id()
+    );
+    let dir = desktop_read_only_capability_snapshots_dir()?;
+    fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "failed to create desktop read-only capability snapshots directory {}: {error}",
+            dir.display()
+        )
+    })?;
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+    let tools = desktop_read_only_capability_targets()
+        .into_iter()
+        .map(|(tool_id, title, category, command)| {
+            let (found_on_path, path) = command_path_status(command);
+            DesktopReadOnlyCapabilityTool {
+                tool_id: tool_id.to_string(),
+                title: title.to_string(),
+                category: category.to_string(),
+                command: command.to_string(),
+                path,
+                found_on_path,
+                read_only_prerequisite: true,
+                live_action_enabled: false,
+            }
+        })
+        .collect::<Vec<_>>();
+    let count_by_category = |category: &str| {
+        tools
+            .iter()
+            .filter(|tool| tool.category == category)
+            .count()
+    };
+    let available_by_category = |category: &str| {
+        tools
+            .iter()
+            .filter(|tool| tool.category == category && tool.found_on_path)
+            .count()
+    };
+    let tool_count = tools.len();
+    let available_tool_count = tools.iter().filter(|tool| tool.found_on_path).count();
+    let window_inventory_tool_count = count_by_category("window-inventory");
+    let available_window_inventory_tool_count = available_by_category("window-inventory");
+    let screenshot_tool_count = count_by_category("screenshot");
+    let available_screenshot_tool_count = available_by_category("screenshot");
+    let accessibility_tool_count = count_by_category("accessibility");
+    let available_accessibility_tool_count = available_by_category("accessibility");
+    let input_helper_tool_count = count_by_category("input-helper");
+    let available_input_helper_tool_count = available_by_category("input-helper");
+
+    let mut blockers = Vec::new();
+    if available_window_inventory_tool_count == 0 {
+        blockers.push("no window-inventory helper was found on PATH".to_string());
+    }
+    if available_screenshot_tool_count == 0 {
+        blockers.push("no screenshot helper was found on PATH".to_string());
+    }
+    if available_accessibility_tool_count == 0 {
+        blockers.push("no accessibility DBus helper was found on PATH".to_string());
+    }
+    if available_input_helper_tool_count == 0 {
+        blockers.push("no input helper was found on PATH; pointer/keyboard actions stay blocked".to_string());
+    }
+    let status = if blockers.is_empty() {
+        "desktop_read_only_capability_snapshot_recorded_prerequisites_visible"
+    } else {
+        "desktop_read_only_capability_snapshot_recorded_with_missing_prerequisites"
+    }
+    .to_string();
+    let record_path_display = record_path.display().to_string();
+    let log_path_display = log_path.display().to_string();
+    let record = DesktopReadOnlyCapabilitySnapshotRecord {
+        id: id.clone(),
+        status: status.clone(),
+        requested_by,
+        tool_count,
+        available_tool_count,
+        window_inventory_tool_count,
+        available_window_inventory_tool_count,
+        screenshot_tool_count,
+        available_screenshot_tool_count,
+        accessibility_tool_count,
+        available_accessibility_tool_count,
+        input_helper_tool_count,
+        available_input_helper_tool_count,
+        tools,
+        read_only: true,
+        path_probe_enabled: true,
+        process_spawn_enabled: false,
+        window_inventory_enabled: false,
+        screenshot_capture_enabled: false,
+        accessibility_tree_read_enabled: false,
+        pointer_injection_enabled: false,
+        keyboard_injection_enabled: false,
+        capture_enabled: false,
+        ocr_enabled: false,
+        target_window_control_enabled: false,
+        element_action_enabled: false,
+        desktop_control_enabled: false,
+        socket_connect_enabled: false,
+        terminal_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path_display.clone(),
+        log_path: log_path_display.clone(),
+        blockers,
+        next_step: "Use this PATH-only prerequisite snapshot to choose the first safe read-only desktop probe; helper binaries were not launched and all capture, accessibility, socket, input, focus, window-control, write, and execution gates remain disabled.".to_string(),
+    };
+    let json = serde_json::to_string_pretty(&record)
+        .map_err(|error| format!("failed to serialize desktop read-only capability snapshot: {error}"))?;
+    fs::write(&record_path, json).map_err(|error| {
+        format!(
+            "failed to write desktop read-only capability snapshot {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "event": "desktop_read_only_capability_snapshot_recorded",
+            "id": &record.id,
+            "status": &record.status,
+            "tool_count": record.tool_count,
+            "available_tool_count": record.available_tool_count,
+            "available_window_inventory_tool_count": record.available_window_inventory_tool_count,
+            "available_screenshot_tool_count": record.available_screenshot_tool_count,
+            "available_accessibility_tool_count": record.available_accessibility_tool_count,
+            "available_input_helper_tool_count": record.available_input_helper_tool_count,
+            "path_probe_enabled": true,
+            "process_spawn_enabled": false,
+            "window_inventory_enabled": false,
+            "screenshot_capture_enabled": false,
+            "accessibility_tree_read_enabled": false,
+            "pointer_injection_enabled": false,
+            "keyboard_injection_enabled": false,
+            "capture_enabled": false,
+            "desktop_control_enabled": false,
+            "socket_connect_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": timestamp
+        }),
+    )?;
+    Ok(record)
+}
+
+#[tauri::command]
+pub fn list_desktop_read_only_capability_snapshots(
+) -> Result<Vec<DesktopReadOnlyCapabilitySnapshotRecord>, String> {
+    let dir = desktop_read_only_capability_snapshots_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read desktop read-only capability snapshots directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry =
+            entry.map_err(|error| format!("failed to read desktop read-only capability snapshot entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<DesktopReadOnlyCapabilitySnapshotRecord>(&content) {
+            records.push(record);
+        }
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(40);
+    Ok(records)
+}
+
+#[tauri::command]
+pub fn record_desktop_environment_snapshot(
+    request: DesktopEnvironmentSnapshotRequest,
+) -> Result<DesktopEnvironmentSnapshotRecord, String> {
+    let timestamp = now_ms()?;
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "linux-desktop-readiness".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "linux-desktop-readiness".to_string()
+    } else {
+        requested_by
+    };
+    let id = format!(
+        "desktop-environment-snapshot-{}-{}",
+        timestamp,
+        std::process::id()
+    );
+    let dir = desktop_environment_snapshots_dir()?;
+    fs::create_dir_all(&dir).map_err(|error| {
+        format!(
+            "failed to create desktop environment snapshots directory {}: {error}",
+            dir.display()
+        )
+    })?;
+    let record_path = dir.join(format!("{id}.json"));
+    let log_path = dir.join(format!("{id}.jsonl"));
+
+    let session_type = desktop_env_value("XDG_SESSION_TYPE");
+    let current_desktop = desktop_env_value("XDG_CURRENT_DESKTOP");
+    let desktop_session = desktop_env_value("DESKTOP_SESSION");
+    let wayland_display = desktop_env_value("WAYLAND_DISPLAY");
+    let display = desktop_env_value("DISPLAY");
+    let wayland_display_present = desktop_env_present("WAYLAND_DISPLAY");
+    let display_present = desktop_env_present("DISPLAY");
+    let graphical_session_visible = wayland_display_present || display_present;
+    let dbus_session_bus_present = desktop_env_present("DBUS_SESSION_BUS_ADDRESS");
+    let at_spi_bus_present = desktop_env_present("AT_SPI_BUS_ADDRESS");
+    let (ydotool_socket_metadata_checked, ydotool_socket_visible, ydotool_socket_is_socket) =
+        ydotool_socket_status();
+
+    let mut blockers = Vec::new();
+    if !graphical_session_visible {
+        blockers.push("no Wayland or X11 display variable is visible to this process".to_string());
+    }
+    if !dbus_session_bus_present {
+        blockers.push("DBUS_SESSION_BUS_ADDRESS is not visible to this process".to_string());
+    }
+    if !at_spi_bus_present {
+        blockers.push("AT_SPI_BUS_ADDRESS is not visible; accessibility tree reads remain blocked".to_string());
+    }
+    if !ydotool_socket_is_socket {
+        blockers.push("ydotool socket is not visible as a Unix socket; pointer/keyboard injection stays blocked".to_string());
+    }
+
+    let backend_status = if !graphical_session_visible {
+        "desktop_environment_snapshot_recorded_no_display_backend"
+    } else if ydotool_socket_is_socket {
+        "desktop_environment_snapshot_recorded_backend_and_ydotool_socket_visible"
+    } else {
+        "desktop_environment_snapshot_recorded_backend_visible_socket_missing"
+    }
+    .to_string();
+    let record_path_display = record_path.display().to_string();
+    let log_path_display = log_path.display().to_string();
+    let record = DesktopEnvironmentSnapshotRecord {
+        id: id.clone(),
+        status: backend_status.clone(),
+        requested_by,
+        session_type,
+        current_desktop,
+        desktop_session,
+        wayland_display,
+        wayland_display_present,
+        display,
+        display_present,
+        graphical_session_visible,
+        dbus_session_bus_present,
+        dbus_session_bus_preview: dbus_session_bus_preview(),
+        at_spi_bus_present,
+        ydotool_socket_path: YDOTOOL_SOCKET_PATH.to_string(),
+        ydotool_socket_metadata_checked,
+        ydotool_socket_visible,
+        ydotool_socket_is_socket,
+        backend_status,
+        read_only: true,
+        environment_probe_enabled: true,
+        capture_enabled: false,
+        ocr_enabled: false,
+        target_window_control_enabled: false,
+        element_action_enabled: false,
+        desktop_control_enabled: false,
+        socket_connect_enabled: false,
+        process_spawn_enabled: false,
+        terminal_enabled: false,
+        file_write_enabled: false,
+        patch_apply_enabled: false,
+        live_mcp_call_enabled: false,
+        config_read_enabled: false,
+        export_enabled: false,
+        memory_write_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        created_at_ms: timestamp,
+        record_path: record_path_display.clone(),
+        log_path: log_path_display.clone(),
+        blockers,
+        next_step: "Use this read-only environment snapshot to decide the next desktop-control readiness slice; screenshots, accessibility reads, socket connects, pointer/keyboard injection, focus changes, app launch, and window control remain disabled.".to_string(),
+    };
+
+    let json = serde_json::to_string_pretty(&record)
+        .map_err(|error| format!("failed to serialize desktop environment snapshot: {error}"))?;
+    fs::write(&record_path, json).map_err(|error| {
+        format!(
+            "failed to write desktop environment snapshot {}: {error}",
+            record_path.display()
+        )
+    })?;
+    write_jsonl_event(
+        &log_path,
+        serde_json::json!({
+            "event": "desktop_environment_snapshot_recorded",
+            "id": &record.id,
+            "status": &record.status,
+            "requested_by": &record.requested_by,
+            "session_type": &record.session_type,
+            "current_desktop": &record.current_desktop,
+            "desktop_session": &record.desktop_session,
+            "wayland_display_present": record.wayland_display_present,
+            "display_present": record.display_present,
+            "graphical_session_visible": record.graphical_session_visible,
+            "dbus_session_bus_present": record.dbus_session_bus_present,
+            "at_spi_bus_present": record.at_spi_bus_present,
+            "ydotool_socket_metadata_checked": record.ydotool_socket_metadata_checked,
+            "ydotool_socket_visible": record.ydotool_socket_visible,
+            "ydotool_socket_is_socket": record.ydotool_socket_is_socket,
+            "backend_status": &record.backend_status,
+            "environment_probe_enabled": true,
+            "capture_enabled": false,
+            "ocr_enabled": false,
+            "target_window_control_enabled": false,
+            "element_action_enabled": false,
+            "desktop_control_enabled": false,
+            "socket_connect_enabled": false,
+            "process_spawn_enabled": false,
+            "terminal_enabled": false,
+            "file_write_enabled": false,
+            "patch_apply_enabled": false,
+            "live_mcp_call_enabled": false,
+            "config_read_enabled": false,
+            "export_enabled": false,
+            "memory_write_enabled": false,
+            "writes_allowed": false,
+            "execution_enabled": false,
+            "created_at_ms": timestamp
+        }),
+    )?;
+    Ok(record)
+}
+
+#[tauri::command]
+pub fn list_desktop_environment_snapshots(
+) -> Result<Vec<DesktopEnvironmentSnapshotRecord>, String> {
+    let dir = desktop_environment_snapshots_dir()?;
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    for entry in fs::read_dir(&dir).map_err(|error| {
+        format!(
+            "failed to read desktop environment snapshots directory {}: {error}",
+            dir.display()
+        )
+    })? {
+        let entry =
+            entry.map_err(|error| format!("failed to read desktop environment snapshot entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        if let Ok(record) = serde_json::from_str::<DesktopEnvironmentSnapshotRecord>(&content) {
+            records.push(record);
+        }
+    }
+
+    records.sort_by(|left, right| right.created_at_ms.cmp(&left.created_at_ms));
+    records.truncate(40);
+    Ok(records)
+}
+
 fn linux_desktop_control_readiness_dashboard_section(
     section_id: &'static str,
     title: &'static str,
@@ -99912,6 +103374,96 @@ pub fn linux_desktop_control_readiness_dashboard(
         .into_iter()
         .filter(desktop_command_surface_group)
         .collect::<Vec<_>>();
+    let desktop_environment_snapshots = list_desktop_environment_snapshots().unwrap_or_default();
+    let desktop_environment_snapshot_count = desktop_environment_snapshots.len();
+    let desktop_environment_snapshot_ready_count = desktop_environment_snapshots
+        .iter()
+        .filter(|record| desktop_environment_snapshot_ready(record))
+        .count();
+    let latest_desktop_environment_snapshot = desktop_environment_snapshots.first();
+    let latest_desktop_environment_snapshot_age_ms =
+        latest_desktop_environment_snapshot_age_ms(latest_desktop_environment_snapshot);
+    let latest_desktop_environment_snapshot_fresh = latest_desktop_environment_snapshot_age_ms
+        .map(|age| age <= DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS)
+        .unwrap_or(false);
+    let latest_desktop_environment_snapshot_status = latest_desktop_environment_snapshot
+        .map(|record| record.status.clone())
+        .unwrap_or_else(|| "desktop_environment_snapshot_missing".to_string());
+    let latest_desktop_environment_snapshot_record_path = latest_desktop_environment_snapshot
+        .map(|record| record.record_path.clone())
+        .unwrap_or_default();
+    let latest_desktop_environment_graphical_session_visible =
+        latest_desktop_environment_snapshot
+            .map(|record| record.graphical_session_visible)
+            .unwrap_or(false);
+    let latest_desktop_environment_wayland_display_present =
+        latest_desktop_environment_snapshot
+            .map(|record| record.wayland_display_present)
+            .unwrap_or(false);
+    let latest_desktop_environment_display_present = latest_desktop_environment_snapshot
+        .map(|record| record.display_present)
+        .unwrap_or(false);
+    let latest_desktop_environment_dbus_session_bus_present =
+        latest_desktop_environment_snapshot
+            .map(|record| record.dbus_session_bus_present)
+            .unwrap_or(false);
+    let latest_desktop_environment_at_spi_bus_present = latest_desktop_environment_snapshot
+        .map(|record| record.at_spi_bus_present)
+        .unwrap_or(false);
+    let latest_desktop_environment_ydotool_socket_visible =
+        latest_desktop_environment_snapshot
+            .map(|record| record.ydotool_socket_visible)
+            .unwrap_or(false);
+    let latest_desktop_environment_ydotool_socket_is_socket =
+        latest_desktop_environment_snapshot
+            .map(|record| record.ydotool_socket_is_socket)
+            .unwrap_or(false);
+    let latest_desktop_environment_backend_status = latest_desktop_environment_snapshot
+        .map(|record| record.backend_status.clone())
+        .unwrap_or_else(|| "desktop_environment_snapshot_missing".to_string());
+    let desktop_read_only_capability_snapshots =
+        list_desktop_read_only_capability_snapshots().unwrap_or_default();
+    let desktop_read_only_capability_snapshot_count =
+        desktop_read_only_capability_snapshots.len();
+    let desktop_read_only_capability_snapshot_ready_count =
+        desktop_read_only_capability_snapshots
+            .iter()
+            .filter(|record| desktop_read_only_capability_snapshot_ready(record))
+            .count();
+    let latest_desktop_read_only_capability_snapshot =
+        desktop_read_only_capability_snapshots.first();
+    let latest_desktop_read_only_capability_snapshot_status =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.status.clone())
+            .unwrap_or_else(|| "desktop_read_only_capability_snapshot_missing".to_string());
+    let latest_desktop_read_only_capability_snapshot_record_path =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.record_path.clone())
+            .unwrap_or_default();
+    let latest_desktop_read_only_capability_available_tool_count =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_tool_count)
+            .unwrap_or(0);
+    let latest_desktop_read_only_capability_tool_count =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.tool_count)
+            .unwrap_or(0);
+    let latest_desktop_read_only_capability_window_inventory_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_window_inventory_tool_count > 0)
+            .unwrap_or(false);
+    let latest_desktop_read_only_capability_screenshot_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_screenshot_tool_count > 0)
+            .unwrap_or(false);
+    let latest_desktop_read_only_capability_accessibility_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_accessibility_tool_count > 0)
+            .unwrap_or(false);
+    let latest_desktop_read_only_capability_input_helper_ready =
+        latest_desktop_read_only_capability_snapshot
+            .map(|record| record.available_input_helper_tool_count > 0)
+            .unwrap_or(false);
 
     let foundation_desktop_lanes = foundation
         .items
@@ -99970,7 +103522,7 @@ pub fn linux_desktop_control_readiness_dashboard(
         .filter(|group| group.command_count > 0)
         .count();
 
-    let sections = vec![
+    let mut sections = vec![
         linux_desktop_control_readiness_dashboard_section(
             "foundation-desktop-lane",
             "Foundation desktop lane",
@@ -100044,6 +103596,34 @@ pub fn linux_desktop_control_readiness_dashboard(
             true,
         ),
     ];
+    if desktop_environment_snapshot_count > 0 {
+        sections.push(linux_desktop_control_readiness_dashboard_section(
+            "desktop-environment-snapshot",
+            "Desktop environment snapshot",
+            "desktop-environment-snapshots",
+            desktop_environment_snapshot_count,
+            desktop_environment_snapshot_ready_count,
+            "desktop_environment_snapshot_recorded_control_disabled",
+            "Use the latest read-only desktop environment snapshot to decide whether screenshot, accessibility, socket, pointer, keyboard, focus, and window-control prerequisites are actually visible.",
+            true,
+            false,
+            true,
+        ));
+    }
+    if desktop_read_only_capability_snapshot_count > 0 {
+        sections.push(linux_desktop_control_readiness_dashboard_section(
+            "desktop-read-only-capability-snapshot",
+            "Desktop stage-1 capability snapshot",
+            "desktop-read-only-capability-snapshots",
+            desktop_read_only_capability_snapshot_count,
+            desktop_read_only_capability_snapshot_ready_count,
+            "desktop_stage1_capability_snapshot_recorded_actions_disabled",
+            "Use the latest PATH-only stage-1 capability snapshot to decide which read-only window, screenshot, accessibility, or input prerequisite needs repair before any desktop action gate can open.",
+            true,
+            false,
+            true,
+        ));
+    }
 
     let disabled_gate_count = sections
         .iter()
@@ -100068,6 +103648,32 @@ pub fn linux_desktop_control_readiness_dashboard(
     Ok(LinuxDesktopControlReadinessDashboard {
         status: "linux_desktop_control_readiness_dashboard_read_only",
         section_count: sections.len(),
+        desktop_environment_snapshot_count,
+        desktop_environment_snapshot_ready_count,
+        desktop_environment_snapshot_freshness_threshold_ms:
+            DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS,
+        latest_desktop_environment_snapshot_status,
+        latest_desktop_environment_snapshot_record_path,
+        latest_desktop_environment_snapshot_age_ms,
+        latest_desktop_environment_snapshot_fresh,
+        latest_desktop_environment_graphical_session_visible,
+        latest_desktop_environment_wayland_display_present,
+        latest_desktop_environment_display_present,
+        latest_desktop_environment_dbus_session_bus_present,
+        latest_desktop_environment_at_spi_bus_present,
+        latest_desktop_environment_ydotool_socket_visible,
+        latest_desktop_environment_ydotool_socket_is_socket,
+        latest_desktop_environment_backend_status,
+        desktop_read_only_capability_snapshot_count,
+        desktop_read_only_capability_snapshot_ready_count,
+        latest_desktop_read_only_capability_snapshot_status,
+        latest_desktop_read_only_capability_snapshot_record_path,
+        latest_desktop_read_only_capability_available_tool_count,
+        latest_desktop_read_only_capability_tool_count,
+        latest_desktop_read_only_capability_window_inventory_ready,
+        latest_desktop_read_only_capability_screenshot_ready,
+        latest_desktop_read_only_capability_accessibility_ready,
+        latest_desktop_read_only_capability_input_helper_ready,
         foundation_desktop_lane_count,
         foundation_desktop_ready_count,
         work_queue_desktop_lane_count,
@@ -100098,10 +103704,10 @@ pub fn linux_desktop_control_readiness_dashboard(
         sections,
         reasons: vec![
             "dashboard groups existing desktop lane, work queue, inventory, readiness, approval spine, and command-surface evidence into one Linux desktop control readiness view",
-            "dashboard reads existing ledgers only and creates no desktop, capture, OCR, target-window, action, socket, process, terminal, config, export, memory, file, patch, or execution records",
+            "dashboard reads existing ledgers and the latest desktop environment snapshot only; snapshot creation is explicit and creates no capture, OCR, target-window, action, socket, process, terminal, config, export, memory, file, patch, or execution records",
             "desktop control, capture, sockets, process spawn, terminal control, file writes, patches, live MCP calls, config reads, exports, memory writes, workspace writes, and execution remain disabled",
         ],
-        next_slice: "Use this dashboard to add explicit screenshot/OCR/window/action approval policies before any Linux desktop control, capture, socket, process, terminal, or execution gate is opened.",
+        next_slice: "Use this dashboard to add explicit stage-1 read-only screenshot/accessibility/window inventory probes before any Linux desktop control, capture, socket, process, terminal, or execution gate is opened.",
     })
 }
 
@@ -110421,9 +114027,17 @@ pub fn open_workspace_stub(path: String) -> WorkspaceStub {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static TEST_ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn test_env_lock() -> MutexGuard<'static, ()> {
+        TEST_ENV_LOCK.lock().expect("test env lock")
+    }
 
     #[test]
     fn product_workspace_paths_are_rebuild_scoped() {
+        let _test_env_guard = test_env_lock();
         let read_path = resolve_product_workspace_read_path("README.md")
             .expect("README.md resolves inside the rebuild workspace");
         assert_eq!(read_path.1, "README.md");
@@ -110436,6 +114050,7 @@ mod tests {
 
     #[test]
     fn product_terminal_allowlist_blocks_shell_interpolation() {
+        let _test_env_guard = test_env_lock();
         let validate = product_terminal_allowed_argv("npm run validate")
             .expect("validate command is allowed");
         assert_eq!(validate, vec!["npm", "run", "validate"]);
@@ -110454,11 +114069,17 @@ mod tests {
 
     #[test]
     fn product_terminal_transcript_replay_reads_existing_session_without_execution() {
+        let _test_env_guard = test_env_lock();
         let terminal = run_product_terminal_command(ProductTerminalCommandRequest {
             command: "pwd".to_string(),
             timeout_ms: Some(5_000),
         })
         .expect("bounded terminal command runs");
+        assert!(terminal.stdout_pipe_reader_enabled);
+        assert!(terminal.stderr_pipe_reader_enabled);
+        assert!(!terminal.timeout_kill_sent);
+        assert_eq!(terminal.wait_after_kill_ms, 0);
+        assert!(terminal.partial_output_captured);
         let replay = record_product_terminal_transcript_replay(
             ProductTerminalTranscriptReplayRequest {
                 session_record_path: Some(terminal.record_path.clone()),
@@ -110492,6 +114113,113 @@ mod tests {
         let listed = list_product_terminal_transcript_replays()
             .expect("terminal transcript replay list loads");
         assert!(listed.iter().any(|record| record.id == replay.id));
+
+        let blocked_result = run_product_terminal_command(ProductTerminalCommandRequest {
+            command: "cat /etc/passwd".to_string(),
+            timeout_ms: Some(1_000),
+        });
+        assert!(blocked_result.is_err());
+        let blocked_records = list_product_terminal_blocked_commands(12)
+            .expect("blocked terminal command evidence list loads");
+        let blocked_record = blocked_records
+            .iter()
+            .find(|record| record.command_preview.contains("cat /etc/passwd"))
+            .expect("blocked terminal command is persisted");
+        assert_eq!(blocked_record.status, "product_terminal_command_blocked");
+        assert_eq!(blocked_record.requested_mode, "sync");
+        assert_eq!(blocked_record.block_class, "allowlist-denied");
+        assert!(blocked_record.allowlist_enforced);
+        assert!(!blocked_record.process_spawn_enabled);
+        assert!(!blocked_record.transcript_capture_enabled);
+        assert!(!blocked_record.command_runner_enabled);
+        assert!(!blocked_record.terminal_write_enabled);
+        assert!(!blocked_record.live_tail_enabled);
+        assert!(!blocked_record.process_control_enabled);
+        assert!(!blocked_record.file_write_enabled);
+        assert!(!blocked_record.patch_apply_enabled);
+        assert!(!blocked_record.desktop_control_enabled);
+        assert!(!blocked_record.live_mcp_call_enabled);
+        assert!(!blocked_record.config_read_enabled);
+        assert!(!blocked_record.capture_enabled);
+        assert!(!blocked_record.export_enabled);
+        assert!(!blocked_record.memory_write_enabled);
+        assert!(!blocked_record.writes_allowed);
+        assert!(!blocked_record.execution_enabled);
+        assert!(fs::metadata(&blocked_record.record_path).is_ok());
+        assert!(fs::metadata(&blocked_record.log_path).is_ok());
+
+        let terminal_process_dashboard =
+            terminal_process_lane_dashboard().expect("terminal/process dashboard loads");
+        assert!(
+            terminal_process_dashboard
+                .recent_terminal_sessions
+                .iter()
+                .any(|record| {
+                    record.command == "pwd"
+                        && record.status == "product_terminal_command_succeeded"
+                        && record.source_process_spawn_enabled
+                        && record.source_transcript_capture_enabled
+                        && record.source_command_runner_enabled
+                        && record.source_execution_enabled
+                        && record.stdout_pipe_reader_enabled
+                        && record.stderr_pipe_reader_enabled
+                        && !record.timeout_kill_sent
+                        && record.partial_output_captured
+                        && !record.source_writes_allowed
+                        && !record.terminal_write_enabled
+                        && !record.live_tail_enabled
+                        && !record.process_control_enabled
+                        && !record.writes_allowed
+                        && !record.execution_enabled
+                })
+        );
+        assert!(
+            terminal_process_dashboard
+                .recent_terminal_replays
+                .iter()
+                .any(|record| record.id == replay.id && record.transcript_read_enabled)
+        );
+        assert!(terminal_process_dashboard.recent_terminal_session_count >= 1);
+        assert!(terminal_process_dashboard.recent_terminal_replay_count >= 1);
+        assert!(terminal_process_dashboard.blocked_terminal_command_count >= 1);
+        assert!(
+            terminal_process_dashboard
+                .recent_blocked_terminal_commands
+                .iter()
+                .any(|record| {
+                    record.command_preview.contains("cat /etc/passwd")
+                        && record.status == "product_terminal_command_blocked"
+                        && !record.process_spawn_enabled
+                        && !record.command_runner_enabled
+                        && !record.writes_allowed
+                        && !record.execution_enabled
+                })
+        );
+        assert!(terminal_process_dashboard.terminal_process_visible);
+        assert!(terminal_process_dashboard.read_only);
+        assert!(!terminal_process_dashboard.terminal_write_enabled);
+        assert!(!terminal_process_dashboard.live_tail_enabled);
+        assert!(!terminal_process_dashboard.process_control_enabled);
+        assert!(!terminal_process_dashboard.writes_allowed);
+        assert!(!terminal_process_dashboard.execution_enabled);
+
+        let pet_dashboard =
+            steno_pet_companion_dashboard().expect("pet dashboard loads blocked terminal attention");
+        assert!(pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "terminal-blocked"
+                    && item.related_record_path.as_deref()
+                        == Some(blocked_record.record_path.as_str())
+                    && item.state == "warning"
+                    && item.title.contains("Blocked terminal command")
+                    && item.read_only
+                    && !item.terminal_enabled
+                    && !item.process_spawn_enabled
+                    && !item.writes_allowed
+                    && !item.execution_enabled
+            }));
         assert!(
             record_product_terminal_transcript_replay(ProductTerminalTranscriptReplayRequest {
                 session_record_path: Some("/etc/passwd".to_string()),
@@ -110503,7 +114231,318 @@ mod tests {
     }
 
     #[test]
+    fn product_terminal_stream_record_summary_preserves_lifecycle_evidence() {
+        let _test_env_guard = test_env_lock();
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-terminal-stream-summary-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create stream summary dir");
+        let record_path = test_root.join("product-terminal-stream-test.json");
+        let stdout_path = test_root.join("product-terminal-stream-test.stdout.txt");
+        let stderr_path = test_root.join("product-terminal-stream-test.stderr.txt");
+        fs::write(&stdout_path, "stream stdout ready\n").expect("write stdout transcript");
+        fs::write(&stderr_path, "stream stderr ready\n").expect("write stderr transcript");
+        let value = serde_json::json!({
+            "session_id": "product-terminal-stream-test",
+            "status": "product_terminal_stream_timed_out",
+            "command": "npm run validate",
+            "cwd": rebuild_workspace_root().display().to_string(),
+            "exit_code": null,
+            "timed_out": true,
+            "duration_ms": 1234,
+            "stdout_pipe_reader_enabled": true,
+            "stderr_pipe_reader_enabled": true,
+            "timeout_kill_sent": true,
+            "wait_after_kill_ms": 17,
+            "partial_output_captured": true,
+            "timeout_ms": 100,
+            "stdout_transcript_path": stdout_path.display().to_string(),
+            "stderr_transcript_path": stderr_path.display().to_string(),
+            "stream_enabled": true,
+            "process_spawn_enabled": true,
+            "transcript_capture_enabled": true,
+            "command_runner_enabled": true,
+            "writes_allowed": false,
+            "execution_enabled": true,
+            "created_at_ms": 99
+        });
+        let summary = terminal_session_summary_from_record(record_path, value);
+        assert_eq!(summary.session_id, "product-terminal-stream-test");
+        assert_eq!(summary.status, "product_terminal_stream_timed_out");
+        assert_eq!(summary.command, "npm run validate");
+        assert!(summary.timed_out);
+        assert!(summary.source_stream_enabled);
+        assert!(summary.source_process_spawn_enabled);
+        assert!(summary.source_transcript_capture_enabled);
+        assert!(summary.source_command_runner_enabled);
+        assert!(summary.source_execution_enabled);
+        assert!(!summary.source_writes_allowed);
+        assert!(summary.stdout_pipe_reader_enabled);
+        assert!(summary.stderr_pipe_reader_enabled);
+        assert!(summary.timeout_kill_sent);
+        assert_eq!(summary.wait_after_kill_ms, 17);
+        assert!(summary.partial_output_captured);
+        assert!(summary.stdout_size_bytes > 0);
+        assert!(summary.stderr_size_bytes > 0);
+        assert!(!summary.terminal_write_enabled);
+        assert!(!summary.live_tail_enabled);
+        assert!(!summary.process_control_enabled);
+        assert!(!summary.writes_allowed);
+        assert!(!summary.execution_enabled);
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn product_terminal_process_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-terminal-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake terminal dir");
+        let fake_command = test_root.join("fake-terminal-command");
+        fs::write(
+            &fake_command,
+            r#"#!/bin/sh
+printf 'terminal stdout ready\n'
+printf 'terminal stderr ready\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'terminal stdout chunk %s\n' "$i"
+  printf 'terminal stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake terminal command");
+        let mut permissions = fs::metadata(&fake_command)
+            .expect("fake terminal metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_command, permissions).expect("chmod fake terminal command");
+
+        let output = run_product_terminal_command_process(
+            fake_command.to_str().expect("fake terminal path"),
+            &[],
+            &test_root,
+            100,
+        );
+        assert_eq!(output.status, "product_terminal_command_timed_out");
+        assert!(output.timed_out);
+        assert!(output.timeout_kill_sent);
+        assert!(output.stdout_pipe_reader_enabled);
+        assert!(output.stderr_pipe_reader_enabled);
+        assert!(output.partial_output_captured);
+        assert!(String::from_utf8_lossy(&output.stdout_bytes).contains("terminal stdout ready"));
+        assert!(String::from_utf8_lossy(&output.stderr_bytes).contains("terminal stderr ready"));
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hermes_kimi_assist_process_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-hermes-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake hermes dir");
+        let fake_hermes = test_root.join("hermes");
+        fs::write(
+            &fake_hermes,
+            r#"#!/bin/sh
+printf 'ready stdout\n'
+printf 'ready stderr\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'stdout chunk %s\n' "$i"
+  printf 'stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake hermes");
+        let mut permissions = fs::metadata(&fake_hermes)
+            .expect("fake hermes metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_hermes, permissions).expect("chmod fake hermes");
+
+        let output = run_hermes_kimi_assist_process_with_binary(
+            fake_hermes.to_str().expect("fake hermes path"),
+            "verify Hermes pipe drain robustness",
+            100,
+        );
+        assert_eq!(output.status, "hermes_kimi_assist_brief_timed_out");
+        assert!(output.timed_out);
+        assert!(output.timeout_kill_sent);
+        assert!(output.stdout_pipe_reader_enabled);
+        assert!(output.stderr_pipe_reader_enabled);
+        assert!(output.partial_output_captured);
+        assert_eq!(output.query_transport, "argv-compact-query");
+        assert!(output.argv_char_count > 0);
+        assert!(String::from_utf8_lossy(&output.stdout_bytes).contains("ready stdout"));
+        assert!(String::from_utf8_lossy(&output.stderr_bytes).contains("ready stderr"));
+        assert_eq!(output.bounded_execution_performed, true);
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_transcript_session_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-agent-transcript-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake agent transcript dir");
+        let fake_agent = test_root.join("codex");
+        fs::write(
+            &fake_agent,
+            r#"#!/bin/sh
+printf 'agent transcript stdout ready\n'
+printf 'agent transcript stderr ready\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'agent transcript stdout chunk %s\n' "$i"
+  printf 'agent transcript stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake agent binary");
+        let mut permissions = fs::metadata(&fake_agent)
+            .expect("fake agent metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_agent, permissions).expect("chmod fake agent");
+
+        let target = AgentTranscriptTarget {
+            runtime: "codex",
+            target: "codex-pipe-test",
+            session_kind: "help",
+            title: "Codex pipe transcript test",
+            binary: "codex",
+            args: vec!["--help"],
+            required_for: "Rust pipe-drain regression coverage.",
+        };
+        let record = run_agent_transcript_target_with_binary(
+            &target,
+            fake_agent.to_str().expect("fake agent path"),
+            "rust-test-agent-transcript-pipe",
+            100,
+            now_ms().expect("clock"),
+            &test_root,
+        )
+        .expect("agent transcript target records");
+        assert_eq!(record.status, "agent_transcript_session_timed_out");
+        assert!(record.timed_out);
+        assert!(record.timeout_kill_sent);
+        assert!(record.stdout_pipe_reader_enabled);
+        assert!(record.stderr_pipe_reader_enabled);
+        assert!(record.partial_output_captured);
+        assert!(record.stdout.contains("agent transcript stdout ready"));
+        assert!(record.stderr.contains("agent transcript stderr ready"));
+        assert!(fs::metadata(&record.stdout_transcript_path).is_ok());
+        assert!(fs::metadata(&record.stderr_transcript_path).is_ok());
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn steno_pet_dashboard_surfaces_agent_transcript_pipe_evidence() {
+        let _test_env_guard = test_env_lock();
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-agent-transcript-dashboard-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake dashboard agent dir");
+        let fake_agent = test_root.join("codex");
+        fs::write(
+            &fake_agent,
+            r#"#!/bin/sh
+printf 'agent transcript dashboard stdout ready\n'
+printf 'agent transcript dashboard stderr ready\n' >&2
+"#,
+        )
+        .expect("write fake dashboard agent binary");
+        let mut permissions = fs::metadata(&fake_agent)
+            .expect("fake dashboard agent metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_agent, permissions).expect("chmod fake dashboard agent");
+
+        let target = AgentTranscriptTarget {
+            runtime: "codex",
+            target: "codex-dashboard-transcript-test",
+            session_kind: "version",
+            title: "Codex dashboard transcript test",
+            binary: "codex",
+            args: vec!["--version"],
+            required_for: "Steno dashboard pipe evidence coverage.",
+        };
+        let dir = agent_transcript_sessions_dir().expect("agent transcript sessions dir");
+        fs::create_dir_all(&dir).expect("create agent transcript sessions dir");
+        let record = run_agent_transcript_target_with_binary(
+            &target,
+            fake_agent.to_str().expect("fake dashboard agent path"),
+            "rust-test-agent-transcript-dashboard",
+            2_000,
+            now_ms().expect("clock"),
+            &dir,
+        )
+        .expect("agent transcript dashboard record writes");
+        assert_eq!(record.status, "agent_transcript_session_succeeded");
+        assert!(record.stdout_pipe_reader_enabled);
+        assert!(record.stderr_pipe_reader_enabled);
+        assert!(record.partial_output_captured);
+
+        let dashboard = steno_pet_companion_dashboard()
+            .expect("Steno pet dashboard includes agent transcript sessions");
+        assert!(dashboard.agent_transcript_session_count >= 1);
+        assert!(dashboard.agent_transcript_ready_count >= 1);
+        assert!(dashboard.agent_transcript_pipe_reader_ready_count >= 1);
+        assert!(dashboard.agent_transcript_partial_output_count >= 1);
+        assert!(dashboard
+            .recent_agent_transcript_sessions
+            .iter()
+            .any(|session| {
+                session.id == record.id
+                    && session.stdout_pipe_reader_enabled
+                    && session.stderr_pipe_reader_enabled
+                    && session.partial_output_captured
+            }));
+        assert!(dashboard.sections.iter().any(|section| {
+            section.section_id == "agent-transcript-sessions"
+                && section.record_count >= 1
+                && section.ready_count >= 1
+                && section.read_only
+                && !section.execution_enabled
+        }));
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[test]
     fn sovereign_docs_preview_records_self_contained_html_without_export_gates() {
+        let _test_env_guard = test_env_lock();
         let markdown = "# Gravity Omega Brief\n\n- Codex Lead\n- Hermes/Kimi assist\n\n```txt\nsealed evidence\n```\n";
         let record = record_sovereign_docs_preview(SovereignDocsPreviewRequest {
             source_path: "Omega Agent Work.md".to_string(),
@@ -110547,6 +114586,7 @@ mod tests {
 
     #[test]
     fn omega_computer_session_records_codex_lead_hermes_roles_without_desktop_control() {
+        let _test_env_guard = test_env_lock();
         let record = record_omega_computer_session(OmegaComputerSessionRequest {
             prompt_preview: Some(
                 "Use Codex as lead, delegate bounded review to Hermes/Kimi, and verify before reporting."
@@ -110623,6 +114663,7 @@ mod tests {
 
     #[test]
     fn provider_settings_dashboard_redacts_secret_values() {
+        let _test_env_guard = test_env_lock();
         let dashboard = provider_settings_dashboard();
 
         assert!(dashboard.read_only);
@@ -110639,6 +114680,7 @@ mod tests {
 
     #[test]
     fn product_workbench_smoke_runs_and_is_listed() {
+        let _test_env_guard = test_env_lock();
         let smoke = run_product_workbench_smoke().expect("product workbench smoke runs");
 
         assert!(smoke.accepted);
@@ -110672,6 +114714,7 @@ mod tests {
 
     #[test]
     fn product_evidence_history_reads_existing_product_ledgers() {
+        let _test_env_guard = test_env_lock();
         let _ = run_product_workbench_smoke().expect("product workbench smoke seeds evidence");
         let history = product_evidence_history().expect("product evidence history loads");
 
@@ -110692,7 +114735,84 @@ mod tests {
     }
 
     #[test]
+    fn evidence_durability_manifest_seals_readable_product_evidence_without_export() {
+        let _test_env_guard = test_env_lock();
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-evidence-durability-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        let saved_state = env::var_os("XDG_STATE_HOME");
+        env::set_var("XDG_STATE_HOME", &test_root);
+
+        let smoke = run_product_workbench_smoke().expect("product workbench smoke seeds evidence");
+        let record = record_evidence_durability_manifest(EvidenceDurabilityManifestRequest {
+            requested_by: Some("rust-test".to_string()),
+        })
+        .expect("evidence durability manifest records");
+
+        assert_eq!(record.requested_by, "rust-test");
+        assert_eq!(record.status, "evidence_durability_manifest_recorded");
+        assert_eq!(record.source_history_status, "product_evidence_history_ready");
+        assert!(record.evidence_record_count >= 1);
+        assert_eq!(record.readable_record_count, record.evidence_record_count);
+        assert_eq!(record.missing_record_count, 0);
+        assert!(record.category_count >= 1);
+        assert!(record.manifest_input_bytes > 0);
+        assert!(record.manifest_hash.starts_with("fnv1a64:"));
+        assert!(record.latest_evidence_record_path.contains("gravity-omega-native"));
+        assert!(record
+            .categories
+            .iter()
+            .any(|category| category.category == "smoke"
+                && category.record_count >= 1
+                && category.readable_record_count >= 1
+                && category.latest_record_path == smoke.record_path));
+        assert!(record.local_manifest_recorded);
+        assert!(record.read_only);
+        assert!(record.history_enabled);
+        assert!(record.evidence_read_enabled);
+        assert!(!record.process_spawn_enabled);
+        assert!(!record.terminal_enabled);
+        assert!(!record.desktop_control_enabled);
+        assert!(!record.capture_enabled);
+        assert!(!record.file_write_enabled);
+        assert!(!record.patch_apply_enabled);
+        assert!(!record.export_enabled);
+        assert!(!record.live_mcp_call_enabled);
+        assert!(!record.config_read_enabled);
+        assert!(!record.memory_write_enabled);
+        assert!(!record.writes_allowed);
+        assert!(!record.execution_enabled);
+        assert!(record.blockers.is_empty());
+        assert!(fs::metadata(&record.record_path).is_ok());
+        assert!(fs::metadata(&record.log_path).is_ok());
+
+        let listed = list_evidence_durability_manifests()
+            .expect("evidence durability manifest list loads");
+        assert!(listed.iter().any(|item| item.id == record.id));
+        let history = product_evidence_history().expect("product evidence history includes manifest");
+        assert!(history
+            .categories
+            .iter()
+            .any(|category| category == "evidence-durability"));
+        assert!(history.items.iter().any(|item| {
+            item.category == "evidence-durability"
+                && item.record_path == record.record_path
+                && item.detail.contains("seal=fnv1a64:")
+        }));
+
+        let _ = fs::remove_dir_all(&test_root);
+        if let Some(value) = saved_state {
+            env::set_var("XDG_STATE_HOME", value);
+        } else {
+            env::remove_var("XDG_STATE_HOME");
+        }
+    }
+
+    #[test]
     fn command_dry_run_resolves_joint_ci_launchpad() {
+        let _test_env_guard = test_env_lock();
         let result = execute_command_stub("agent.joint_ci".to_string()).expect("dry-run resolves");
 
         assert!(result.found);
@@ -110707,6 +114827,7 @@ mod tests {
 
     #[test]
     fn toolbar_registry_has_no_missing_commands_and_resolves_former_holes() {
+        let _test_env_guard = test_env_lock();
         let commands = command_registry().expect("toolbar registry loads");
 
         assert_eq!(commands.len(), 34);
@@ -110936,6 +115057,7 @@ mod tests {
 
     #[test]
     fn command_surface_collapse_board_maps_kimi_findings_to_twenty_families() {
+        let _test_env_guard = test_env_lock();
         let board = command_surface_collapse_board();
 
         assert_eq!(board.status, "command_surface_collapse_board_read_only");
@@ -110997,6 +115119,7 @@ mod tests {
 
     #[test]
     fn finish_line_readiness_surfaces_name_ship_blockers_without_enabling_live_gates() {
+        let _test_env_guard = test_env_lock();
         let readiness = replacement_app_ship_readiness();
 
         assert_eq!(readiness.status, "replacement_app_ship_readiness_read_only");
@@ -111307,6 +115430,7 @@ mod tests {
 
     #[test]
     fn runtime_probe_board_is_bounded_and_keeps_launch_gates_disabled() {
+        let _test_env_guard = test_env_lock();
         let targets = runtime_probe_targets();
         assert_eq!(targets.len(), 9);
         assert!(targets.iter().any(|target| {
@@ -111537,6 +115661,7 @@ mod tests {
 
     #[test]
     fn runtime_sidecar_process_snapshot_records_bounded_process_evidence_without_control() {
+        let _test_env_guard = test_env_lock();
         let record = record_runtime_sidecar_process_snapshot(RuntimeSidecarProcessSnapshotRequest {
             requested_by: Some("rust-test".to_string()),
         })
@@ -111553,6 +115678,16 @@ mod tests {
                 "pid=,args=".to_string()
             ]
         );
+        assert_eq!(
+            record.process_list_timeout_ms,
+            RUNTIME_SIDECAR_PROCESS_LIST_TIMEOUT_MS
+        );
+        assert!(record.stdout_pipe_reader_enabled);
+        assert!(record.stderr_pipe_reader_enabled);
+        assert!(!record.process_list_timed_out);
+        assert!(!record.process_list_timeout_kill_sent);
+        assert_eq!(record.process_list_wait_after_kill_ms, 0);
+        assert!(!record.process_list_partial_output_captured);
         assert_eq!(record.target_count, record.targets.len());
         assert!(record.target_count >= 7);
         assert_eq!(
@@ -111605,6 +115740,54 @@ mod tests {
         assert!(!health_packets.spawn_enabled);
         assert!(!health_packets.execution_enabled);
 
+        let mcp_dashboard =
+            first_class_mcp_dashboard().expect("first-class MCP dashboard loads runtime evidence");
+        assert!(mcp_dashboard.runtime_process_snapshot_count > 0);
+        assert_eq!(mcp_dashboard.lane_count, 3);
+        assert_eq!(mcp_dashboard.latest_runtime_process_snapshot_status, record.status);
+        assert_eq!(
+            mcp_dashboard.runtime_process_snapshot_freshness_threshold_ms,
+            RUNTIME_PROCESS_SNAPSHOT_FRESHNESS_THRESHOLD_MS
+        );
+        assert!(mcp_dashboard
+            .latest_runtime_process_snapshot_age_ms
+            .is_some());
+        assert_eq!(
+            mcp_dashboard.latest_runtime_process_snapshot_freshness_status,
+            "runtime_process_snapshot_fresh"
+        );
+        assert!(mcp_dashboard.latest_runtime_process_snapshot_fresh);
+        assert!(!mcp_dashboard.latest_runtime_process_snapshot_stale);
+        assert!(mcp_dashboard.latest_runtime_process_snapshot_pipe_reader_ready);
+        assert!(!mcp_dashboard.latest_runtime_process_snapshot_partial_output_captured);
+        assert!(!mcp_dashboard.latest_runtime_process_snapshot_timed_out);
+        assert_eq!(
+            mcp_dashboard.latest_runtime_process_snapshot_path.as_deref(),
+            Some(record.record_path.as_str())
+        );
+        assert!(mcp_dashboard.lanes.iter().any(|lane| {
+            lane.subsystem == "sswp"
+                && lane.runtime_target_id == "sswp-mcp"
+                && lane.runtime_snapshot_status == record.status
+                && lane.runtime_snapshot_freshness_status == "runtime_process_snapshot_fresh"
+                && lane.runtime_snapshot_fresh
+                && !lane.runtime_snapshot_stale
+                && lane.runtime_snapshot_pipe_reader_ready
+                && !lane.runtime_snapshot_partial_output_captured
+                && !lane.runtime_snapshot_timed_out
+                && lane.runtime_record_path.as_deref() == Some(record.record_path.as_str())
+                && lane.runtime_expected_pattern.contains("sswp")
+        }));
+        assert!(mcp_dashboard.lanes.iter().all(|lane| {
+            !lane.live_call_enabled
+                && !lane.config_read_enabled
+                && !lane.socket_connect_enabled
+                && !lane.memory_write_enabled
+                && !lane.process_spawn_enabled
+                && !lane.writes_allowed
+                && !lane.execution_enabled
+        }));
+
         let history = product_evidence_history().expect("product evidence history loads");
         assert!(history
             .categories
@@ -111614,6 +115797,7 @@ mod tests {
 
     #[test]
     fn pet_runtime_snapshot_signal_reflects_latest_process_snapshot_without_memory_writes() {
+        let _test_env_guard = test_env_lock();
         let snapshot = record_runtime_sidecar_process_snapshot(RuntimeSidecarProcessSnapshotRequest {
             requested_by: Some("rust-test-pet".to_string()),
         })
@@ -111644,12 +115828,48 @@ mod tests {
         let dashboard = steno_pet_companion_dashboard().expect("Steno pet companion dashboard");
         assert!(dashboard.pet_runtime_signal_count > 0);
         assert_eq!(dashboard.latest_pet_state, signal.state);
+        assert!(dashboard
+            .recent_pet_runtime_signals
+            .iter()
+            .any(|record| record.id == signal.id && record.record_path == signal.record_path));
+        assert!(dashboard
+            .recent_pet_runtime_signals
+            .iter()
+            .all(|record| !record.memory_write_enabled
+                && !record.live_mcp_call_enabled
+                && !record.file_write_enabled
+                && !record.patch_apply_enabled
+                && !record.desktop_control_enabled
+                && !record.writes_allowed
+                && !record.execution_enabled));
+        assert_eq!(
+            dashboard.pet_attention_item_count,
+            dashboard.recent_pet_attention_items.len()
+        );
+        assert!(matches!(
+            dashboard.latest_pet_attention_state.as_str(),
+            "idle" | "error" | "warning" | "reminder" | "success" | "working" | "thinking"
+        ));
+        assert!(dashboard.recent_pet_attention_items.iter().all(|item| {
+            item.read_only
+                && !item.steno_write_enabled
+                && !item.memory_write_enabled
+                && !item.live_mcp_call_enabled
+                && !item.file_write_enabled
+                && !item.patch_apply_enabled
+                && !item.desktop_control_enabled
+                && !item.terminal_enabled
+                && !item.process_spawn_enabled
+                && !item.writes_allowed
+                && !item.execution_enabled
+        }));
         let history = product_evidence_history().expect("product evidence history loads");
         assert!(history.categories.iter().any(|category| category == "pet-signal"));
     }
 
     #[test]
     fn workspace_explorer_snapshot_reads_rebuild_tree_without_mutation_gates() {
+        let _test_env_guard = test_env_lock();
         let snapshot = workspace_explorer_snapshot(WorkspaceExplorerRequest {
             root: None,
             preview_path: Some(workspace_explorer_default_preview_path()),
@@ -111716,6 +115936,7 @@ mod tests {
 
     #[test]
     fn product_workspace_search_finds_rebuild_text_without_mutation_gates() {
+        let _test_env_guard = test_env_lock();
         let result = product_workspace_search(ProductWorkspaceSearchRequest {
             query: "omega-product-shell".to_string(),
             max_results: Some(25),
@@ -111762,6 +115983,7 @@ mod tests {
 
     #[test]
     fn workspace_edit_save_preview_is_family_shaped_and_read_only() {
+        let _test_env_guard = test_env_lock();
         let plan = workspace_edit(WorkspaceEditRequest {
             mode: Some("save_preview".to_string()),
             source_command_id: Some("file.save".to_string()),
@@ -111823,6 +116045,7 @@ mod tests {
 
     #[test]
     fn ui_ux_test_matrix_covers_twenty_families_with_disabled_live_gates() {
+        let _test_env_guard = test_env_lock();
         let matrix = ui_ux_test_matrix();
 
         assert_eq!(matrix.status, "ui_ux_test_matrix_read_only");
@@ -111898,6 +116121,7 @@ mod tests {
 
     #[test]
     fn bundled_docs_and_about_are_live_static_surfaces() {
+        let _test_env_guard = test_env_lock();
         let docs = docs_open();
         assert_eq!(docs.status, "docs_open_bundled_in_app");
         assert_eq!(docs.section_count, 5);
@@ -111941,6 +116165,7 @@ mod tests {
 
     #[test]
     fn command_palette_open_is_read_only_registry_browser() {
+        let _test_env_guard = test_env_lock();
         let palette = command_palette_open().expect("command palette opens");
 
         assert_eq!(palette.status, "command_palette_open_read_only");
@@ -111987,6 +116212,7 @@ mod tests {
 
     #[test]
     fn terminal_toggle_opens_read_only_panel_without_pty_or_process() {
+        let _test_env_guard = test_env_lock();
         let toggle = terminal_toggle().expect("terminal toggle opens");
 
         assert_eq!(toggle.status, "terminal_toggle_panel_visible_read_only");
@@ -112021,6 +116247,7 @@ mod tests {
 
     #[test]
     fn editor_find_opens_read_only_panel_without_buffer_reads() {
+        let _test_env_guard = test_env_lock();
         let find = editor_find();
 
         assert_eq!(find.status, "editor_find_panel_read_only");
@@ -112054,6 +116281,11 @@ mod tests {
 
     #[test]
     fn sswp_status_opens_read_only_lane_without_live_mcp() {
+        let _test_env_guard = test_env_lock();
+        let snapshot = record_runtime_sidecar_process_snapshot(RuntimeSidecarProcessSnapshotRequest {
+            requested_by: Some("rust-test-sswp-status".to_string()),
+        })
+        .expect("runtime sidecar process snapshot records before SSWP status");
         let panel = sswp_status().expect("SSWP status opens");
 
         assert_eq!(panel.status, "sswp_status_panel_read_only");
@@ -112069,6 +116301,16 @@ mod tests {
             panel.registry_snapshot_count == 0,
             panel.latest_registry_snapshot_path.is_none()
         );
+        assert!(panel.runtime_process_snapshot_count > 0);
+        assert_eq!(panel.latest_runtime_process_snapshot_status, snapshot.status);
+        assert_eq!(
+            panel.latest_runtime_process_snapshot_path.as_deref(),
+            Some(snapshot.record_path.as_str())
+        );
+        assert_eq!(panel.runtime_target_id, "sswp-mcp");
+        assert_eq!(panel.runtime_health_status, panel.lane.runtime_health_status);
+        assert_eq!(panel.runtime_process_count, panel.lane.runtime_process_count);
+        assert!(panel.runtime_expected_pattern.contains("sswp"));
         assert!(panel.highest_risk_percent >= 0.0);
         assert!(panel.read_only);
         assert!(panel.lane.read_only);
@@ -112095,6 +116337,7 @@ mod tests {
 
     #[test]
     fn sswp_registry_parser_extracts_cli_table_without_witness_or_verify() {
+        let _test_env_guard = test_env_lock();
         let nodes = parse_sswp_registry_nodes(
             "⬡  SSWP Registry — 3 node(s)\n\nNODE ID                     RISK      LAST WITNESS          COUNT\n----------------------------------------------------------------------\naegis                       0.0%      5/13/2026, 4:03:17 AM 2\ngravity-omega               12.5%     5/25/2026, 4:02:55 AM 48\nNo nodes exceed risk threshold 0.3.\n",
         );
@@ -112108,19 +116351,81 @@ mod tests {
         assert_eq!(nodes[1].witness_count, 48);
     }
 
+    #[cfg(unix)]
     #[test]
-    fn steno_search_opens_read_only_panel_without_transcript_reads() {
-        let panel = steno_search().expect("Steno search opens");
+    fn sswp_registry_command_drains_pipes_and_captures_timeout_partial_output() {
+        let _test_env_guard = test_env_lock();
+        use std::os::unix::fs::PermissionsExt;
+
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-sswp-pipe-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        fs::create_dir_all(&test_root).expect("create fake sswp dir");
+        let fake_sswp = test_root.join("sswp");
+        fs::write(
+            &fake_sswp,
+            r#"#!/bin/sh
+printf 'SSWP Registry - 1 node(s)\n\n'
+printf 'NODE ID                     RISK      LAST WITNESS          COUNT\n'
+printf '----------------------------------------------------------------------\n'
+printf 'gravity-omega               12.5%%     5/25/2026, 4:02:55 AM 48\n'
+printf 'sswp stderr ready\n' >&2
+i=0
+while [ "$i" -lt 180 ]; do
+  printf 'sswp stdout chunk %s\n' "$i"
+  printf 'sswp stderr chunk %s\n' "$i" >&2
+  i=$((i + 1))
+done
+sleep 2
+"#,
+        )
+        .expect("write fake sswp");
+        let mut permissions = fs::metadata(&fake_sswp)
+            .expect("fake sswp metadata")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&fake_sswp, permissions).expect("chmod fake sswp");
+
+        let output = run_sswp_registry_command_with_binary(
+            fake_sswp.to_str().expect("fake sswp path"),
+            &["registry", "list"],
+            100,
+        );
+        assert_eq!(output.status, "timed_out");
+        assert!(output.timed_out);
+        assert!(output.timeout_kill_sent);
+        assert!(output.stdout_pipe_reader_enabled);
+        assert!(output.stderr_pipe_reader_enabled);
+        assert!(output.partial_output_captured);
+        assert!(output.command[0].ends_with("/sswp"));
+        assert!(output.stdout_preview.contains("gravity-omega"));
+        assert!(output.stderr_preview.contains("sswp stderr ready"));
+        let _ = fs::remove_dir_all(&test_root);
+    }
+
+    #[test]
+    fn steno_search_opens_read_only_panel_with_query_binding() {
+        let _test_env_guard = test_env_lock();
+        let panel = steno_search(None).expect("Steno search opens");
 
         assert_eq!(panel.status, "steno_search_panel_read_only");
         assert_eq!(panel.panel_id, "steno-search-panel");
         assert_eq!(panel.query, "");
         assert_eq!(panel.result_count, 0);
+        assert_eq!(panel.searched_file_count, 0);
+        assert_eq!(panel.matched_file_count, 0);
+        assert_eq!(
+            panel.postmortem_result_count,
+            panel.recent_postmortem_results.len()
+        );
+        assert!(panel.results.is_empty());
         assert!(panel.section_count >= 5);
         assert!(panel.read_only);
         assert!(!panel.transcript_read_enabled);
         assert!(!panel.transcript_index_enabled);
-        assert!(!panel.query_binding_enabled);
+        assert!(panel.query_binding_enabled);
         assert!(!panel.capture_enabled);
         assert!(!panel.export_enabled);
         assert!(!panel.live_mcp_call_enabled);
@@ -112141,7 +116446,64 @@ mod tests {
     }
 
     #[test]
+    fn steno_search_reads_approved_evidence_records_without_live_mcp() {
+        let _test_env_guard = test_env_lock();
+        let marker = format!("steno search rust test unique signal {}", now_ms().unwrap());
+        let record = record_pet_runtime_signal(PetRuntimeSignalRequest {
+            state: Some("working".to_string()),
+            source: Some("steno-search-rust-test".to_string()),
+            message: Some(marker.clone()),
+            severity: Some("info".to_string()),
+            progress: Some(44),
+            related_record_path: None,
+        })
+        .expect("pet signal record writes bounded evidence");
+
+        let panel = steno_search(Some(StenoSearchRequest {
+            query: Some(marker.clone()),
+            max_results: Some(8),
+            max_file_bytes: Some(262_144),
+        }))
+        .expect("Steno search reads approved evidence");
+
+        assert_eq!(panel.status, "steno_search_panel_read_only");
+        assert_eq!(panel.query, marker);
+        assert!(panel.result_count >= 1);
+        assert!(panel.searched_file_count >= 1);
+        assert!(panel.matched_file_count >= 1);
+        assert_eq!(
+            panel.postmortem_result_count,
+            panel.recent_postmortem_results.len()
+        );
+        assert!(panel.transcript_read_enabled);
+        assert!(panel.transcript_index_enabled);
+        assert!(panel.query_binding_enabled);
+        assert!(panel.results.iter().any(|result| {
+            result.category == "pet-signal"
+                && result.record_path == record.record_path
+                && result.snippet.contains("steno search rust test unique signal")
+                && result.line_number > 0
+                && result.status == "steno_search_result_read_only"
+        }));
+        assert!(panel.read_only);
+        assert!(!panel.capture_enabled);
+        assert!(!panel.export_enabled);
+        assert!(!panel.live_mcp_call_enabled);
+        assert!(!panel.config_read_enabled);
+        assert!(!panel.socket_connect_enabled);
+        assert!(!panel.memory_write_enabled);
+        assert!(!panel.desktop_control_enabled);
+        assert!(!panel.terminal_enabled);
+        assert!(!panel.process_spawn_enabled);
+        assert!(!panel.file_write_enabled);
+        assert!(!panel.patch_apply_enabled);
+        assert!(!panel.writes_allowed);
+        assert!(!panel.execution_enabled);
+    }
+
+    #[test]
     fn toolbar_action_readiness_covers_every_non_live_toolbar_command() {
+        let _test_env_guard = test_env_lock();
         let commands = command_registry().expect("toolbar registry loads");
         let non_live_commands: Vec<&ToolbarCommand> = commands
             .iter()
@@ -112223,6 +116585,7 @@ mod tests {
 
     #[test]
     fn first_class_integration_launchpad_exposes_remaining_core_integrations_read_only() {
+        let _test_env_guard = test_env_lock();
         let panel = first_class_integration_launchpad(Some("steno.capture".to_string()))
             .expect("integration launchpad opens");
 
@@ -112286,6 +116649,7 @@ mod tests {
 
     #[test]
     fn gated_action_release_board_groups_remaining_gated_toolbar_actions() {
+        let _test_env_guard = test_env_lock();
         let board = gated_action_release_board().expect("gated action board opens");
 
         assert!(!board.accepted);
@@ -112337,6 +116701,7 @@ mod tests {
 
     #[test]
     fn workspace_mutation_workbench_groups_save_save_as_and_replace_without_writes() {
+        let _test_env_guard = test_env_lock();
         let workbench = workspace_mutation_workbench(Some("search.replace".to_string()))
             .expect("workspace mutation workbench opens");
 
@@ -112411,6 +116776,7 @@ mod tests {
 
     #[test]
     fn terminal_process_workbench_exposes_terminal_create_without_pty_or_spawn() {
+        let _test_env_guard = test_env_lock();
         let workbench = terminal_process_workbench(Some("terminal.new".to_string()))
             .expect("terminal process workbench opens");
 
@@ -112489,6 +116855,7 @@ mod tests {
 
     #[test]
     fn security_shield_workbench_groups_restricted_controls_without_host_actions() {
+        let _test_env_guard = test_env_lock();
         let workbench = security_shield_workbench(Some("security.basilisk_activate".to_string()))
             .expect("security shield workbench opens");
 
@@ -112576,6 +116943,7 @@ mod tests {
 
     #[test]
     fn native_shell_pairing_workbench_closes_devtools_and_mobile_without_tokens_or_sockets() {
+        let _test_env_guard = test_env_lock();
         let workbench = native_shell_pairing_workbench(Some("mobile.qr".to_string()))
             .expect("native shell pairing workbench opens");
 
@@ -112653,6 +117021,7 @@ mod tests {
 
     #[test]
     fn gated_adapter_release_pipeline_records_all_gated_commands_without_enabling_adapters() {
+        let _test_env_guard = test_env_lock();
         let queue = gated_adapter_release_queue().expect("gated adapter release queue opens");
 
         assert!(!queue.accepted);
@@ -112802,6 +117171,7 @@ mod tests {
 
     #[test]
     fn sandbox_gate_allows_review_but_keeps_execution_disabled() {
+        let _test_env_guard = test_env_lock();
         let decision = evaluate_execution_gate(ExecutionGateRequest {
             argv: vec![
                 "codex".to_string(),
@@ -112823,6 +117193,7 @@ mod tests {
 
     #[test]
     fn sandbox_gate_blocks_restricted_tokens() {
+        let _test_env_guard = test_env_lock();
         let decision = evaluate_execution_gate(ExecutionGateRequest {
             argv: vec!["sudo".to_string(), "apt".to_string(), "install".to_string()],
             command_id: Some("system.package_install".to_string()),
@@ -112838,7 +117209,253 @@ mod tests {
     }
 
     #[test]
+    fn desktop_environment_snapshot_records_read_only_backend_evidence_without_control() {
+        let _test_env_guard = test_env_lock();
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-desktop-env-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        let env_keys = [
+            "XDG_STATE_HOME",
+            "XDG_SESSION_TYPE",
+            "XDG_CURRENT_DESKTOP",
+            "DESKTOP_SESSION",
+            "WAYLAND_DISPLAY",
+            "DISPLAY",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "AT_SPI_BUS_ADDRESS",
+        ];
+        let saved_env = env_keys
+            .iter()
+            .map(|key| ((*key).to_string(), env::var_os(key)))
+            .collect::<Vec<_>>();
+
+        env::set_var("XDG_STATE_HOME", &test_root);
+        env::set_var("XDG_SESSION_TYPE", "wayland");
+        env::set_var("XDG_CURRENT_DESKTOP", "COSMIC");
+        env::set_var("DESKTOP_SESSION", "cosmic");
+        env::set_var("WAYLAND_DISPLAY", "wayland-test");
+        env::set_var("DISPLAY", ":99");
+        env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/fake-dbus");
+        env::set_var("AT_SPI_BUS_ADDRESS", "unix:path=/tmp/fake-atspi");
+
+        let record = record_desktop_environment_snapshot(DesktopEnvironmentSnapshotRequest {
+            requested_by: Some("rust-test".to_string()),
+        })
+        .expect("desktop environment snapshot records");
+        assert_eq!(record.requested_by, "rust-test");
+        assert!(record.status.contains("desktop_environment_snapshot_recorded"));
+        assert_eq!(record.session_type, "wayland");
+        assert_eq!(record.current_desktop, "COSMIC");
+        assert_eq!(record.desktop_session, "cosmic");
+        assert!(record.wayland_display_present);
+        assert!(record.display_present);
+        assert!(record.graphical_session_visible);
+        assert!(record.dbus_session_bus_present);
+        assert_eq!(record.dbus_session_bus_preview, "unix:path=<redacted>");
+        assert!(record.at_spi_bus_present);
+        assert_eq!(record.ydotool_socket_path, YDOTOOL_SOCKET_PATH);
+        assert!(record.ydotool_socket_metadata_checked);
+        assert!(record.read_only);
+        assert!(record.environment_probe_enabled);
+        assert!(!record.capture_enabled);
+        assert!(!record.ocr_enabled);
+        assert!(!record.target_window_control_enabled);
+        assert!(!record.element_action_enabled);
+        assert!(!record.desktop_control_enabled);
+        assert!(!record.socket_connect_enabled);
+        assert!(!record.process_spawn_enabled);
+        assert!(!record.terminal_enabled);
+        assert!(!record.file_write_enabled);
+        assert!(!record.patch_apply_enabled);
+        assert!(!record.live_mcp_call_enabled);
+        assert!(!record.config_read_enabled);
+        assert!(!record.export_enabled);
+        assert!(!record.memory_write_enabled);
+        assert!(!record.writes_allowed);
+        assert!(!record.execution_enabled);
+        assert!(fs::metadata(&record.record_path).is_ok());
+        assert!(fs::metadata(&record.log_path).is_ok());
+
+        let listed = list_desktop_environment_snapshots()
+            .expect("desktop environment snapshot list reads");
+        assert!(listed.iter().any(|item| item.id == record.id));
+
+        let dashboard = linux_desktop_control_readiness_dashboard()
+            .expect("desktop readiness dashboard includes environment snapshot");
+        assert_eq!(dashboard.desktop_environment_snapshot_count, 1);
+        assert_eq!(dashboard.desktop_environment_snapshot_ready_count, 1);
+        assert_eq!(
+            dashboard.desktop_environment_snapshot_freshness_threshold_ms,
+            DESKTOP_ENVIRONMENT_SNAPSHOT_FRESHNESS_THRESHOLD_MS
+        );
+        assert_eq!(dashboard.latest_desktop_environment_snapshot_status, record.status);
+        assert!(dashboard.latest_desktop_environment_snapshot_fresh);
+        assert!(dashboard.latest_desktop_environment_graphical_session_visible);
+        assert!(dashboard.latest_desktop_environment_wayland_display_present);
+        assert!(dashboard.latest_desktop_environment_display_present);
+        assert!(dashboard.latest_desktop_environment_dbus_session_bus_present);
+        assert!(dashboard.latest_desktop_environment_at_spi_bus_present);
+        assert!(!dashboard.capture_enabled);
+        assert!(!dashboard.desktop_control_enabled);
+        assert!(!dashboard.socket_connect_enabled);
+        assert!(!dashboard.process_spawn_enabled);
+        assert!(!dashboard.execution_enabled);
+        assert!(dashboard.sections.iter().any(|section| {
+            section.section_id == "desktop-environment-snapshot"
+                && section.source_ledger == "desktop-environment-snapshots"
+                && section.record_count == 1
+                && section.ready_count == 1
+                && section.desktop_evidence
+                && section.operator_surface
+                && !section.capture_enabled
+                && !section.desktop_control_enabled
+                && !section.socket_connect_enabled
+                && !section.execution_enabled
+        }));
+
+        let history = product_evidence_history().expect("product evidence history loads");
+        assert!(history
+            .items
+            .iter()
+            .any(|item| item.category == "desktop-environment"
+                && item.record_path == record.record_path));
+
+        let _ = fs::remove_dir_all(&test_root);
+        for (key, value) in saved_env {
+            if let Some(value) = value {
+                env::set_var(key, value);
+            } else {
+                env::remove_var(key);
+            }
+        }
+    }
+
+    #[test]
+    fn desktop_stage1_capability_snapshot_records_path_prerequisites_without_spawn() {
+        let _test_env_guard = test_env_lock();
+        let test_root = env::temp_dir().join(format!(
+            "gravity-omega-desktop-stage1-test-{}-{}",
+            std::process::id(),
+            now_ms().expect("clock")
+        ));
+        let fake_bin = test_root.join("bin");
+        fs::create_dir_all(&fake_bin).expect("fake bin dir");
+        for command in ["gdbus", "busctl", "grim", "ydotool"] {
+            fs::write(fake_bin.join(command), b"").expect("fake desktop helper");
+        }
+        let saved_state = env::var_os("XDG_STATE_HOME");
+        let saved_path = env::var_os("PATH");
+        env::set_var("XDG_STATE_HOME", &test_root);
+        env::set_var("PATH", &fake_bin);
+
+        let record = record_desktop_read_only_capability_snapshot(
+            DesktopReadOnlyCapabilitySnapshotRequest {
+                requested_by: Some("rust-test".to_string()),
+            },
+        )
+        .expect("desktop stage-1 capability snapshot records");
+        assert_eq!(record.requested_by, "rust-test");
+        assert_eq!(
+            record.status,
+            "desktop_read_only_capability_snapshot_recorded_prerequisites_visible"
+        );
+        assert_eq!(record.tool_count, 11);
+        assert_eq!(record.available_tool_count, 6);
+        assert_eq!(record.window_inventory_tool_count, 4);
+        assert_eq!(record.available_window_inventory_tool_count, 2);
+        assert_eq!(record.screenshot_tool_count, 3);
+        assert_eq!(record.available_screenshot_tool_count, 1);
+        assert_eq!(record.accessibility_tool_count, 2);
+        assert_eq!(record.available_accessibility_tool_count, 2);
+        assert_eq!(record.input_helper_tool_count, 2);
+        assert_eq!(record.available_input_helper_tool_count, 1);
+        assert!(record.tools.iter().any(|tool| {
+            tool.command == "gdbus"
+                && tool.found_on_path
+                && tool.read_only_prerequisite
+                && !tool.live_action_enabled
+        }));
+        assert!(record.read_only);
+        assert!(record.path_probe_enabled);
+        assert!(!record.process_spawn_enabled);
+        assert!(!record.window_inventory_enabled);
+        assert!(!record.screenshot_capture_enabled);
+        assert!(!record.accessibility_tree_read_enabled);
+        assert!(!record.pointer_injection_enabled);
+        assert!(!record.keyboard_injection_enabled);
+        assert!(!record.capture_enabled);
+        assert!(!record.desktop_control_enabled);
+        assert!(!record.socket_connect_enabled);
+        assert!(!record.writes_allowed);
+        assert!(!record.execution_enabled);
+        assert!(record.blockers.is_empty());
+        assert!(fs::metadata(&record.record_path).is_ok());
+        assert!(fs::metadata(&record.log_path).is_ok());
+
+        let listed = list_desktop_read_only_capability_snapshots()
+            .expect("desktop stage-1 capability snapshot list reads");
+        assert!(listed.iter().any(|item| item.id == record.id));
+
+        let dashboard = linux_desktop_control_readiness_dashboard()
+            .expect("desktop readiness dashboard includes stage-1 capability snapshot");
+        assert_eq!(dashboard.desktop_read_only_capability_snapshot_count, 1);
+        assert_eq!(dashboard.desktop_read_only_capability_snapshot_ready_count, 1);
+        assert_eq!(
+            dashboard.latest_desktop_read_only_capability_snapshot_status,
+            record.status
+        );
+        assert_eq!(
+            dashboard.latest_desktop_read_only_capability_available_tool_count,
+            record.available_tool_count
+        );
+        assert_eq!(
+            dashboard.latest_desktop_read_only_capability_tool_count,
+            record.tool_count
+        );
+        assert!(dashboard.latest_desktop_read_only_capability_window_inventory_ready);
+        assert!(dashboard.latest_desktop_read_only_capability_screenshot_ready);
+        assert!(dashboard.latest_desktop_read_only_capability_accessibility_ready);
+        assert!(dashboard.latest_desktop_read_only_capability_input_helper_ready);
+        assert!(!dashboard.capture_enabled);
+        assert!(!dashboard.desktop_control_enabled);
+        assert!(!dashboard.socket_connect_enabled);
+        assert!(!dashboard.execution_enabled);
+        assert!(dashboard.sections.iter().any(|section| {
+            section.section_id == "desktop-read-only-capability-snapshot"
+                && section.source_ledger == "desktop-read-only-capability-snapshots"
+                && section.record_count == 1
+                && section.ready_count == 1
+                && section.desktop_evidence
+                && section.operator_surface
+                && !section.process_spawn_enabled
+                && !section.capture_enabled
+                && !section.desktop_control_enabled
+                && !section.execution_enabled
+        }));
+
+        let history = product_evidence_history().expect("product evidence history loads");
+        assert!(history.items.iter().any(|item| {
+            item.category == "desktop-stage1-capability" && item.record_path == record.record_path
+        }));
+
+        let _ = fs::remove_dir_all(&test_root);
+        if let Some(value) = saved_state {
+            env::set_var("XDG_STATE_HOME", value);
+        } else {
+            env::remove_var("XDG_STATE_HOME");
+        }
+        if let Some(value) = saved_path {
+            env::set_var("PATH", value);
+        } else {
+            env::remove_var("PATH");
+        }
+    }
+
+    #[test]
     fn blocked_task_run_approval_and_artifact_are_persisted_to_xdg_state() {
+        let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
             "gravity-omega-native-test-{}-{}",
             std::process::id(),
@@ -113925,6 +118542,37 @@ mod tests {
         assert_eq!(terminal_process_dashboard.process_lifecycle_ready_count, 1);
         assert_eq!(terminal_process_dashboard.process_control_policy_count, 2);
         assert_eq!(terminal_process_dashboard.process_control_policy_ready_count, 2);
+        assert_eq!(terminal_process_dashboard.recent_process_control_policy_count, 2);
+        assert_eq!(
+            terminal_process_dashboard
+                .recent_process_control_policies
+                .len(),
+            2
+        );
+        assert!(terminal_process_dashboard
+            .recent_process_control_policies
+            .iter()
+            .any(|policy| {
+                policy.id == retry_policy.policy.id
+                    && policy.requested_action == "retry"
+                    && policy.status == "retry_recorded_spawn_disabled"
+                    && !policy.signal_enabled
+                    && !policy.retry_spawn_enabled
+                    && !policy.process_spawn_enabled
+                    && !policy.execution_enabled
+            }));
+        assert!(terminal_process_dashboard
+            .recent_process_control_policies
+            .iter()
+            .any(|policy| {
+                policy.id == cancel_policy.policy.id
+                    && policy.requested_action == "cancel"
+                    && policy.status == "cancel_recorded_signal_disabled"
+                    && !policy.signal_enabled
+                    && !policy.retry_spawn_enabled
+                    && !policy.process_spawn_enabled
+                    && !policy.execution_enabled
+            }));
         assert_eq!(
             terminal_process_dashboard.process_supervisor_preflight_count,
             1
@@ -113949,6 +118597,31 @@ mod tests {
             terminal_process_dashboard.process_supervisor_exit_summary_ready_count,
             1
         );
+        assert_eq!(terminal_process_dashboard.recent_process_exit_summary_count, 1);
+        assert_eq!(
+            terminal_process_dashboard
+                .recent_process_exit_summaries
+                .len(),
+            1
+        );
+        assert_eq!(
+            terminal_process_dashboard.recent_process_exit_summaries[0].id,
+            exit_summary.summary.id
+        );
+        assert_eq!(
+            terminal_process_dashboard.recent_process_exit_summaries[0].status,
+            "exit_summary_recorded_no_process"
+        );
+        assert!(!terminal_process_dashboard.recent_process_exit_summaries[0].signal_enabled);
+        assert!(
+            !terminal_process_dashboard.recent_process_exit_summaries[0]
+                .retry_spawn_enabled
+        );
+        assert!(
+            !terminal_process_dashboard.recent_process_exit_summaries[0]
+                .process_spawn_enabled
+        );
+        assert!(!terminal_process_dashboard.recent_process_exit_summaries[0].execution_enabled);
         assert_eq!(
             terminal_process_dashboard.process_output_tail_summary_count,
             1
@@ -114205,10 +118878,324 @@ mod tests {
                 && !policy.execution_enabled
         }));
 
+        let orchestration_dir =
+            codex_lead_orchestrations_dir().expect("codex orchestration dir");
+        fs::create_dir_all(&orchestration_dir).expect("create codex orchestration dir");
+        let orchestration_path = orchestration_dir.join("run-view-evidence-orchestration.json");
+        let orchestration_log_path =
+            orchestration_dir.join("run-view-evidence-orchestration.jsonl");
+        let orchestration_record = CodexLeadOrchestrationRecord {
+            id: "run-view-evidence-orchestration".to_string(),
+            status: "codex_lead_orchestration_recorded_ready_for_responsive_stream".to_string(),
+            requested_by: "rust-test".to_string(),
+            task_run_id: Some(stub.id.clone()),
+            prompt_preview: "test run view evidence".to_string(),
+            stream_runtime: "codex-workspace-write".to_string(),
+            hermes_lane_runtime: "hermes-chat-kimi".to_string(),
+            runtime_depth_record_id: Some("runtime-depth-test".to_string()),
+            runtime_depth_record_path: Some("/tmp/runtime-depth-test.json".to_string()),
+            hermes_skill_count: 12,
+            hermes_mcp_server_count: 3,
+            hermes_hook_count: 4,
+            codex_runtime_ready: true,
+            hermes_runtime_ready: true,
+            sswp_runtime_ready: true,
+            mcp_metadata_ready: true,
+            steno_metadata_ready: true,
+            pet_metadata_ready: true,
+            hermes_log_writable: true,
+            runtime_depth_ready: true,
+            delegation_count: 3,
+            codex_owned_count: 2,
+            hermes_assist_count: 1,
+            process_spawn_enabled: false,
+            sidecar_launch_enabled: false,
+            live_mcp_call_enabled: false,
+            workspace_write_enabled: false,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            writes_allowed: false,
+            execution_enabled: false,
+            created_at_ms: now_ms().expect("clock") + 10,
+            record_path: orchestration_path.display().to_string(),
+            log_path: orchestration_log_path.display().to_string(),
+            delegations: Vec::new(),
+            blockers: Vec::new(),
+            next_step: "Surface this orchestration in the run view.".to_string(),
+        };
+        fs::write(
+            &orchestration_path,
+            serde_json::to_string_pretty(&orchestration_record)
+                .expect("serialize orchestration"),
+        )
+        .expect("write orchestration");
+
+        let inventory_dir =
+            hermes_kimi_capability_inventories_dir().expect("hermes inventory dir");
+        fs::create_dir_all(&inventory_dir).expect("create hermes inventory dir");
+        let inventory_path = inventory_dir.join("run-view-evidence-inventory.json");
+        let inventory_log_path = inventory_dir.join("run-view-evidence-inventory.jsonl");
+        let inventory_record = HermesKimiCapabilityInventoryRecord {
+            id: "run-view-evidence-inventory".to_string(),
+            status: "hermes_kimi_capability_inventory_recorded_ready_for_codex_lead".to_string(),
+            requested_by: "rust-test".to_string(),
+            prompt_preview: "test run view evidence".to_string(),
+            hermes_binary: "hermes".to_string(),
+            enabled_skill_count: 12,
+            builtin_skill_count: 8,
+            local_skill_count: 4,
+            filesystem_skill_count: 12,
+            mcp_server_count: 3,
+            hook_count: 4,
+            focus_skill_count: 2,
+            skills_stdout_preview: "skills ok".to_string(),
+            mcp_stdout_preview: "mcp ok".to_string(),
+            hooks_stdout_preview: "hooks ok".to_string(),
+            skills_stderr_preview: String::new(),
+            mcp_stderr_preview: String::new(),
+            hooks_stderr_preview: String::new(),
+            skills_exit_code: Some(0),
+            mcp_exit_code: Some(0),
+            hooks_exit_code: Some(0),
+            skills_duration_ms: 11,
+            mcp_duration_ms: 12,
+            hooks_duration_ms: 13,
+            skills: vec![HermesKimiSkillInventoryItem {
+                id: "software-development/rust".to_string(),
+                name: "Rust".to_string(),
+                category: "software-development".to_string(),
+                source: "filesystem".to_string(),
+                status: "enabled".to_string(),
+                path: "/tmp/skill".to_string(),
+                metadata_only: true,
+            }],
+            focus_skills: vec![
+                "software-development/rust".to_string(),
+                "veritas/omega-strike-deep".to_string(),
+            ],
+            mcp_servers: vec![HermesKimiMcpInventoryItem {
+                name: "omega-stenographer".to_string(),
+                transport_preview: "stdio".to_string(),
+                tools: "search, capture".to_string(),
+                status: "ready".to_string(),
+            }],
+            hooks: vec![HermesKimiHookInventoryItem {
+                hook: "PreToolUse".to_string(),
+                command: "omega-hook".to_string(),
+                timeout_seconds: Some(3),
+                allowed: true,
+                approved_at: Some("2026-05-25T00:00:00Z".to_string()),
+            }],
+            metadata_only: true,
+            skill_content_read_enabled: false,
+            hermes_chat_enabled: false,
+            process_spawn_enabled: true,
+            live_mcp_call_enabled: false,
+            workspace_write_enabled: false,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            memory_write_enabled: false,
+            writes_allowed: false,
+            execution_enabled: false,
+            created_at_ms: now_ms().expect("clock") + 11,
+            record_path: inventory_path.display().to_string(),
+            log_path: inventory_log_path.display().to_string(),
+            blockers: Vec::new(),
+            next_step: "Surface this inventory in the run view.".to_string(),
+        };
+        fs::write(
+            &inventory_path,
+            serde_json::to_string_pretty(&inventory_record).expect("serialize inventory"),
+        )
+        .expect("write inventory");
+
+        let assist_dir = hermes_kimi_assist_briefs_dir().expect("hermes assist dir");
+        fs::create_dir_all(&assist_dir).expect("create hermes assist dir");
+        let assist_path = assist_dir.join("run-view-evidence-assist.json");
+        let assist_log_path = assist_dir.join("run-view-evidence-assist.jsonl");
+        let assist_stdout_path = assist_dir.join("run-view-evidence-assist.stdout.txt");
+        let assist_stderr_path = assist_dir.join("run-view-evidence-assist.stderr.txt");
+        let assist_record = HermesKimiAssistBriefRecord {
+            id: "run-view-evidence-assist".to_string(),
+            status: "hermes_kimi_assist_brief_succeeded".to_string(),
+            requested_by: "rust-test".to_string(),
+            task_run_id: Some(stub.id.clone()),
+            prompt_preview: "test run view evidence".to_string(),
+            prompt_size_bytes: 22,
+            compact_query_preview: "compact query".to_string(),
+            compact_query_size_bytes: 13,
+            hermes_binary: "hermes".to_string(),
+            argv_redacted: vec![
+                "hermes".to_string(),
+                "chat".to_string(),
+                "<compact-assist-query>".to_string(),
+            ],
+            source: "gravity-omega-native".to_string(),
+            max_turns: 1,
+            timeout_ms: 5_000,
+            pid: Some(4242),
+            exit_code: Some(0),
+            timed_out: false,
+            duration_ms: 222,
+            stdout: "Hermes says keep the test scoped and verify the run view.".to_string(),
+            stderr: "Hermes stderr stayed clean".to_string(),
+            stdout_size_bytes: 57,
+            stderr_size_bytes: 26,
+            query_transport: "argv-compact-query".to_string(),
+            argv_char_count: 220,
+            stdout_pipe_reader_enabled: true,
+            stderr_pipe_reader_enabled: true,
+            timeout_kill_sent: false,
+            wait_after_kill_ms: 0,
+            partial_output_captured: true,
+            stdout_transcript_path: assist_stdout_path.display().to_string(),
+            stderr_transcript_path: assist_stderr_path.display().to_string(),
+            inventory_record_path: Some(inventory_path.display().to_string()),
+            orchestration_record_path: Some(orchestration_path.display().to_string()),
+            focus_skills: vec!["software-development/rust".to_string()],
+            mcp_servers: vec!["omega-stenographer".to_string()],
+            hooks: vec!["PreToolUse: omega-hook".to_string()],
+            hermes_chat_enabled: true,
+            process_spawn_enabled: true,
+            transcript_capture_enabled: true,
+            agent_prompt_execution_enabled: true,
+            bounded_execution_performed: true,
+            live_mcp_call_enabled: false,
+            workspace_read_enabled: true,
+            workspace_write_enabled: false,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            memory_write_enabled: false,
+            writes_allowed: false,
+            execution_enabled: true,
+            created_at_ms: now_ms().expect("clock") + 12,
+            record_path: assist_path.display().to_string(),
+            log_path: assist_log_path.display().to_string(),
+            blockers: Vec::new(),
+            reasons: vec!["bounded assist captured".to_string()],
+            next_step: "Surface this assist in the run view.".to_string(),
+        };
+        fs::write(
+            &assist_path,
+            serde_json::to_string_pretty(&assist_record).expect("serialize assist"),
+        )
+        .expect("write assist");
+        fs::write(&assist_stdout_path, &assist_record.stdout)
+            .expect("write assist stdout transcript");
+        fs::write(&assist_stderr_path, &assist_record.stderr)
+            .expect("write assist stderr transcript");
+
+        let failed_assist_path = assist_dir.join("run-view-evidence-assist-timeout.json");
+        let failed_assist_log_path = assist_dir.join("run-view-evidence-assist-timeout.jsonl");
+        let failed_assist_stdout_path =
+            assist_dir.join("run-view-evidence-assist-timeout.stdout.txt");
+        let failed_assist_stderr_path =
+            assist_dir.join("run-view-evidence-assist-timeout.stderr.txt");
+        let failed_assist_stdout = "Hermes started reviewing but did not finish.".to_string();
+        let failed_assist_stderr = "Hermes/Kimi assist timed out before final answer.".to_string();
+        let failed_assist_record = HermesKimiAssistBriefRecord {
+            id: "run-view-evidence-assist-timeout".to_string(),
+            status: "hermes_kimi_assist_brief_timed_out".to_string(),
+            exit_code: None,
+            timed_out: true,
+            duration_ms: 5_000,
+            stdout: failed_assist_stdout.clone(),
+            stderr: failed_assist_stderr.clone(),
+            stdout_size_bytes: failed_assist_stdout.len() as u64,
+            stderr_size_bytes: failed_assist_stderr.len() as u64,
+            stdout_transcript_path: failed_assist_stdout_path.display().to_string(),
+            stderr_transcript_path: failed_assist_stderr_path.display().to_string(),
+            record_path: failed_assist_path.display().to_string(),
+            log_path: failed_assist_log_path.display().to_string(),
+            blockers: vec!["Hermes/Kimi assist timed out before final answer.".to_string()],
+            created_at_ms: now_ms().expect("clock") + 11,
+            next_step: "Show this Hermes/Kimi timeout before retrying assist delegation.".to_string(),
+            ..assist_record.clone()
+        };
+        fs::write(
+            &failed_assist_path,
+            serde_json::to_string_pretty(&failed_assist_record)
+                .expect("serialize failed assist"),
+        )
+        .expect("write failed assist");
+        fs::write(&failed_assist_stdout_path, &failed_assist_record.stdout)
+            .expect("write failed assist stdout transcript");
+        fs::write(&failed_assist_stderr_path, &failed_assist_record.stderr)
+            .expect("write failed assist stderr transcript");
+
+        let agent_session_dir =
+            unlocked_agent_prompt_sessions_dir().expect("unlocked agent session dir");
+        fs::create_dir_all(&agent_session_dir).expect("create unlocked agent session dir");
+        let agent_session_path = agent_session_dir.join("run-view-agent-postmortem.json");
+        let agent_session_log_path = agent_session_dir.join("run-view-agent-postmortem.jsonl");
+        let agent_session_stdout_path = agent_session_dir.join("run-view-agent-postmortem.stdout.txt");
+        let agent_session_stderr_path = agent_session_dir.join("run-view-agent-postmortem.stderr.txt");
+        let agent_session_record = UnlockedAgentPromptSessionRecord {
+            id: "run-view-agent-postmortem".to_string(),
+            runtime: "codex-workspace-write".to_string(),
+            title: "Codex Write".to_string(),
+            binary: "codex".to_string(),
+            argv_redacted: vec![
+                "codex".to_string(),
+                "exec".to_string(),
+                "<prompt>".to_string(),
+            ],
+            sandbox_policy: "workspace-write".to_string(),
+            workspace_root: test_root.display().to_string(),
+            task_run_id: stub.id.clone(),
+            task_run_found: true,
+            prompt_preview: "long prompt stress test".to_string(),
+            prompt_size_bytes: 4096,
+            requested_by: "rust-test".to_string(),
+            status: "unlocked_agent_prompt_stream_timed_out".to_string(),
+            pid: Some(5252),
+            exit_code: None,
+            timed_out: true,
+            duration_ms: 15_000,
+            stdout: "stream started and partial output arrived".to_string(),
+            stderr: "timed out while waiting for final answer".to_string(),
+            stdout_size_bytes: 41,
+            stderr_size_bytes: 40,
+            stdout_transcript_path: agent_session_stdout_path.display().to_string(),
+            stderr_transcript_path: agent_session_stderr_path.display().to_string(),
+            process_spawn_enabled: true,
+            transcript_capture_enabled: true,
+            agent_prompt_execution_enabled: true,
+            bounded_execution_performed: true,
+            sidecar_launch_enabled: false,
+            terminal_enabled: false,
+            workspace_read_enabled: true,
+            workspace_write_enabled: true,
+            file_write_enabled: false,
+            patch_apply_enabled: false,
+            live_mcp_call_enabled: false,
+            config_read_enabled: false,
+            export_enabled: false,
+            memory_write_enabled: false,
+            writes_allowed: false,
+            execution_enabled: true,
+            created_at_ms: now_ms().expect("clock") + 13,
+            updated_at_ms: now_ms().expect("clock") + 14,
+            record_path: agent_session_path.display().to_string(),
+            log_path: agent_session_log_path.display().to_string(),
+            reasons: vec!["stream timed out before final answer".to_string()],
+            next_step: "Show this timeout as a postmortem before retry.".to_string(),
+        };
+        fs::write(
+            &agent_session_path,
+            serde_json::to_string_pretty(&agent_session_record)
+                .expect("serialize agent session"),
+        )
+        .expect("write agent session");
+        fs::write(&agent_session_stdout_path, &agent_session_record.stdout)
+            .expect("write agent session stdout");
+        fs::write(&agent_session_stderr_path, &agent_session_record.stderr)
+            .expect("write agent session stderr");
+
         let run_view = codex_hermes_run_view_dashboard()
             .expect("codex hermes run view dashboard");
         assert_eq!(run_view.status, "codex_hermes_run_view_dashboard_read_only");
-        assert_eq!(run_view.section_count, 8);
+        assert_eq!(run_view.section_count, 9);
         assert_eq!(run_view.run_count, 1);
         assert_eq!(run_view.approval_count, 1);
         assert_eq!(run_view.resolved_approval_count, 1);
@@ -114221,8 +119208,88 @@ mod tests {
         assert_eq!(run_view.transcript_protection_policy_count, 1);
         assert_eq!(run_view.typed_event_log_count, 1);
         assert_eq!(run_view.typed_event_count, 2);
+        assert_eq!(run_view.codex_orchestration_count, 1);
+        assert_eq!(run_view.hermes_inventory_count, 1);
+        assert_eq!(run_view.hermes_assist_count, 2);
+        assert_eq!(run_view.hermes_assist_failure_count, 1);
+        assert_eq!(run_view.hermes_assist_timeout_count, 1);
+        assert_eq!(
+            run_view.latest_hermes_assist_status,
+            "hermes_kimi_assist_brief_succeeded"
+        );
+        assert_eq!(
+            run_view.latest_hermes_assist_record_path.as_deref(),
+            Some(assist_record.record_path.as_str())
+        );
+        assert_eq!(
+            run_view.latest_hermes_assist_postmortem_status,
+            "hermes_kimi_assist_brief_timed_out"
+        );
+        assert_eq!(
+            run_view.latest_hermes_assist_postmortem_record_path.as_deref(),
+            Some(failed_assist_record.record_path.as_str())
+        );
+        assert_eq!(run_view.agent_session_count, 1);
+        assert_eq!(run_view.agent_session_failure_count, 1);
+        assert_eq!(run_view.agent_session_timeout_count, 1);
+        assert_eq!(
+            run_view.latest_agent_session_status,
+            "unlocked_agent_prompt_stream_timed_out"
+        );
+        assert_eq!(
+            run_view.latest_agent_session_record_path.as_deref(),
+            Some(agent_session_record.record_path.as_str())
+        );
+        assert_eq!(
+            run_view.latest_agent_postmortem_status,
+            "unlocked_agent_prompt_stream_timed_out"
+        );
+        assert_eq!(
+            run_view.latest_agent_postmortem_record_path.as_deref(),
+            Some(agent_session_record.record_path.as_str())
+        );
+
+        let steno_panel = steno_search(None).expect("Steno search recent postmortems");
+        assert_eq!(steno_panel.status, "steno_search_panel_read_only");
+        assert_eq!(steno_panel.query, "");
+        assert_eq!(steno_panel.result_count, 0);
+        assert!(steno_panel.results.is_empty());
+        assert!(steno_panel.postmortem_result_count >= 2);
+        assert!(steno_panel
+            .recent_postmortem_results
+            .iter()
+            .any(|result| {
+                result.category == "agent-postmortem"
+                    && result.record_path == agent_session_record.record_path
+                    && result.snippet.contains("timed_out")
+                    && result.status == "steno_recent_postmortem_read_only"
+            }));
+        assert!(steno_panel
+            .recent_postmortem_results
+            .iter()
+            .any(|result| {
+                result.category == "hermes-assist-postmortem"
+                    && result.record_path == failed_assist_record.record_path
+                    && result.snippet.contains("timed_out")
+                    && result.status == "steno_recent_postmortem_read_only"
+            }));
+        assert!(steno_panel.read_only);
+        assert!(!steno_panel.capture_enabled);
+        assert!(!steno_panel.export_enabled);
+        assert!(!steno_panel.live_mcp_call_enabled);
+        assert!(!steno_panel.config_read_enabled);
+        assert!(!steno_panel.socket_connect_enabled);
+        assert!(!steno_panel.memory_write_enabled);
+        assert!(!steno_panel.desktop_control_enabled);
+        assert!(!steno_panel.terminal_enabled);
+        assert!(!steno_panel.process_spawn_enabled);
+        assert!(!steno_panel.file_write_enabled);
+        assert!(!steno_panel.patch_apply_enabled);
+        assert!(!steno_panel.writes_allowed);
+        assert!(!steno_panel.execution_enabled);
+        assert_eq!(run_view.evidence_summary_count, 5);
         assert_eq!(run_view.active_task_run_id, stub.id);
-        assert_eq!(run_view.disabled_gate_count, 8);
+        assert_eq!(run_view.disabled_gate_count, 9);
         assert!(run_view.read_only);
         assert!(!run_view.process_spawn_enabled);
         assert!(!run_view.terminal_enabled);
@@ -114235,6 +119302,104 @@ mod tests {
         assert!(!run_view.memory_write_enabled);
         assert!(!run_view.writes_allowed);
         assert!(!run_view.execution_enabled);
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "agent-run-postmortem"
+                && summary.record_id == "run-view-agent-postmortem"
+                && summary.primary_metric.contains("timeout=true")
+                && summary.secondary_metric.contains("stdout=41b")
+                && summary.transcript_evidence_ready
+                && summary.stdout_transcript_found
+                && summary.stderr_transcript_found
+                && summary.stdout_transcript_line_count == 1
+                && summary.stderr_transcript_line_count == 1
+                && summary.stdout_transcript_size_bytes == 41
+                && summary.stderr_transcript_size_bytes == 40
+                && summary.stdout_transcript_path.as_deref()
+                    == Some(agent_session_record.stdout_transcript_path.as_str())
+                && summary.stderr_transcript_path.as_deref()
+                    == Some(agent_session_record.stderr_transcript_path.as_str())
+                && summary.stdout_preview_source == "stdout-transcript"
+                && summary.stderr_preview_source == "stderr-transcript"
+                && summary.stdout_preview.as_deref().unwrap_or("").contains("partial output")
+                && summary.stderr_preview.as_deref().unwrap_or("").contains("timed out")
+                && summary.blocker_count >= 2
+                && summary.record_process_spawn_enabled
+                && summary.record_execution_enabled
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "codex-lead-orchestration"
+                && summary.record_id == "run-view-evidence-orchestration"
+                && summary.primary_metric.contains("3 lanes")
+                && summary.secondary_metric.contains("skills=12")
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "hermes-kimi-inventory"
+                && summary.record_id == "run-view-evidence-inventory"
+                && summary.primary_metric.contains("skills=12")
+                && summary.secondary_metric.contains("mcp=3")
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "hermes-kimi-assist"
+                && summary.record_id == "run-view-evidence-assist"
+                && summary.transcript_evidence_ready
+                && summary.stdout_transcript_found
+                && summary.stderr_transcript_found
+                && summary.stdout_transcript_line_count == 1
+                && summary.stderr_transcript_line_count == 1
+                && summary.stdout_transcript_size_bytes == 57
+                && summary.stderr_transcript_size_bytes == 26
+                && summary.stdout_transcript_path.as_deref()
+                    == Some(assist_record.stdout_transcript_path.as_str())
+                && summary.stderr_transcript_path.as_deref()
+                    == Some(assist_record.stderr_transcript_path.as_str())
+                && summary.stdout_preview_source == "stdout-transcript"
+                && summary.stderr_preview_source == "stderr-transcript"
+                && summary.stdout_preview.as_deref().unwrap_or("").contains("Hermes says")
+                && summary.stderr_preview.as_deref().unwrap_or("").contains("stayed clean")
+                && summary.record_process_spawn_enabled
+                && summary.record_execution_enabled
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().any(|summary| {
+            summary.source_id == "hermes-kimi-assist-postmortem"
+                && summary.record_id == "run-view-evidence-assist-timeout"
+                && summary.title == "Latest failed/timed-out Hermes/Kimi assist brief"
+                && summary.primary_metric.contains("timeout=true")
+                && summary.transcript_evidence_ready
+                && summary.stdout_transcript_found
+                && summary.stderr_transcript_found
+                && summary.stdout_transcript_line_count == 1
+                && summary.stderr_transcript_line_count == 1
+                && summary.stdout_transcript_path.as_deref()
+                    == Some(failed_assist_record.stdout_transcript_path.as_str())
+                && summary.stderr_transcript_path.as_deref()
+                    == Some(failed_assist_record.stderr_transcript_path.as_str())
+                && summary.stdout_preview_source == "stdout-transcript"
+                && summary.stderr_preview_source == "stderr-transcript"
+                && summary.stdout_preview.as_deref().unwrap_or("").contains("did not finish")
+                && summary.stderr_preview.as_deref().unwrap_or("").contains("timed out")
+                && summary.blocker_count >= 1
+                && summary.record_process_spawn_enabled
+                && summary.record_execution_enabled
+                && summary.read_only
+        }));
+        assert!(run_view.evidence_summaries.iter().all(|summary| {
+            summary.read_only
+                && !summary.process_spawn_enabled
+                && !summary.terminal_enabled
+                && !summary.live_mcp_call_enabled
+                && !summary.file_write_enabled
+                && !summary.patch_apply_enabled
+                && !summary.desktop_control_enabled
+                && !summary.capture_enabled
+                && !summary.export_enabled
+                && !summary.memory_write_enabled
+                && !summary.writes_allowed
+                && !summary.dashboard_execution_enabled
+        }));
         assert!(run_view.sections.iter().any(|section| {
             section.section_id == "task-runs"
                 && section.record_count == 1
@@ -114247,9 +119412,16 @@ mod tests {
                 && section.ready_count == 3
         }));
         assert!(run_view.sections.iter().any(|section| {
-            section.section_id == "typed-events"
+            section.section_id == "agent-sessions"
                 && section.record_count == 1
-                && section.ready_count == 2
+                && section.ready_count == 0
+                && section.blocked_count == 1
+                && section.source_ledger == "unlocked-agent-prompt-sessions"
+        }));
+        assert!(run_view.sections.iter().any(|section| {
+            section.section_id == "typed-events"
+            && section.record_count == 1
+            && section.ready_count == 2
         }));
         assert!(run_view.sections.iter().all(|section| {
             section.read_only
@@ -114503,13 +119675,13 @@ mod tests {
         );
         assert_eq!(evidence_diff_board.active_task_run_id, stub.id);
         assert!(evidence_diff_board.selected_run_found);
-        assert_eq!(evidence_diff_board.diff_count, 8);
-        assert_eq!(evidence_diff_board.balanced_diff_count, 3);
+        assert_eq!(evidence_diff_board.diff_count, 10);
+        assert_eq!(evidence_diff_board.balanced_diff_count, 5);
         assert_eq!(evidence_diff_board.gap_diff_count, 5);
         assert_eq!(evidence_diff_board.codex_ready_evidence_count, 8);
         assert_eq!(evidence_diff_board.hermes_ready_evidence_count, 3);
         assert_eq!(evidence_diff_board.gravity_ready_evidence_count, 2);
-        assert_eq!(evidence_diff_board.disabled_gate_count, 8);
+        assert_eq!(evidence_diff_board.disabled_gate_count, 10);
         assert!(evidence_diff_board.read_only);
         assert!(!evidence_diff_board.process_spawn_enabled);
         assert!(!evidence_diff_board.terminal_enabled);
@@ -114576,6 +119748,24 @@ mod tests {
                 && diff.delta == 5
                 && diff.gap_detected
         }));
+        assert!(evidence_diff_board.diffs.iter().any(|diff| {
+            diff.diff_id == "postmortem-failures"
+                && diff.metric == "failure_postmortem_count"
+                && diff.source_count == 1
+                && diff.target_count == 1
+                && diff.delta == 0
+                && diff.balanced
+                && !diff.gap_detected
+        }));
+        assert!(evidence_diff_board.diffs.iter().any(|diff| {
+            diff.diff_id == "postmortem-timeouts"
+                && diff.metric == "timeout_postmortem_count"
+                && diff.source_count == 1
+                && diff.target_count == 1
+                && diff.delta == 0
+                && diff.balanced
+                && !diff.gap_detected
+        }));
         assert!(evidence_diff_board.diffs.iter().all(|diff| {
             diff.read_only
                 && diff.source_runtime == "codex"
@@ -114601,15 +119791,15 @@ mod tests {
         );
         assert_eq!(reconciliation_checklist.active_task_run_id, stub.id);
         assert!(reconciliation_checklist.selected_run_found);
-        assert_eq!(reconciliation_checklist.checklist_count, 9);
-        assert_eq!(reconciliation_checklist.ready_check_count, 4);
-        assert_eq!(reconciliation_checklist.balanced_check_count, 4);
+        assert_eq!(reconciliation_checklist.checklist_count, 11);
+        assert_eq!(reconciliation_checklist.ready_check_count, 6);
+        assert_eq!(reconciliation_checklist.balanced_check_count, 6);
         assert_eq!(reconciliation_checklist.gap_check_count, 5);
         assert_eq!(reconciliation_checklist.action_required_count, 5);
         assert_eq!(reconciliation_checklist.codex_ready_evidence_count, 8);
         assert_eq!(reconciliation_checklist.hermes_ready_evidence_count, 3);
         assert_eq!(reconciliation_checklist.gravity_ready_evidence_count, 2);
-        assert_eq!(reconciliation_checklist.disabled_gate_count, 9);
+        assert_eq!(reconciliation_checklist.disabled_gate_count, 11);
         assert!(reconciliation_checklist.read_only);
         assert!(!reconciliation_checklist.process_spawn_enabled);
         assert!(!reconciliation_checklist.terminal_enabled);
@@ -114647,6 +119837,24 @@ mod tests {
                 && item.hermes_count == 3
         }));
         assert!(reconciliation_checklist.checklist.iter().any(|item| {
+            item.item_id == "reconcile-postmortem-failures"
+                && item.ready
+                && item.balanced
+                && !item.action_required
+                && item.metric == "failure_postmortem_count"
+                && item.codex_count == 1
+                && item.hermes_count == 1
+        }));
+        assert!(reconciliation_checklist.checklist.iter().any(|item| {
+            item.item_id == "reconcile-postmortem-timeouts"
+                && item.ready
+                && item.balanced
+                && !item.action_required
+                && item.metric == "timeout_postmortem_count"
+                && item.codex_count == 1
+                && item.hermes_count == 1
+        }));
+        assert!(reconciliation_checklist.checklist.iter().any(|item| {
             item.item_id == "gravity-omega-reconciliation"
                 && item.ready
                 && item.balanced
@@ -114682,8 +119890,8 @@ mod tests {
         assert_eq!(reconciliation_action_plan.gap_action_count, 5);
         assert_eq!(reconciliation_action_plan.blocked_action_count, 5);
         assert_eq!(reconciliation_action_plan.missing_evidence_total, 10);
-        assert_eq!(reconciliation_action_plan.checklist_count, 9);
-        assert_eq!(reconciliation_action_plan.ready_check_count, 4);
+        assert_eq!(reconciliation_action_plan.checklist_count, 11);
+        assert_eq!(reconciliation_action_plan.ready_check_count, 6);
         assert_eq!(reconciliation_action_plan.action_required_count, 5);
         assert_eq!(reconciliation_action_plan.codex_ready_evidence_count, 8);
         assert_eq!(reconciliation_action_plan.hermes_ready_evidence_count, 3);
@@ -117007,7 +122215,11 @@ mod tests {
             steno_pet_dashboard.status,
             "steno_pet_companion_dashboard_read_only"
         );
-        assert_eq!(steno_pet_dashboard.section_count, 5);
+        assert_eq!(steno_pet_dashboard.section_count, 6);
+        assert!(steno_pet_dashboard
+            .sections
+            .iter()
+            .any(|section| section.section_id == "agent-transcript-sessions"));
         assert_eq!(steno_pet_dashboard.transcript_bundle_count, 1);
         assert_eq!(steno_pet_dashboard.transcript_bundle_ready_count, 1);
         assert_eq!(steno_pet_dashboard.transcript_export_policy_count, 2);
@@ -117023,7 +122235,57 @@ mod tests {
         assert_eq!(steno_pet_dashboard.pet_inventory_ready_count, 1);
         assert_eq!(steno_pet_dashboard.pet_readiness_count, 1);
         assert_eq!(steno_pet_dashboard.pet_readiness_ready_count, 1);
-        assert_eq!(steno_pet_dashboard.disabled_gate_count, 5);
+        assert!(steno_pet_dashboard.pet_attention_item_count >= 5);
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "codex-agent-postmortem"
+                    && item.state == "error"
+                    && item.related_record_path.as_deref()
+                        == Some(agent_session_record.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "hermes-kimi-postmortem"
+                    && item.state == "warning"
+                    && item.related_record_path.as_deref()
+                        == Some(failed_assist_record.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "process-control-policy"
+                    && item.state == "reminder"
+                    && item.related_record_path.as_deref()
+                        == Some(retry_policy.policy.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard
+            .recent_pet_attention_items
+            .iter()
+            .any(|item| {
+                item.source == "process-exit-summary"
+                    && item.state == "reminder"
+                    && item.related_record_path.as_deref()
+                        == Some(exit_summary.summary.record_path.as_str())
+            }));
+        assert!(steno_pet_dashboard.recent_pet_attention_items.iter().all(|item| {
+            item.read_only
+                && !item.steno_write_enabled
+                && !item.memory_write_enabled
+                && !item.live_mcp_call_enabled
+                && !item.file_write_enabled
+                && !item.patch_apply_enabled
+                && !item.desktop_control_enabled
+                && !item.terminal_enabled
+                && !item.process_spawn_enabled
+                && !item.writes_allowed
+                && !item.execution_enabled
+        }));
+        assert_eq!(steno_pet_dashboard.disabled_gate_count, 6);
         assert!(steno_pet_dashboard.read_only);
         assert!(steno_pet_dashboard.steno_first_class);
         assert!(steno_pet_dashboard.pet_first_class);
@@ -139658,7 +144920,8 @@ mod tests {
 
         let unlocked_prompt_sessions =
             list_unlocked_agent_prompt_sessions().expect("unlocked prompt session list");
-        assert_eq!(unlocked_prompt_sessions.len(), 0);
+        assert_eq!(unlocked_prompt_sessions.len(), 1);
+        assert_eq!(unlocked_prompt_sessions[0].id, "run-view-agent-postmortem");
 
         let _ = fs::remove_dir_all(&test_root);
         env::remove_var("XDG_STATE_HOME");
