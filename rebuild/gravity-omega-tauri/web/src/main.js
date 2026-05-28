@@ -29101,6 +29101,173 @@ footer {
     return node;
   };
 
+  const omegaComputerListValues = (value, fallback = []) => {
+    const values = Array.isArray(value)
+      ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
+      : [];
+    return values.length > 0 ? values : fallback;
+  };
+
+  const appendOmegaComputerListBlock = (parent, title, items, className = "") => {
+    const values = omegaComputerListValues(items);
+    if (values.length === 0) return null;
+    const block = document.createElement("section");
+    block.className = `omega-computer-detail-block ${className}`.trim();
+    appendOmegaComputerText(block, "strong", title);
+    const list = document.createElement("ul");
+    for (const item of values.slice(0, 5)) {
+      appendOmegaComputerText(list, "li", item);
+    }
+    block.append(list);
+    parent.append(block);
+    return block;
+  };
+
+  const omegaComputerWorkerEvidence = (worker) =>
+    omegaComputerListValues(worker?.evidence_required, [
+      "Omega Agent Work.md",
+      "Omega Computer session record",
+      "verification output or evidence history entry",
+    ]);
+
+  const omegaComputerWorkerBlockedActions = (worker) =>
+    omegaComputerListValues(worker?.blocked_actions, [
+      "desktop control from this computer packet",
+      "unapproved file writes or patches",
+      "terminal/process execution outside explicit lanes",
+    ]);
+
+  const formatOmegaComputerWorkPacket = (record) => {
+    const workers = omegaComputerWorkersFromRecord(record);
+    const stages = Array.isArray(record?.stages) ? record.stages : [];
+    const roles = Array.isArray(record?.roles) ? record.roles : [];
+    const blockers = omegaComputerListValues(record?.blockers, [
+      "Live desktop action, terminal execution, file writes, patches, exports, captures, live MCP calls, and memory writes remain separate gated workflows.",
+    ]);
+    const workerLines = workers.length > 0
+      ? workers.flatMap((worker) => [
+          `### ${worker.id_badge || "worker"} ${worker.name || "Specialist"}`,
+          `- lane: ${worker.runtime_lane || "not recorded"}`,
+          `- status: ${worker.status || "ready"} / ${worker.progress_label || "queued"} / ${worker.progress_percent ?? 0}%`,
+          `- current task: ${worker.current_task || "not recorded"}`,
+          `- handoff targets: ${(worker.handoff_targets ?? []).join(", ") || "none"}`,
+          `- evidence required: ${omegaComputerWorkerEvidence(worker).join("; ")}`,
+          `- blocked actions: ${omegaComputerWorkerBlockedActions(worker).join("; ")}`,
+          "",
+        ])
+      : ["- No specialist worker records were available.", ""];
+    const stageLines = stages.length > 0
+      ? stages.flatMap((stage) => [
+          `- ${stage.title || stage.id || "Stage"}: ${stage.status || "unknown"}; owner=${stage.owner || "not recorded"}`,
+          `  evidence=${stage.evidence || "not recorded"}`,
+          `  next=${stage.next_step || "not recorded"}`,
+        ])
+      : ["- No stage records were available."];
+    const roleLines = roles.length > 0
+      ? roles.map((role) => `- ${role.title || role.id}: ${role.runtime || "runtime unknown"}; autonomy=${role.autonomy || "unknown"}; execute=${Boolean(role.can_execute)}; next=${role.next_step || "not recorded"}`)
+      : ["- Role records were not available in this environment."];
+    return [
+      "# Omega Agent Work",
+      "",
+      `opened: ${new Date().toISOString()}`,
+      "runtime: omega-computer-session",
+      "label: Omega Computer",
+      `record: ${record?.record_path || "frontend-static-preview"}`,
+      `requested_by: ${record?.requested_by || "omega-computer"}`,
+      "",
+      "## Omega Computer Session Packet",
+      `status: ${record?.status || "frontend_static_omega_computer_ready"}`,
+      `mode: ${record?.mode || "codex_lead_with_hermes_kimi_assist"}`,
+      `workers: ${record?.specialist_worker_count ?? workers.length}`,
+      `active_worker: ${record?.active_worker_id || "CL-00"}`,
+      `stages: ${record?.stage_count ?? stages.length}`,
+      `blocked_stages: ${record?.blocked_stage_count ?? 0}`,
+      "",
+      "## Request Preview",
+      record?.prompt_preview || "No prompt was active when Omega Computer opened.",
+      "",
+      "## Stage Pipeline",
+      ...stageLines,
+      "",
+      "## Specialist Agent Lanes",
+      ...workerLines,
+      "## Roles",
+      ...roleLines,
+      "",
+      "## Safety Gates",
+      ...blockers.map((blocker) => `- ${blocker}`),
+      `- desktop_control=${Boolean(record?.desktop_control_enabled)}`,
+      `- terminal_execution=${Boolean(record?.terminal_execution_enabled)}`,
+      `- file_write=${Boolean(record?.file_write_enabled)}`,
+      `- patch_apply=${Boolean(record?.patch_apply_enabled)}`,
+      `- live_mcp=${Boolean(record?.live_mcp_call_enabled)}`,
+      `- memory_write=${Boolean(record?.memory_write_enabled)}`,
+      "",
+      "## Next",
+      record?.next_step || "Use Codex Lead as the primary coding operator with Hermes/Kimi assisting from bounded records.",
+    ].join("\n");
+  };
+
+  const openOmegaComputerWorkPacket = (record) => {
+    const content = formatOmegaComputerWorkPacket(record);
+    if (agentWorkFlushTimer) {
+      window.clearTimeout(agentWorkFlushTimer);
+      agentWorkFlushTimer = 0;
+    }
+    agentWorkPendingLines = [];
+    activeAgentWorkArtifact = {
+      runtime: "omega-computer-session",
+      label: "Omega Computer",
+      content,
+      lineCount: 0,
+      streamStarted: false,
+      streamTruncated: false,
+      fileCandidates: new Set(),
+    };
+    collectAgentWorkFileCandidates(content);
+    setAgentWorkArtifactValue(content, "Omega Computer session packet opened in Omega Agent Work.md.");
+    appendEvidenceText(`omega computer work packet opened in Monaco: ${record?.record_path || "frontend-preview"}`);
+    return content;
+  };
+
+  const buildOmegaComputerStageRail = (record) => {
+    const stages = Array.isArray(record?.stages) ? record.stages : [];
+    const rail = document.createElement("section");
+    rail.className = "omega-computer-stage-rail";
+    const summary = document.createElement("div");
+    summary.className = "omega-computer-session-strip";
+    appendOmegaComputerText(summary, "strong", "Session Packet");
+    appendOmegaComputerText(
+      summary,
+      "span",
+      `record=${record?.record_path || "frontend-preview"} / ready=${record?.ready_stage_count ?? 0} / blocked=${record?.blocked_stage_count ?? 0}`,
+    );
+    rail.append(summary);
+    const stageRow = document.createElement("div");
+    stageRow.className = "omega-computer-stage-row";
+    const visibleStages = stages.length > 0
+      ? stages
+      : [
+          { id: "observe", title: "Observe", owner: "Codex Lead", status: "ready_metadata_only", evidence: "existing app metadata" },
+          { id: "plan", title: "Plan", owner: "Codex Lead", status: "ready", evidence: "doctrine and todo" },
+          { id: "delegate", title: "Delegate", owner: "Codex + Hermes/Kimi", status: "ready", evidence: "assist records" },
+          { id: "act", title: "Act", owner: "Codex Lead", status: "blocked_until_explicit_action_packet", evidence: "separate action lane" },
+          { id: "verify", title: "Verify", owner: "Codex Lead", status: "ready", evidence: "tests and evidence" },
+        ];
+    for (const stage of visibleStages.slice(0, 6)) {
+      const card = document.createElement("article");
+      card.className = "omega-computer-stage-card";
+      card.dataset.state = String(stage.status || "ready").includes("blocked") ? "blocked" : "ready";
+      appendOmegaComputerText(card, "span", stage.id || stage.title || "stage", "omega-computer-stage-id");
+      appendOmegaComputerText(card, "strong", stage.title || "Stage");
+      appendOmegaComputerText(card, "span", `${stage.status || "ready"} / ${stage.owner || "owner unknown"}`, "omega-computer-stage-status");
+      appendOmegaComputerText(card, "p", stage.evidence || "Evidence not recorded yet.");
+      stageRow.append(card);
+    }
+    rail.append(stageRow);
+    return rail;
+  };
+
   const copyOmegaComputerPromptToComposer = (promptInput) => {
     const prompt = String(promptInput?.value ?? productInput?.value ?? "").trim();
     if (!prompt) {
@@ -29211,6 +29378,14 @@ footer {
         appendOmegaComputerText(taskLog, "li", line);
       }
       screen.append(taskLog);
+      const detailGrid = document.createElement("div");
+      detailGrid.className = "omega-computer-detail-grid";
+      appendOmegaComputerListBlock(detailGrid, "Evidence Required", omegaComputerWorkerEvidence(selected), "evidence");
+      appendOmegaComputerListBlock(detailGrid, "Blocked Actions", omegaComputerWorkerBlockedActions(selected), "blocked");
+      appendOmegaComputerListBlock(detailGrid, "Handoff Targets", selected.handoff_targets ?? [], "handoff");
+      if (detailGrid.childElementCount > 0) {
+        screen.append(detailGrid);
+      }
       appendOmegaComputerText(
         screen,
         "div",
@@ -29301,6 +29476,7 @@ footer {
     actionRow.className = "omega-computer-main-actions";
     const actions = [
       ["use", "Use In Chat"],
+      ["packet", "Open Work Packet"],
       ["main", "Run Main"],
       ["codex", "Codex Only"],
       ["hermes", "Hermes Only"],
@@ -29320,6 +29496,11 @@ footer {
           }
           return;
         }
+        if (action === "packet") {
+          openOmegaComputerWorkPacket(record);
+          setProductStatus("Omega Computer session packet opened in Monaco.", "done");
+          return;
+        }
         runOmegaComputerComposerAction(action, promptInput);
       });
       actionRow.append(button);
@@ -29330,7 +29511,7 @@ footer {
     terminal.className = "omega-computer-main-terminal";
     renderOmegaComputerSwarmTerminal(record, "", terminal);
 
-    shell.append(header, controls, terminal);
+    shell.append(header, buildOmegaComputerStageRail(record), controls, terminal);
     omegaComputerMainSurface.append(shell);
     setEditorStatus("Omega Computer control surface ready.");
     return true;
@@ -29342,6 +29523,7 @@ footer {
         ? `${record.status}; workers=${record.specialist_worker_count ?? 0}; selected=${record.active_worker_id ?? "CL-00"}; desktop control disabled`
         : "Omega Computer unavailable in static preview";
     }
+    openOmegaComputerWorkPacket(record);
     showOmegaComputerMainSurface(record);
     switchProductPanel("security");
     switchBottomView("output");

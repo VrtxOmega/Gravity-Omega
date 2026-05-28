@@ -52,7 +52,7 @@ function findFreePort() {
 async function waitForDevtools(port) {
   const started = Date.now();
   let lastError = null;
-  while (Date.now() - started < 15000) {
+  while (Date.now() - started < 30000) {
     try {
       return await requestJson(`http://127.0.0.1:${port}/json/version`);
     } catch (error) {
@@ -61,6 +61,22 @@ async function waitForDevtools(port) {
     }
   }
   throw new Error(`Chrome DevTools did not become ready: ${lastError?.message ?? "unknown error"}`);
+}
+
+function waitForChildExit(child, timeoutMs = 3000) {
+  if (!child || child.exitCode !== null || child.signalCode) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      resolve();
+    }, timeoutMs);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
 }
 
 async function makeCdpClient(webSocketDebuggerUrl) {
@@ -204,6 +220,8 @@ async function main() {
   } finally {
     cdp?.close();
     chrome.kill("SIGTERM");
+    await waitForChildExit(chrome);
+    await fs.rm(userDataDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -307,6 +325,11 @@ async function workbenchQa() {
         assert(visible(document.querySelector("#omega-computer-main-surface")), "Omega Computer opens the main control surface");
         assert(text("#omega-computer-main-surface").includes("Omega Computer"), "Omega Computer surface names itself");
         assert(document.querySelectorAll(".omega-computer-worker-card").length >= 8, "Omega Computer renders worker cards");
+        assert(visible(document.querySelector(".omega-computer-stage-rail")), "Omega Computer renders the stage pipeline");
+        assert(text("#omega-computer-main-surface").includes("Session Packet"), "Omega Computer shows session packet evidence");
+        assert(text("#omega-computer-main-surface").includes("Evidence Required"), "Omega Computer shows selected-agent evidence detail");
+        assert(text("#omega-computer-main-surface").includes("Blocked Actions"), "Omega Computer shows selected-agent blocked-action detail");
+        assert(text("#omega-editor-tabs").includes("Omega Agent Work"), "Omega Computer opens the Monaco work packet tab");
       } else {
         const shell = document.querySelector(`.omega-panel-main-shell[data-panel-action-surface="${action}"]`);
         assert(visible(document.querySelector("#omega-panel-main-surface")), `${action} opens the shared main surface`);
