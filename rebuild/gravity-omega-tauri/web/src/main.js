@@ -25535,6 +25535,7 @@ function initOmegaProductShell() {
   const terminalSessionDuration = document.querySelector("#omega-terminal-session-duration");
   const terminalSessionRecord = document.querySelector("#omega-terminal-session-record");
   const terminalClearBtn = document.querySelector("#omega-terminal-clear");
+  const terminalStopBtn = document.querySelector("#omega-terminal-stop");
   const terminalEvidenceBtn = document.querySelector("#omega-terminal-show-evidence");
   const artifactPreviewBtn = document.querySelector("#omega-product-artifact-preview-btn");
   const artifactPreviewTitleProduct = document.querySelector("#omega-artifact-preview-title-product");
@@ -26501,6 +26502,16 @@ function initOmegaProductShell() {
     productShell.setAttribute("data-terminal-stream-stale-warnings", String(activeTerminalStreamRun?.staleWarningCount ?? 0));
   };
 
+  const syncTerminalStopControl = () => {
+    if (!terminalStopBtn) return;
+    const running = Boolean(activeTerminalStreamRun?.sessionId);
+    terminalStopBtn.disabled = !running;
+    terminalStopBtn.textContent = running ? "Stop" : "Stop";
+    terminalStopBtn.title = running
+      ? `Stop terminal stream ${activeTerminalStreamRun.sessionId}`
+      : "No active terminal stream to stop";
+  };
+
   const recordTerminalStreamLifecycleEvent = (eventName, patch = {}, options = {}) => {
     if (!activeTerminalStreamRun && patch.sessionId) {
       activeTerminalStreamRun = {
@@ -26524,6 +26535,7 @@ function initOmegaProductShell() {
       lastEventName: eventName,
     };
     syncTerminalStreamDataset();
+    syncTerminalStopControl();
     if (!options.silent) {
       appendEvidenceText(`terminal-stream ${eventName}: ${activeTerminalStreamRun.status || "running"} ${activeTerminalStreamRun.recordPath || ""}`.trim());
     }
@@ -26536,6 +26548,7 @@ function initOmegaProductShell() {
       terminalStreamWatchdogTimer = 0;
     }
     syncTerminalStreamDataset();
+    syncTerminalStopControl();
   };
 
   const tickTerminalStreamWatchdog = () => {
@@ -26607,6 +26620,8 @@ function initOmegaProductShell() {
         `timeoutKill=${Boolean(lastTerminalSession.timeoutKillSent)}`,
         `waitAfterKillMs=${lastTerminalSession.waitAfterKillMs ?? 0}`,
         `partialOutput=${Boolean(lastTerminalSession.partialOutputCaptured)}`,
+        `cancellation_requested=${Boolean(lastTerminalSession.cancellationRequested)}`,
+        `cancel_kill_sent=${Boolean(lastTerminalSession.cancelKillSent)}`,
         `replay=${lastTerminalSession.replayRecordPath || "none"}`,
       ].join("\n");
     }
@@ -31088,6 +31103,7 @@ footer {
     productShell?.classList.remove("xterm-pending", "xterm-failed");
     productShell?.classList.add("xterm-ready");
     updateTerminalSessionHud({ status: "idle", state: "idle", cwd: "rebuild workspace" });
+    syncTerminalStopControl();
     terminalWrite("Gravity Omega terminal lane ready.");
     terminalWrite("Allowed commands: pwd, ls, git status --short, git diff --stat, git diff --check, node --check web/src/main.js, npm run validate, cargo check --manifest-path src-tauri/Cargo.toml.");
   };
@@ -31362,6 +31378,70 @@ footer {
     });
   };
 
+  const cancelTerminalStream = async () => {
+    const sessionId = activeTerminalStreamRun?.sessionId || activeTerminalStreamId || "";
+    if (!sessionId) {
+      terminalWrite("[terminal_stop] no active terminal stream");
+      setProductStatus("No active terminal stream to stop.", "warning");
+      return;
+    }
+    if (!invoke) {
+      terminalWrite("[terminal_stop] Tauri runtime required for backend terminal cancellation.");
+      setProductStatus("Tauri runtime required for terminal cancellation.", "error");
+      return;
+    }
+
+    terminalStopBtn?.setAttribute("disabled", "disabled");
+    terminalStopBtn && (terminalStopBtn.textContent = "Stopping...");
+    try {
+      const result = await invoke("cancel_product_terminal_stream", {
+        request: {
+          session_id: sessionId,
+          requested_by: "gravity-omega-terminal-stop",
+          reason: "operator clicked Stop for a running terminal stream",
+        },
+      });
+      const accepted = Boolean(result?.accepted && result?.cancellation_requested);
+      recordTerminalStreamLifecycleEvent("stream-stop-requested", {
+        sessionId,
+        status: result?.status || "product_terminal_stream_cancel_requested",
+        phase: accepted ? "cancelling" : "stop-not-accepted",
+        recordPath: result?.record_path || activeTerminalStreamRun?.recordPath || lastTerminalSession.recordPath || "",
+        logPath: result?.log_path || activeTerminalStreamRun?.logPath || lastTerminalSession.logPath || "",
+      });
+      updateTerminalSessionHud({
+        sessionId,
+        status: result?.status || "product_terminal_stream_cancel_requested",
+        state: accepted ? "running" : "error",
+        recordPath: result?.record_path || lastTerminalSession.recordPath,
+        logPath: result?.log_path || lastTerminalSession.logPath,
+        cancellationRequested: accepted,
+        cancelKillSent: Boolean(result?.kill_delegated_to_stream_worker),
+      });
+      terminalWrite(`[terminal_stop] ${result?.status || "unknown"} delegated=${Boolean(result?.kill_delegated_to_stream_worker)} pid=${result?.pid ?? "pending"}`);
+      appendEvidenceText(
+        accepted
+          ? `terminal stream cancel requested: ${result.record_path}`
+          : `terminal stream stop did not request backend kill: ${result?.blockers?.join("; ") || "no tracked stream"}`
+      );
+      setProductStatus(
+        accepted
+          ? "Terminal stop requested; the stream worker will record the final cancelled status."
+          : "Terminal stop could not find a tracked backend stream. No backend terminal kill is claimed.",
+        accepted ? "warning" : "error",
+      );
+      if (!accepted) {
+        terminalStopBtn?.removeAttribute("disabled");
+        syncTerminalStopControl();
+      }
+    } catch (error) {
+      terminalWrite(`[terminal_stop] failed: ${error.message}`);
+      setProblemText(`Terminal stop failed: ${error.message}`);
+      setProductStatus(`Terminal stop failed: ${error.message}`, "error");
+      syncTerminalStopControl();
+    }
+  };
+
   const runTerminalCommand = async (command) => {
     const trimmed = command.trim();
     if (!trimmed) {
@@ -31412,6 +31492,7 @@ footer {
           staleWarningCount: 0,
         };
         syncTerminalStreamDataset();
+        syncTerminalStopControl();
         startTerminalStreamWatchdog();
         updateTerminalSessionHud({
           command: started.command || trimmed,
@@ -31495,6 +31576,7 @@ footer {
       if (!listen) {
         terminalRunBtn?.removeAttribute("disabled");
       }
+      syncTerminalStopControl();
     }
   };
 
@@ -33599,6 +33681,12 @@ footer {
 
   terminalClearBtn?.addEventListener("click", () => {
     clearProductTerminal();
+  });
+
+  terminalStopBtn?.addEventListener("click", () => {
+    cancelTerminalStream().catch((error) => {
+      setProductStatus(`Terminal stop failed: ${error.message}`, "error");
+    });
   });
 
   terminalEvidenceBtn?.addEventListener("click", () => {

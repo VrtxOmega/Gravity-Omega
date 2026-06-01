@@ -2781,6 +2781,35 @@ pub struct ProductTerminalStreamStartResult {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ProductTerminalStreamCancelRequest {
+    pub session_id: String,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProductTerminalStreamCancelResult {
+    pub accepted: bool,
+    pub status: String,
+    pub session_id: String,
+    pub command: String,
+    pub pid: Option<u32>,
+    pub record_path: String,
+    pub log_path: String,
+    pub process_spawn_enabled: bool,
+    pub process_control_enabled: bool,
+    pub terminal_enabled: bool,
+    pub terminal_write_enabled: bool,
+    pub cancellation_requested: bool,
+    pub kill_delegated_to_stream_worker: bool,
+    pub created_at_ms: u64,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ProductTerminalTranscriptReplayRequest {
     #[serde(default)]
     pub session_record_path: Option<String>,
@@ -2848,6 +2877,8 @@ pub struct ProductTerminalSessionSummary {
     pub timeout_kill_sent: bool,
     pub wait_after_kill_ms: u64,
     pub partial_output_captured: bool,
+    pub cancellation_requested: bool,
+    pub cancel_kill_sent: bool,
     pub source_stream_enabled: bool,
     pub source_process_spawn_enabled: bool,
     pub source_transcript_capture_enabled: bool,
@@ -43597,6 +43628,90 @@ pub fn run_product_terminal_command(
 
 const PRODUCT_TERMINAL_STREAM_EVENT: &str = "product-terminal-stream";
 
+#[derive(Debug, Clone)]
+struct ProductTerminalStreamProcessState {
+    session_id: String,
+    command: String,
+    pid: Option<u32>,
+    record_path: String,
+    log_path: String,
+    started_at_ms: u64,
+    cancel_requested: bool,
+    cancel_requested_at_ms: Option<u64>,
+    cancel_requested_by: String,
+    cancel_reason: String,
+}
+
+static PRODUCT_TERMINAL_STREAM_PROCESSES: OnceLock<
+    Mutex<BTreeMap<String, ProductTerminalStreamProcessState>>,
+> = OnceLock::new();
+
+fn product_terminal_stream_processes(
+) -> &'static Mutex<BTreeMap<String, ProductTerminalStreamProcessState>> {
+    PRODUCT_TERMINAL_STREAM_PROCESSES.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+fn with_product_terminal_stream_processes<T>(
+    f: impl FnOnce(&mut BTreeMap<String, ProductTerminalStreamProcessState>) -> T,
+) -> Result<T, String> {
+    let mut guard = product_terminal_stream_processes()
+        .lock()
+        .map_err(|_| "product terminal stream process registry lock poisoned".to_string())?;
+    Ok(f(&mut guard))
+}
+
+fn register_product_terminal_stream_process(
+    state: ProductTerminalStreamProcessState,
+) -> Result<(), String> {
+    with_product_terminal_stream_processes(|processes| {
+        processes.insert(state.session_id.clone(), state);
+    })
+}
+
+fn update_product_terminal_stream_pid(session_id: &str, pid: u32) -> Result<(), String> {
+    with_product_terminal_stream_processes(|processes| {
+        if let Some(state) = processes.get_mut(session_id) {
+            state.pid = Some(pid);
+        }
+    })
+}
+
+fn mark_product_terminal_stream_cancel_requested(
+    session_id: &str,
+    requested_by: &str,
+    reason: &str,
+    timestamp: u64,
+) -> Result<Option<ProductTerminalStreamProcessState>, String> {
+    with_product_terminal_stream_processes(|processes| {
+        let state = processes.get_mut(session_id)?;
+        state.cancel_requested = true;
+        state.cancel_requested_at_ms = Some(timestamp);
+        state.cancel_requested_by = requested_by.to_string();
+        state.cancel_reason = reason.to_string();
+        Some(state.clone())
+    })
+}
+
+fn product_terminal_stream_cancel_state(
+    session_id: &str,
+) -> Option<ProductTerminalStreamProcessState> {
+    with_product_terminal_stream_processes(|processes| processes.get(session_id).cloned())
+        .ok()
+        .flatten()
+}
+
+fn product_terminal_stream_cancel_requested(session_id: &str) -> bool {
+    product_terminal_stream_cancel_state(session_id)
+        .map(|state| state.cancel_requested)
+        .unwrap_or(false)
+}
+
+fn unregister_product_terminal_stream_process(session_id: &str) {
+    let _ = with_product_terminal_stream_processes(|processes| {
+        processes.remove(session_id);
+    });
+}
+
 fn emit_product_terminal_stream_event(
     app: &tauri::AppHandle,
     log_path: &PathBuf,
@@ -43622,6 +43737,133 @@ fn emit_product_terminal_stream_event(
             "created_at_ms": event.created_at_ms
         }),
     );
+}
+
+#[tauri::command]
+pub fn cancel_product_terminal_stream(
+    request: ProductTerminalStreamCancelRequest,
+) -> Result<ProductTerminalStreamCancelResult, String> {
+    let timestamp = now_ms()?;
+    let session_id = request.session_id.trim().to_string();
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "gravity-omega-product-ui".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "gravity-omega-product-ui".to_string()
+    } else {
+        requested_by
+    };
+    let reason = request
+        .reason
+        .unwrap_or_else(|| "operator terminal stop requested".to_string())
+        .trim()
+        .chars()
+        .take(260)
+        .collect::<String>();
+    let reason = if reason.is_empty() {
+        "operator terminal stop requested".to_string()
+    } else {
+        reason
+    };
+
+    if session_id.is_empty() {
+        return Ok(ProductTerminalStreamCancelResult {
+            accepted: false,
+            status: "product_terminal_stream_cancel_rejected".to_string(),
+            session_id,
+            command: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            terminal_enabled: true,
+            terminal_write_enabled: false,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "session_id is required to stop a tracked product terminal stream".to_string(),
+            ],
+            next_step: "Retry after a terminal stream has emitted a session id.".to_string(),
+        });
+    }
+
+    let Some(state) = mark_product_terminal_stream_cancel_requested(
+        &session_id,
+        &requested_by,
+        &reason,
+        timestamp,
+    )?
+    else {
+        return Ok(ProductTerminalStreamCancelResult {
+            accepted: false,
+            status: "product_terminal_stream_cancel_not_found".to_string(),
+            session_id,
+            command: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            terminal_enabled: true,
+            terminal_write_enabled: false,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "No tracked active product terminal stream matched the requested session id."
+                    .to_string(),
+            ],
+            next_step: "The UI may clear its visible running state, but no backend terminal process kill was requested.".to_string(),
+        });
+    };
+
+    let status = if state.pid.is_some() {
+        "product_terminal_stream_cancel_requested"
+    } else {
+        "product_terminal_stream_cancel_requested_pending_spawn"
+    }
+    .to_string();
+    let _ = write_jsonl_event(
+        &PathBuf::from(&state.log_path),
+        serde_json::json!({
+            "event": "product_terminal_stream_cancel_requested",
+            "session_id": state.session_id.clone(),
+            "command": state.command.clone(),
+            "pid": state.pid,
+            "status": status.clone(),
+            "requested_by": requested_by,
+            "reason": reason,
+            "started_at_ms": state.started_at_ms,
+            "created_at_ms": timestamp,
+            "process_control_enabled": true,
+            "kill_delegated_to_stream_worker": true
+        }),
+    );
+
+    Ok(ProductTerminalStreamCancelResult {
+        accepted: true,
+        status,
+        session_id: state.session_id,
+        command: state.command,
+        pid: state.pid,
+        record_path: state.record_path,
+        log_path: state.log_path,
+        process_spawn_enabled: true,
+        process_control_enabled: true,
+        terminal_enabled: true,
+        terminal_write_enabled: false,
+        cancellation_requested: true,
+        kill_delegated_to_stream_worker: true,
+        created_at_ms: timestamp,
+        blockers: Vec::new(),
+        next_step: "The tracked terminal stream worker will terminate its own child process and record a cancelled final status.".to_string(),
+    })
 }
 
 fn read_product_terminal_stream<R: Read + Send + 'static>(
@@ -43730,7 +43972,7 @@ pub fn run_product_terminal_command_stream(
     fs::write(
         &record_path,
         serde_json::to_string_pretty(&serde_json::json!({
-            "session_id": session_id,
+            "session_id": session_id.clone(),
             "status": result.status,
             "command": command,
             "argv": argv,
@@ -43743,6 +43985,8 @@ pub fn run_product_terminal_command_stream(
             "timeout_kill_sent": false,
             "wait_after_kill_ms": 0,
             "partial_output_captured": false,
+            "cancellation_requested": false,
+            "cancel_kill_sent": false,
             "timeout_ms": timeout_ms,
             "stream_enabled": true,
             "process_spawn_enabled": true,
@@ -43759,6 +44003,18 @@ pub fn run_product_terminal_command_stream(
             "failed to write terminal stream start record {}: {error}",
             record_path.display()
         )
+    })?;
+    register_product_terminal_stream_process(ProductTerminalStreamProcessState {
+        session_id: session_id.clone(),
+        command: result.command.clone(),
+        pid: None,
+        record_path: record_path.display().to_string(),
+        log_path: log_path.display().to_string(),
+        started_at_ms: timestamp,
+        cancel_requested: false,
+        cancel_requested_at_ms: None,
+        cancel_requested_by: String::new(),
+        cancel_reason: String::new(),
     })?;
 
     emit_product_terminal_stream_event(
@@ -43825,6 +44081,8 @@ pub fn run_product_terminal_command_stream(
                         "timeout_kill_sent": false,
                         "wait_after_kill_ms": 0,
                         "partial_output_captured": true,
+                        "cancellation_requested": false,
+                        "cancel_kill_sent": false,
                         "timeout_ms": timeout_ms,
                         "stdout_transcript_path": thread_stdout_path.display().to_string(),
                         "stderr_transcript_path": thread_stderr_path.display().to_string(),
@@ -43842,7 +44100,7 @@ pub fn run_product_terminal_command_stream(
                     &thread_app,
                     &thread_log_path,
                     ProductTerminalStreamEvent {
-                        session_id: thread_session_id,
+                        session_id: thread_session_id.clone(),
                         kind: "error".to_string(),
                         line,
                         status,
@@ -43858,9 +44116,11 @@ pub fn run_product_terminal_command_stream(
                         created_at_ms: timestamp,
                     },
                 );
+                unregister_product_terminal_stream_process(&thread_session_id);
                 return;
             }
         };
+        let _ = update_product_terminal_stream_pid(&thread_session_id, child.id());
 
         let stdout_reader = child.stdout.take();
         let stderr_reader = child.stderr.take();
@@ -43900,9 +44160,11 @@ pub fn run_product_terminal_command_stream(
         });
 
         let mut timed_out = false;
+        let mut cancelled = false;
         let stdout_pipe_reader_enabled = stdout_handle.is_some();
         let stderr_pipe_reader_enabled = stderr_handle.is_some();
         let mut timeout_kill_sent = false;
+        let mut cancel_kill_sent = false;
         let mut wait_after_kill_ms = 0;
         let exit_code;
         let mut wait_failed = false;
@@ -43913,6 +44175,14 @@ pub fn run_product_terminal_command_stream(
                     break;
                 }
                 Ok(None) => {
+                    if product_terminal_stream_cancel_requested(&thread_session_id) {
+                        cancelled = true;
+                        let kill_started = Instant::now();
+                        cancel_kill_sent = child.kill().is_ok();
+                        exit_code = child.wait().ok().and_then(|status| status.code());
+                        wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                        break;
+                    }
                     if started.elapsed() >= Duration::from_millis(timeout_ms) {
                         timed_out = true;
                         let kill_started = Instant::now();
@@ -43963,7 +44233,12 @@ pub fn run_product_terminal_command_stream(
         let partial_output_captured = !stdout.is_empty() || !stderr.is_empty();
         let _ = fs::write(&thread_stdout_path, &stdout);
         let _ = fs::write(&thread_stderr_path, &stderr);
-        let status = if timed_out {
+        let cancel_state = product_terminal_stream_cancel_state(&thread_session_id);
+        let cancellation_requested =
+            cancelled || cancel_state.as_ref().map(|state| state.cancel_requested).unwrap_or(false);
+        let status = if cancelled {
+            "product_terminal_stream_cancelled"
+        } else if timed_out {
             "product_terminal_stream_timed_out"
         } else if wait_failed {
             "product_terminal_stream_wait_failed"
@@ -43990,6 +44265,11 @@ pub fn run_product_terminal_command_stream(
                 "timeout_kill_sent": timeout_kill_sent,
                 "wait_after_kill_ms": wait_after_kill_ms,
                 "partial_output_captured": partial_output_captured,
+                "cancellation_requested": cancellation_requested,
+                "cancel_kill_sent": cancel_kill_sent,
+                "cancel_requested_at_ms": cancel_state.as_ref().and_then(|state| state.cancel_requested_at_ms),
+                "cancel_requested_by": cancel_state.as_ref().map(|state| state.cancel_requested_by.clone()).unwrap_or_default(),
+                "cancel_reason": cancel_state.as_ref().map(|state| state.cancel_reason.clone()).unwrap_or_default(),
                 "timeout_ms": timeout_ms,
                 "stdout_transcript_path": thread_stdout_path.display().to_string(),
                 "stderr_transcript_path": thread_stderr_path.display().to_string(),
@@ -44007,7 +44287,7 @@ pub fn run_product_terminal_command_stream(
             &thread_app,
             &thread_log_path,
             ProductTerminalStreamEvent {
-                session_id: thread_session_id,
+                session_id: thread_session_id.clone(),
                 kind: "lifecycle".to_string(),
                 line: format!("{status} exit={exit_code:?} duration={duration_ms}ms"),
                 status,
@@ -44023,6 +44303,7 @@ pub fn run_product_terminal_command_stream(
                 created_at_ms: timestamp,
             },
         );
+        unregister_product_terminal_stream_process(&thread_session_id);
     });
 
     Ok(result)
@@ -44097,6 +44378,8 @@ fn write_product_terminal_command_result(
         "timeout_kill_sent": result.timeout_kill_sent,
         "wait_after_kill_ms": result.wait_after_kill_ms,
         "partial_output_captured": result.partial_output_captured,
+        "cancellation_requested": false,
+        "cancel_kill_sent": false,
         "stdout_transcript_path": result.stdout_transcript_path,
         "stderr_transcript_path": result.stderr_transcript_path,
         "process_spawn_enabled": true,
@@ -44210,6 +44493,8 @@ fn terminal_session_summary_from_record(
         timeout_kill_sent: terminal_record_bool(&value, "timeout_kill_sent"),
         wait_after_kill_ms: terminal_record_u64(&value, "wait_after_kill_ms"),
         partial_output_captured: terminal_record_bool(&value, "partial_output_captured"),
+        cancellation_requested: terminal_record_bool(&value, "cancellation_requested"),
+        cancel_kill_sent: terminal_record_bool(&value, "cancel_kill_sent"),
         stdout_transcript_path,
         stderr_transcript_path,
         source_stream_enabled: terminal_record_bool(&value, "stream_enabled"),
@@ -114715,6 +115000,72 @@ mod tests {
     }
 
     #[test]
+    fn product_terminal_stream_cancel_registry_is_tracked_and_scoped() {
+        let _test_env_guard = test_env_lock();
+        let timestamp = now_ms().expect("timestamp");
+        let session_id = format!("test-product-terminal-stream-cancel-{timestamp}");
+        let record_path = std::env::temp_dir()
+            .join(format!("{session_id}.json"))
+            .display()
+            .to_string();
+        let log_path = std::env::temp_dir()
+            .join(format!("{session_id}.jsonl"))
+            .display()
+            .to_string();
+        unregister_product_terminal_stream_process(&session_id);
+        register_product_terminal_stream_process(ProductTerminalStreamProcessState {
+            session_id: session_id.clone(),
+            command: "npm run validate".to_string(),
+            pid: None,
+            record_path: record_path.clone(),
+            log_path: log_path.clone(),
+            started_at_ms: timestamp,
+            cancel_requested: false,
+            cancel_requested_at_ms: None,
+            cancel_requested_by: String::new(),
+            cancel_reason: String::new(),
+        })
+        .expect("registry accepts test terminal stream");
+
+        let accepted = cancel_product_terminal_stream(ProductTerminalStreamCancelRequest {
+            session_id: session_id.clone(),
+            requested_by: Some("rust-test".to_string()),
+            reason: Some("verify scoped terminal cancellation".to_string()),
+        })
+        .expect("terminal cancel request resolves");
+        assert!(accepted.accepted);
+        assert_eq!(
+            accepted.status,
+            "product_terminal_stream_cancel_requested_pending_spawn"
+        );
+        assert_eq!(accepted.session_id, session_id);
+        assert_eq!(accepted.command, "npm run validate");
+        assert_eq!(accepted.pid, None);
+        assert_eq!(accepted.record_path, record_path);
+        assert_eq!(accepted.log_path, log_path);
+        assert!(accepted.process_spawn_enabled);
+        assert!(accepted.process_control_enabled);
+        assert!(accepted.terminal_enabled);
+        assert!(!accepted.terminal_write_enabled);
+        assert!(accepted.cancellation_requested);
+        assert!(accepted.kill_delegated_to_stream_worker);
+        assert!(product_terminal_stream_cancel_requested(&accepted.session_id));
+        unregister_product_terminal_stream_process(&accepted.session_id);
+
+        let missing = cancel_product_terminal_stream(ProductTerminalStreamCancelRequest {
+            session_id: "not-a-tracked-terminal-stream".to_string(),
+            requested_by: Some("rust-test".to_string()),
+            reason: Some("verify scoped rejection".to_string()),
+        })
+        .expect("missing terminal cancel request resolves");
+        assert!(!missing.accepted);
+        assert_eq!(missing.status, "product_terminal_stream_cancel_not_found");
+        assert!(!missing.process_control_enabled);
+        assert!(!missing.cancellation_requested);
+        assert!(!missing.kill_delegated_to_stream_worker);
+    }
+
+    #[test]
     fn product_terminal_stream_record_summary_preserves_lifecycle_evidence() {
         let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
@@ -114741,6 +115092,8 @@ mod tests {
             "timeout_kill_sent": true,
             "wait_after_kill_ms": 17,
             "partial_output_captured": true,
+            "cancellation_requested": true,
+            "cancel_kill_sent": true,
             "timeout_ms": 100,
             "stdout_transcript_path": stdout_path.display().to_string(),
             "stderr_transcript_path": stderr_path.display().to_string(),
@@ -114768,6 +115121,8 @@ mod tests {
         assert!(summary.timeout_kill_sent);
         assert_eq!(summary.wait_after_kill_ms, 17);
         assert!(summary.partial_output_captured);
+        assert!(summary.cancellation_requested);
+        assert!(summary.cancel_kill_sent);
         assert!(summary.stdout_size_bytes > 0);
         assert!(summary.stderr_size_bytes > 0);
         assert!(!summary.terminal_write_enabled);

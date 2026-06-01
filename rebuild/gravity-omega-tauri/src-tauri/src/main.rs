@@ -56,6 +56,7 @@ fn main() {
             commands::product_workspace_search,
             commands::run_product_terminal_command,
             commands::run_product_terminal_command_stream,
+            commands::cancel_product_terminal_stream,
             commands::record_product_terminal_transcript_replay,
             commands::list_product_terminal_transcript_replays,
             commands::record_sovereign_docs_preview,
