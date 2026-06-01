@@ -172,7 +172,7 @@ for (const unlockedNeedle of [
   "unlocked_agent_prompt_stdin_mode",
   "write_unlocked_agent_prompt_stdin",
   "hermes_log_write_preflight",
-  "Hermes/Kimi log path is not writable for this Gravity Omega process",
+  "Hermes log path is not writable for this Gravity Omega process",
   "<prompt:stdin>",
   ".stdin(unlocked_agent_prompt_stdin_mode",
   "codex-workspace-write",
@@ -210,11 +210,11 @@ if (/workspace_arg\.clone\(\),\s*prompt\.to_string\(\),/.test(rustCommandsSource
 const hermesAssistProcessStart = rustCommandsSource.indexOf("fn run_hermes_kimi_assist_process_with_binary");
 const hermesAssistProcessEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn record_hermes_kimi_assist_brief", hermesAssistProcessStart);
 if (hermesAssistProcessStart < 0 || hermesAssistProcessEnd < hermesAssistProcessStart) {
-  throw new Error("Hermes/Kimi assist process runner body is missing.");
+  throw new Error("Hermes assist process runner body is missing.");
 }
 const hermesAssistProcessBody = rustCommandsSource.slice(hermesAssistProcessStart, hermesAssistProcessEnd);
 if (hermesAssistProcessBody.includes("wait_with_output")) {
-  throw new Error("Hermes/Kimi assist runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+  throw new Error("Hermes assist runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
 }
 
 const productTerminalProcessStart = rustCommandsSource.indexOf("fn run_product_terminal_command_process");
@@ -459,8 +459,8 @@ for (const productShellNeedle of [
   "omega-agent-mode-row",
   "data-agent-run-mode=\"codex-lead\"",
   "data-agent-run-mode=\"evidence-compare\"",
-  "Codex Lead + Hermes/Kimi",
-  "Describe the work. Ctrl+Enter runs Codex Lead + Hermes/Kimi.",
+  "Codex Lead + Hermes",
+  "Describe the work. Ctrl+Enter runs Codex Lead + Hermes.",
   "Run Main",
   "Codex Only",
   "Hermes Only",
@@ -806,8 +806,8 @@ for (const productBridgeNeedle of [
   "record_process_spawn_enabled",
   'source_id: "hermes-kimi-assist"',
   "stderr_preview_source",
-  "Hermes/Kimi Live Capability Inventory",
-  "Hermes/Kimi Assist Brief",
+  "Hermes Live Capability Inventory",
+  "Hermes Assist Brief",
   "runtimeInventory",
   "hermesAssist",
   "includeFullInventory = false",
@@ -819,8 +819,8 @@ for (const productBridgeNeedle of [
   "frontend/frontend-visual-polish",
   "software-development/test-driven-development",
   "veritas/veritas-omega-code",
-  "Kimi 2.6",
-  "Kimi/Moonshot",
+  "Hermes owns the active model/profile",
+  "future providers are Hermes configuration details",
   "omega-stenographer",
   "sswp",
   "recent_pet_runtime_signals",
@@ -909,7 +909,7 @@ if (!primaryFunctionBody.includes("isAgentRunStatusFollowup(prompt)") || !primar
 
 const sendHandlerMatch = frontendSource.match(/sendBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*?\n  \}\);\n\n  const runVisibleAgent/);
 if (!sendHandlerMatch || !sendHandlerMatch[0].includes("runPrimaryAgentWork")) {
-  throw new Error("Primary composer Send button must run the Codex Lead + Hermes/Kimi main work path.");
+  throw new Error("Primary composer Send button must run the Codex Lead + Hermes main work path.");
 }
 
 if (sendHandlerMatch[0].includes("runVisibleAgent(\"codex-readonly\"")) {
@@ -997,9 +997,9 @@ if (codexLeadFunctionBody.includes("Waiting for readable stream output")) {
 for (const prepNeedle of [
   "await updateCodexLeadPreparationStatus(\"Codex Lead recording orchestration\"",
   "await updateCodexLeadPreparationStatus(\"Codex Lead orchestration recorded\"",
-  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory running\"",
-  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory recorded\"",
-  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi assist running\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes inventory running\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes inventory recorded\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes assist running\"",
   "timeoutMs: codexLeadAssistTimeoutMs",
   "await updateCodexLeadPreparationStatus(\"Codex Lead stream handoff\"",
 ]) {
@@ -1009,12 +1009,12 @@ for (const prepNeedle of [
 }
 
 if (!frontendSource.includes("const codexLeadAssistTimeoutMs = 15000")) {
-  throw new Error("Run Dual must use an explicit shorter renderer-side Hermes/Kimi assist timeout.");
+  throw new Error("Run Dual must use an explicit shorter renderer-side Hermes assist timeout.");
 }
 
 const assistBriefFunctionMatch = frontendSource.match(/async function recordHermesKimiAssistBrief\(\{[\s\S]*?\n\}/);
 if (!assistBriefFunctionMatch?.[0]?.includes("timeoutMs = 15000") || !assistBriefFunctionMatch[0].includes("timeout_ms: timeoutMs")) {
-  throw new Error("Hermes/Kimi assist helper must accept and forward an explicit timeoutMs value.");
+  throw new Error("Hermes assist helper must accept and forward an explicit timeoutMs value.");
 }
 
 if (!codexLeadFunctionBody.includes("createCodexLeadOrchestrationRecord(prompt)")) {
@@ -1026,23 +1026,23 @@ if (codexLeadFunctionBody.indexOf("createCodexLeadOrchestrationRecord(prompt)") 
 }
 
 if (!codexLeadFunctionBody.includes("recordHermesKimiCapabilityInventory(prompt)")) {
-  throw new Error("Run Dual must record a current Hermes/Kimi capability inventory before starting the stream.");
+  throw new Error("Run Dual must record a current Hermes capability inventory before starting the stream.");
 }
 
 if (codexLeadFunctionBody.indexOf("recordHermesKimiCapabilityInventory(prompt)") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
-  throw new Error("Hermes/Kimi capability inventory evidence must be created before the responsive stream starts.");
+  throw new Error("Hermes capability inventory evidence must be created before the responsive stream starts.");
 }
 
 if (!codexLeadFunctionBody.includes("recordHermesKimiAssistBrief({") || !codexLeadFunctionBody.includes("timeoutMs: codexLeadAssistTimeoutMs")) {
-  throw new Error("Run Dual must run a bounded Hermes/Kimi assist brief before starting the stream.");
+  throw new Error("Run Dual must run a bounded Hermes assist brief before starting the stream.");
 }
 
 if (codexLeadFunctionBody.indexOf("recordHermesKimiAssistBrief({") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
-  throw new Error("Hermes/Kimi assist evidence must be created before the responsive Codex stream starts.");
+  throw new Error("Hermes assist evidence must be created before the responsive Codex stream starts.");
 }
 
 if (!codexLeadFunctionBody.includes("codexLeadStreamingPrompt({ prompt, orchestration, hermesInventory, hermesAssist })")) {
-  throw new Error("Codex Lead stream prompt must include orchestration, Hermes/Kimi inventory, and Hermes/Kimi assist summaries.");
+  throw new Error("Codex Lead stream prompt must include orchestration, Hermes inventory, and Hermes assist summaries.");
 }
 
 const visibleAgentFunctionMatch = frontendSource.match(/const runVisibleAgent = async \(runtime, label\) => \{[\s\S]*?\n  \};\n\n  codexBtn/);
@@ -3033,7 +3033,7 @@ for (const runtimeDepthNeedle of [
   "hermes_kimi_assist_brief_recorded",
   "hermes_assist_is_postmortem",
   "hermes-kimi-assist-postmortem",
-  "Latest failed/timed-out Hermes/Kimi assist brief",
+  "Latest failed/timed-out Hermes assist brief",
   "compact_hermes_kimi_assist_query",
   "run_hermes_kimi_assist_process",
   "push_product_evidence_history_dir(&mut items, \"hermes-assist\"",

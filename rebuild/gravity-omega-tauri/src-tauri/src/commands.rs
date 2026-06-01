@@ -1666,7 +1666,7 @@ fn hermes_log_write_preflight(target: &UnlockedAgentPromptTarget) -> Result<(), 
     let log_dir = hermes_home.join("logs");
     fs::create_dir_all(&log_dir).map_err(|error| {
         format!(
-            "Hermes/Kimi log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes/Kimi.",
+            "Hermes log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes.",
             log_dir.display()
         )
     })?;
@@ -1684,7 +1684,7 @@ fn hermes_log_write_preflight(target: &UnlockedAgentPromptTarget) -> Result<(), 
         })
         .map_err(|error| {
             format!(
-                "Hermes/Kimi log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes/Kimi.",
+                "Hermes log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes.",
                 log_dir.display()
             )
         })?;
@@ -34396,13 +34396,13 @@ fn runtime_sidecar_process_targets() -> Vec<RuntimeSidecarProcessTarget> {
         },
         RuntimeSidecarProcessTarget {
             target_id: "hermes-gateway",
-            title: "Hermes/Kimi gateway",
+            title: "Hermes gateway",
             target_family: "hermes_kimi",
             expected_pattern: "hermes_cli.main gateway",
-            required_for: "Hermes/Kimi assist briefs, secondary analysis, skill inventory, and Codex delegation context.",
+            required_for: "Hermes assist briefs, secondary analysis, skill inventory, and Codex delegation context.",
             needles: vec!["hermes_cli.main", "gateway"],
             required: true,
-            next_action: "Use this as the Kimi-backed secondary lane while keeping writes owned by Codex Lead.",
+            next_action: "Use this as the model-agnostic Hermes secondary lane while keeping writes owned by Codex Lead.",
         },
         RuntimeSidecarProcessTarget {
             target_id: "hermes-dashboard",
@@ -35167,12 +35167,12 @@ fn runtime_depth_path_probes() -> Vec<RuntimeDepthPathProbe> {
         runtime_depth_path_probe("hermes-home", "Hermes home", hermes_home_for_preflight()),
         runtime_depth_path_probe(
             "hermes-config",
-            "Hermes/Kimi config metadata",
+            "Hermes config metadata",
             hermes_home_for_preflight().join("config.yaml"),
         ),
         runtime_depth_path_probe(
             "hermes-logs",
-            "Hermes/Kimi log directory",
+            "Hermes log directory",
             hermes_home_for_preflight().join("logs"),
         ),
         runtime_depth_path_probe(
@@ -35406,17 +35406,17 @@ fn runtime_depth_hermes_capability_probes() -> Vec<RuntimeDepthHermesCapabilityP
     vec![
         run_runtime_depth_hermes_capability_probe(
             "hermes-skills",
-            "Hermes/Kimi installed skills",
+            "Hermes installed skills",
             &["skills", "list"],
         ),
         run_runtime_depth_hermes_capability_probe(
             "hermes-mcp",
-            "Hermes/Kimi MCP servers",
+            "Hermes MCP servers",
             &["mcp", "list"],
         ),
         run_runtime_depth_hermes_capability_probe(
             "hermes-hooks",
-            "Hermes/Kimi hook allowlist",
+            "Hermes hook allowlist",
             &["hooks", "list"],
         ),
     ]
@@ -35514,7 +35514,7 @@ pub fn run_runtime_depth_probe(
     let mut blockers = board.blockers.clone();
     if !hermes_log_writable {
         blockers.push(format!(
-            "Hermes/Kimi log write preflight failed: {}",
+            "Hermes log write preflight failed: {}",
             hermes_log_preflight_error
                 .clone()
                 .unwrap_or_else(|| "unknown Hermes log write error".to_string())
@@ -35527,7 +35527,7 @@ pub fn run_runtime_depth_probe(
         blockers.push("Omega Stenographer metadata is incomplete; keep Steno memory writes disabled until home, db, and MCP server metadata exist.".to_string());
     }
     if hermes_skill_count == 0 || hermes_mcp_server_count == 0 || hermes_hook_count == 0 {
-        blockers.push("Hermes/Kimi capability probes did not produce complete skills, MCP, and hook counts; keep delegation skill-aware but evidence-gated.".to_string());
+        blockers.push("Hermes capability probes did not produce complete skills, MCP, and hook counts; keep delegation skill-aware but evidence-gated.".to_string());
     }
     if !pet_metadata_ready {
         blockers.push("Pet companion metadata is incomplete; keep pet runtime behavior informational until CodePet state and Verity manifest metadata exist.".to_string());
@@ -35801,16 +35801,16 @@ fn build_codex_lead_delegations(
         ),
         codex_lead_delegation_lane(
             "hermes-kimi-skill-pass",
-            "Hermes/Kimi skill-aware assist",
-            "Hermes/Kimi Assist",
+            "Hermes skill-aware assist",
+            "Hermes Assist",
             "secondary reviewer and subtask adviser",
-            "Use the local Hermes Kimi-backed skill, toolset, MCP, hook, and worktree awareness to critique the plan, suggest narrow subtasks, and flag missing tests.",
+            "Use the local Hermes-backed skill, toolset, MCP, hook, and worktree awareness to critique the plan, suggest narrow subtasks, and flag missing tests.",
             &["software-development", "veritas", "sswp-registry", "research"],
             &["omega-brain", "omega-stenographer", "sswp"],
             &["Hermes skill count", "Hermes MCP count", "Hermes hook count", "assist summary in Omega Agent Work"],
             "read-only assist; Codex owns final writes",
             hermes_status,
-            "Ask Hermes/Kimi for compact assist when the request benefits from reviewer, research, or skill-map context.",
+            "Ask Hermes for compact assist when the request benefits from reviewer, research, or skill-map context.",
         ),
         codex_lead_delegation_lane(
             "codex-implementation-and-tests",
@@ -35823,12 +35823,12 @@ fn build_codex_lead_delegations(
             &["changed files list", "command evidence", "diff inspection", "build or test result"],
             "scoped implementation files only",
             "codex_owned_ready",
-            "Codex performs the work and verification; Hermes/Kimi remains assist unless explicitly promoted.",
+            "Codex performs the work and verification; Hermes remains assist unless explicitly promoted.",
         ),
         codex_lead_delegation_lane(
             "sswp-steno-evidence",
             "SSWP and Stenographer evidence lane",
-            "Hermes/Kimi Assist",
+            "Hermes Assist",
             "memory and witness adviser",
             "Prepare SSWP/Steno witness prompts, memory summaries, and evidence handoff notes without live writes unless the run has explicit approval.",
             &["sswp-registry", "veritas/omega-strike-deep"],
@@ -35917,7 +35917,7 @@ pub fn create_codex_lead_orchestration_record(
         .count();
     let hermes_assist_count = delegations
         .iter()
-        .filter(|lane| lane.owner == "Hermes/Kimi Assist")
+        .filter(|lane| lane.owner == "Hermes Assist")
         .count();
 
     let mut blockers = Vec::new();
@@ -35925,13 +35925,13 @@ pub fn create_codex_lead_orchestration_record(
         blockers.push("Codex runtime is not ready in the latest runtime-depth evidence.".to_string());
     }
     if !hermes_runtime_ready {
-        blockers.push("Hermes/Kimi runtime is not ready in the latest runtime-depth evidence.".to_string());
+        blockers.push("Hermes runtime is not ready in the latest runtime-depth evidence.".to_string());
     }
     if !hermes_has_inventory {
-        blockers.push("Hermes/Kimi skills, MCP servers, and hooks are not all counted yet; keep assist compact and evidence-gated.".to_string());
+        blockers.push("Hermes skills, MCP servers, and hooks are not all counted yet; keep assist compact and evidence-gated.".to_string());
     }
     if !hermes_log_writable {
-        blockers.push("Hermes/Kimi log write preflight is not writable for this app process.".to_string());
+        blockers.push("Hermes log write preflight is not writable for this app process.".to_string());
     }
     if !mcp_metadata_ready {
         blockers.push("MCP metadata is incomplete; keep live MCP calls disabled.".to_string());
@@ -35982,7 +35982,7 @@ pub fn create_codex_lead_orchestration_record(
         task_run_id,
         prompt_preview,
         stream_runtime: "codex-workspace-write".to_string(),
-        hermes_lane_runtime: "hermes-chat-kimi".to_string(),
+        hermes_lane_runtime: "hermes-chat".to_string(),
         runtime_depth_record_id,
         runtime_depth_record_path,
         hermes_skill_count,
@@ -36012,7 +36012,7 @@ pub fn create_codex_lead_orchestration_record(
         log_path: log_path_display.clone(),
         delegations,
         blockers,
-        next_step: "Attach this record path to the responsive Codex Lead stream. Codex remains final owner; Hermes/Kimi is a compact secondary assist lane; SSWP, Steno, pet, and live MCP behavior stay evidence-gated until their runtime-depth records are clean.".to_string(),
+        next_step: "Attach this record path to the responsive Codex Lead stream. Codex remains final owner; Hermes is a compact secondary assist lane; SSWP, Steno, pet, and live MCP behavior stay evidence-gated until their runtime-depth records are clean.".to_string(),
     };
 
     let json = serde_json::to_string_pretty(&record)
@@ -36181,12 +36181,12 @@ fn collect_hermes_kimi_skill_metadata(
     }
     for entry in fs::read_dir(current).map_err(|error| {
         format!(
-            "failed to read Hermes/Kimi skill metadata directory {}: {error}",
+            "failed to read Hermes skill metadata directory {}: {error}",
             current.display()
         )
     })? {
         let entry =
-            entry.map_err(|error| format!("failed to read Hermes/Kimi skill entry: {error}"))?;
+            entry.map_err(|error| format!("failed to read Hermes skill entry: {error}"))?;
         let path = entry.path();
         let path_text = path.display().to_string();
         if path_text.contains("/.archive/") {
@@ -36468,7 +36468,7 @@ pub fn record_hermes_kimi_capability_inventory(
         blockers.push("No Hermes SKILL.md metadata files were found under the Hermes skills directory.".to_string());
     }
     if focus_skills.is_empty() {
-        blockers.push("No prompt-focused Hermes/Kimi skills could be selected from the metadata inventory.".to_string());
+        blockers.push("No prompt-focused Hermes skills could be selected from the metadata inventory.".to_string());
     }
 
     let status = if blockers.is_empty() {
@@ -36538,14 +36538,14 @@ pub fn record_hermes_kimi_capability_inventory(
         record_path: record_path_display.clone(),
         log_path: log_path_display.clone(),
         blockers,
-        next_step: "Attach this current Hermes/Kimi inventory to the Codex Lead stream so Codex can delegate compact reviewer/research subtasks while keeping Hermes-owned writes, live MCP calls, and execution disabled.".to_string(),
+        next_step: "Attach this current Hermes inventory to the Codex Lead stream so Codex can delegate compact reviewer/research subtasks while keeping Hermes-owned writes, live MCP calls, and execution disabled.".to_string(),
     };
 
     let json = serde_json::to_string_pretty(&record)
-        .map_err(|error| format!("failed to serialize Hermes/Kimi inventory: {error}"))?;
+        .map_err(|error| format!("failed to serialize Hermes inventory: {error}"))?;
     fs::write(&record_path, json).map_err(|error| {
         format!(
-            "failed to write Hermes/Kimi capability inventory {}: {error}",
+            "failed to write Hermes capability inventory {}: {error}",
             record_path.display()
         )
     })?;
@@ -36590,7 +36590,7 @@ pub fn list_hermes_kimi_capability_inventories(
         )
     })? {
         let entry = entry.map_err(|error| {
-            format!("failed to read Hermes/Kimi inventory entry: {error}")
+            format!("failed to read Hermes inventory entry: {error}")
         })?;
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
@@ -36654,10 +36654,10 @@ fn compact_hermes_kimi_assist_query(
         hooks.join("; ")
     };
     [
-        "Gravity Omega Hermes/Kimi assist brief.",
+        "Gravity Omega Hermes assist brief.",
         "",
         "Role:",
-        "You are Hermes Agent backed by Kimi through the local Moonshot profile. You are the secondary reviewer and adviser for Codex Lead.",
+        "You are Hermes Agent using the active local Hermes model/profile. You are the secondary reviewer and adviser for Codex Lead.",
         "",
         "Strict boundaries:",
         "- Do not edit files.",
@@ -36675,10 +36675,10 @@ fn compact_hermes_kimi_assist_query(
         prompt_note,
         "",
         "Evidence context:",
-        inventory_record_path.unwrap_or("Hermes/Kimi inventory record not attached."),
+        inventory_record_path.unwrap_or("Hermes inventory record not attached."),
         orchestration_record_path.unwrap_or("Codex Lead orchestration record not attached."),
         "",
-        "Focused Hermes/Kimi skills:",
+        "Focused Hermes skills:",
         &focus_skill_text,
         "",
         "MCP awareness:",
@@ -36689,7 +36689,7 @@ fn compact_hermes_kimi_assist_query(
         "",
         "Return exactly four compact sections:",
         "1. Codex plan adjustments",
-        "2. Hermes/Kimi concerns",
+        "2. Hermes concerns",
         "3. Verification ideas",
         "4. Stop/skip conditions",
     ]
@@ -36997,12 +36997,12 @@ pub fn record_hermes_kimi_assist_brief(
     };
 
     if prompt_trimmed.is_empty() {
-        blockers.push("Prompt is empty; Hermes/Kimi assist brief was not started.".to_string());
+        blockers.push("Prompt is empty; Hermes assist brief was not started.".to_string());
         output.status = "hermes_kimi_assist_brief_rejected_empty_prompt".to_string();
     } else {
         let preflight_target = UnlockedAgentPromptTarget {
             runtime: "hermes-chat",
-            title: "Hermes/Kimi assist brief",
+            title: "Hermes assist brief",
             binary: "hermes",
             sandbox_policy: "hermes-cli",
             argv_redacted: Vec::new(),
@@ -37020,7 +37020,7 @@ pub fn record_hermes_kimi_assist_brief(
             output = run_hermes_kimi_assist_process(&compact_query, timeout_ms);
             if output.status != "hermes_kimi_assist_brief_succeeded" {
                 blockers.push(format!(
-                    "Hermes/Kimi assist brief status={} exit={:?}",
+                    "Hermes assist brief status={} exit={:?}",
                     output.status, output.exit_code
                 ));
             }
@@ -37030,14 +37030,14 @@ pub fn record_hermes_kimi_assist_brief(
     fs::write(&stdout_transcript_path, String::from_utf8_lossy(&output.stdout_bytes).as_ref())
         .map_err(|error| {
             format!(
-                "failed to write Hermes/Kimi assist stdout transcript {}: {error}",
+                "failed to write Hermes assist stdout transcript {}: {error}",
                 stdout_transcript_path.display()
             )
         })?;
     fs::write(&stderr_transcript_path, String::from_utf8_lossy(&output.stderr_bytes).as_ref())
         .map_err(|error| {
             format!(
-                "failed to write Hermes/Kimi assist stderr transcript {}: {error}",
+                "failed to write Hermes assist stderr transcript {}: {error}",
                 stderr_transcript_path.display()
             )
         })?;
@@ -37110,19 +37110,19 @@ pub fn record_hermes_kimi_assist_brief(
         log_path: log_path_display.clone(),
         blockers,
         reasons: vec![
-            "Hermes/Kimi runs as a bounded secondary assist lane for Codex Lead.".to_string(),
+            "Hermes runs as a bounded secondary assist lane for Codex Lead.".to_string(),
             "The full user prompt is compacted before becoming a Hermes --query argument.".to_string(),
-            "The query explicitly instructs Hermes/Kimi not to edit, patch, execute shell, call MCP tools, or write memory.".to_string(),
+            "The query explicitly instructs Hermes not to edit, patch, execute shell, call MCP tools, or write memory.".to_string(),
             "stdout and stderr are captured to durable transcripts for Codex review.".to_string(),
         ],
         next_step: "Attach this assist brief to the Codex Lead stream prompt; Codex remains responsible for implementation, verification, and final evidence.".to_string(),
     };
 
     let json = serde_json::to_string_pretty(&record)
-        .map_err(|error| format!("failed to serialize Hermes/Kimi assist brief: {error}"))?;
+        .map_err(|error| format!("failed to serialize Hermes assist brief: {error}"))?;
     fs::write(&record_path, json).map_err(|error| {
         format!(
-            "failed to write Hermes/Kimi assist brief {}: {error}",
+            "failed to write Hermes assist brief {}: {error}",
             record_path.display()
         )
     })?;
@@ -37181,7 +37181,7 @@ pub fn list_hermes_kimi_assist_briefs() -> Result<Vec<HermesKimiAssistBriefRecor
         )
     })? {
         let entry =
-            entry.map_err(|error| format!("failed to read Hermes/Kimi assist entry: {error}"))?;
+            entry.map_err(|error| format!("failed to read Hermes assist entry: {error}"))?;
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
@@ -39639,7 +39639,7 @@ pub fn run_unlocked_agent_prompt_session(
             execution_enabled: false,
             records: Vec::new(),
             blockers: vec![blocker],
-            next_step: "Fix the Hermes/Kimi writable log path or run the app outside the read-only wrapper, then retry Hermes/Kimi.".to_string(),
+            next_step: "Fix the Hermes writable log path or run the app outside the read-only wrapper, then retry Hermes.".to_string(),
         });
     }
 
@@ -40140,7 +40140,7 @@ pub fn run_unlocked_agent_prompt_session_stream(
             execution_enabled: false,
             created_at_ms: timestamp,
             blockers: vec![blocker],
-            next_step: "Fix the Hermes/Kimi writable log path or run the app outside the read-only wrapper, then retry Hermes/Kimi.".to_string(),
+            next_step: "Fix the Hermes writable log path or run the app outside the read-only wrapper, then retry Hermes.".to_string(),
         });
     }
 
@@ -44967,8 +44967,8 @@ fn omega_computer_roles() -> Vec<OmegaComputerRole> {
         },
         OmegaComputerRole {
             id: "hermes-kimi-assist".to_string(),
-            title: "Hermes/Kimi Assist".to_string(),
-            runtime: "hermes chat -Q via Moonshot/Kimi".to_string(),
+            title: "Hermes Assist".to_string(),
+            runtime: "hermes chat -Q via active Hermes profile".to_string(),
             responsibility: "Provide secondary planning, skill-aware decomposition, risk review, and implementation critique from the local Hermes agent inventory.".to_string(),
             autonomy: "delegated-assist".to_string(),
             enabled: true,
@@ -44980,10 +44980,10 @@ fn omega_computer_roles() -> Vec<OmegaComputerRole> {
                 "review-only guidance".to_string(),
             ],
             evidence_required: vec![
-                "Hermes/Kimi inventory or assist record when invoked".to_string(),
+                "Hermes inventory or assist record when invoked".to_string(),
                 "delegation summary in Omega Agent Work".to_string(),
             ],
-            next_step: "Let Codex Lead delegate bounded questions to Hermes/Kimi, then reconcile before any write path runs.".to_string(),
+            next_step: "Let Codex Lead delegate bounded questions to Hermes, then reconcile before any write path runs.".to_string(),
         },
         OmegaComputerRole {
             id: "workspace-specialist".to_string(),
@@ -45088,7 +45088,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             task_log: vec![
                 "Accept prompt from the Omega chat composer.".to_string(),
                 "Create the top-level plan and preserve Agent Operating Doctrine.".to_string(),
-                "Dispatch specialist questions to Hermes/Kimi-backed lanes.".to_string(),
+                "Dispatch specialist questions to Hermes-backed lanes.".to_string(),
                 "Reconcile evidence before any final report.".to_string(),
             ],
             handoff_targets: vec![
@@ -45111,17 +45111,17 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
         },
         OmegaComputerWorker {
             id_badge: "HK-01".to_string(),
-            name: "Hermes/Kimi Router".to_string(),
+            name: "Hermes Router".to_string(),
             specialty: "skill-aware delegation and critique".to_string(),
-            runtime_lane: "hermes-chat-kimi".to_string(),
+            runtime_lane: "hermes-chat".to_string(),
             status: "assist_lane_ready".to_string(),
             progress_percent: 28,
             progress_label: "standing by".to_string(),
             selected_by_default: false,
-            screen_title: "Hermes/Kimi dispatch".to_string(),
+            screen_title: "Hermes dispatch".to_string(),
             current_task: "Prepare compact assist briefs and route specialist review without direct writes.".to_string(),
             task_log: vec![
-                "Use local Hermes as the Kimi-backed lane.".to_string(),
+                "Use local Hermes with its active model/profile.".to_string(),
                 "Prefer compact prompts and review-only outputs.".to_string(),
                 "Return findings to Codex Lead for reconciliation.".to_string(),
             ],
@@ -45131,7 +45131,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
                 "UX-08".to_string(),
             ],
             evidence_required: vec![
-                "Hermes/Kimi assist brief".to_string(),
+                "Hermes assist brief".to_string(),
                 "capability inventory".to_string(),
             ],
             blocked_actions: vec![
@@ -45146,7 +45146,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             id_badge: "DR-01".to_string(),
             name: "Deep Research".to_string(),
             specialty: "broad source discovery and context gathering".to_string(),
-            runtime_lane: "Hermes/Kimi assist".to_string(),
+            runtime_lane: "Hermes assist".to_string(),
             status: "ready_to_dispatch".to_string(),
             progress_percent: 18,
             progress_label: "queued".to_string(),
@@ -45169,7 +45169,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             id_badge: "RA-02".to_string(),
             name: "Research Analysis".to_string(),
             specialty: "synthesis, tradeoffs, and decision support".to_string(),
-            runtime_lane: "Hermes/Kimi assist".to_string(),
+            runtime_lane: "Hermes assist".to_string(),
             status: "ready_to_dispatch".to_string(),
             progress_percent: 16,
             progress_label: "queued".to_string(),
@@ -45192,7 +45192,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             id_badge: "WA-03".to_string(),
             name: "Writing Analysis".to_string(),
             specialty: "operator-readable summaries and artifact wording".to_string(),
-            runtime_lane: "Hermes/Kimi assist".to_string(),
+            runtime_lane: "Hermes assist".to_string(),
             status: "ready_to_dispatch".to_string(),
             progress_percent: 14,
             progress_label: "queued".to_string(),
@@ -45340,7 +45340,7 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
                 "current prompt".to_string(),
                 "active editor snapshot".to_string(),
                 "existing evidence records".to_string(),
-                "declared Hermes/Kimi capability inventory".to_string(),
+                "declared Hermes capability inventory".to_string(),
             ],
             blocked_actions: vec![
                 "live screenshot capture".to_string(),
@@ -45358,7 +45358,7 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
             allowed_inputs: vec![
                 "doctrine".to_string(),
                 "todo review".to_string(),
-                "Hermes/Kimi skill map".to_string(),
+                "Hermes skill map".to_string(),
             ],
             blocked_actions: vec![
                 "process spawn from this packet".to_string(),
@@ -45370,10 +45370,10 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
         OmegaComputerStage {
             id: "delegate".to_string(),
             title: "Delegate".to_string(),
-            owner: "Codex Lead + Hermes/Kimi".to_string(),
+            owner: "Codex Lead + Hermes".to_string(),
             status: "ready".to_string(),
             allowed_inputs: vec![
-                "compact Hermes/Kimi assist query".to_string(),
+                "compact Hermes assist query".to_string(),
                 "skill names and tool categories".to_string(),
                 "review focus".to_string(),
             ],
@@ -45381,8 +45381,8 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
                 "Hermes direct writes".to_string(),
                 "Hermes shell/tool execution from this packet".to_string(),
             ],
-            evidence: "Hermes/Kimi can assist through existing bounded inventory/assist records while Codex remains lead.".to_string(),
-            next_step: "Attach Hermes/Kimi brief evidence to the Codex Lead run before final reconciliation.".to_string(),
+            evidence: "Hermes can assist through existing bounded inventory/assist records while Codex remains lead.".to_string(),
+            next_step: "Attach Hermes brief evidence to the Codex Lead run before final reconciliation.".to_string(),
         },
         OmegaComputerStage {
             id: "act".to_string(),
@@ -45515,7 +45515,7 @@ pub fn record_omega_computer_session(
             "Live screenshot capture, OCR, pointer/keyboard injection, and target-window control require explicit approval records plus deferred QA.".to_string(),
             "Terminal/process execution, file writes, patches, exports, live MCP calls, and memory writes stay in their existing explicit lanes.".to_string(),
         ],
-        next_step: "Use this toolbar function as the main Omega-native computer workflow entrypoint: Codex Lead opens the swarm terminal, specialist agents become inspectable by ID badge, Hermes/Kimi assists from capability records, and live action stays behind separate verified gates.".to_string(),
+        next_step: "Use this toolbar function as the main Omega-native computer workflow entrypoint: Codex Lead opens the swarm terminal, specialist agents become inspectable by ID badge, Hermes assists from capability records, and live action stays behind separate verified gates.".to_string(),
     };
     fs::write(
         &record_path,
@@ -46713,7 +46713,7 @@ fn product_evidence_title_detail(
             let mcp = json_u64(value, "mcp_server_count").unwrap_or(0);
             let hooks = json_u64(value, "hook_count").unwrap_or(0);
             (
-                "Hermes/Kimi capability inventory".to_string(),
+                "Hermes capability inventory".to_string(),
                 format!("enabled_skills={skills}; filesystem_skills={files}; mcp={mcp}; hooks={hooks}; execution_disabled=true"),
             )
         }
@@ -46726,7 +46726,7 @@ fn product_evidence_title_detail(
             let duration = json_u64(value, "duration_ms").unwrap_or(0);
             let stdout = json_u64(value, "stdout_size_bytes").unwrap_or(0);
             (
-                "Hermes/Kimi assist brief".to_string(),
+                "Hermes assist brief".to_string(),
                 format!("{status}; exit={exit_code}; duration={duration}ms; stdout={stdout}b; writes_disabled=true"),
             )
         }
@@ -97110,7 +97110,7 @@ fn hermes_inventory_run_view_summary(
     };
     codex_hermes_run_view_evidence_summary(
         "hermes-kimi-inventory",
-        "Latest Hermes/Kimi capability inventory",
+        "Latest Hermes capability inventory",
         record.id.clone(),
         record.status.clone(),
         record.record_path.clone(),
@@ -97415,7 +97415,7 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         evidence_summaries.push(hermes_assist_run_view_summary(
             record,
             "hermes-kimi-assist-postmortem",
-            "Latest failed/timed-out Hermes/Kimi assist brief",
+            "Latest failed/timed-out Hermes assist brief",
         ));
     }
     if let Some(record) = hermes_assists.first() {
@@ -97426,7 +97426,7 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
             evidence_summaries.push(hermes_assist_run_view_summary(
                 record,
                 "hermes-kimi-assist",
-                "Latest Hermes/Kimi assist brief",
+                "Latest Hermes assist brief",
             ));
         }
     }
@@ -97604,11 +97604,11 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         reasons: vec![
             "run view dashboard groups existing Codex/Hermes evidence ledgers into one operator surface",
             "failed and timed-out unlocked agent sessions are promoted as postmortem evidence before generic ledgers",
-            "latest Codex Lead orchestration, Hermes/Kimi inventory, and Hermes/Kimi assist records are surfaced as read-only evidence summaries when present",
+            "latest Codex Lead orchestration, Hermes inventory, and Hermes assist records are surfaced as read-only evidence summaries when present",
             "dashboard reads existing records only and creates no task, approval, runner, joint plan, artifact, transcript, export, protection, or event records",
             "process spawn, terminal control, live MCP calls, writes, patches, desktop control, capture, export, memory writes, and execution remain disabled",
         ],
-        next_slice: "Use these visible run summaries to deepen Hermes/Kimi execution robustness, PTY/process maturity, live MCP/SSWP/Steno behavior, and pet runtime linkage while keeping unsafe live gates explicit.",
+        next_slice: "Use these visible run summaries to deepen Hermes execution robustness, PTY/process maturity, live MCP/SSWP/Steno behavior, and pet runtime linkage while keeping unsafe live gates explicit.",
     })
 }
 
@@ -98693,7 +98693,7 @@ pub fn codex_hermes_run_evidence_diff_board(
             "failure_postmortem_count",
             run_view.agent_session_failure_count,
             run_view.hermes_assist_failure_count,
-            "Compare Codex agent failures against Hermes/Kimi assist failures before retrying or delegating.",
+            "Compare Codex agent failures against Hermes assist failures before retrying or delegating.",
         ),
         codex_hermes_run_evidence_diff_item(
             "postmortem-timeouts",
@@ -98701,7 +98701,7 @@ pub fn codex_hermes_run_evidence_diff_board(
             "timeout_postmortem_count",
             run_view.agent_session_timeout_count,
             run_view.hermes_assist_timeout_count,
-            "Compare timeout pressure across Codex and Hermes/Kimi before launching another long run.",
+            "Compare timeout pressure across Codex and Hermes before launching another long run.",
         ),
     ];
 
@@ -101092,7 +101092,7 @@ fn pet_runtime_attention_items(
             "hermes-kimi-postmortem",
             "warning",
             "warning",
-            "Hermes/Kimi assist postmortem needs review",
+            "Hermes assist postmortem needs review",
             format!(
                 "{}; timed_out={}; exit={:?}; duration={}ms; blocker={}",
                 record.status, record.timed_out, record.exit_code, record.duration_ms, blocker
@@ -101938,7 +101938,7 @@ fn steno_postmortem_result_from_hermes(
     );
 
     StenoSearchResult {
-        title: "Hermes/Kimi assist postmortem".to_string(),
+        title: "Hermes assist postmortem".to_string(),
         category: "hermes-assist-postmortem".to_string(),
         record_path: record.record_path.clone(),
         snippet,
@@ -102038,7 +102038,7 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         sections: dashboard.sections,
         reasons: vec![
             "panel searches only approved Gravity Omega evidence and transcript record directories",
-            "panel surfaces recent Codex agent and Hermes/Kimi assist postmortems before query results without launching either runtime",
+            "panel surfaces recent Codex agent and Hermes assist postmortems before query results without launching either runtime",
             "panel creates no records and never reads old Electron .sswp files",
             "capture, export, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
         ],
@@ -114865,7 +114865,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
     #[test]
     fn sovereign_docs_preview_records_self_contained_html_without_export_gates() {
         let _test_env_guard = test_env_lock();
-        let markdown = "# Gravity Omega Brief\n\n- Codex Lead\n- Hermes/Kimi assist\n\n```txt\nsealed evidence\n```\n";
+        let markdown = "# Gravity Omega Brief\n\n- Codex Lead\n- Hermes assist\n\n```txt\nsealed evidence\n```\n";
         let record = record_sovereign_docs_preview(SovereignDocsPreviewRequest {
             source_path: "Omega Agent Work.md".to_string(),
             markdown: markdown.to_string(),
@@ -114911,7 +114911,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         let _test_env_guard = test_env_lock();
         let record = record_omega_computer_session(OmegaComputerSessionRequest {
             prompt_preview: Some(
-                "Use Codex as lead, delegate bounded review to Hermes/Kimi, and verify before reporting."
+                "Use Codex as lead, delegate bounded review to Hermes, and verify before reporting."
                     .to_string(),
             ),
             requested_by: Some("rust-test".to_string()),
@@ -114937,7 +114937,9 @@ printf 'agent transcript dashboard stderr ready\n' >&2
             role.id == "codex-lead" && role.autonomy == "primary" && !role.can_execute
         }));
         assert!(record.roles.iter().any(|role| {
-            role.id == "hermes-kimi-assist" && role.runtime.contains("Kimi") && !role.can_execute
+            role.id == "hermes-kimi-assist"
+                && role.runtime.contains("active Hermes profile")
+                && !role.can_execute
         }));
         assert!(record.workers.iter().any(|worker| {
             worker.id_badge == "DR-01"
@@ -115252,7 +115254,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         assert_eq!(omega_computer.capability_tier, "safe");
         assert!(omega_computer
             .unavailable_reason
-            .contains("Codex Lead + Hermes/Kimi"));
+            .contains("Codex Lead + Hermes"));
 
         for command_id in [
             "agent.hermes_companion",
@@ -115851,7 +115853,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
             &["omega-brain (enabled, tools=all)".to_string()],
             &["PreToolUse: timeout=30".to_string()],
         );
-        assert!(assist_query.contains("Gravity Omega Hermes/Kimi assist brief."));
+        assert!(assist_query.contains("Gravity Omega Hermes assist brief."));
         assert!(assist_query.contains("Do not edit files."));
         assert!(assist_query.contains("Do not run shell commands or call tools."));
         assert!(assist_query.contains("software-development/plan"));
@@ -115949,7 +115951,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         );
         assert!(delegations.iter().any(|lane| {
             lane.id == "hermes-kimi-skill-pass"
-                && lane.owner == "Hermes/Kimi Assist"
+                && lane.owner == "Hermes Assist"
                 && lane.status == "assist_lane_ready_for_codex_prompt"
                 && !lane.execution_enabled
                 && !lane.live_mcp_call_enabled
@@ -119213,7 +119215,7 @@ sleep 2
             task_run_id: Some(stub.id.clone()),
             prompt_preview: "test run view evidence".to_string(),
             stream_runtime: "codex-workspace-write".to_string(),
-            hermes_lane_runtime: "hermes-chat-kimi".to_string(),
+            hermes_lane_runtime: "hermes-chat".to_string(),
             runtime_depth_record_id: Some("runtime-depth-test".to_string()),
             runtime_depth_record_path: Some("/tmp/runtime-depth-test.json".to_string()),
             hermes_skill_count: 12,
@@ -119414,7 +119416,7 @@ sleep 2
         let failed_assist_stderr_path =
             assist_dir.join("run-view-evidence-assist-timeout.stderr.txt");
         let failed_assist_stdout = "Hermes started reviewing but did not finish.".to_string();
-        let failed_assist_stderr = "Hermes/Kimi assist timed out before final answer.".to_string();
+        let failed_assist_stderr = "Hermes assist timed out before final answer.".to_string();
         let failed_assist_record = HermesKimiAssistBriefRecord {
             id: "run-view-evidence-assist-timeout".to_string(),
             status: "hermes_kimi_assist_brief_timed_out".to_string(),
@@ -119429,9 +119431,9 @@ sleep 2
             stderr_transcript_path: failed_assist_stderr_path.display().to_string(),
             record_path: failed_assist_path.display().to_string(),
             log_path: failed_assist_log_path.display().to_string(),
-            blockers: vec!["Hermes/Kimi assist timed out before final answer.".to_string()],
+            blockers: vec!["Hermes assist timed out before final answer.".to_string()],
             created_at_ms: now_ms().expect("clock") + 11,
-            next_step: "Show this Hermes/Kimi timeout before retrying assist delegation.".to_string(),
+            next_step: "Show this Hermes timeout before retrying assist delegation.".to_string(),
             ..assist_record.clone()
         };
         fs::write(
@@ -119688,7 +119690,7 @@ sleep 2
         assert!(run_view.evidence_summaries.iter().any(|summary| {
             summary.source_id == "hermes-kimi-assist-postmortem"
                 && summary.record_id == "run-view-evidence-assist-timeout"
-                && summary.title == "Latest failed/timed-out Hermes/Kimi assist brief"
+                && summary.title == "Latest failed/timed-out Hermes assist brief"
                 && summary.primary_metric.contains("timeout=true")
                 && summary.transcript_evidence_ready
                 && summary.stdout_transcript_found
