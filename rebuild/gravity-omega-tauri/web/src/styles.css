@@ -3908,7 +3908,7 @@ textarea:focus-visible,
 }
 
 #omega-product-shell.omega-calm-mode .omega-chat-actions {
-  grid-template-columns: 0.8fr 1fr 0.9fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 #omega-product-shell.omega-calm-mode .omega-chat-messages {
@@ -4319,7 +4319,7 @@ textarea:focus-visible,
 
 .omega-chat-actions {
   display: grid;
-  grid-template-columns: 0.75fr 1fr 0.85fr 0.9fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -4343,6 +4343,7 @@ textarea:focus-visible,
 }
 
 #omega-parity-send {
+  grid-column: 1 / -1;
   border-color: rgba(212, 168, 67, 0.58);
   background: rgba(212, 168, 67, 0.16);
   color: var(--gold-bright);
@@ -4358,6 +4359,23 @@ textarea:focus-visible,
 
 #omega-parity-compare {
   border-color: rgba(212, 168, 67, 0.35);
+}
+
+#omega-parity-recover {
+  border-color: rgba(244, 139, 92, 0.38);
+  color: #e6b28a;
+}
+
+#omega-parity-recover:not(:disabled):hover,
+#omega-parity-recover:not(:disabled):focus-visible {
+  border-color: rgba(244, 139, 92, 0.8);
+  background: rgba(244, 139, 92, 0.14);
+  color: #ffd6ba;
+}
+
+#omega-parity-recover:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 #omega-parity-composer-status {

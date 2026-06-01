@@ -448,6 +448,7 @@ for (const productShellNeedle of [
   "omega-parity-codex-write",
   "omega-parity-hermes",
   "omega-parity-compare",
+  "omega-parity-recover",
   "omega-agent-mode-row",
   "data-agent-run-mode=\"codex-lead\"",
   "data-agent-run-mode=\"evidence-compare\"",
@@ -457,6 +458,7 @@ for (const productShellNeedle of [
   "Codex Only",
   "Hermes Only",
   "Run Dual",
+  "Recover",
   "Workbench ready. Ask Omega, Codex, or Hermes from the right rail.",
   "omega-bottom-panel",
 ]) {
@@ -584,6 +586,12 @@ for (const productBridgeNeedle of [
   "timeout_ms: 900000",
   "runAgentComparison",
   "runPrimaryAgentWork",
+  "recoverAgentRunUi",
+  "ignoredAgentStreamIds",
+  "Run Recovery Requested",
+  "backend_process_cancellation=not_exposed",
+  "Backend process cancellation is not exposed",
+  "Late events from this recovered session will be ignored by the UI.",
   "createComparisonSummary",
   "compareExistingAgentEvidence",
   "isAgentRunStatusFollowup",
@@ -923,6 +931,18 @@ if (!frontendSource.includes("Omega Agent Work is still being updated in Monaco.
   throw new Error("Agent run watchdog must update the visible chat answer when a stream goes quiet.");
 }
 
+if (!frontendSource.includes("const recoverAgentRunUi = () => {") || !frontendSource.includes("recoverBtn?.addEventListener(\"click\"")) {
+  throw new Error("Agent runs must expose an operator recovery control for wedged visible run state.");
+}
+
+if (!frontendSource.includes("ignoredAgentStreamIds.has(payload.session_id)") || !frontendSource.includes("rememberIgnoredAgentStreamId(snapshot.sessionId)")) {
+  throw new Error("Recovered agent streams must be ignored so stale lifecycle events cannot resurrect old run state.");
+}
+
+if (!frontendSource.includes("backend_process_cancellation=not_exposed") || !frontendSource.includes("This is not a backend kill")) {
+  throw new Error("Agent run recovery must be honest that it resets the UI gate without claiming backend process cancellation.");
+}
+
 if (!frontendSource.includes("agentRunFinalSummaryText({ label, runtime, payload, readback, loaded })")) {
   throw new Error("Agent stream completion must replace the running chat bubble with a final evidence summary.");
 }
@@ -1128,6 +1148,7 @@ for (const productStyleNeedle of [
   ".omega-replace-row",
   ".omega-search-mode-row",
   ".omega-workspace-search-status",
+  "#omega-parity-recover",
   ".omega-first-class-dashboard",
   ".omega-dashboard-header",
   ".omega-first-class-dashboard-list",

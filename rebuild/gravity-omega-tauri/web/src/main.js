@@ -25424,6 +25424,7 @@ function initOmegaProductShell() {
   const codexBtn = document.querySelector("#omega-parity-codex-write");
   const hermesBtn = document.querySelector("#omega-parity-hermes");
   const compareBtn = document.querySelector("#omega-parity-compare");
+  const recoverBtn = document.querySelector("#omega-parity-recover");
   const contextToggleButtons = Array.from(document.querySelectorAll(".omega-context-toggle[data-context-key]"));
   const agentModeButtons = Array.from(document.querySelectorAll(".omega-agent-mode-row [data-agent-run-mode]"));
   const editorInput = document.querySelector("#omega-editor-input");
@@ -25544,6 +25545,7 @@ function initOmegaProductShell() {
   let terminalStreamWatchdogTimer = 0;
   let activeAgentStreamId = "";
   let activeAgentRun = null;
+  const ignoredAgentStreamIds = new Set();
   let agentRunWatchdogTimer = 0;
   let suppressEditorDirty = false;
   let activeAgentTranscript = null;
@@ -25686,6 +25688,30 @@ function initOmegaProductShell() {
     }
   };
 
+  const syncAgentRunRecoveryControl = () => {
+    if (!recoverBtn) return;
+    const hasActiveRun = !!(activeAgentRun || activeAgentStreamId);
+    recoverBtn.textContent = "Recover";
+    recoverBtn.title = hasActiveRun
+      ? "Reset the visible agent run gate and preserve evidence. This does not claim backend process cancellation."
+      : "No active agent run to recover.";
+    if (hasActiveRun) {
+      recoverBtn.removeAttribute("disabled");
+    } else {
+      recoverBtn.setAttribute("disabled", "disabled");
+    }
+  };
+
+  const rememberIgnoredAgentStreamId = (sessionId) => {
+    const normalized = String(sessionId ?? "").trim();
+    if (!normalized) return;
+    ignoredAgentStreamIds.add(normalized);
+    while (ignoredAgentStreamIds.size > 16) {
+      const first = ignoredAgentStreamIds.values().next().value;
+      ignoredAgentStreamIds.delete(first);
+    }
+  };
+
   const describeActiveAgentRun = () => {
     if (!activeAgentRun && !activeAgentStreamId) return "";
     const label = activeAgentRun?.label || "Agent run";
@@ -25801,6 +25827,7 @@ function initOmegaProductShell() {
     };
     syncAgentRunGateDataset();
     setAgentRunControlsDisabled(true);
+    syncAgentRunRecoveryControl();
     startAgentRunWatchdog();
     recordAgentRunLifecycleEvent("gate-started");
     return true;
@@ -25813,6 +25840,7 @@ function initOmegaProductShell() {
       activeAgentStreamId = activeAgentRun.sessionId;
     }
     syncAgentRunGateDataset();
+    syncAgentRunRecoveryControl();
   };
 
   const clearAgentRunGate = () => {
@@ -25827,6 +25855,72 @@ function initOmegaProductShell() {
     productShell?.removeAttribute("data-agent-run-prompt-chars");
     productShell?.removeAttribute("data-agent-run-last-event");
     setAgentRunControlsDisabled(false);
+    syncAgentRunRecoveryControl();
+  };
+
+  const recoverAgentRunUi = () => {
+    if (!activeAgentRun && !activeAgentStreamId) {
+      setProductStatus("No active agent run to recover.", "warning");
+      return;
+    }
+    const snapshot = {
+      label: activeAgentRun?.label || "Agent run",
+      runtime: activeAgentRun?.runtime || "agent",
+      phase: activeAgentRun?.phase || "unknown",
+      sessionId: activeAgentRun?.sessionId || activeAgentStreamId || "",
+      recordPath: activeAgentRun?.recordPath || "",
+      lastEvent: activeAgentRun?.lastEvent || "unknown",
+      staleWarningCount: activeAgentRun?.staleWarningCount || 0,
+      ageMs: Date.now() - (activeAgentRun?.startedAt || Date.now()),
+    };
+    rememberIgnoredAgentStreamId(snapshot.sessionId);
+    const evidence = [
+      `label=${snapshot.label}`,
+      `runtime=${snapshot.runtime}`,
+      `phase=${snapshot.phase}`,
+      `session=${snapshot.sessionId || "pending"}`,
+      `last_event=${snapshot.lastEvent}`,
+      `age_ms=${Math.max(0, snapshot.ageMs)}`,
+      `stale_warnings=${snapshot.staleWarningCount}`,
+      `record=${snapshot.recordPath || "none"}`,
+      "operator_action=ui_gate_recovered",
+      "backend_process_cancellation=not_exposed",
+    ].join("\n");
+    appendAgentWorkArtifact("Run Recovery Requested", evidence);
+    appendEvidenceText(`agent run recovery requested: ${snapshot.runtime}; session=${snapshot.sessionId || "pending"}; record=${snapshot.recordPath || "none"}`);
+    setProblemText(
+      [
+        "Agent run recovery reset the visible UI gate only.",
+        "Backend process cancellation is not exposed by the current Tauri bridge, so this does not claim the underlying process was killed.",
+        snapshot.recordPath ? `Inspect the evidence record before rerunning: ${snapshot.recordPath}` : "No evidence record path had been emitted yet.",
+      ].join("\n")
+    );
+    updateAgentAnswerMessage(
+      `${snapshot.label} recovery requested`,
+      [
+        "Recovered the visible workbench run gate so you can keep using the app.",
+        "Late events from this recovered session will be ignored by the UI.",
+        "This is not a backend kill; it preserves the evidence trail instead of pretending cancellation happened.",
+        snapshot.recordPath ? `Evidence: ${snapshot.recordPath}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
+    setPetCompanionRuntimeState({
+      state: "warning",
+      source: "agent-run-recovery",
+      message: "Agent run UI gate recovered; inspect evidence before rerun.",
+      progress: 100,
+      relatedRecordPath: snapshot.recordPath || "",
+    }, { record: true });
+    clearAgentRunGate();
+    setProductStatus("Run recovery reset the UI gate. Inspect evidence before rerunning.", "warning");
+    Promise.allSettled([
+      refreshProductAgentRunCenter(),
+      refreshProductEvidenceHistory(),
+    ]).catch((error) => {
+      setProblemText(`Run recovery refresh failed: ${error.message}`);
+    });
   };
 
   const readStoredJson = (key, fallback) => {
@@ -31043,6 +31137,7 @@ footer {
     if (!listen) return;
     listen("unlocked-agent-prompt-stream", async (event) => {
       const payload = event?.payload ?? {};
+      if (payload.session_id && ignoredAgentStreamIds.has(payload.session_id)) return;
       if (activeAgentStreamId && payload.session_id !== activeAgentStreamId) return;
       const runtime = payload.runtime || "agent";
       if (payload.kind === "stdout" || payload.kind === "stderr") {
@@ -33177,6 +33272,10 @@ footer {
     });
   });
 
+  recoverBtn?.addEventListener("click", () => {
+    recoverAgentRunUi();
+  });
+
   productAgentRunRefreshBtn?.addEventListener("click", () => {
     refreshProductAgentRunCenter().catch((error) => {
       setProductStatus(`Run center refresh failed: ${error.message}`, "error");
@@ -33517,6 +33616,7 @@ footer {
   setActiveArtifactPreview(activeArtifactPreview);
   restorePromptContextState();
   restoreAgentRunMode();
+  syncAgentRunRecoveryControl();
   restoreTerminalHistory();
   restoreEditorSession();
   renderEditorTabs();
