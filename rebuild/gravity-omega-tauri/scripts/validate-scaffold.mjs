@@ -159,8 +159,15 @@ for (const scriptNeedle of [
 for (const unlockedNeedle of [
   "run_unlocked_agent_prompt_session",
   "run_unlocked_agent_prompt_session_stream",
+  "cancel_unlocked_agent_prompt_session_stream",
   "unlocked-agent-prompt-stream",
   "UnlockedAgentPromptSessionRecord",
+  "UnlockedAgentPromptSessionCancelRequest",
+  "UnlockedAgentPromptSessionCancelResult",
+  "UNLOCKED_AGENT_PROMPT_STREAM_PROCESSES",
+  "unlocked_agent_prompt_stream_cancel_requested",
+  "unlocked_agent_prompt_stream_cancelled",
+  "kill_delegated_to_stream_worker",
   "prompt_stdin: Option<String>",
   "unlocked_agent_prompt_stdin_mode",
   "write_unlocked_agent_prompt_stdin",
@@ -586,11 +593,15 @@ for (const productBridgeNeedle of [
   "timeout_ms: 900000",
   "runAgentComparison",
   "runPrimaryAgentWork",
+  "cancelUnlockedAgentPromptSessionStream",
   "recoverAgentRunUi",
   "ignoredAgentStreamIds",
   "Run Recovery Requested",
-  "backend_process_cancellation=not_exposed",
-  "Backend process cancellation is not exposed",
+  "backend_cancel_status",
+  "backend_cancellation_requested",
+  "backend_cancel_pid",
+  "kill_delegated_to_stream_worker",
+  "Requested backend cancellation for the tracked stream",
   "Late events from this recovered session will be ignored by the UI.",
   "createComparisonSummary",
   "compareExistingAgentEvidence",
@@ -931,7 +942,7 @@ if (!frontendSource.includes("Omega Agent Work is still being updated in Monaco.
   throw new Error("Agent run watchdog must update the visible chat answer when a stream goes quiet.");
 }
 
-if (!frontendSource.includes("const recoverAgentRunUi = () => {") || !frontendSource.includes("recoverBtn?.addEventListener(\"click\"")) {
+if (!frontendSource.includes("const recoverAgentRunUi = async () => {") || !frontendSource.includes("recoverBtn?.addEventListener(\"click\"")) {
   throw new Error("Agent runs must expose an operator recovery control for wedged visible run state.");
 }
 
@@ -939,8 +950,12 @@ if (!frontendSource.includes("ignoredAgentStreamIds.has(payload.session_id)") ||
   throw new Error("Recovered agent streams must be ignored so stale lifecycle events cannot resurrect old run state.");
 }
 
-if (!frontendSource.includes("backend_process_cancellation=not_exposed") || !frontendSource.includes("This is not a backend kill")) {
-  throw new Error("Agent run recovery must be honest that it resets the UI gate without claiming backend process cancellation.");
+if (
+  !frontendSource.includes("cancelUnlockedAgentPromptSessionStream") ||
+  !frontendSource.includes("backend_cancellation_requested") ||
+  !frontendSource.includes("No backend kill is claimed because the cancellation request was not accepted.")
+) {
+  throw new Error("Agent run recovery must request tracked backend cancellation first, then honestly fall back to UI recovery.");
 }
 
 if (!frontendSource.includes("agentRunFinalSummaryText({ label, runtime, payload, readback, loaded })")) {
@@ -1405,6 +1420,7 @@ for (const command of [
   "record_pet_runtime_snapshot_signal",
   "run_unlocked_agent_prompt_session",
   "run_unlocked_agent_prompt_session_stream",
+  "cancel_unlocked_agent_prompt_session_stream",
   "list_unlocked_agent_prompt_sessions",
   "ui_ux_test_matrix",
   "codex_hermes_run_view_dashboard",

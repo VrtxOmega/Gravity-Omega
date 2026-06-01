@@ -10445,6 +10445,37 @@ async function runUnlockedAgentPromptSessionStream(runtime = "codex-workspace-wr
   });
 }
 
+async function cancelUnlockedAgentPromptSessionStream(sessionId, reason = "operator recovery requested") {
+  const invoke = tauriInvoke();
+  const normalizedSessionId = String(sessionId || "").trim();
+  if (!invoke) {
+    return {
+      accepted: false,
+      status: "unlocked_agent_prompt_stream_cancel_unavailable",
+      session_id: normalizedSessionId,
+      runtime: "",
+      pid: null,
+      record_path: "",
+      log_path: "",
+      process_spawn_enabled: true,
+      process_control_enabled: false,
+      agent_prompt_execution_enabled: true,
+      cancellation_requested: false,
+      kill_delegated_to_stream_worker: false,
+      blockers: ["Tauri runtime is required to cancel a backend agent stream."],
+      next_step: "Open the native app runtime to cancel active agent streams.",
+    };
+  }
+
+  return invoke("cancel_unlocked_agent_prompt_session_stream", {
+    request: {
+      session_id: normalizedSessionId,
+      requested_by: "gravity-omega-product-ui",
+      reason,
+    },
+  });
+}
+
 async function loadUnlockedAgentPromptSessions() {
   const invoke = tauriInvoke();
   if (!invoke) {
@@ -25858,7 +25889,7 @@ function initOmegaProductShell() {
     syncAgentRunRecoveryControl();
   };
 
-  const recoverAgentRunUi = () => {
+  const recoverAgentRunUi = async () => {
     if (!activeAgentRun && !activeAgentStreamId) {
       setProductStatus("No active agent run to recover.", "warning");
       return;
@@ -25874,6 +25905,44 @@ function initOmegaProductShell() {
       ageMs: Date.now() - (activeAgentRun?.startedAt || Date.now()),
     };
     rememberIgnoredAgentStreamId(snapshot.sessionId);
+    let cancelResult = {
+      accepted: false,
+      status: snapshot.sessionId
+        ? "backend_cancel_not_attempted"
+        : "backend_cancel_missing_session",
+      runtime: snapshot.runtime,
+      pid: null,
+      record_path: snapshot.recordPath || "",
+      log_path: "",
+      cancellation_requested: false,
+      kill_delegated_to_stream_worker: false,
+      blockers: snapshot.sessionId
+        ? []
+        : ["No stream session id was available for backend cancellation."],
+    };
+    if (snapshot.sessionId) {
+      try {
+        cancelResult = await cancelUnlockedAgentPromptSessionStream(
+          snapshot.sessionId,
+          "operator clicked Recover for a stuck visible agent run"
+        );
+      } catch (error) {
+        cancelResult = {
+          accepted: false,
+          status: "backend_cancel_invoke_failed",
+          runtime: snapshot.runtime,
+          pid: null,
+          record_path: snapshot.recordPath || "",
+          log_path: "",
+          cancellation_requested: false,
+          kill_delegated_to_stream_worker: false,
+          blockers: [error.message],
+        };
+      }
+    }
+    const backendCancelRequested = Boolean(
+      cancelResult?.accepted && cancelResult?.cancellation_requested
+    );
     const evidence = [
       `label=${snapshot.label}`,
       `runtime=${snapshot.runtime}`,
@@ -25883,24 +25952,41 @@ function initOmegaProductShell() {
       `age_ms=${Math.max(0, snapshot.ageMs)}`,
       `stale_warnings=${snapshot.staleWarningCount}`,
       `record=${snapshot.recordPath || "none"}`,
-      "operator_action=ui_gate_recovered",
-      "backend_process_cancellation=not_exposed",
+      `operator_action=${backendCancelRequested ? "backend_cancel_requested" : "ui_gate_recovered"}`,
+      `backend_cancel_status=${cancelResult?.status || "unknown"}`,
+      `backend_cancellation_requested=${backendCancelRequested}`,
+      `backend_cancel_pid=${cancelResult?.pid ?? "none"}`,
+      `backend_cancel_record=${cancelResult?.record_path || snapshot.recordPath || "none"}`,
+      `backend_cancel_log=${cancelResult?.log_path || "none"}`,
+      `kill_delegated_to_stream_worker=${Boolean(cancelResult?.kill_delegated_to_stream_worker)}`,
+      `backend_cancel_blockers=${(cancelResult?.blockers || []).join(" | ") || "none"}`,
     ].join("\n");
     appendAgentWorkArtifact("Run Recovery Requested", evidence);
-    appendEvidenceText(`agent run recovery requested: ${snapshot.runtime}; session=${snapshot.sessionId || "pending"}; record=${snapshot.recordPath || "none"}`);
+    appendEvidenceText(`agent run recovery requested: ${snapshot.runtime}; session=${snapshot.sessionId || "pending"}; backend=${cancelResult?.status || "unknown"}; record=${snapshot.recordPath || "none"}`);
     setProblemText(
-      [
-        "Agent run recovery reset the visible UI gate only.",
-        "Backend process cancellation is not exposed by the current Tauri bridge, so this does not claim the underlying process was killed.",
-        snapshot.recordPath ? `Inspect the evidence record before rerunning: ${snapshot.recordPath}` : "No evidence record path had been emitted yet.",
-      ].join("\n")
+      backendCancelRequested
+        ? [
+            "Agent run recovery requested backend cancellation for the tracked stream.",
+            "The stream worker owns the child process and will record a cancelled final status when the kill completes.",
+            snapshot.recordPath ? `Inspect the evidence record before rerunning: ${snapshot.recordPath}` : "No evidence record path had been emitted yet.",
+          ].join("\n")
+        : [
+            "Agent run recovery reset the visible UI gate.",
+            `Backend cancellation was not accepted: ${cancelResult?.status || "unknown"}.`,
+            (cancelResult?.blockers || []).join(" ") || "No backend process cancellation was claimed.",
+            snapshot.recordPath ? `Inspect the evidence record before rerunning: ${snapshot.recordPath}` : "No evidence record path had been emitted yet.",
+          ].join("\n")
     );
     updateAgentAnswerMessage(
       `${snapshot.label} recovery requested`,
       [
-        "Recovered the visible workbench run gate so you can keep using the app.",
+        backendCancelRequested
+          ? "Requested backend cancellation for the tracked stream, then recovered the visible workbench gate."
+          : "Recovered the visible workbench run gate so you can keep using the app.",
         "Late events from this recovered session will be ignored by the UI.",
-        "This is not a backend kill; it preserves the evidence trail instead of pretending cancellation happened.",
+        backendCancelRequested
+          ? "The worker will write the final cancelled evidence when the child process exits."
+          : "No backend kill is claimed because the cancellation request was not accepted.",
         snapshot.recordPath ? `Evidence: ${snapshot.recordPath}` : "",
       ]
         .filter(Boolean)
@@ -25909,12 +25995,19 @@ function initOmegaProductShell() {
     setPetCompanionRuntimeState({
       state: "warning",
       source: "agent-run-recovery",
-      message: "Agent run UI gate recovered; inspect evidence before rerun.",
+      message: backendCancelRequested
+        ? "Agent stream cancellation requested; inspect evidence before rerun."
+        : "Agent run UI gate recovered; inspect evidence before rerun.",
       progress: 100,
       relatedRecordPath: snapshot.recordPath || "",
     }, { record: true });
     clearAgentRunGate();
-    setProductStatus("Run recovery reset the UI gate. Inspect evidence before rerunning.", "warning");
+    setProductStatus(
+      backendCancelRequested
+        ? "Run recovery requested backend cancellation and reset the UI gate."
+        : "Run recovery reset the UI gate. Backend cancellation was not accepted.",
+      "warning"
+    );
     Promise.allSettled([
       refreshProductAgentRunCenter(),
       refreshProductEvidenceHistory(),
@@ -33273,7 +33366,9 @@ footer {
   });
 
   recoverBtn?.addEventListener("click", () => {
-    recoverAgentRunUi();
+    recoverAgentRunUi().catch((error) => {
+      setProductStatus(`Run recovery failed: ${error.message}`, "error");
+    });
   });
 
   productAgentRunRefreshBtn?.addEventListener("click", () => {

@@ -7,6 +7,7 @@ use std::{
     os::unix::fs::FileTypeExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
@@ -1829,6 +1830,34 @@ pub struct UnlockedAgentPromptSessionStreamStartResult {
     pub memory_write_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UnlockedAgentPromptSessionCancelRequest {
+    pub session_id: String,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UnlockedAgentPromptSessionCancelResult {
+    pub accepted: bool,
+    pub status: String,
+    pub session_id: String,
+    pub runtime: String,
+    pub pid: Option<u32>,
+    pub record_path: String,
+    pub log_path: String,
+    pub process_spawn_enabled: bool,
+    pub process_control_enabled: bool,
+    pub agent_prompt_execution_enabled: bool,
+    pub cancellation_requested: bool,
+    pub kill_delegated_to_stream_worker: bool,
     pub created_at_ms: u64,
     pub blockers: Vec<String>,
     pub next_step: String,
@@ -39701,6 +39730,86 @@ pub fn run_unlocked_agent_prompt_session(
 
 const UNLOCKED_AGENT_PROMPT_STREAM_EVENT: &str = "unlocked-agent-prompt-stream";
 
+#[derive(Debug, Clone)]
+struct UnlockedAgentPromptStreamProcessState {
+    session_id: String,
+    runtime: String,
+    pid: Option<u32>,
+    record_path: String,
+    log_path: String,
+    started_at_ms: u64,
+    cancel_requested: bool,
+    cancel_requested_at_ms: Option<u64>,
+    cancel_requested_by: String,
+    cancel_reason: String,
+}
+
+static UNLOCKED_AGENT_PROMPT_STREAM_PROCESSES: OnceLock<
+    Mutex<BTreeMap<String, UnlockedAgentPromptStreamProcessState>>,
+> = OnceLock::new();
+
+fn unlocked_agent_prompt_stream_processes(
+) -> &'static Mutex<BTreeMap<String, UnlockedAgentPromptStreamProcessState>> {
+    UNLOCKED_AGENT_PROMPT_STREAM_PROCESSES.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+fn with_unlocked_agent_prompt_stream_processes<T>(
+    f: impl FnOnce(&mut BTreeMap<String, UnlockedAgentPromptStreamProcessState>) -> T,
+) -> Result<T, String> {
+    let mut guard = unlocked_agent_prompt_stream_processes()
+        .lock()
+        .map_err(|_| "unlocked agent stream process registry lock poisoned".to_string())?;
+    Ok(f(&mut guard))
+}
+
+fn register_unlocked_agent_prompt_stream_process(
+    state: UnlockedAgentPromptStreamProcessState,
+) -> Result<(), String> {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        processes.insert(state.session_id.clone(), state);
+    })
+}
+
+fn update_unlocked_agent_prompt_stream_pid(session_id: &str, pid: u32) -> Result<(), String> {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        if let Some(state) = processes.get_mut(session_id) {
+            state.pid = Some(pid);
+        }
+    })
+}
+
+fn mark_unlocked_agent_prompt_stream_cancel_requested(
+    session_id: &str,
+    requested_by: &str,
+    reason: &str,
+    timestamp: u64,
+) -> Result<Option<UnlockedAgentPromptStreamProcessState>, String> {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        let state = processes.get_mut(session_id)?;
+        state.cancel_requested = true;
+        state.cancel_requested_at_ms = Some(timestamp);
+        state.cancel_requested_by = requested_by.to_string();
+        state.cancel_reason = reason.to_string();
+        Some(state.clone())
+    })
+}
+
+fn unlocked_agent_prompt_stream_cancel_requested(session_id: &str) -> bool {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        processes
+            .get(session_id)
+            .map(|state| state.cancel_requested)
+            .unwrap_or(false)
+    })
+    .unwrap_or(false)
+}
+
+fn unregister_unlocked_agent_prompt_stream_process(session_id: &str) {
+    let _ = with_unlocked_agent_prompt_stream_processes(|processes| {
+        processes.remove(session_id);
+    });
+}
+
 fn emit_unlocked_agent_prompt_stream_event(
     app: &tauri::AppHandle,
     log_path: &PathBuf,
@@ -39720,6 +39829,120 @@ fn emit_unlocked_agent_prompt_stream_event(
             "created_at_ms": event.created_at_ms
         }),
     );
+}
+
+#[tauri::command]
+pub fn cancel_unlocked_agent_prompt_session_stream(
+    request: UnlockedAgentPromptSessionCancelRequest,
+) -> Result<UnlockedAgentPromptSessionCancelResult, String> {
+    let timestamp = now_ms()?;
+    let session_id = request.session_id.trim().to_string();
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "gravity-omega-product-ui".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let reason = request
+        .reason
+        .unwrap_or_else(|| "operator recovery requested".to_string())
+        .trim()
+        .chars()
+        .take(260)
+        .collect::<String>();
+
+    if session_id.is_empty() {
+        return Ok(UnlockedAgentPromptSessionCancelResult {
+            accepted: false,
+            status: "unlocked_agent_prompt_stream_cancel_rejected".to_string(),
+            session_id,
+            runtime: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            agent_prompt_execution_enabled: true,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "session_id is required to cancel a tracked unlocked-agent stream".to_string(),
+            ],
+            next_step: "Retry recovery after an agent stream has emitted a session id.".to_string(),
+        });
+    }
+
+    let Some(state) = mark_unlocked_agent_prompt_stream_cancel_requested(
+        &session_id,
+        &requested_by,
+        &reason,
+        timestamp,
+    )?
+    else {
+        return Ok(UnlockedAgentPromptSessionCancelResult {
+            accepted: false,
+            status: "unlocked_agent_prompt_stream_cancel_not_found".to_string(),
+            session_id,
+            runtime: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            agent_prompt_execution_enabled: true,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "No tracked active unlocked-agent stream matched the requested session id."
+                    .to_string(),
+            ],
+            next_step: "The UI can still recover its visible gate, but no backend process cancellation was requested.".to_string(),
+        });
+    };
+
+    let status = if state.pid.is_some() {
+        "unlocked_agent_prompt_stream_cancel_requested"
+    } else {
+        "unlocked_agent_prompt_stream_cancel_requested_pending_spawn"
+    }
+    .to_string();
+    let _ = write_jsonl_event(
+        &PathBuf::from(&state.log_path),
+        serde_json::json!({
+            "event": "unlocked_agent_prompt_stream_cancel_requested",
+            "session_id": state.session_id.clone(),
+            "runtime": state.runtime.clone(),
+            "pid": state.pid,
+            "status": status.clone(),
+            "requested_by": requested_by,
+            "reason": reason,
+            "started_at_ms": state.started_at_ms,
+            "created_at_ms": timestamp,
+            "process_control_enabled": true,
+            "kill_delegated_to_stream_worker": true
+        }),
+    );
+
+    Ok(UnlockedAgentPromptSessionCancelResult {
+        accepted: true,
+        status,
+        session_id: state.session_id,
+        runtime: state.runtime,
+        pid: state.pid,
+        record_path: state.record_path,
+        log_path: state.log_path,
+        process_spawn_enabled: true,
+        process_control_enabled: true,
+        agent_prompt_execution_enabled: true,
+        cancellation_requested: true,
+        kill_delegated_to_stream_worker: true,
+        created_at_ms: timestamp,
+        blockers: Vec::new(),
+        next_step: "The tracked stream worker will terminate its own child process and record a cancelled final status.".to_string(),
+    })
 }
 
 fn read_unlocked_agent_prompt_stream<R: Read + Send + 'static>(
@@ -40034,6 +40257,19 @@ pub fn run_unlocked_agent_prompt_session_stream(
         )
     })?;
 
+    register_unlocked_agent_prompt_stream_process(UnlockedAgentPromptStreamProcessState {
+        session_id: session_id.clone(),
+        runtime: target.runtime.to_string(),
+        pid: None,
+        record_path: record_path.display().to_string(),
+        log_path: log_path.display().to_string(),
+        started_at_ms: timestamp,
+        cancel_requested: false,
+        cancel_requested_at_ms: None,
+        cancel_requested_by: String::new(),
+        cancel_reason: String::new(),
+    })?;
+
     emit_unlocked_agent_prompt_stream_event(
         &app,
         &log_path,
@@ -40106,22 +40342,24 @@ pub fn run_unlocked_agent_prompt_session_stream(
                     &thread_app,
                     &thread_log_path,
                     UnlockedAgentPromptSessionStreamEvent {
-                        session_id: thread_session_id,
-                        runtime: thread_runtime,
+                        session_id: thread_session_id.clone(),
+                        runtime: thread_runtime.clone(),
                         kind: "error".to_string(),
                         line: String::from_utf8_lossy(&stderr_bytes).to_string(),
                         status,
                         exit_code: None,
-                        record_path: thread_record_path_display,
+                        record_path: thread_record_path_display.clone(),
                         log_path: thread_log_path.display().to_string(),
                         created_at_ms: timestamp,
                     },
                 );
+                unregister_unlocked_agent_prompt_stream_process(&thread_session_id);
                 return;
             }
         };
 
         let pid = Some(child.id());
+        let _ = update_unlocked_agent_prompt_stream_pid(&thread_session_id, child.id());
         if let Err(error) = write_unlocked_agent_prompt_stdin(&mut child, &thread_target) {
             let status = "unlocked_agent_prompt_stream_stdin_failed".to_string();
             let _ = child.kill();
@@ -40152,17 +40390,18 @@ pub fn run_unlocked_agent_prompt_session_stream(
                 &thread_app,
                 &thread_log_path,
                 UnlockedAgentPromptSessionStreamEvent {
-                    session_id: thread_session_id,
-                    runtime: thread_runtime,
+                    session_id: thread_session_id.clone(),
+                    runtime: thread_runtime.clone(),
                     kind: "error".to_string(),
                     line: String::from_utf8_lossy(&stderr_bytes).to_string(),
                     status,
                     exit_code: None,
-                    record_path: thread_record_path_display,
+                    record_path: thread_record_path_display.clone(),
                     log_path: thread_log_path.display().to_string(),
                     created_at_ms: timestamp,
                 },
             );
+            unregister_unlocked_agent_prompt_stream_process(&thread_session_id);
             return;
         }
         let stdout_reader = child.stdout.take();
@@ -40207,10 +40446,16 @@ pub fn run_unlocked_agent_prompt_session_stream(
         });
 
         let mut timed_out = false;
+        let mut cancelled = false;
         loop {
             match child.try_wait() {
                 Ok(Some(_status)) => break,
                 Ok(None) => {
+                    if unlocked_agent_prompt_stream_cancel_requested(&thread_session_id) {
+                        cancelled = true;
+                        let _ = child.kill();
+                        break;
+                    }
                     if started.elapsed() >= Duration::from_millis(timeout_ms) {
                         timed_out = true;
                         let _ = child.kill();
@@ -40249,6 +40494,8 @@ pub fn run_unlocked_agent_prompt_session_stream(
             .unwrap_or_default();
         let status = if timed_out {
             "unlocked_agent_prompt_stream_timed_out"
+        } else if cancelled {
+            "unlocked_agent_prompt_stream_cancelled"
         } else if exit_code == Some(0) {
             "unlocked_agent_prompt_stream_succeeded"
         } else {
@@ -40286,17 +40533,18 @@ pub fn run_unlocked_agent_prompt_session_stream(
             &thread_app,
             &thread_log_path,
             UnlockedAgentPromptSessionStreamEvent {
-                session_id: thread_session_id,
-                runtime: thread_runtime,
+                session_id: thread_session_id.clone(),
+                runtime: thread_runtime.clone(),
                 kind: "lifecycle".to_string(),
                 line: format!("{final_status} exit={exit_code:?} duration={duration_ms}ms"),
                 status: final_status,
                 exit_code,
-                record_path: thread_record_path_display,
+                record_path: thread_record_path_display.clone(),
                 log_path: thread_log_path.display().to_string(),
                 created_at_ms: timestamp,
             },
         );
+        unregister_unlocked_agent_prompt_stream_process(&thread_session_id);
     });
 
     Ok(result)
@@ -114228,6 +114476,80 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn unlocked_agent_stream_cancel_registry_is_tracked_and_scoped() {
+        let _test_env_guard = test_env_lock();
+        let timestamp = now_ms().expect("timestamp");
+        let session_id = format!("test-unlocked-agent-stream-cancel-{timestamp}");
+        let record_path = std::env::temp_dir()
+            .join(format!("{session_id}.json"))
+            .display()
+            .to_string();
+        let log_path = std::env::temp_dir()
+            .join(format!("{session_id}.jsonl"))
+            .display()
+            .to_string();
+        unregister_unlocked_agent_prompt_stream_process(&session_id);
+        register_unlocked_agent_prompt_stream_process(UnlockedAgentPromptStreamProcessState {
+            session_id: session_id.clone(),
+            runtime: "codex-workspace-write".to_string(),
+            pid: None,
+            record_path: record_path.clone(),
+            log_path: log_path.clone(),
+            started_at_ms: timestamp,
+            cancel_requested: false,
+            cancel_requested_at_ms: None,
+            cancel_requested_by: String::new(),
+            cancel_reason: String::new(),
+        })
+        .expect("registry accepts test stream");
+
+        let accepted = cancel_unlocked_agent_prompt_session_stream(
+            UnlockedAgentPromptSessionCancelRequest {
+                session_id: session_id.clone(),
+                requested_by: Some("rust-test".to_string()),
+                reason: Some("verify scoped cancellation".to_string()),
+            },
+        )
+        .expect("cancel request resolves");
+        assert!(accepted.accepted);
+        assert_eq!(
+            accepted.status,
+            "unlocked_agent_prompt_stream_cancel_requested_pending_spawn"
+        );
+        assert_eq!(accepted.session_id, session_id);
+        assert_eq!(accepted.runtime, "codex-workspace-write");
+        assert_eq!(accepted.pid, None);
+        assert_eq!(accepted.record_path, record_path);
+        assert_eq!(accepted.log_path, log_path);
+        assert!(accepted.process_spawn_enabled);
+        assert!(accepted.process_control_enabled);
+        assert!(accepted.agent_prompt_execution_enabled);
+        assert!(accepted.cancellation_requested);
+        assert!(accepted.kill_delegated_to_stream_worker);
+        assert!(unlocked_agent_prompt_stream_cancel_requested(
+            &accepted.session_id
+        ));
+        unregister_unlocked_agent_prompt_stream_process(&accepted.session_id);
+
+        let missing = cancel_unlocked_agent_prompt_session_stream(
+            UnlockedAgentPromptSessionCancelRequest {
+                session_id: "not-a-tracked-stream".to_string(),
+                requested_by: Some("rust-test".to_string()),
+                reason: Some("verify scoped rejection".to_string()),
+            },
+        )
+        .expect("missing cancel request resolves");
+        assert!(!missing.accepted);
+        assert_eq!(
+            missing.status,
+            "unlocked_agent_prompt_stream_cancel_not_found"
+        );
+        assert!(!missing.process_control_enabled);
+        assert!(!missing.cancellation_requested);
+        assert!(!missing.kill_delegated_to_stream_worker);
     }
 
     #[test]
