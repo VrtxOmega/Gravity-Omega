@@ -32735,18 +32735,25 @@ footer {
     }
     const stdout = String(assist.stdout || "").trim();
     const stderr = String(assist.stderr || "").trim();
+    const stageSummary = Array.isArray(assist.stage_summary)
+      ? assist.stage_summary.slice(0, 8).join("\n")
+      : "";
     return [
       `Hermes assist brief: ${assist.record_path || assist.status || "none"}`,
       `- status: ${assist.status ?? "unknown"}`,
+      `- outcome: ${assist.outcome_category || "unknown"}; preflight_passed=${Boolean(assist.preflight_passed)}; transcript_ready=${Boolean(assist.transcript_evidence_ready)}`,
       `- exit: ${assist.exit_code ?? "none"}; timed_out=${Boolean(assist.timed_out)}; duration=${assist.duration_ms ?? 0}ms`,
       `- stdout_bytes: ${assist.stdout_size_bytes ?? 0}; stderr_bytes=${assist.stderr_size_bytes ?? 0}`,
       `- transport: ${assist.query_transport ?? "unknown"}; argv_chars=${assist.argv_char_count ?? 0}; pipe_readers=${Boolean(assist.stdout_pipe_reader_enabled)}/${Boolean(assist.stderr_pipe_reader_enabled)}`,
       `- timeout: kill_sent=${Boolean(assist.timeout_kill_sent)}; wait_after_kill=${assist.wait_after_kill_ms ?? 0}ms; partial_output=${Boolean(assist.partial_output_captured)}`,
       `- focus_skills: ${(assist.focus_skills ?? []).slice(0, 12).join(", ") || "none"}`,
       `- blockers: ${(assist.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
+      `- failure_summary: ${assist.failure_summary || "none"}`,
+      `- next_action: ${assist.operator_next_action || assist.next_step || "none"}`,
+      stageSummary ? `\nHermes execution stages:\n${stageSummary}` : "",
       "",
       "Hermes guidance:",
-      stdout ? limitText(stdout, 2600) : "(no Hermes stdout captured)",
+      stdout ? limitText(stdout, 2600) : (assist.guidance_preview || "(no Hermes stdout captured)"),
       stderr ? `\nHermes stderr preview:\n${limitText(stderr, 900)}` : "",
     ].join("\n").trim();
   };
@@ -33058,15 +33065,21 @@ footer {
           [
             `status=${hermesAssist.status ?? "unknown"}`,
             `record=${hermesAssist.record_path || "none"}`,
+            `outcome=${hermesAssist.outcome_category || "unknown"}`,
+            `preflight_passed=${Boolean(hermesAssist.preflight_passed)}`,
+            `transcript_ready=${Boolean(hermesAssist.transcript_evidence_ready)}`,
             `exit=${hermesAssist.exit_code ?? "none"}`,
             `timed_out=${Boolean(hermesAssist.timed_out)}`,
             `duration_ms=${hermesAssist.duration_ms ?? 0}`,
             `stdout_bytes=${hermesAssist.stdout_size_bytes ?? 0}`,
             `stderr_bytes=${hermesAssist.stderr_size_bytes ?? 0}`,
             `focus_skills=${(hermesAssist.focus_skills ?? []).slice(0, 12).join(", ") || "none"}`,
+            `stage_summary=${(hermesAssist.stage_summary ?? []).slice(0, 8).join(" | ") || "none"}`,
+            `failure_summary=${hermesAssist.failure_summary || "none"}`,
+            `next_action=${hermesAssist.operator_next_action || hermesAssist.next_step || "none"}`,
             `blockers=${(hermesAssist.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
             "",
-            limitText(String(hermesAssist.stdout || "").trim() || "(no Hermes guidance captured)", 3200),
+            limitText(String(hermesAssist.stdout || hermesAssist.guidance_preview || "").trim() || "(no Hermes guidance captured)", 3200),
           ].join("\n")
         );
         if (hermesAssist.status !== "hermes_kimi_assist_brief_succeeded") {

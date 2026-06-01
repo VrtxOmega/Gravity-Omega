@@ -1234,6 +1234,20 @@ pub struct HermesKimiAssistBriefRecord {
     pub wait_after_kill_ms: u64,
     #[serde(default)]
     pub partial_output_captured: bool,
+    #[serde(default)]
+    pub preflight_passed: bool,
+    #[serde(default)]
+    pub stage_summary: Vec<String>,
+    #[serde(default)]
+    pub outcome_category: String,
+    #[serde(default)]
+    pub failure_summary: String,
+    #[serde(default)]
+    pub operator_next_action: String,
+    #[serde(default)]
+    pub transcript_evidence_ready: bool,
+    #[serde(default)]
+    pub guidance_preview: String,
     pub stdout_transcript_path: String,
     pub stderr_transcript_path: String,
     pub inventory_record_path: Option<String>,
@@ -36917,6 +36931,101 @@ fn run_hermes_kimi_assist_process_with_binary(
     }
 }
 
+fn hermes_assist_outcome_category(
+    status: &str,
+    timed_out: bool,
+    exit_code: Option<i32>,
+    blockers: &[String],
+) -> String {
+    if status.contains("succeeded") {
+        "succeeded".to_string()
+    } else if status.contains("rejected_empty_prompt") {
+        "rejected-empty-prompt".to_string()
+    } else if status.contains("rejected_log_preflight") {
+        "blocked-log-preflight".to_string()
+    } else if timed_out || status.contains("timed_out") {
+        "timed-out".to_string()
+    } else if status.contains("failed") || exit_code.map(|code| code != 0).unwrap_or(false) {
+        "failed".to_string()
+    } else if blockers.is_empty() {
+        "unknown".to_string()
+    } else {
+        "blocked".to_string()
+    }
+}
+
+fn hermes_assist_operator_next_action(outcome_category: &str) -> String {
+    match outcome_category {
+        "succeeded" => "Attach this Hermes assist brief to the Codex Lead stream; keep Codex responsible for implementation, verification, and final evidence.",
+        "blocked-log-preflight" => "Fix the Hermes writable log path or launch Gravity Omega outside the read-only wrapper, then retry Hermes assist.",
+        "timed-out" => "Review partial Hermes stdout/stderr transcripts, keep Codex moving with the recorded warning, and retry Hermes with a smaller prompt if the guidance is needed.",
+        "failed" => "Review Hermes stdout/stderr transcripts and blockers before retrying; Codex Lead may continue only with the failure recorded.",
+        "rejected-empty-prompt" => "Enter a non-empty task before requesting Hermes assist.",
+        "blocked" => "Resolve the listed Hermes blockers before depending on assist guidance.",
+        _ => "Treat this Hermes assist record as incomplete; inspect transcripts and blockers before using it.",
+    }
+    .to_string()
+}
+
+fn hermes_assist_stage_summary(
+    prompt_trimmed: &str,
+    preflight_passed: bool,
+    output: &HermesKimiAssistProcessOutput,
+    outcome_category: &str,
+    transcript_evidence_ready: bool,
+) -> Vec<String> {
+    vec![
+        format!(
+            "prompt:{}:{}b",
+            if prompt_trimmed.is_empty() {
+                "rejected-empty"
+            } else {
+                "accepted"
+            },
+            prompt_trimmed.len()
+        ),
+        format!(
+            "log-preflight:{}",
+            if preflight_passed { "passed" } else { "not-passed" }
+        ),
+        format!(
+            "process:{}:pid={}:transport={}",
+            if output.bounded_execution_performed {
+                "started"
+            } else {
+                "not-started"
+            },
+            output
+                .pid
+                .map(|pid| pid.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+            output.query_transport
+        ),
+        format!(
+            "pipes:stdout_reader={}:stderr_reader={}:partial={}",
+            output.stdout_pipe_reader_enabled,
+            output.stderr_pipe_reader_enabled,
+            output.partial_output_captured
+        ),
+        format!(
+            "transcripts:ready={}:stdout={}b:stderr={}b",
+            transcript_evidence_ready,
+            output.stdout_bytes.len(),
+            output.stderr_bytes.len()
+        ),
+        format!(
+            "outcome:{}:exit={}:timeout={}:duration={}ms",
+            outcome_category,
+            output
+                .exit_code
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+            output.timed_out,
+            output.duration_ms
+        ),
+    ]
+}
+
 #[tauri::command]
 pub fn record_hermes_kimi_assist_brief(
     request: HermesKimiAssistBriefRequest,
@@ -36978,6 +37087,7 @@ pub fn record_hermes_kimi_assist_brief(
     let stdout_transcript_path = dir.join(format!("{id}.stdout.txt"));
     let stderr_transcript_path = dir.join(format!("{id}.stderr.txt"));
     let mut blockers = Vec::new();
+    let mut preflight_passed = false;
     let mut output = HermesKimiAssistProcessOutput {
         pid: None,
         exit_code: None,
@@ -37017,6 +37127,7 @@ pub fn record_hermes_kimi_assist_brief(
             blockers.push(blocker);
             output.status = "hermes_kimi_assist_brief_rejected_log_preflight".to_string();
         } else {
+            preflight_passed = true;
             output = run_hermes_kimi_assist_process(&compact_query, timeout_ms);
             if output.status != "hermes_kimi_assist_brief_succeeded" {
                 blockers.push(format!(
@@ -37046,6 +37157,33 @@ pub fn record_hermes_kimi_assist_brief(
     let log_path_display = log_path.display().to_string();
     let stdout_transcript_display = stdout_transcript_path.display().to_string();
     let stderr_transcript_display = stderr_transcript_path.display().to_string();
+    let transcript_evidence_ready =
+        fs::metadata(&stdout_transcript_path).is_ok() && fs::metadata(&stderr_transcript_path).is_ok();
+    let outcome_category = hermes_assist_outcome_category(
+        &output.status,
+        output.timed_out,
+        output.exit_code,
+        &blockers,
+    );
+    let failure_summary = if blockers.is_empty() {
+        "none".to_string()
+    } else {
+        blockers
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    let operator_next_action = hermes_assist_operator_next_action(&outcome_category);
+    let stage_summary = hermes_assist_stage_summary(
+        &prompt_trimmed,
+        preflight_passed,
+        &output,
+        &outcome_category,
+        transcript_evidence_ready,
+    );
+    let guidance_preview = prompt_preview(&String::from_utf8_lossy(&output.stdout_bytes), 900);
     let record = HermesKimiAssistBriefRecord {
         id: id.clone(),
         status: output.status.clone(),
@@ -37085,6 +37223,13 @@ pub fn record_hermes_kimi_assist_brief(
         timeout_kill_sent: output.timeout_kill_sent,
         wait_after_kill_ms: output.wait_after_kill_ms,
         partial_output_captured: output.partial_output_captured,
+        preflight_passed,
+        stage_summary,
+        outcome_category,
+        failure_summary,
+        operator_next_action: operator_next_action.clone(),
+        transcript_evidence_ready,
+        guidance_preview,
         stdout_transcript_path: stdout_transcript_display.clone(),
         stderr_transcript_path: stderr_transcript_display.clone(),
         inventory_record_path,
@@ -37115,7 +37260,7 @@ pub fn record_hermes_kimi_assist_brief(
             "The query explicitly instructs Hermes not to edit, patch, execute shell, call MCP tools, or write memory.".to_string(),
             "stdout and stderr are captured to durable transcripts for Codex review.".to_string(),
         ],
-        next_step: "Attach this assist brief to the Codex Lead stream prompt; Codex remains responsible for implementation, verification, and final evidence.".to_string(),
+        next_step: operator_next_action,
     };
 
     let json = serde_json::to_string_pretty(&record)
@@ -37145,6 +37290,12 @@ pub fn record_hermes_kimi_assist_brief(
             "timeout_kill_sent": record.timeout_kill_sent,
             "wait_after_kill_ms": record.wait_after_kill_ms,
             "partial_output_captured": record.partial_output_captured,
+            "preflight_passed": record.preflight_passed,
+            "stage_summary": &record.stage_summary,
+            "outcome_category": &record.outcome_category,
+            "failure_summary": &record.failure_summary,
+            "operator_next_action": &record.operator_next_action,
+            "transcript_evidence_ready": record.transcript_evidence_ready,
             "focus_skill_count": record.focus_skills.len(),
             "mcp_focus_count": record.mcp_servers.len(),
             "hook_focus_count": record.hooks.len(),
@@ -97157,6 +97308,11 @@ fn hermes_assist_run_view_summary(
         .preview
         .clone()
         .or_else(|| Some(prompt_preview(&record.stderr, 480)));
+    let stage_summary = if record.stage_summary.is_empty() {
+        "stages=legacy-record".to_string()
+    } else {
+        format!("stages={}", record.stage_summary.join(" | "))
+    };
     let mut summary = codex_hermes_run_view_evidence_summary(
         source_id,
         title,
@@ -97174,11 +97330,14 @@ fn hermes_assist_run_view_summary(
             record.stdout_size_bytes, record.stderr_size_bytes, record.partial_output_captured
         ),
         format!(
-            "source={} max_turns={} transport={} argv_chars={} pipe_readers={}/{} timeout_kill={} wait_after_kill={}ms stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={}",
+            "source={} max_turns={} transport={} argv_chars={} outcome={} preflight={} transcript_ready={} pipe_readers={}/{} timeout_kill={} wait_after_kill={}ms stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={} failure={} next_action={} {}",
             record.source,
             record.max_turns,
             record.query_transport,
             record.argv_char_count,
+            if record.outcome_category.is_empty() { "unknown" } else { record.outcome_category.as_str() },
+            record.preflight_passed,
+            record.transcript_evidence_ready,
             record.stdout_pipe_reader_enabled,
             record.stderr_pipe_reader_enabled,
             record.timeout_kill_sent,
@@ -97188,7 +97347,10 @@ fn hermes_assist_run_view_summary(
             stdout_transcript.line_count,
             record.stderr_transcript_path,
             stderr_transcript.found,
-            stderr_transcript.line_count
+            stderr_transcript.line_count,
+            if record.failure_summary.is_empty() { "none" } else { record.failure_summary.as_str() },
+            if record.operator_next_action.is_empty() { record.next_step.as_str() } else { record.operator_next_action.as_str() },
+            stage_summary
         ),
         stdout_preview,
         stderr_preview,
@@ -119372,6 +119534,19 @@ sleep 2
             timeout_kill_sent: false,
             wait_after_kill_ms: 0,
             partial_output_captured: true,
+            preflight_passed: true,
+            stage_summary: vec![
+                "prompt:accepted:22b".to_string(),
+                "log-preflight:passed".to_string(),
+                "process:started:pid=4242:transport=argv-compact-query".to_string(),
+                "transcripts:ready=true:stdout=57b:stderr=26b".to_string(),
+                "outcome:succeeded:exit=0:timeout=false:duration=222ms".to_string(),
+            ],
+            outcome_category: "succeeded".to_string(),
+            failure_summary: "none".to_string(),
+            operator_next_action: "Attach this Hermes assist brief to the Codex Lead stream.".to_string(),
+            transcript_evidence_ready: true,
+            guidance_preview: "Hermes says keep the test scoped and verify the run view.".to_string(),
             stdout_transcript_path: assist_stdout_path.display().to_string(),
             stderr_transcript_path: assist_stderr_path.display().to_string(),
             inventory_record_path: Some(inventory_path.display().to_string()),
@@ -119431,6 +119606,17 @@ sleep 2
             stderr_transcript_path: failed_assist_stderr_path.display().to_string(),
             record_path: failed_assist_path.display().to_string(),
             log_path: failed_assist_log_path.display().to_string(),
+            stage_summary: vec![
+                "prompt:accepted:22b".to_string(),
+                "log-preflight:passed".to_string(),
+                "process:started:pid=4242:transport=argv-compact-query".to_string(),
+                "transcripts:ready=true:stdout=43b:stderr=45b".to_string(),
+                "outcome:timed-out:exit=none:timeout=true:duration=5000ms".to_string(),
+            ],
+            outcome_category: "timed-out".to_string(),
+            failure_summary: "Hermes assist timed out before final answer.".to_string(),
+            operator_next_action: "Review partial Hermes stdout/stderr transcripts before retrying.".to_string(),
+            guidance_preview: failed_assist_stdout.clone(),
             blockers: vec!["Hermes assist timed out before final answer.".to_string()],
             created_at_ms: now_ms().expect("clock") + 11,
             next_step: "Show this Hermes timeout before retrying assist delegation.".to_string(),
@@ -119681,6 +119867,9 @@ sleep 2
                     == Some(assist_record.stderr_transcript_path.as_str())
                 && summary.stdout_preview_source == "stdout-transcript"
                 && summary.stderr_preview_source == "stderr-transcript"
+                && summary.detail.contains("outcome=succeeded")
+                && summary.detail.contains("preflight=true")
+                && summary.detail.contains("stages=prompt:accepted")
                 && summary.stdout_preview.as_deref().unwrap_or("").contains("Hermes says")
                 && summary.stderr_preview.as_deref().unwrap_or("").contains("stayed clean")
                 && summary.record_process_spawn_enabled
@@ -119703,6 +119892,9 @@ sleep 2
                     == Some(failed_assist_record.stderr_transcript_path.as_str())
                 && summary.stdout_preview_source == "stdout-transcript"
                 && summary.stderr_preview_source == "stderr-transcript"
+                && summary.detail.contains("outcome=timed-out")
+                && summary.detail.contains("failure=Hermes assist timed out")
+                && summary.detail.contains("next_action=Review partial Hermes")
                 && summary.stdout_preview.as_deref().unwrap_or("").contains("did not finish")
                 && summary.stderr_preview.as_deref().unwrap_or("").contains("timed out")
                 && summary.blocker_count >= 1
