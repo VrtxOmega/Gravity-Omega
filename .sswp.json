@@ -1,10 +1,10 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-06-03T01:34:02.864Z",
+  "timestamp": "2026-06-03T01:48:33.480Z",
   "target": {
     "name": "gravity-omega",
     "repo": "/home/rage/apps/gravity-omega-rust-rebuild",
-    "commitHash": "fb2915a7a70bedb0bea0fc7449d46193a0caf7da",
+    "commitHash": "413008f2769398a19c12f69e3c0633511014c94d",
     "branch": "codex/gravity-omega-daily-driver-agent-loop"
   },
   "environment": {
@@ -126,13 +126,13 @@
       "gate": "TEST_PASS",
       "status": "PASS",
       "evidence": "All tests passed",
-      "durationMs": 54738
+      "durationMs": 21162
     },
     {
       "gate": "LINT",
       "status": "PASS",
       "evidence": "npx passed",
-      "durationMs": 1247
+      "durationMs": 1270
     }
   ],
   "adversarial": {
@@ -347,8 +347,8 @@
     "overallRisk": 0.4
   },
   "seal": {
-    "chainHash": "8e072c2618af16412c661c16643b42b2d2d823a59516b190a2fdc6150d194478",
+    "chainHash": "9ae5b33ffa7452fc70941b84c94419524a6b5e0af456d13d63b6a6bc87e91d22",
     "sequence": 5
   },
-  "signature": "85e295f06db53c40de8709469b1c935e4a719561d2c7cd9b797b70a1f3cde6c5"
+  "signature": "8762755386f5f578c40f86393dc545e1d96b4a996bc99a5452af7e7c5ccd4c60"
 }
