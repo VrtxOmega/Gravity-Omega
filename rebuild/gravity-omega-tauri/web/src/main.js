@@ -812,6 +812,19 @@ function formatEvidenceBytes(value) {
   return `${amount.toFixed(digits)} ${units[unitIndex]}`;
 }
 
+function formatEvidenceTimestamp(value) {
+  const millis = Number(value ?? 0);
+  if (!Number.isFinite(millis) || millis <= 0) return "newest=none";
+  const date = new Date(millis);
+  if (Number.isNaN(date.getTime())) return "newest=invalid";
+  return `newest=${date.toLocaleString(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
 function item(title, meta, text) {
   const node = document.createElement("section");
   node.className = "list-item";
@@ -5996,6 +6009,7 @@ function renderStenoSearchPanel(panel) {
       summary.status || "read-only",
       `${summary.allowed_file_count ?? 0} files`,
       formatEvidenceBytes(summary.total_bytes),
+      formatEvidenceTimestamp(summary.newest_record_ms),
       (summary.skipped_large_file_count ?? 0) > 0 ? `skipped_large=${summary.skipped_large_file_count}` : "",
     ].filter(Boolean).join(" / ");
     const node = item(title, meta, summary.directory_path || "directory path unavailable");

@@ -117643,6 +117643,7 @@ sleep 2
             summary.category == "pet-signal"
                 && summary.allowed_file_count >= 1
                 && summary.total_bytes > 0
+                && summary.newest_record_ms > 0
                 && summary.read_only
                 && !summary.capture_enabled
                 && !summary.export_enabled
