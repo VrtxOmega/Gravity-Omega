@@ -798,6 +798,20 @@ async function loadJson(path) {
   return response.json();
 }
 
+function formatEvidenceBytes(value) {
+  const bytes = Number(value ?? 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let amount = bytes;
+  let unitIndex = 0;
+  while (amount >= 1024 && unitIndex < units.length - 1) {
+    amount /= 1024;
+    unitIndex += 1;
+  }
+  const digits = unitIndex === 0 || amount >= 10 ? 0 : 1;
+  return `${amount.toFixed(digits)} ${units[unitIndex]}`;
+}
+
 function item(title, meta, text) {
   const node = document.createElement("section");
   node.className = "list-item";
@@ -5944,7 +5958,7 @@ function renderStenoSearchPanel(panel) {
     `results=${panel.result_count}`,
     `postmortems=${panel.postmortem_result_count ?? 0}`,
     `corpus=${panel.corpus_file_count ?? 0}/${panel.corpus_summary_count ?? 0}`,
-    `bytes=${panel.corpus_total_bytes ?? 0}`,
+    `corpus_bytes=${formatEvidenceBytes(panel.corpus_total_bytes)}`,
     `matched=${panel.matched_file_count ?? 0}`,
     `searched=${panel.searched_file_count ?? 0}`,
     `limit=${panel.max_results ?? 0}`,
@@ -5981,7 +5995,7 @@ function renderStenoSearchPanel(panel) {
     const meta = [
       summary.status || "read-only",
       `${summary.allowed_file_count ?? 0} files`,
-      `${summary.total_bytes ?? 0} bytes`,
+      formatEvidenceBytes(summary.total_bytes),
       (summary.skipped_large_file_count ?? 0) > 0 ? `skipped_large=${summary.skipped_large_file_count}` : "",
     ].filter(Boolean).join(" / ");
     const node = item(title, meta, summary.directory_path || "directory path unavailable");
