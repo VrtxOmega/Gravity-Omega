@@ -5723,9 +5723,14 @@ function renderSswpStatusPanel(panel) {
   }
 
   const lane = panel.lane ?? {};
+  const attestation = panel.attestation ?? {};
   const highRisk = Number(panel.highest_risk_percent ?? 0).toFixed(1);
+  const attestationRisk = Number(attestation.highest_dependency_risk ?? 0).toFixed(1);
   sswpStatusPanelSummary.textContent = [
     panel.status,
+    `attestation=${attestation.status ?? "missing"}`,
+    `gates=${attestation.passing_gate_count ?? 0}/${attestation.gate_count ?? 0}`,
+    `deps=${attestation.suspicious_dependency_count ?? 0}/${attestation.dependency_count ?? 0}`,
     `evidence=${panel.ready_evidence_count}/${panel.evidence_record_count}`,
     `registry=${panel.registry_node_count ?? 0}/${panel.registry_snapshot_count ?? 0}`,
     `risky=${panel.risky_node_count ?? 0}`,
@@ -5745,6 +5750,12 @@ function renderSswpStatusPanel(panel) {
 
   clearList(sswpStatusPanelList);
   const records = [
+    {
+      title: "Local SSWP Attestation",
+      meta: `${attestation.passing_gate_count ?? 0}/${attestation.gate_count ?? 0} gates / ${attestation.suspicious_dependency_count ?? 0}/${attestation.dependency_count ?? 0} suspicious deps`,
+      text: `${attestation.status ?? "sswp_attestation_missing"}; target=${attestation.target_name ?? "unknown"}; branch=${attestation.branch ?? "unknown"}; commit=${String(attestation.commit_hash ?? "unknown").slice(0, 12)}; timestamp=${attestation.timestamp ?? "unknown"}; inconclusive=${attestation.inconclusive_gate_count ?? 0}; failures=${attestation.failing_gate_count ?? 0}; highestRisk=${attestationRisk}%; path=${attestation.attestation_path ?? "none"}; witness=${Boolean(attestation.witness_enabled)}; verify=${Boolean(attestation.verify_enabled)}; export=${Boolean(attestation.export_enabled)}; exec=${Boolean(attestation.execution_enabled)}`,
+      state: attestation.failing_gate_count > 0 ? "gated" : "ready",
+    },
     {
       title: `${panel.display_name} / ${lane.lane_role ?? "sovereign workflow protocol lane"}`,
       meta: `${panel.ready_evidence_count}/${panel.evidence_record_count} evidence / ${panel.command_count} commands`,
@@ -8075,6 +8086,28 @@ async function loadSswpStatusPanel() {
     panel_title: "SSWP Status",
     subsystem: lane.subsystem,
     display_name: lane.display_name,
+    attestation: {
+      status: "sswp_attestation_browser_preview",
+      attestation_path: null,
+      target_name: "gravity-omega",
+      branch: "browser-preview",
+      commit_hash: "browser-preview",
+      timestamp: "browser-preview",
+      gate_count: 0,
+      passing_gate_count: 0,
+      inconclusive_gate_count: 0,
+      failing_gate_count: 0,
+      dependency_count: 0,
+      suspicious_dependency_count: 0,
+      highest_dependency_risk: 0,
+      read_only: true,
+      witness_enabled: false,
+      verify_enabled: false,
+      export_enabled: false,
+      writes_allowed: false,
+      execution_enabled: false,
+      next_action: "Open the Tauri app to read the local .sswp.json witness file.",
+    },
     evidence_record_count: lane.evidence_record_count,
     ready_evidence_count: lane.ready_evidence_count,
     blocked_evidence_count: lane.blocked_evidence_count,

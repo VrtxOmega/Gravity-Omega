@@ -5441,6 +5441,30 @@ pub struct FirstClassMcpDashboard {
     pub next_slice: &'static str,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct SswpAttestationSummary {
+    pub status: String,
+    pub attestation_path: Option<String>,
+    pub target_name: String,
+    pub branch: String,
+    pub commit_hash: String,
+    pub timestamp: String,
+    pub gate_count: usize,
+    pub passing_gate_count: usize,
+    pub inconclusive_gate_count: usize,
+    pub failing_gate_count: usize,
+    pub dependency_count: usize,
+    pub suspicious_dependency_count: usize,
+    pub highest_dependency_risk: f64,
+    pub read_only: bool,
+    pub witness_enabled: bool,
+    pub verify_enabled: bool,
+    pub export_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub next_action: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct SswpStatusPanel {
     pub status: &'static str,
@@ -5448,6 +5472,7 @@ pub struct SswpStatusPanel {
     pub panel_title: &'static str,
     pub subsystem: &'static str,
     pub display_name: &'static str,
+    pub attestation: SswpAttestationSummary,
     pub evidence_record_count: usize,
     pub ready_evidence_count: usize,
     pub blocked_evidence_count: usize,
@@ -101252,6 +101277,156 @@ pub fn list_sswp_registry_snapshots() -> Result<Vec<SswpRegistrySnapshotRecord>,
     Ok(records)
 }
 
+fn sswp_attestation_path() -> Option<PathBuf> {
+    let mut cursor = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for _ in 0..6 {
+        let candidate = cursor.join(".sswp.json");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        if !cursor.pop() {
+            break;
+        }
+    }
+    None
+}
+
+fn sswp_empty_attestation_summary(
+    status: &str,
+    path: Option<&Path>,
+    next_action: &str,
+) -> SswpAttestationSummary {
+    SswpAttestationSummary {
+        status: status.to_string(),
+        attestation_path: path.map(|path| path.display().to_string()),
+        target_name: "unknown".to_string(),
+        branch: "unknown".to_string(),
+        commit_hash: "unknown".to_string(),
+        timestamp: "unknown".to_string(),
+        gate_count: 0,
+        passing_gate_count: 0,
+        inconclusive_gate_count: 0,
+        failing_gate_count: 0,
+        dependency_count: 0,
+        suspicious_dependency_count: 0,
+        highest_dependency_risk: 0.0,
+        read_only: true,
+        witness_enabled: false,
+        verify_enabled: false,
+        export_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        next_action: next_action.to_string(),
+    }
+}
+
+fn sswp_attestation_summary() -> SswpAttestationSummary {
+    let Some(path) = sswp_attestation_path() else {
+        return sswp_empty_attestation_summary(
+            "sswp_attestation_missing",
+            None,
+            "Run SSWP witness outside the panel, then refresh the read-only lane.",
+        );
+    };
+
+    let Ok(content) = fs::read_to_string(&path) else {
+        return sswp_empty_attestation_summary(
+            "sswp_attestation_unreadable",
+            Some(&path),
+            "Fix the local .sswp.json permissions before trusting this lane.",
+        );
+    };
+
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return sswp_empty_attestation_summary(
+            "sswp_attestation_invalid_json",
+            Some(&path),
+            "Regenerate the local SSWP witness file; the current JSON is invalid.",
+        );
+    };
+
+    let gates = value
+        .get("gates")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let dependencies = value
+        .get("dependencies")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let passing_gate_count = gates
+        .iter()
+        .filter(|gate| gate.get("status").and_then(serde_json::Value::as_str) == Some("PASS"))
+        .count();
+    let inconclusive_gate_count = gates
+        .iter()
+        .filter(|gate| {
+            gate.get("status").and_then(serde_json::Value::as_str) == Some("INCONCLUSIVE")
+        })
+        .count();
+    let failing_gate_count = gates
+        .len()
+        .saturating_sub(passing_gate_count + inconclusive_gate_count);
+    let suspicious_dependency_count = dependencies
+        .iter()
+        .filter(|dependency| {
+            dependency
+                .get("suspicious")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        })
+        .count();
+    let highest_dependency_risk = dependencies
+        .iter()
+        .filter_map(|dependency| dependency.get("riskScore").and_then(serde_json::Value::as_f64))
+        .fold(0.0, f64::max);
+
+    SswpAttestationSummary {
+        status: if failing_gate_count == 0 {
+            "sswp_attestation_read_only".to_string()
+        } else {
+            "sswp_attestation_has_failures".to_string()
+        },
+        attestation_path: Some(path.display().to_string()),
+        target_name: value
+            .pointer("/target/name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        branch: value
+            .pointer("/target/branch")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        commit_hash: value
+            .pointer("/target/commitHash")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        timestamp: value
+            .get("timestamp")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        gate_count: gates.len(),
+        passing_gate_count,
+        inconclusive_gate_count,
+        failing_gate_count,
+        dependency_count: dependencies.len(),
+        suspicious_dependency_count,
+        highest_dependency_risk,
+        read_only: true,
+        witness_enabled: false,
+        verify_enabled: false,
+        export_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        next_action: "Use the external SSWP witness workflow for mutation; this panel remains read-only evidence."
+            .to_string(),
+    }
+}
+
 #[tauri::command]
 pub fn sswp_status() -> Result<SswpStatusPanel, String> {
     let dashboard = first_class_mcp_dashboard()?;
@@ -101293,6 +101468,7 @@ pub fn sswp_status() -> Result<SswpStatusPanel, String> {
         panel_title: "SSWP Status",
         subsystem: lane.subsystem,
         display_name: lane.display_name,
+        attestation: sswp_attestation_summary(),
         evidence_record_count: lane.evidence_record_count,
         ready_evidence_count: lane.ready_evidence_count,
         blocked_evidence_count: lane.blocked_evidence_count,
@@ -117134,6 +117310,22 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         assert_eq!(panel.subsystem, "sswp");
         assert_eq!(panel.lane.subsystem, "sswp");
         assert_eq!(panel.display_name, "SSWP");
+        assert!(panel.attestation.read_only);
+        assert!(panel.attestation.status.starts_with("sswp_attestation_"));
+        assert_eq!(panel.attestation.target_name, "gravity-omega");
+        assert_ne!(panel.attestation.branch, "unknown");
+        assert!(panel.attestation.attestation_path.is_some());
+        assert!(panel.attestation.commit_hash.len() >= 7);
+        assert!(panel.attestation.gate_count >= 5);
+        assert!(panel.attestation.passing_gate_count >= 4);
+        assert!(panel.attestation.dependency_count > 0);
+        assert!(panel.attestation.suspicious_dependency_count > 0);
+        assert!(panel.attestation.highest_dependency_risk >= 0.0);
+        assert!(!panel.attestation.witness_enabled);
+        assert!(!panel.attestation.verify_enabled);
+        assert!(!panel.attestation.export_enabled);
+        assert!(!panel.attestation.writes_allowed);
+        assert!(!panel.attestation.execution_enabled);
         assert_eq!(panel.disabled_gate_count, 1);
         assert!(panel
             .latest_registry_snapshot_status
