@@ -5943,6 +5943,8 @@ function renderStenoSearchPanel(panel) {
     `query="${panel.query}"`,
     `results=${panel.result_count}`,
     `postmortems=${panel.postmortem_result_count ?? 0}`,
+    `corpus=${panel.corpus_file_count ?? 0}/${panel.corpus_summary_count ?? 0}`,
+    `bytes=${panel.corpus_total_bytes ?? 0}`,
     `matched=${panel.matched_file_count ?? 0}`,
     `searched=${panel.searched_file_count ?? 0}`,
     `limit=${panel.max_results ?? 0}`,
@@ -5960,8 +5962,32 @@ function renderStenoSearchPanel(panel) {
   clearList(stenoSearchPanelList);
   const results = panel.results ?? [];
   const postmortems = panel.recent_postmortem_results ?? [];
+  const corpusSummaries = panel.corpus_summaries ?? [];
   const sections = panel.sections ?? [];
-  stenoSearchPanelCount.textContent = String(results.length + postmortems.length);
+  stenoSearchPanelCount.textContent = String(results.length + postmortems.length + corpusSummaries.length);
+
+  if (corpusSummaries.length > 0) {
+    stenoSearchPanelList.append(
+      item(
+        "Approved Steno corpus",
+        `${panel.corpus_file_count ?? 0} files across ${corpusSummaries.length} directories`,
+        "Read-only inventory of local evidence/transcript records available for explicit searches; no capture, export, live index, writes, or execution are enabled.",
+      ),
+    );
+  }
+
+  for (const summary of corpusSummaries) {
+    const title = `Corpus: ${summary.category || "evidence"}`;
+    const meta = [
+      summary.status || "read-only",
+      `${summary.allowed_file_count ?? 0} files`,
+      `${summary.total_bytes ?? 0} bytes`,
+      (summary.skipped_large_file_count ?? 0) > 0 ? `skipped_large=${summary.skipped_large_file_count}` : "",
+    ].filter(Boolean).join(" / ");
+    const node = item(title, meta, summary.directory_path || "directory path unavailable");
+    node.dataset.state = summary.directory_exists ? "ready" : "blocked";
+    stenoSearchPanelList.append(node);
+  }
 
   if (postmortems.length > 0) {
     stenoSearchPanelList.append(
@@ -6007,13 +6033,13 @@ function renderStenoSearchPanel(panel) {
   }
 
   if (sections.length === 0) {
-    if (results.length === 0 && postmortems.length === 0) {
+    if (results.length === 0 && postmortems.length === 0 && corpusSummaries.length === 0) {
       stenoSearchPanelList.append(item("No Steno search readiness sections", "empty", "Refresh the read-only Steno search panel."));
     }
     return;
   }
 
-  if (results.length > 0 || postmortems.length > 0) {
+  if (results.length > 0 || postmortems.length > 0 || corpusSummaries.length > 0) {
     stenoSearchPanelList.append(item("Read-only Steno readiness", `${sections.length} sections`, "Search results above are local evidence/transcript records; capture/export/live MCP remain disabled."));
   }
 
@@ -8308,6 +8334,9 @@ async function loadStenoSearchPanel(query = "") {
     searched_file_count: 0,
     matched_file_count: 0,
     postmortem_result_count: 0,
+    corpus_summary_count: dashboard.sections?.length ?? 0,
+    corpus_file_count: 0,
+    corpus_total_bytes: 0,
     max_results: 18,
     max_file_bytes: 262144,
     transcript_bundle_count: dashboard.transcript_bundle_count,
@@ -8337,6 +8366,22 @@ async function loadStenoSearchPanel(query = "") {
     execution_enabled: dashboard.execution_enabled,
     results: [],
     recent_postmortem_results: [],
+    corpus_summaries: (dashboard.sections ?? []).map((section) => ({
+      category: section.section_id ?? "preview",
+      directory_path: section.source_ledger ?? "resolved by Tauri runtime",
+      directory_exists: false,
+      allowed_file_count: 0,
+      skipped_large_file_count: 0,
+      total_bytes: 0,
+      newest_record_ms: 0,
+      read_only: true,
+      capture_enabled: false,
+      export_enabled: false,
+      live_index_enabled: false,
+      writes_allowed: false,
+      execution_enabled: false,
+      status: "steno_corpus_browser_preview_read_only",
+    })),
     sections: dashboard.sections,
     reasons: [
       "Static preview binds the Steno query but defers local record reads to the Tauri runtime.",

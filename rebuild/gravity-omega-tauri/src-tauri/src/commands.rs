@@ -5758,6 +5758,24 @@ pub struct StenoSearchResult {
     pub status: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct StenoCorpusSummary {
+    pub category: String,
+    pub directory_path: String,
+    pub directory_exists: bool,
+    pub allowed_file_count: usize,
+    pub skipped_large_file_count: usize,
+    pub total_bytes: u64,
+    pub newest_record_ms: u64,
+    pub read_only: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub live_index_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub status: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct StenoSearchRequest {
     #[serde(default)]
@@ -5778,6 +5796,9 @@ pub struct StenoSearchPanel {
     pub searched_file_count: usize,
     pub matched_file_count: usize,
     pub postmortem_result_count: usize,
+    pub corpus_summary_count: usize,
+    pub corpus_file_count: usize,
+    pub corpus_total_bytes: u64,
     pub max_results: usize,
     pub max_file_bytes: u64,
     pub transcript_bundle_count: usize,
@@ -5807,6 +5828,7 @@ pub struct StenoSearchPanel {
     pub execution_enabled: bool,
     pub results: Vec<StenoSearchResult>,
     pub recent_postmortem_results: Vec<StenoSearchResult>,
+    pub corpus_summaries: Vec<StenoCorpusSummary>,
     pub sections: Vec<StenoPetCompanionDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -102438,6 +102460,80 @@ fn steno_search_snippet(content: &str, query: &str) -> Option<(usize, String)> {
     })
 }
 
+fn steno_corpus_summaries(max_file_bytes: u64) -> Result<Vec<StenoCorpusSummary>, String> {
+    let mut summaries = Vec::new();
+
+    for (category, dir) in steno_search_dirs()? {
+        let mut allowed_file_count = 0;
+        let mut skipped_large_file_count = 0;
+        let mut total_bytes = 0;
+        let mut newest_record_ms = 0;
+        let directory_exists = dir.exists();
+
+        if directory_exists {
+            for entry in fs::read_dir(&dir).map_err(|error| {
+                format!(
+                    "failed to read Steno corpus directory {}: {error}",
+                    dir.display()
+                )
+            })? {
+                let entry = entry.map_err(|error| {
+                    format!(
+                        "failed to read Steno corpus directory entry {}: {error}",
+                        dir.display()
+                    )
+                })?;
+                let path = entry.path();
+                if !path.is_file() || !steno_search_file_allowed(&path) {
+                    continue;
+                }
+
+                let metadata = match path.metadata() {
+                    Ok(metadata) => metadata,
+                    Err(_) => continue,
+                };
+                if metadata.len() > max_file_bytes {
+                    skipped_large_file_count += 1;
+                    continue;
+                }
+
+                allowed_file_count += 1;
+                total_bytes += metadata.len();
+                newest_record_ms = newest_record_ms.max(steno_search_file_created_at(&path));
+            }
+        }
+
+        summaries.push(StenoCorpusSummary {
+            category: category.to_string(),
+            directory_path: dir.display().to_string(),
+            directory_exists,
+            allowed_file_count,
+            skipped_large_file_count,
+            total_bytes,
+            newest_record_ms,
+            read_only: true,
+            capture_enabled: false,
+            export_enabled: false,
+            live_index_enabled: false,
+            writes_allowed: false,
+            execution_enabled: false,
+            status: if directory_exists {
+                "steno_corpus_summary_read_only".to_string()
+            } else {
+                "steno_corpus_directory_missing_read_only".to_string()
+            },
+        });
+    }
+
+    summaries.sort_by(|left, right| {
+        right
+            .allowed_file_count
+            .cmp(&left.allowed_file_count)
+            .then_with(|| left.category.cmp(&right.category))
+    });
+    Ok(summaries)
+}
+
 fn run_steno_search(
     query: &str,
     max_results: usize,
@@ -102619,6 +102715,16 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
     let search_ran = !query.is_empty();
     let recent_postmortem_results = steno_recent_postmortem_results(max_results.min(8))?;
     let postmortem_result_count = recent_postmortem_results.len();
+    let corpus_summaries = steno_corpus_summaries(max_file_bytes)?;
+    let corpus_summary_count = corpus_summaries.len();
+    let corpus_file_count = corpus_summaries
+        .iter()
+        .map(|summary| summary.allowed_file_count)
+        .sum();
+    let corpus_total_bytes = corpus_summaries
+        .iter()
+        .map(|summary| summary.total_bytes)
+        .sum();
 
     Ok(StenoSearchPanel {
         status: "steno_search_panel_read_only",
@@ -102629,6 +102735,9 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         searched_file_count,
         matched_file_count,
         postmortem_result_count,
+        corpus_summary_count,
+        corpus_file_count,
+        corpus_total_bytes,
         max_results,
         max_file_bytes,
         transcript_bundle_count: dashboard.transcript_bundle_count,
@@ -102658,6 +102767,7 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         execution_enabled: dashboard.execution_enabled,
         results,
         recent_postmortem_results,
+        corpus_summaries,
         sections: dashboard.sections,
         reasons: vec![
             "panel searches only approved Gravity Omega evidence and transcript record directories",
@@ -117453,6 +117563,26 @@ sleep 2
             panel.postmortem_result_count,
             panel.recent_postmortem_results.len()
         );
+        assert_eq!(panel.corpus_summary_count, panel.corpus_summaries.len());
+        assert_eq!(
+            panel.corpus_file_count,
+            panel
+                .corpus_summaries
+                .iter()
+                .map(|summary| summary.allowed_file_count)
+                .sum::<usize>()
+        );
+        assert!(panel.corpus_summary_count >= 5);
+        assert!(panel.corpus_summaries.iter().any(|summary| {
+            summary.category == "pet-signal"
+                && summary.read_only
+                && !summary.capture_enabled
+                && !summary.export_enabled
+                && !summary.live_index_enabled
+                && !summary.writes_allowed
+                && !summary.execution_enabled
+                && summary.status.starts_with("steno_corpus_")
+        }));
         assert!(panel.results.is_empty());
         assert!(panel.section_count >= 5);
         assert!(panel.read_only);
@@ -117508,6 +117638,18 @@ sleep 2
             panel.postmortem_result_count,
             panel.recent_postmortem_results.len()
         );
+        assert_eq!(panel.corpus_summary_count, panel.corpus_summaries.len());
+        assert!(panel.corpus_summaries.iter().any(|summary| {
+            summary.category == "pet-signal"
+                && summary.allowed_file_count >= 1
+                && summary.total_bytes > 0
+                && summary.read_only
+                && !summary.capture_enabled
+                && !summary.export_enabled
+                && !summary.live_index_enabled
+                && !summary.writes_allowed
+                && !summary.execution_enabled
+        }));
         assert!(panel.transcript_read_enabled);
         assert!(panel.transcript_index_enabled);
         assert!(panel.query_binding_enabled);
