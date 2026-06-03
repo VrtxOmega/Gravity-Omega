@@ -10292,8 +10292,8 @@ async function runSupervisedRuntimeSmoke(target = "rust-build") {
       writes_allowed: false,
       task_execution_enabled: false,
       records: [],
-      blockers: ["Tauri runtime is required to run supervised runtime smoke probes."],
-      next_step: "Open the native app runtime to capture supervised process transcripts.",
+      blockers: ["Open Gravity Omega as the native desktop app to run supervised runtime smoke probes."],
+      next_step: "Launch the native app, then capture supervised process transcripts.",
     };
   }
 
@@ -10340,8 +10340,8 @@ async function runAgentTranscriptSession(runtime = "all") {
       writes_allowed: false,
       execution_enabled: false,
       records: [],
-      blockers: ["Tauri runtime is required to run Codex/Hermes transcript sessions."],
-      next_step: "Open the native app runtime to capture fixed agent-runtime transcripts.",
+      blockers: ["Open Gravity Omega as the native desktop app to run Codex/Hermes transcript sessions."],
+      next_step: "Launch the native app, then record the agent-runtime transcript evidence from this rail.",
     };
   }
 
@@ -10394,8 +10394,8 @@ async function runUnlockedAgentPromptSession(runtime = "codex-workspace-write", 
       writes_allowed: false,
       execution_enabled: false,
       records: [],
-      blockers: ["Tauri runtime is required to run unlocked Codex/Hermes prompts."],
-      next_step: "Open the native app runtime to run unlocked agent prompts.",
+      blockers: ["Open Gravity Omega as the native desktop app to run Codex/Hermes prompts."],
+      next_step: "Launch the native app, then run the prompt from the operator rail.",
     };
   }
 
@@ -26094,10 +26094,10 @@ function initOmegaProductShell() {
     } catch {
       // Ignore storage failures; the visual reset still applies.
     }
-    setProductLayoutSize("chat", cssPixelValue("--chat-width", 320), false);
+    setProductLayoutSize("chat", 360, false);
     setProductLayoutSize("bottom", cssPixelValue("--bottom-panel-height", 180), false);
-    appendEvidenceText("layout reset to 320px chat rail and 180px bottom dock");
-    setOutputText("Product layout reset to the parity workbench chat rail and bottom panel dimensions.");
+    appendEvidenceText("layout reset to 360px chat rail and 180px bottom dock");
+    setOutputText("Product layout reset to the operator rail and bottom panel defaults.");
     setProductStatus("Product layout reset.", "done");
   };
 
