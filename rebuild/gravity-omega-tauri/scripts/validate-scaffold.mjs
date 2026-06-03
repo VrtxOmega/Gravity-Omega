@@ -867,6 +867,9 @@ for (const productBridgeNeedle of [
   "Blocked terminal command:",
   "Process control:",
   "Process exit:",
+  "stenoPreviewMarkdown",
+  "attachStenoResultPreview",
+  "panel-read-only",
 ]) {
   if (!frontendSource.includes(productBridgeNeedle)) {
     throw new Error(`Visible workbench prompt bridge missing ${productBridgeNeedle}.`);
@@ -2776,6 +2779,8 @@ for (const elementId of [
   "steno-search-query",
   "steno-search-run-btn",
   "steno-search-panel-list",
+  "steno-search-result-preview",
+  "steno-search-result-preview-meta",
   "run-agent-transcript-session-btn",
   "agent-transcript-session-summary",
   "agent-transcript-session-ledger",

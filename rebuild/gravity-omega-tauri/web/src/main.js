@@ -164,6 +164,8 @@ const stenoSearchPanelSummary = document.querySelector("#steno-search-panel-summ
 const stenoSearchQueryInput = document.querySelector("#steno-search-query");
 const stenoSearchRunBtn = document.querySelector("#steno-search-run-btn");
 const refreshStenoSearchPanelBtn = document.querySelector("#refresh-steno-search-panel-btn");
+const stenoSearchResultPreview = document.querySelector("#steno-search-result-preview");
+const stenoSearchResultPreviewMeta = document.querySelector("#steno-search-result-preview-meta");
 const terminalProcessLaneDashboardList = document.querySelector("#terminal-process-lane-dashboard-list");
 const terminalProcessLaneDashboardCount = document.querySelector("#terminal-process-lane-dashboard-count");
 const terminalProcessLaneDashboardSummary = document.querySelector("#terminal-process-lane-dashboard-summary");
@@ -842,6 +844,57 @@ function item(title, meta, text) {
 
   node.append(heading, badge, body);
   return node;
+}
+
+function stenoPreviewMarkdown(result, kind = "result") {
+  const title = result?.title || "Steno evidence match";
+  const category = result?.category || "evidence";
+  const status = result?.status || "read-only";
+  const line = result?.line_number ? `line ${result.line_number}` : "line unavailable";
+  const path = result?.record_path || "record path unavailable";
+  const snippet = result?.snippet || "No snippet recorded.";
+  return [
+    `# ${title}`,
+    "",
+    `- kind: ${kind}`,
+    `- category: ${category}`,
+    `- status: ${status}`,
+    `- source: ${path}`,
+    `- ${line}`,
+    "- mode: read-only preview; no capture/export/write/execute action is enabled",
+    "",
+    "```text",
+    snippet,
+    "```",
+    "",
+  ].join("\n");
+}
+
+function attachStenoResultPreview(node, result, kind = "result") {
+  if (!node || !result) return;
+  const title = result.title || "Steno evidence match";
+  const path = result.record_path || "steno-result.md";
+  const preview = stenoPreviewMarkdown(result, kind);
+  node.tabIndex = 0;
+  node.setAttribute("role", "button");
+  node.setAttribute("aria-label", `Preview ${title} in the read-only Steno panel`);
+  node.dataset.previewTarget = "panel-read-only";
+  const openPreview = () => {
+    if (stenoSearchResultPreview) {
+      stenoSearchResultPreview.textContent = preview;
+    }
+    if (stenoSearchResultPreviewMeta) {
+      stenoSearchResultPreviewMeta.textContent = `preview=${kind} | source=${path} | writes=false | export=false | exec=false`;
+    }
+
+  };
+  node.addEventListener("click", openPreview);
+  node.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openPreview();
+    }
+  });
 }
 
 function tauriInvoke() {
@@ -5987,6 +6040,12 @@ function renderStenoSearchPanel(panel) {
   ].join(" | ");
 
   clearList(stenoSearchPanelList);
+  if (stenoSearchResultPreview) {
+    stenoSearchResultPreview.textContent = "Select a Steno search result to preview its read-only snippet.";
+  }
+  if (stenoSearchResultPreviewMeta) {
+    stenoSearchResultPreviewMeta.textContent = "No Steno result selected.";
+  }
   const results = panel.results ?? [];
   const postmortems = panel.recent_postmortem_results ?? [];
   const corpusSummaries = panel.corpus_summaries ?? [];
@@ -6035,6 +6094,7 @@ function renderStenoSearchPanel(panel) {
     ].filter(Boolean).join(" / ");
     const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
     node.dataset.state = "warning";
+    attachStenoResultPreview(node, result, "postmortem");
     stenoSearchPanelList.append(node);
   }
 
@@ -6057,6 +6117,7 @@ function renderStenoSearchPanel(panel) {
     ].filter(Boolean).join(" / ");
     const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
     node.dataset.state = "ready";
+    attachStenoResultPreview(node, result, "result");
     stenoSearchPanelList.append(node);
   }
 
