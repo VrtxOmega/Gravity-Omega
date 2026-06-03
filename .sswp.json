@@ -1,10 +1,10 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-06-03T09:04:02.582Z",
+  "timestamp": "2026-06-03T11:16:50.399Z",
   "target": {
     "name": "gravity-omega",
     "repo": "/home/rage/apps/gravity-omega-rust-rebuild",
-    "commitHash": "0e817474be918adfc9071409cae3e4b11a3d1a3c",
+    "commitHash": "9f1814ecd95f7140c09383e35586631ef150d9e3",
     "branch": "codex/gravity-omega-daily-driver-agent-loop"
   },
   "environment": {
@@ -108,13 +108,13 @@
       "gate": "GIT_INTEGRITY",
       "status": "PASS",
       "evidence": "Working tree clean",
-      "durationMs": 34
+      "durationMs": 6
     },
     {
       "gate": "LOCKFILE",
       "status": "PASS",
       "evidence": "package-lock.json present",
-      "durationMs": 1
+      "durationMs": 0
     },
     {
       "gate": "DETERMINISTIC_BUILD",
@@ -126,13 +126,13 @@
       "gate": "TEST_PASS",
       "status": "PASS",
       "evidence": "All tests passed",
-      "durationMs": 100751
+      "durationMs": 55173
     },
     {
       "gate": "LINT",
       "status": "PASS",
       "evidence": "npx passed",
-      "durationMs": 988
+      "durationMs": 1338
     }
   ],
   "adversarial": {
@@ -347,8 +347,8 @@
     "overallRisk": 0.4
   },
   "seal": {
-    "chainHash": "607449c6082e19dd8502b1673d77df03a0ccc85f255cc5caba2e01d84884c389",
-    "sequence": 37
+    "chainHash": "3d79e72acb3a080143329975e0a1092406d91d7eecce45e9f9e0bed6a7d10453",
+    "sequence": 5
   },
-  "signature": "d7a45842c10152730d8a9c3db63cf4a25415360c05cb2c3166f2daf03032e14b"
+  "signature": "e8a9b7be0249eb43c90ddaee37bb7985c00ed7d552b8727d8591b70944604fa9"
 }
