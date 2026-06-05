@@ -131,12 +131,22 @@ for (const launcherNeedle of [
   "set -euo pipefail",
   "gravity-omega-native",
   "launcher.log",
+  "source_head=",
+  "source_commit_epoch",
+  "binary_mtime_epoch",
+  "launch blocked: release binary is older than source HEAD",
+  "GRAVITY_OMEGA_ALLOW_STALE_BINARY",
+  "GRAVITY_OMEGA_LAUNCHER_DRY_RUN",
+  "launch dry-run passed",
+  "RUST_BACKTRACE",
+  "WEBKIT_DISABLE_DMABUF_RENDERER",
   "cd \"$app_root\"",
   "set +e",
-  "/usr/bin/setsid -f \"$binary\" >>\"$log_file\" 2>&1",
+  "/usr/bin/setsid \"$binary\" >>\"$log_file\" 2>&1 &",
   "set -e",
   "launch requested",
   "launch spawn status",
+  "pid=",
 ]) {
   if (!desktopLauncherScriptSource.includes(launcherNeedle)) {
     throw new Error(`Desktop launcher script missing ${launcherNeedle}.`);
