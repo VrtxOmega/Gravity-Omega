@@ -97,8 +97,8 @@
 
           <section class="omega-side-panel" data-panel-content="omega" aria-label="Omega panel">
             <div class="omega-integration-grid" id="omega-first-class-status-grid">
-              <button type="button" data-panel-action="codex" data-action-glyph="Cx"><strong>Codex</strong><span>write runtime unlocked</span></button>
-              <button type="button" data-panel-action="hermes" data-action-glyph="HK"><strong>Hermes</strong><span>companion runtime unlocked</span></button>
+              <button type="button" data-panel-action="codex" data-action-glyph="Cx"><strong>Codex</strong><span>focused coding executor</span></button>
+              <button type="button" data-panel-action="hermes" data-action-glyph="HK"><strong>Hermes</strong><span>context hub and operator partner</span></button>
               <button type="button" data-panel-action="mcp" data-action-glyph="M"><strong>MCP</strong><span id="omega-mcp-status-line">loading readiness</span></button>
               <button type="button" data-panel-action="joint-ci" data-action-glyph="CI"><strong>Joint CI</strong><span>plan, delegate, compare, reconcile</span></button>
             </div>
@@ -250,8 +250,32 @@
             <div id="omega-monaco-container" aria-label="Gravity Omega Monaco editor"></div>
             <div id="omega-home-surface" aria-label="Gravity Omega home surface" hidden>
               <div class="omega-home-grid" aria-hidden="true"></div>
-              <div class="omega-home-mark" aria-hidden="true">&Omega;</div>
-              <div class="omega-home-title">Gravity Omega</div>
+              <div class="omega-home-command-center">
+                <div class="omega-home-kicker">Sovereign control plane</div>
+                <div class="omega-home-mark" aria-hidden="true">&Omega;</div>
+                <div class="omega-home-title">Gravity Omega</div>
+                <p class="omega-home-subtitle">Run Codex and Hermes with visible evidence, approval gates, and VERITAS/SSWP/Steno context in one operator console.</p>
+                <div class="omega-home-actions" aria-label="Available workbench actions">
+                  <span>Run Main</span>
+                  <span>Codex Only</span>
+                  <span>Hermes Only</span>
+                  <span>Evidence</span>
+                </div>
+                <div class="omega-home-next">
+                  <article>
+                    <strong>1. Describe the work</strong>
+                    <span>Use the right rail. Gravity keeps file, output, problem, and terminal context attached.</span>
+                  </article>
+                  <article>
+                    <strong>2. Choose the lane</strong>
+                    <span>Main for paired Codex/Hermes, Codex for focused edits, Hermes for context/recovery.</span>
+                  </article>
+                  <article>
+                    <strong>3. Verify the evidence</strong>
+                    <span>Bottom dock and Vault lanes show task runs, artifacts, gates, and SSWP/VERITAS status.</span>
+                  </article>
+                </div>
+              </div>
             </div>
             <div id="omega-computer-main-surface" aria-label="Omega Computer control surface" hidden></div>
             <div id="omega-panel-main-surface" aria-label="Omega sidebar control surface" hidden></div>
@@ -279,6 +303,7 @@
                 <span id="omega-terminal-session-duration">duration: 0ms</span>
                 <span id="omega-terminal-session-record">record: none</span>
                 <button id="omega-terminal-clear" type="button">Clear</button>
+                <button id="omega-terminal-stop" type="button" disabled>Stop</button>
                 <button id="omega-terminal-show-evidence" type="button">Evidence</button>
               </div>
               <div id="omega-xterm-surface"></div>
@@ -346,8 +371,8 @@
           <div id="omega-chat-resizer-product" class="omega-product-resizer vertical" role="separator" aria-orientation="vertical" tabindex="0"></div>
           <header class="omega-chat-header">
             <div>
-              <div class="omega-chat-title">&Omega; OMEGA AGENT</div>
-              <div class="omega-chat-subtitle">Codex Lead + Hermes/Kimi</div>
+              <div class="omega-chat-title">&Omega; Operator Run Rail</div>
+              <div class="omega-chat-subtitle">Codex executor + Hermes context</div>
             </div>
             <div class="omega-mcp-dots" aria-label="MCP health">
               <span class="omega-mcp-dot ok">B</span>
@@ -359,7 +384,7 @@
           <details class="omega-agent-run-center" id="omega-agent-run-center-details" aria-label="Codex Hermes Joint CI run center">
             <summary class="omega-agent-run-center-summary">
               <span>
-                <strong>Codex / Hermes Run Center</strong>
+                <strong>Run Center</strong>
                 <small id="omega-product-agent-run-compact">0 sessions / 0 plans / 0 packets</small>
               </span>
               <span class="omega-agent-run-center-chevron" aria-hidden="true"></span>
@@ -394,12 +419,13 @@
               <button class="active" type="button" data-agent-run-mode="codex-lead" aria-pressed="true">Dual Main</button>
               <button type="button" data-agent-run-mode="evidence-compare" aria-pressed="false">Evidence Compare</button>
             </div>
-            <textarea id="omega-chat-input-parity" rows="4" placeholder="Describe the work. Ctrl+Enter runs Codex Lead + Hermes/Kimi." aria-label="Omega chat input"></textarea>
+            <textarea id="omega-chat-input-parity" rows="4" placeholder="Describe the work. Ctrl+Enter runs the main paired lane." aria-label="Omega chat input"></textarea>
             <div class="omega-chat-actions">
               <button id="omega-parity-send" type="button">Run Main</button>
               <button id="omega-parity-codex-write" type="button">Codex Only</button>
               <button id="omega-parity-hermes" type="button">Hermes Only</button>
               <button id="omega-parity-compare" type="button">Run Dual</button>
+              <button id="omega-parity-recover" type="button" data-recovery-action="agent-run" disabled>Recover</button>
             </div>
             <div id="omega-parity-composer-status">Ready.</div>
           </div>
@@ -1446,6 +1472,8 @@
               <button id="steno-search-run-btn" class="panel-mini-btn" type="button">Search</button>
             </div>
             <div id="steno-search-panel-list" class="list"></div>
+            <pre id="steno-search-result-preview" class="artifact-preview">Select a Steno search result to preview its read-only snippet.</pre>
+            <p id="steno-search-result-preview-meta" class="mono-line">No Steno result selected.</p>
           </article>
 
           <article class="panel">

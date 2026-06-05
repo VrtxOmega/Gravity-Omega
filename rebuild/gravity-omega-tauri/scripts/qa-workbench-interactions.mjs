@@ -436,6 +436,13 @@ async function workbenchQa() {
       assert(text("#omega-parity-chat-messages").includes("Latest Omega Computer recap"), "status follow-up posts latest run recap");
       assert(text("#omega-product-status-detail").toLowerCase().includes("recap"), "status follow-up updates status detail");
     }
+    chatInput.value = "status";
+    chatInput.dispatchEvent(new Event("input", { bubbles: true }));
+    chatInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true }));
+    interactions.push("keyboard:ctrl-enter-status-recap");
+    await sleep(220);
+    assert(text("#omega-parity-chat-messages").includes("Latest Omega Computer recap"), "Ctrl+Enter posts latest run recap without launching a new run");
+    assert(document.querySelector("#omega-parity-recover")?.disabled, "recover button stays disabled when no active run is present");
     chatInput.value = longPrompt;
     chatInput.dispatchEvent(new Event("input", { bubbles: true }));
   } else {

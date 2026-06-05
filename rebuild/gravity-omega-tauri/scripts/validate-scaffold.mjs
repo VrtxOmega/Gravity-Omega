@@ -131,12 +131,22 @@ for (const launcherNeedle of [
   "set -euo pipefail",
   "gravity-omega-native",
   "launcher.log",
+  "source_head=",
+  "source_commit_epoch",
+  "binary_mtime_epoch",
+  "launch blocked: release binary is older than source HEAD",
+  "GRAVITY_OMEGA_ALLOW_STALE_BINARY",
+  "GRAVITY_OMEGA_LAUNCHER_DRY_RUN",
+  "launch dry-run passed",
+  "RUST_BACKTRACE",
+  "WEBKIT_DISABLE_DMABUF_RENDERER",
   "cd \"$app_root\"",
   "set +e",
-  "/usr/bin/setsid -f \"$binary\" >>\"$log_file\" 2>&1",
+  "/usr/bin/setsid \"$binary\" >>\"$log_file\" 2>&1 &",
   "set -e",
   "launch requested",
   "launch spawn status",
+  "pid=",
 ]) {
   if (!desktopLauncherScriptSource.includes(launcherNeedle)) {
     throw new Error(`Desktop launcher script missing ${launcherNeedle}.`);
@@ -159,13 +169,20 @@ for (const scriptNeedle of [
 for (const unlockedNeedle of [
   "run_unlocked_agent_prompt_session",
   "run_unlocked_agent_prompt_session_stream",
+  "cancel_unlocked_agent_prompt_session_stream",
   "unlocked-agent-prompt-stream",
   "UnlockedAgentPromptSessionRecord",
+  "UnlockedAgentPromptSessionCancelRequest",
+  "UnlockedAgentPromptSessionCancelResult",
+  "UNLOCKED_AGENT_PROMPT_STREAM_PROCESSES",
+  "unlocked_agent_prompt_stream_cancel_requested",
+  "unlocked_agent_prompt_stream_cancelled",
+  "kill_delegated_to_stream_worker",
   "prompt_stdin: Option<String>",
   "unlocked_agent_prompt_stdin_mode",
   "write_unlocked_agent_prompt_stdin",
   "hermes_log_write_preflight",
-  "Hermes/Kimi log path is not writable for this Gravity Omega process",
+  "Hermes log path is not writable for this Gravity Omega process",
   "<prompt:stdin>",
   ".stdin(unlocked_agent_prompt_stdin_mode",
   "codex-workspace-write",
@@ -203,11 +220,11 @@ if (/workspace_arg\.clone\(\),\s*prompt\.to_string\(\),/.test(rustCommandsSource
 const hermesAssistProcessStart = rustCommandsSource.indexOf("fn run_hermes_kimi_assist_process_with_binary");
 const hermesAssistProcessEnd = rustCommandsSource.indexOf("#[tauri::command]\npub fn record_hermes_kimi_assist_brief", hermesAssistProcessStart);
 if (hermesAssistProcessStart < 0 || hermesAssistProcessEnd < hermesAssistProcessStart) {
-  throw new Error("Hermes/Kimi assist process runner body is missing.");
+  throw new Error("Hermes assist process runner body is missing.");
 }
 const hermesAssistProcessBody = rustCommandsSource.slice(hermesAssistProcessStart, hermesAssistProcessEnd);
 if (hermesAssistProcessBody.includes("wait_with_output")) {
-  throw new Error("Hermes/Kimi assist runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
+  throw new Error("Hermes assist runner must drain stdout/stderr pipes while the process runs, not wait_with_output afterward.");
 }
 
 const productTerminalProcessStart = rustCommandsSource.indexOf("fn run_product_terminal_command_process");
@@ -232,6 +249,10 @@ for (const terminalStreamNeedle of [
   "timeout_kill_sent",
   "wait_after_kill_ms",
   "partial_output_captured",
+  "cancellation_requested",
+  "cancel_kill_sent",
+  "product_terminal_stream_cancel_requested",
+  "product_terminal_stream_cancelled",
   "timeout_ms",
 ]) {
   if (!productTerminalStreamBody.includes(terminalStreamNeedle)) {
@@ -375,6 +396,7 @@ for (const productShellNeedle of [
   "omega-terminal-session-duration",
   "omega-terminal-session-record",
   "omega-terminal-clear",
+  "omega-terminal-stop",
   "omega-terminal-show-evidence",
   "omega-xterm-surface",
   "omega-output-view",
@@ -448,15 +470,18 @@ for (const productShellNeedle of [
   "omega-parity-codex-write",
   "omega-parity-hermes",
   "omega-parity-compare",
+  "omega-parity-recover",
   "omega-agent-mode-row",
   "data-agent-run-mode=\"codex-lead\"",
   "data-agent-run-mode=\"evidence-compare\"",
-  "Codex Lead + Hermes/Kimi",
-  "Describe the work. Ctrl+Enter runs Codex Lead + Hermes/Kimi.",
+  "Operator Run Rail",
+  "Codex executor + Hermes context",
+  "Describe the work. Ctrl+Enter runs the main paired lane.",
   "Run Main",
   "Codex Only",
   "Hermes Only",
   "Run Dual",
+  "Recover",
   "Workbench ready. Ask Omega, Codex, or Hermes from the right rail.",
   "omega-bottom-panel",
 ]) {
@@ -472,6 +497,7 @@ for (const productBridgeNeedle of [
   "product_workspace_search",
   "run_product_terminal_command",
   "run_product_terminal_command_stream",
+  "cancel_product_terminal_stream",
   "record_product_terminal_transcript_replay",
   "list_product_terminal_transcript_replays",
   "record_sovereign_docs_preview",
@@ -584,6 +610,16 @@ for (const productBridgeNeedle of [
   "timeout_ms: 900000",
   "runAgentComparison",
   "runPrimaryAgentWork",
+  "cancelUnlockedAgentPromptSessionStream",
+  "recoverAgentRunUi",
+  "ignoredAgentStreamIds",
+  "Run Recovery Requested",
+  "backend_cancel_status",
+  "backend_cancellation_requested",
+  "backend_cancel_pid",
+  "kill_delegated_to_stream_worker",
+  "Requested backend cancellation for the tracked stream",
+  "Late events from this recovered session will be ignored by the UI.",
   "createComparisonSummary",
   "compareExistingAgentEvidence",
   "isAgentRunStatusFollowup",
@@ -671,7 +707,7 @@ for (const productBridgeNeedle of [
   "activeArtifactPreview",
   "openArtifactPreviewOverlay",
   "closeArtifactPreviewOverlay",
-  "layout reset to 320px chat rail and 180px bottom dock",
+  "layout reset to 360px chat rail and 180px bottom dock",
   "productSidebarStorageKey",
   "omega-sidebar-collapsed",
   "setProductSidebarCollapsed",
@@ -772,6 +808,12 @@ for (const productBridgeNeedle of [
   "timeout_postmortem_count",
   "unlocked-agent-prompt-sessions",
   "transcript_evidence_ready",
+  "outcome_category",
+  "stage_summary",
+  "failure_summary",
+  "operator_next_action",
+  "preflight_passed",
+  "Hermes execution stages",
   "stdout_transcript_found",
   "stderr_transcript_line_count",
   "stdout_preview_source",
@@ -787,8 +829,8 @@ for (const productBridgeNeedle of [
   "record_process_spawn_enabled",
   'source_id: "hermes-kimi-assist"',
   "stderr_preview_source",
-  "Hermes/Kimi Live Capability Inventory",
-  "Hermes/Kimi Assist Brief",
+  "Hermes Live Capability Inventory",
+  "Hermes Assist Brief",
   "runtimeInventory",
   "hermesAssist",
   "includeFullInventory = false",
@@ -800,8 +842,8 @@ for (const productBridgeNeedle of [
   "frontend/frontend-visual-polish",
   "software-development/test-driven-development",
   "veritas/veritas-omega-code",
-  "Kimi 2.6",
-  "Kimi/Moonshot",
+  "Hermes owns the active model/profile",
+  "future providers are Hermes configuration details",
   "omega-stenographer",
   "sswp",
   "recent_pet_runtime_signals",
@@ -820,17 +862,24 @@ for (const productBridgeNeedle of [
   "timeout_kill_sent",
   "wait_after_kill_ms",
   "partial_output_captured",
+  "cancellation_requested",
+  "cancel_kill_sent",
   "pipeReaders=",
   "activeTerminalStreamRun",
+  "cancelTerminalStream",
   "recordTerminalStreamLifecycleEvent",
   "tickTerminalStreamWatchdog",
   "data-terminal-stream-session",
   "terminal stream stale warning",
   "Terminal session:",
   "Terminal replay:",
+  "No backend terminal kill is claimed",
   "Blocked terminal command:",
   "Process control:",
   "Process exit:",
+  "stenoPreviewMarkdown",
+  "attachStenoResultPreview",
+  "panel-read-only",
 ]) {
   if (!frontendSource.includes(productBridgeNeedle)) {
     throw new Error(`Visible workbench prompt bridge missing ${productBridgeNeedle}.`);
@@ -890,7 +939,7 @@ if (!primaryFunctionBody.includes("isAgentRunStatusFollowup(prompt)") || !primar
 
 const sendHandlerMatch = frontendSource.match(/sendBtn\?\.addEventListener\("click", \(\) => \{[\s\S]*?\n  \}\);\n\n  const runVisibleAgent/);
 if (!sendHandlerMatch || !sendHandlerMatch[0].includes("runPrimaryAgentWork")) {
-  throw new Error("Primary composer Send button must run the Codex Lead + Hermes/Kimi main work path.");
+  throw new Error("Primary composer Send button must run the Codex Lead + Hermes main work path.");
 }
 
 if (sendHandlerMatch[0].includes("runVisibleAgent(\"codex-readonly\"")) {
@@ -921,6 +970,22 @@ if (!frontendSource.includes("agentRunStaleEventThresholdMs") || !frontendSource
 
 if (!frontendSource.includes("Omega Agent Work is still being updated in Monaco.")) {
   throw new Error("Agent run watchdog must update the visible chat answer when a stream goes quiet.");
+}
+
+if (!frontendSource.includes("const recoverAgentRunUi = async () => {") || !frontendSource.includes("recoverBtn?.addEventListener(\"click\"")) {
+  throw new Error("Agent runs must expose an operator recovery control for wedged visible run state.");
+}
+
+if (!frontendSource.includes("ignoredAgentStreamIds.has(payload.session_id)") || !frontendSource.includes("rememberIgnoredAgentStreamId(snapshot.sessionId)")) {
+  throw new Error("Recovered agent streams must be ignored so stale lifecycle events cannot resurrect old run state.");
+}
+
+if (
+  !frontendSource.includes("cancelUnlockedAgentPromptSessionStream") ||
+  !frontendSource.includes("backend_cancellation_requested") ||
+  !frontendSource.includes("No backend kill is claimed because the cancellation request was not accepted.")
+) {
+  throw new Error("Agent run recovery must request tracked backend cancellation first, then honestly fall back to UI recovery.");
 }
 
 if (!frontendSource.includes("agentRunFinalSummaryText({ label, runtime, payload, readback, loaded })")) {
@@ -962,9 +1027,9 @@ if (codexLeadFunctionBody.includes("Waiting for readable stream output")) {
 for (const prepNeedle of [
   "await updateCodexLeadPreparationStatus(\"Codex Lead recording orchestration\"",
   "await updateCodexLeadPreparationStatus(\"Codex Lead orchestration recorded\"",
-  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory running\"",
-  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi inventory recorded\"",
-  "await updateCodexLeadPreparationStatus(\"Hermes/Kimi assist running\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes inventory running\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes inventory recorded\"",
+  "await updateCodexLeadPreparationStatus(\"Hermes assist running\"",
   "timeoutMs: codexLeadAssistTimeoutMs",
   "await updateCodexLeadPreparationStatus(\"Codex Lead stream handoff\"",
 ]) {
@@ -974,12 +1039,12 @@ for (const prepNeedle of [
 }
 
 if (!frontendSource.includes("const codexLeadAssistTimeoutMs = 15000")) {
-  throw new Error("Run Dual must use an explicit shorter renderer-side Hermes/Kimi assist timeout.");
+  throw new Error("Run Dual must use an explicit shorter renderer-side Hermes assist timeout.");
 }
 
 const assistBriefFunctionMatch = frontendSource.match(/async function recordHermesKimiAssistBrief\(\{[\s\S]*?\n\}/);
 if (!assistBriefFunctionMatch?.[0]?.includes("timeoutMs = 15000") || !assistBriefFunctionMatch[0].includes("timeout_ms: timeoutMs")) {
-  throw new Error("Hermes/Kimi assist helper must accept and forward an explicit timeoutMs value.");
+  throw new Error("Hermes assist helper must accept and forward an explicit timeoutMs value.");
 }
 
 if (!codexLeadFunctionBody.includes("createCodexLeadOrchestrationRecord(prompt)")) {
@@ -991,23 +1056,23 @@ if (codexLeadFunctionBody.indexOf("createCodexLeadOrchestrationRecord(prompt)") 
 }
 
 if (!codexLeadFunctionBody.includes("recordHermesKimiCapabilityInventory(prompt)")) {
-  throw new Error("Run Dual must record a current Hermes/Kimi capability inventory before starting the stream.");
+  throw new Error("Run Dual must record a current Hermes capability inventory before starting the stream.");
 }
 
 if (codexLeadFunctionBody.indexOf("recordHermesKimiCapabilityInventory(prompt)") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
-  throw new Error("Hermes/Kimi capability inventory evidence must be created before the responsive stream starts.");
+  throw new Error("Hermes capability inventory evidence must be created before the responsive stream starts.");
 }
 
 if (!codexLeadFunctionBody.includes("recordHermesKimiAssistBrief({") || !codexLeadFunctionBody.includes("timeoutMs: codexLeadAssistTimeoutMs")) {
-  throw new Error("Run Dual must run a bounded Hermes/Kimi assist brief before starting the stream.");
+  throw new Error("Run Dual must run a bounded Hermes assist brief before starting the stream.");
 }
 
 if (codexLeadFunctionBody.indexOf("recordHermesKimiAssistBrief({") > codexLeadFunctionBody.indexOf("runUnlockedAgentPromptSessionStream(\"codex-workspace-write\"")) {
-  throw new Error("Hermes/Kimi assist evidence must be created before the responsive Codex stream starts.");
+  throw new Error("Hermes assist evidence must be created before the responsive Codex stream starts.");
 }
 
 if (!codexLeadFunctionBody.includes("codexLeadStreamingPrompt({ prompt, orchestration, hermesInventory, hermesAssist })")) {
-  throw new Error("Codex Lead stream prompt must include orchestration, Hermes/Kimi inventory, and Hermes/Kimi assist summaries.");
+  throw new Error("Codex Lead stream prompt must include orchestration, Hermes inventory, and Hermes assist summaries.");
 }
 
 const visibleAgentFunctionMatch = frontendSource.match(/const runVisibleAgent = async \(runtime, label\) => \{[\s\S]*?\n  \};\n\n  codexBtn/);
@@ -1128,6 +1193,7 @@ for (const productStyleNeedle of [
   ".omega-replace-row",
   ".omega-search-mode-row",
   ".omega-workspace-search-status",
+  "#omega-parity-recover",
   ".omega-first-class-dashboard",
   ".omega-dashboard-header",
   ".omega-first-class-dashboard-list",
@@ -1146,7 +1212,7 @@ for (const productStyleNeedle of [
   ".omega-product-resizer",
   "#omega-chat-panel-product",
   "#omega-bottom-panel",
-  "--product-chat-width: var(--chat-width)",
+  "--product-chat-width: 360px",
   "--product-bottom-height: var(--bottom-panel-height)",
   "grid-template-columns: var(--activity-width) var(--sidebar-width) minmax(560px, 1fr) minmax(var(--chat-min-width), var(--product-chat-width))",
   "grid-template-rows: 38px 34px minmax(260px, 1fr) var(--product-bottom-height)",
@@ -1384,6 +1450,7 @@ for (const command of [
   "record_pet_runtime_snapshot_signal",
   "run_unlocked_agent_prompt_session",
   "run_unlocked_agent_prompt_session_stream",
+  "cancel_unlocked_agent_prompt_session_stream",
   "list_unlocked_agent_prompt_sessions",
   "ui_ux_test_matrix",
   "codex_hermes_run_view_dashboard",
@@ -1432,6 +1499,7 @@ for (const command of [
   "product_workspace_search",
   "run_product_terminal_command",
   "run_product_terminal_command_stream",
+  "cancel_product_terminal_stream",
   "record_product_terminal_transcript_replay",
   "list_product_terminal_transcript_replays",
   "record_sovereign_docs_preview",
@@ -2721,6 +2789,8 @@ for (const elementId of [
   "steno-search-query",
   "steno-search-run-btn",
   "steno-search-panel-list",
+  "steno-search-result-preview",
+  "steno-search-result-preview-meta",
   "run-agent-transcript-session-btn",
   "agent-transcript-session-summary",
   "agent-transcript-session-ledger",
@@ -2934,6 +3004,12 @@ for (const runtimeDepthNeedle of [
   "product-terminal-transcript-replays",
   "product_terminal_transcript_replay_recorded",
   "ProductTerminalCommandProcessOutput",
+  "ProductTerminalStreamCancelRequest",
+  "ProductTerminalStreamCancelResult",
+  "PRODUCT_TERMINAL_STREAM_PROCESSES",
+  "product_terminal_stream_cancel_requested",
+  "product_terminal_stream_cancelled",
+  "kill_delegated_to_stream_worker",
   "spawn_product_terminal_pipe_reader",
   "run_product_terminal_command_process",
   "stdout_pipe_reader_enabled",
@@ -2941,6 +3017,8 @@ for (const runtimeDepthNeedle of [
   "timeout_kill_sent",
   "wait_after_kill_ms",
   "partial_output_captured",
+  "cancellation_requested",
+  "cancel_kill_sent",
   "recent_process_control_policies",
   "recent_process_exit_summaries",
   "\"terminal-blocked\"",
@@ -2995,8 +3073,12 @@ for (const runtimeDepthNeedle of [
   "hermes-kimi-assist-briefs",
   "hermes_kimi_assist_brief_recorded",
   "hermes_assist_is_postmortem",
+  "hermes_assist_outcome_category",
+  "hermes_assist_stage_summary",
+  "operator_next_action",
+  "transcript_evidence_ready",
   "hermes-kimi-assist-postmortem",
-  "Latest failed/timed-out Hermes/Kimi assist brief",
+  "Latest failed/timed-out Hermes assist brief",
   "compact_hermes_kimi_assist_query",
   "run_hermes_kimi_assist_process",
   "push_product_evidence_history_dir(&mut items, \"hermes-assist\"",

@@ -1,11 +1,11 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-05-17T09:03:05.204Z",
+  "timestamp": "2026-06-03T15:58:47.652Z",
   "target": {
     "name": "gravity-omega",
-    "repo": "/home/rage/apps/gravity-omega-v2",
-    "commitHash": "90cb76ac9c8a5e4d1bebe287cf6f910b264db624",
-    "branch": "main"
+    "repo": "/home/rage/apps/gravity-omega-rust-rebuild",
+    "commitHash": "5e0e0d173f61a4f1a99b289d524bdadc9416af55",
+    "branch": "codex/gravity-omega-daily-driver-agent-loop"
   },
   "environment": {
     "nodeVersion": "v22.22.2",
@@ -17,98 +17,98 @@
     {
       "name": "@modelcontextprotocol/sdk",
       "version": "1.29.0",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/@modelcontextprotocol/sdk",
-      "integrity": "7ab20eba8fee70f3",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/@modelcontextprotocol/sdk",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "chokidar",
       "version": "4.0.3",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/chokidar",
-      "integrity": "4764fed21a281c69",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/chokidar",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "dompurify",
       "version": "3.3.3",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/dompurify",
-      "integrity": "4253c493c64d91ca",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/dompurify",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "monaco-editor",
       "version": "0.52.2",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/monaco-editor",
-      "integrity": "c793288e0f0c27d5",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/monaco-editor",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "node-pty",
       "version": "1.1.0",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/node-pty",
-      "integrity": "f8b6a14f7022c14f",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/node-pty",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "puppeteer",
       "version": "23.9.0",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/puppeteer",
-      "integrity": "3461ebb63369bea3",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/puppeteer",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "tesseract.js",
       "version": "7.0.0",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/tesseract.js",
-      "integrity": "fa342f37afd66559",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/tesseract.js",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "xterm",
       "version": "5.3.0",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/xterm",
-      "integrity": "d324eb57f7134d28",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/xterm",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "xterm-addon-fit",
       "version": "0.8.0",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/xterm-addon-fit",
-      "integrity": "6bd47031377f4717",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/xterm-addon-fit",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "electron",
       "version": "33.4.11",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/electron",
-      "integrity": "aa6b28f3a59fa3a0",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/electron",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     },
     {
       "name": "electron-builder",
       "version": "25.1.8",
-      "resolved": "/home/rage/apps/gravity-omega-v2/node_modules/electron-builder",
-      "integrity": "ddc43daa899f742d",
-      "suspicious": false,
-      "riskScore": 0.1
+      "resolved": "/home/rage/apps/gravity-omega-rust-rebuild/node_modules/electron-builder",
+      "integrity": null,
+      "suspicious": true,
+      "riskScore": 0.9
     }
   ],
   "gates": [
     {
       "gate": "GIT_INTEGRITY",
-      "status": "FAIL",
-      "evidence": "Modified files: 3",
-      "durationMs": 3
+      "status": "PASS",
+      "evidence": "Working tree clean",
+      "durationMs": 6
     },
     {
       "gate": "LOCKFILE",
@@ -124,20 +124,20 @@
     },
     {
       "gate": "TEST_PASS",
-      "status": "FAIL",
-      "evidence": "Tests failed: npm error Missing script: \"test\"\nnpm error\nnpm error To see a list of scripts, run:\nnpm error   npm run\nnpm error A complete log of this run can be found in: /home/rage/.npm/_logs/2026-05-17T09_03_04_",
-      "durationMs": 67
+      "status": "PASS",
+      "evidence": "All tests passed",
+      "durationMs": 17448
     },
     {
       "gate": "LINT",
       "status": "PASS",
       "evidence": "npx passed",
-      "durationMs": 968
+      "durationMs": 1204
     }
   ],
   "adversarial": {
     "totalPackages": 11,
-    "suspiciousPackages": 0,
+    "suspiciousPackages": 11,
     "probes": [
       {
         "package": "@modelcontextprotocol/sdk",
@@ -154,8 +154,8 @@
       {
         "package": "@modelcontextprotocol/sdk",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: 7ab20eba8fee70f3"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "chokidar",
@@ -172,8 +172,8 @@
       {
         "package": "chokidar",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: 4764fed21a281c69"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "dompurify",
@@ -190,8 +190,8 @@
       {
         "package": "dompurify",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: 4253c493c64d91ca"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "monaco-editor",
@@ -208,8 +208,8 @@
       {
         "package": "monaco-editor",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: c793288e0f0c27d5"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "node-pty",
@@ -226,8 +226,8 @@
       {
         "package": "node-pty",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: f8b6a14f7022c14f"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "puppeteer",
@@ -244,8 +244,8 @@
       {
         "package": "puppeteer",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: 3461ebb63369bea3"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "tesseract.js",
@@ -262,8 +262,8 @@
       {
         "package": "tesseract.js",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: fa342f37afd66559"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "xterm",
@@ -280,8 +280,8 @@
       {
         "package": "xterm",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: d324eb57f7134d28"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "xterm-addon-fit",
@@ -298,8 +298,8 @@
       {
         "package": "xterm-addon-fit",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: 6bd47031377f4717"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "electron",
@@ -316,8 +316,8 @@
       {
         "package": "electron",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: aa6b28f3a59fa3a0"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "electron-builder",
@@ -334,8 +334,8 @@
       {
         "package": "electron-builder",
         "probe": "METADATA_INTEGRITY",
-        "result": "PASS",
-        "detail": "Hash: ddc43daa899f742d"
+        "result": "CRITICAL",
+        "detail": "No integrity hash found"
       },
       {
         "package": "system",
@@ -344,11 +344,11 @@
         "detail": "OLLAMA_CLOUD_API_KEY is not set. Skipping Kimi adversarial analysis."
       }
     ],
-    "overallRisk": 0
+    "overallRisk": 0.4
   },
   "seal": {
-    "chainHash": "c82ff384ef3abeca650b176ac60b070a9b1a864c159cd416ee7b88d2c7e83d59",
-    "sequence": 21
+    "chainHash": "7bf2532c6623ef201744d625e7f8d6c2f67000fb6e4288818a7d977304dc0340",
+    "sequence": 5
   },
-  "signature": "512ba68b8e90046e76b9b97a93f46dece2824083e6ddf8d42c235fb8cc3b3cb5"
+  "signature": "103bec8ad17033e53404ecc994af69eab9237d2a61e366bc86c9798714460e3d"
 }

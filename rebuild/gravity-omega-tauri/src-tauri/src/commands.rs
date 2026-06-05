@@ -7,6 +7,7 @@ use std::{
     os::unix::fs::FileTypeExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
@@ -1233,6 +1234,20 @@ pub struct HermesKimiAssistBriefRecord {
     pub wait_after_kill_ms: u64,
     #[serde(default)]
     pub partial_output_captured: bool,
+    #[serde(default)]
+    pub preflight_passed: bool,
+    #[serde(default)]
+    pub stage_summary: Vec<String>,
+    #[serde(default)]
+    pub outcome_category: String,
+    #[serde(default)]
+    pub failure_summary: String,
+    #[serde(default)]
+    pub operator_next_action: String,
+    #[serde(default)]
+    pub transcript_evidence_ready: bool,
+    #[serde(default)]
+    pub guidance_preview: String,
     pub stdout_transcript_path: String,
     pub stderr_transcript_path: String,
     pub inventory_record_path: Option<String>,
@@ -1665,7 +1680,7 @@ fn hermes_log_write_preflight(target: &UnlockedAgentPromptTarget) -> Result<(), 
     let log_dir = hermes_home.join("logs");
     fs::create_dir_all(&log_dir).map_err(|error| {
         format!(
-            "Hermes/Kimi log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes/Kimi.",
+            "Hermes log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes.",
             log_dir.display()
         )
     })?;
@@ -1683,7 +1698,7 @@ fn hermes_log_write_preflight(target: &UnlockedAgentPromptTarget) -> Result<(), 
         })
         .map_err(|error| {
             format!(
-                "Hermes/Kimi log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes/Kimi.",
+                "Hermes log path is not writable for this Gravity Omega process: {} ({error}). Launch Gravity Omega outside a read-only wrapper, or set HERMES_HOME to a writable Hermes profile before running Hermes.",
                 log_dir.display()
             )
         })?;
@@ -1829,6 +1844,34 @@ pub struct UnlockedAgentPromptSessionStreamStartResult {
     pub memory_write_enabled: bool,
     pub writes_allowed: bool,
     pub execution_enabled: bool,
+    pub created_at_ms: u64,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UnlockedAgentPromptSessionCancelRequest {
+    pub session_id: String,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UnlockedAgentPromptSessionCancelResult {
+    pub accepted: bool,
+    pub status: String,
+    pub session_id: String,
+    pub runtime: String,
+    pub pid: Option<u32>,
+    pub record_path: String,
+    pub log_path: String,
+    pub process_spawn_enabled: bool,
+    pub process_control_enabled: bool,
+    pub agent_prompt_execution_enabled: bool,
+    pub cancellation_requested: bool,
+    pub kill_delegated_to_stream_worker: bool,
     pub created_at_ms: u64,
     pub blockers: Vec<String>,
     pub next_step: String,
@@ -2738,6 +2781,35 @@ pub struct ProductTerminalStreamStartResult {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ProductTerminalStreamCancelRequest {
+    pub session_id: String,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProductTerminalStreamCancelResult {
+    pub accepted: bool,
+    pub status: String,
+    pub session_id: String,
+    pub command: String,
+    pub pid: Option<u32>,
+    pub record_path: String,
+    pub log_path: String,
+    pub process_spawn_enabled: bool,
+    pub process_control_enabled: bool,
+    pub terminal_enabled: bool,
+    pub terminal_write_enabled: bool,
+    pub cancellation_requested: bool,
+    pub kill_delegated_to_stream_worker: bool,
+    pub created_at_ms: u64,
+    pub blockers: Vec<String>,
+    pub next_step: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ProductTerminalTranscriptReplayRequest {
     #[serde(default)]
     pub session_record_path: Option<String>,
@@ -2805,6 +2877,8 @@ pub struct ProductTerminalSessionSummary {
     pub timeout_kill_sent: bool,
     pub wait_after_kill_ms: u64,
     pub partial_output_captured: bool,
+    pub cancellation_requested: bool,
+    pub cancel_kill_sent: bool,
     pub source_stream_enabled: bool,
     pub source_process_spawn_enabled: bool,
     pub source_transcript_capture_enabled: bool,
@@ -5367,6 +5441,30 @@ pub struct FirstClassMcpDashboard {
     pub next_slice: &'static str,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct SswpAttestationSummary {
+    pub status: String,
+    pub attestation_path: Option<String>,
+    pub target_name: String,
+    pub branch: String,
+    pub commit_hash: String,
+    pub timestamp: String,
+    pub gate_count: usize,
+    pub passing_gate_count: usize,
+    pub inconclusive_gate_count: usize,
+    pub failing_gate_count: usize,
+    pub dependency_count: usize,
+    pub suspicious_dependency_count: usize,
+    pub highest_dependency_risk: f64,
+    pub read_only: bool,
+    pub witness_enabled: bool,
+    pub verify_enabled: bool,
+    pub export_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub next_action: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct SswpStatusPanel {
     pub status: &'static str,
@@ -5374,6 +5472,7 @@ pub struct SswpStatusPanel {
     pub panel_title: &'static str,
     pub subsystem: &'static str,
     pub display_name: &'static str,
+    pub attestation: SswpAttestationSummary,
     pub evidence_record_count: usize,
     pub ready_evidence_count: usize,
     pub blocked_evidence_count: usize,
@@ -5659,6 +5758,24 @@ pub struct StenoSearchResult {
     pub status: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct StenoCorpusSummary {
+    pub category: String,
+    pub directory_path: String,
+    pub directory_exists: bool,
+    pub allowed_file_count: usize,
+    pub skipped_large_file_count: usize,
+    pub total_bytes: u64,
+    pub newest_record_ms: u64,
+    pub read_only: bool,
+    pub capture_enabled: bool,
+    pub export_enabled: bool,
+    pub live_index_enabled: bool,
+    pub writes_allowed: bool,
+    pub execution_enabled: bool,
+    pub status: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct StenoSearchRequest {
     #[serde(default)]
@@ -5679,6 +5796,9 @@ pub struct StenoSearchPanel {
     pub searched_file_count: usize,
     pub matched_file_count: usize,
     pub postmortem_result_count: usize,
+    pub corpus_summary_count: usize,
+    pub corpus_file_count: usize,
+    pub corpus_total_bytes: u64,
     pub max_results: usize,
     pub max_file_bytes: u64,
     pub transcript_bundle_count: usize,
@@ -5708,6 +5828,7 @@ pub struct StenoSearchPanel {
     pub execution_enabled: bool,
     pub results: Vec<StenoSearchResult>,
     pub recent_postmortem_results: Vec<StenoSearchResult>,
+    pub corpus_summaries: Vec<StenoCorpusSummary>,
     pub sections: Vec<StenoPetCompanionDashboardSection>,
     pub reasons: Vec<&'static str>,
     pub next_slice: &'static str,
@@ -34367,13 +34488,13 @@ fn runtime_sidecar_process_targets() -> Vec<RuntimeSidecarProcessTarget> {
         },
         RuntimeSidecarProcessTarget {
             target_id: "hermes-gateway",
-            title: "Hermes/Kimi gateway",
+            title: "Hermes gateway",
             target_family: "hermes_kimi",
             expected_pattern: "hermes_cli.main gateway",
-            required_for: "Hermes/Kimi assist briefs, secondary analysis, skill inventory, and Codex delegation context.",
+            required_for: "Hermes assist briefs, secondary analysis, skill inventory, and Codex delegation context.",
             needles: vec!["hermes_cli.main", "gateway"],
             required: true,
-            next_action: "Use this as the Kimi-backed secondary lane while keeping writes owned by Codex Lead.",
+            next_action: "Use this as the model-agnostic Hermes secondary lane while keeping writes owned by Codex Lead.",
         },
         RuntimeSidecarProcessTarget {
             target_id: "hermes-dashboard",
@@ -35138,12 +35259,12 @@ fn runtime_depth_path_probes() -> Vec<RuntimeDepthPathProbe> {
         runtime_depth_path_probe("hermes-home", "Hermes home", hermes_home_for_preflight()),
         runtime_depth_path_probe(
             "hermes-config",
-            "Hermes/Kimi config metadata",
+            "Hermes config metadata",
             hermes_home_for_preflight().join("config.yaml"),
         ),
         runtime_depth_path_probe(
             "hermes-logs",
-            "Hermes/Kimi log directory",
+            "Hermes log directory",
             hermes_home_for_preflight().join("logs"),
         ),
         runtime_depth_path_probe(
@@ -35377,17 +35498,17 @@ fn runtime_depth_hermes_capability_probes() -> Vec<RuntimeDepthHermesCapabilityP
     vec![
         run_runtime_depth_hermes_capability_probe(
             "hermes-skills",
-            "Hermes/Kimi installed skills",
+            "Hermes installed skills",
             &["skills", "list"],
         ),
         run_runtime_depth_hermes_capability_probe(
             "hermes-mcp",
-            "Hermes/Kimi MCP servers",
+            "Hermes MCP servers",
             &["mcp", "list"],
         ),
         run_runtime_depth_hermes_capability_probe(
             "hermes-hooks",
-            "Hermes/Kimi hook allowlist",
+            "Hermes hook allowlist",
             &["hooks", "list"],
         ),
     ]
@@ -35485,7 +35606,7 @@ pub fn run_runtime_depth_probe(
     let mut blockers = board.blockers.clone();
     if !hermes_log_writable {
         blockers.push(format!(
-            "Hermes/Kimi log write preflight failed: {}",
+            "Hermes log write preflight failed: {}",
             hermes_log_preflight_error
                 .clone()
                 .unwrap_or_else(|| "unknown Hermes log write error".to_string())
@@ -35498,7 +35619,7 @@ pub fn run_runtime_depth_probe(
         blockers.push("Omega Stenographer metadata is incomplete; keep Steno memory writes disabled until home, db, and MCP server metadata exist.".to_string());
     }
     if hermes_skill_count == 0 || hermes_mcp_server_count == 0 || hermes_hook_count == 0 {
-        blockers.push("Hermes/Kimi capability probes did not produce complete skills, MCP, and hook counts; keep delegation skill-aware but evidence-gated.".to_string());
+        blockers.push("Hermes capability probes did not produce complete skills, MCP, and hook counts; keep delegation skill-aware but evidence-gated.".to_string());
     }
     if !pet_metadata_ready {
         blockers.push("Pet companion metadata is incomplete; keep pet runtime behavior informational until CodePet state and Verity manifest metadata exist.".to_string());
@@ -35772,16 +35893,16 @@ fn build_codex_lead_delegations(
         ),
         codex_lead_delegation_lane(
             "hermes-kimi-skill-pass",
-            "Hermes/Kimi skill-aware assist",
-            "Hermes/Kimi Assist",
+            "Hermes skill-aware assist",
+            "Hermes Assist",
             "secondary reviewer and subtask adviser",
-            "Use the local Hermes Kimi-backed skill, toolset, MCP, hook, and worktree awareness to critique the plan, suggest narrow subtasks, and flag missing tests.",
+            "Use the local Hermes-backed skill, toolset, MCP, hook, and worktree awareness to critique the plan, suggest narrow subtasks, and flag missing tests.",
             &["software-development", "veritas", "sswp-registry", "research"],
             &["omega-brain", "omega-stenographer", "sswp"],
             &["Hermes skill count", "Hermes MCP count", "Hermes hook count", "assist summary in Omega Agent Work"],
             "read-only assist; Codex owns final writes",
             hermes_status,
-            "Ask Hermes/Kimi for compact assist when the request benefits from reviewer, research, or skill-map context.",
+            "Ask Hermes for compact assist when the request benefits from reviewer, research, or skill-map context.",
         ),
         codex_lead_delegation_lane(
             "codex-implementation-and-tests",
@@ -35794,12 +35915,12 @@ fn build_codex_lead_delegations(
             &["changed files list", "command evidence", "diff inspection", "build or test result"],
             "scoped implementation files only",
             "codex_owned_ready",
-            "Codex performs the work and verification; Hermes/Kimi remains assist unless explicitly promoted.",
+            "Codex performs the work and verification; Hermes remains assist unless explicitly promoted.",
         ),
         codex_lead_delegation_lane(
             "sswp-steno-evidence",
             "SSWP and Stenographer evidence lane",
-            "Hermes/Kimi Assist",
+            "Hermes Assist",
             "memory and witness adviser",
             "Prepare SSWP/Steno witness prompts, memory summaries, and evidence handoff notes without live writes unless the run has explicit approval.",
             &["sswp-registry", "veritas/omega-strike-deep"],
@@ -35888,7 +36009,7 @@ pub fn create_codex_lead_orchestration_record(
         .count();
     let hermes_assist_count = delegations
         .iter()
-        .filter(|lane| lane.owner == "Hermes/Kimi Assist")
+        .filter(|lane| lane.owner == "Hermes Assist")
         .count();
 
     let mut blockers = Vec::new();
@@ -35896,13 +36017,13 @@ pub fn create_codex_lead_orchestration_record(
         blockers.push("Codex runtime is not ready in the latest runtime-depth evidence.".to_string());
     }
     if !hermes_runtime_ready {
-        blockers.push("Hermes/Kimi runtime is not ready in the latest runtime-depth evidence.".to_string());
+        blockers.push("Hermes runtime is not ready in the latest runtime-depth evidence.".to_string());
     }
     if !hermes_has_inventory {
-        blockers.push("Hermes/Kimi skills, MCP servers, and hooks are not all counted yet; keep assist compact and evidence-gated.".to_string());
+        blockers.push("Hermes skills, MCP servers, and hooks are not all counted yet; keep assist compact and evidence-gated.".to_string());
     }
     if !hermes_log_writable {
-        blockers.push("Hermes/Kimi log write preflight is not writable for this app process.".to_string());
+        blockers.push("Hermes log write preflight is not writable for this app process.".to_string());
     }
     if !mcp_metadata_ready {
         blockers.push("MCP metadata is incomplete; keep live MCP calls disabled.".to_string());
@@ -35953,7 +36074,7 @@ pub fn create_codex_lead_orchestration_record(
         task_run_id,
         prompt_preview,
         stream_runtime: "codex-workspace-write".to_string(),
-        hermes_lane_runtime: "hermes-chat-kimi".to_string(),
+        hermes_lane_runtime: "hermes-chat".to_string(),
         runtime_depth_record_id,
         runtime_depth_record_path,
         hermes_skill_count,
@@ -35983,7 +36104,7 @@ pub fn create_codex_lead_orchestration_record(
         log_path: log_path_display.clone(),
         delegations,
         blockers,
-        next_step: "Attach this record path to the responsive Codex Lead stream. Codex remains final owner; Hermes/Kimi is a compact secondary assist lane; SSWP, Steno, pet, and live MCP behavior stay evidence-gated until their runtime-depth records are clean.".to_string(),
+        next_step: "Attach this record path to the responsive Codex Lead stream. Codex remains final owner; Hermes is a compact secondary assist lane; SSWP, Steno, pet, and live MCP behavior stay evidence-gated until their runtime-depth records are clean.".to_string(),
     };
 
     let json = serde_json::to_string_pretty(&record)
@@ -36152,12 +36273,12 @@ fn collect_hermes_kimi_skill_metadata(
     }
     for entry in fs::read_dir(current).map_err(|error| {
         format!(
-            "failed to read Hermes/Kimi skill metadata directory {}: {error}",
+            "failed to read Hermes skill metadata directory {}: {error}",
             current.display()
         )
     })? {
         let entry =
-            entry.map_err(|error| format!("failed to read Hermes/Kimi skill entry: {error}"))?;
+            entry.map_err(|error| format!("failed to read Hermes skill entry: {error}"))?;
         let path = entry.path();
         let path_text = path.display().to_string();
         if path_text.contains("/.archive/") {
@@ -36439,7 +36560,7 @@ pub fn record_hermes_kimi_capability_inventory(
         blockers.push("No Hermes SKILL.md metadata files were found under the Hermes skills directory.".to_string());
     }
     if focus_skills.is_empty() {
-        blockers.push("No prompt-focused Hermes/Kimi skills could be selected from the metadata inventory.".to_string());
+        blockers.push("No prompt-focused Hermes skills could be selected from the metadata inventory.".to_string());
     }
 
     let status = if blockers.is_empty() {
@@ -36509,14 +36630,14 @@ pub fn record_hermes_kimi_capability_inventory(
         record_path: record_path_display.clone(),
         log_path: log_path_display.clone(),
         blockers,
-        next_step: "Attach this current Hermes/Kimi inventory to the Codex Lead stream so Codex can delegate compact reviewer/research subtasks while keeping Hermes-owned writes, live MCP calls, and execution disabled.".to_string(),
+        next_step: "Attach this current Hermes inventory to the Codex Lead stream so Codex can delegate compact reviewer/research subtasks while keeping Hermes-owned writes, live MCP calls, and execution disabled.".to_string(),
     };
 
     let json = serde_json::to_string_pretty(&record)
-        .map_err(|error| format!("failed to serialize Hermes/Kimi inventory: {error}"))?;
+        .map_err(|error| format!("failed to serialize Hermes inventory: {error}"))?;
     fs::write(&record_path, json).map_err(|error| {
         format!(
-            "failed to write Hermes/Kimi capability inventory {}: {error}",
+            "failed to write Hermes capability inventory {}: {error}",
             record_path.display()
         )
     })?;
@@ -36561,7 +36682,7 @@ pub fn list_hermes_kimi_capability_inventories(
         )
     })? {
         let entry = entry.map_err(|error| {
-            format!("failed to read Hermes/Kimi inventory entry: {error}")
+            format!("failed to read Hermes inventory entry: {error}")
         })?;
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
@@ -36625,10 +36746,10 @@ fn compact_hermes_kimi_assist_query(
         hooks.join("; ")
     };
     [
-        "Gravity Omega Hermes/Kimi assist brief.",
+        "Gravity Omega Hermes assist brief.",
         "",
         "Role:",
-        "You are Hermes Agent backed by Kimi through the local Moonshot profile. You are the secondary reviewer and adviser for Codex Lead.",
+        "You are Hermes Agent using the active local Hermes model/profile. You are the secondary reviewer and adviser for Codex Lead.",
         "",
         "Strict boundaries:",
         "- Do not edit files.",
@@ -36646,10 +36767,10 @@ fn compact_hermes_kimi_assist_query(
         prompt_note,
         "",
         "Evidence context:",
-        inventory_record_path.unwrap_or("Hermes/Kimi inventory record not attached."),
+        inventory_record_path.unwrap_or("Hermes inventory record not attached."),
         orchestration_record_path.unwrap_or("Codex Lead orchestration record not attached."),
         "",
-        "Focused Hermes/Kimi skills:",
+        "Focused Hermes skills:",
         &focus_skill_text,
         "",
         "MCP awareness:",
@@ -36660,7 +36781,7 @@ fn compact_hermes_kimi_assist_query(
         "",
         "Return exactly four compact sections:",
         "1. Codex plan adjustments",
-        "2. Hermes/Kimi concerns",
+        "2. Hermes concerns",
         "3. Verification ideas",
         "4. Stop/skip conditions",
     ]
@@ -36888,6 +37009,101 @@ fn run_hermes_kimi_assist_process_with_binary(
     }
 }
 
+fn hermes_assist_outcome_category(
+    status: &str,
+    timed_out: bool,
+    exit_code: Option<i32>,
+    blockers: &[String],
+) -> String {
+    if status.contains("succeeded") {
+        "succeeded".to_string()
+    } else if status.contains("rejected_empty_prompt") {
+        "rejected-empty-prompt".to_string()
+    } else if status.contains("rejected_log_preflight") {
+        "blocked-log-preflight".to_string()
+    } else if timed_out || status.contains("timed_out") {
+        "timed-out".to_string()
+    } else if status.contains("failed") || exit_code.map(|code| code != 0).unwrap_or(false) {
+        "failed".to_string()
+    } else if blockers.is_empty() {
+        "unknown".to_string()
+    } else {
+        "blocked".to_string()
+    }
+}
+
+fn hermes_assist_operator_next_action(outcome_category: &str) -> String {
+    match outcome_category {
+        "succeeded" => "Attach this Hermes assist brief to the Codex Lead stream; keep Codex responsible for implementation, verification, and final evidence.",
+        "blocked-log-preflight" => "Fix the Hermes writable log path or launch Gravity Omega outside the read-only wrapper, then retry Hermes assist.",
+        "timed-out" => "Review partial Hermes stdout/stderr transcripts, keep Codex moving with the recorded warning, and retry Hermes with a smaller prompt if the guidance is needed.",
+        "failed" => "Review Hermes stdout/stderr transcripts and blockers before retrying; Codex Lead may continue only with the failure recorded.",
+        "rejected-empty-prompt" => "Enter a non-empty task before requesting Hermes assist.",
+        "blocked" => "Resolve the listed Hermes blockers before depending on assist guidance.",
+        _ => "Treat this Hermes assist record as incomplete; inspect transcripts and blockers before using it.",
+    }
+    .to_string()
+}
+
+fn hermes_assist_stage_summary(
+    prompt_trimmed: &str,
+    preflight_passed: bool,
+    output: &HermesKimiAssistProcessOutput,
+    outcome_category: &str,
+    transcript_evidence_ready: bool,
+) -> Vec<String> {
+    vec![
+        format!(
+            "prompt:{}:{}b",
+            if prompt_trimmed.is_empty() {
+                "rejected-empty"
+            } else {
+                "accepted"
+            },
+            prompt_trimmed.len()
+        ),
+        format!(
+            "log-preflight:{}",
+            if preflight_passed { "passed" } else { "not-passed" }
+        ),
+        format!(
+            "process:{}:pid={}:transport={}",
+            if output.bounded_execution_performed {
+                "started"
+            } else {
+                "not-started"
+            },
+            output
+                .pid
+                .map(|pid| pid.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+            output.query_transport
+        ),
+        format!(
+            "pipes:stdout_reader={}:stderr_reader={}:partial={}",
+            output.stdout_pipe_reader_enabled,
+            output.stderr_pipe_reader_enabled,
+            output.partial_output_captured
+        ),
+        format!(
+            "transcripts:ready={}:stdout={}b:stderr={}b",
+            transcript_evidence_ready,
+            output.stdout_bytes.len(),
+            output.stderr_bytes.len()
+        ),
+        format!(
+            "outcome:{}:exit={}:timeout={}:duration={}ms",
+            outcome_category,
+            output
+                .exit_code
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+            output.timed_out,
+            output.duration_ms
+        ),
+    ]
+}
+
 #[tauri::command]
 pub fn record_hermes_kimi_assist_brief(
     request: HermesKimiAssistBriefRequest,
@@ -36949,6 +37165,7 @@ pub fn record_hermes_kimi_assist_brief(
     let stdout_transcript_path = dir.join(format!("{id}.stdout.txt"));
     let stderr_transcript_path = dir.join(format!("{id}.stderr.txt"));
     let mut blockers = Vec::new();
+    let mut preflight_passed = false;
     let mut output = HermesKimiAssistProcessOutput {
         pid: None,
         exit_code: None,
@@ -36968,12 +37185,12 @@ pub fn record_hermes_kimi_assist_brief(
     };
 
     if prompt_trimmed.is_empty() {
-        blockers.push("Prompt is empty; Hermes/Kimi assist brief was not started.".to_string());
+        blockers.push("Prompt is empty; Hermes assist brief was not started.".to_string());
         output.status = "hermes_kimi_assist_brief_rejected_empty_prompt".to_string();
     } else {
         let preflight_target = UnlockedAgentPromptTarget {
             runtime: "hermes-chat",
-            title: "Hermes/Kimi assist brief",
+            title: "Hermes assist brief",
             binary: "hermes",
             sandbox_policy: "hermes-cli",
             argv_redacted: Vec::new(),
@@ -36988,10 +37205,11 @@ pub fn record_hermes_kimi_assist_brief(
             blockers.push(blocker);
             output.status = "hermes_kimi_assist_brief_rejected_log_preflight".to_string();
         } else {
+            preflight_passed = true;
             output = run_hermes_kimi_assist_process(&compact_query, timeout_ms);
             if output.status != "hermes_kimi_assist_brief_succeeded" {
                 blockers.push(format!(
-                    "Hermes/Kimi assist brief status={} exit={:?}",
+                    "Hermes assist brief status={} exit={:?}",
                     output.status, output.exit_code
                 ));
             }
@@ -37001,14 +37219,14 @@ pub fn record_hermes_kimi_assist_brief(
     fs::write(&stdout_transcript_path, String::from_utf8_lossy(&output.stdout_bytes).as_ref())
         .map_err(|error| {
             format!(
-                "failed to write Hermes/Kimi assist stdout transcript {}: {error}",
+                "failed to write Hermes assist stdout transcript {}: {error}",
                 stdout_transcript_path.display()
             )
         })?;
     fs::write(&stderr_transcript_path, String::from_utf8_lossy(&output.stderr_bytes).as_ref())
         .map_err(|error| {
             format!(
-                "failed to write Hermes/Kimi assist stderr transcript {}: {error}",
+                "failed to write Hermes assist stderr transcript {}: {error}",
                 stderr_transcript_path.display()
             )
         })?;
@@ -37017,6 +37235,33 @@ pub fn record_hermes_kimi_assist_brief(
     let log_path_display = log_path.display().to_string();
     let stdout_transcript_display = stdout_transcript_path.display().to_string();
     let stderr_transcript_display = stderr_transcript_path.display().to_string();
+    let transcript_evidence_ready =
+        fs::metadata(&stdout_transcript_path).is_ok() && fs::metadata(&stderr_transcript_path).is_ok();
+    let outcome_category = hermes_assist_outcome_category(
+        &output.status,
+        output.timed_out,
+        output.exit_code,
+        &blockers,
+    );
+    let failure_summary = if blockers.is_empty() {
+        "none".to_string()
+    } else {
+        blockers
+            .iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    let operator_next_action = hermes_assist_operator_next_action(&outcome_category);
+    let stage_summary = hermes_assist_stage_summary(
+        &prompt_trimmed,
+        preflight_passed,
+        &output,
+        &outcome_category,
+        transcript_evidence_ready,
+    );
+    let guidance_preview = prompt_preview(&String::from_utf8_lossy(&output.stdout_bytes), 900);
     let record = HermesKimiAssistBriefRecord {
         id: id.clone(),
         status: output.status.clone(),
@@ -37056,6 +37301,13 @@ pub fn record_hermes_kimi_assist_brief(
         timeout_kill_sent: output.timeout_kill_sent,
         wait_after_kill_ms: output.wait_after_kill_ms,
         partial_output_captured: output.partial_output_captured,
+        preflight_passed,
+        stage_summary,
+        outcome_category,
+        failure_summary,
+        operator_next_action: operator_next_action.clone(),
+        transcript_evidence_ready,
+        guidance_preview,
         stdout_transcript_path: stdout_transcript_display.clone(),
         stderr_transcript_path: stderr_transcript_display.clone(),
         inventory_record_path,
@@ -37081,19 +37333,19 @@ pub fn record_hermes_kimi_assist_brief(
         log_path: log_path_display.clone(),
         blockers,
         reasons: vec![
-            "Hermes/Kimi runs as a bounded secondary assist lane for Codex Lead.".to_string(),
+            "Hermes runs as a bounded secondary assist lane for Codex Lead.".to_string(),
             "The full user prompt is compacted before becoming a Hermes --query argument.".to_string(),
-            "The query explicitly instructs Hermes/Kimi not to edit, patch, execute shell, call MCP tools, or write memory.".to_string(),
+            "The query explicitly instructs Hermes not to edit, patch, execute shell, call MCP tools, or write memory.".to_string(),
             "stdout and stderr are captured to durable transcripts for Codex review.".to_string(),
         ],
-        next_step: "Attach this assist brief to the Codex Lead stream prompt; Codex remains responsible for implementation, verification, and final evidence.".to_string(),
+        next_step: operator_next_action,
     };
 
     let json = serde_json::to_string_pretty(&record)
-        .map_err(|error| format!("failed to serialize Hermes/Kimi assist brief: {error}"))?;
+        .map_err(|error| format!("failed to serialize Hermes assist brief: {error}"))?;
     fs::write(&record_path, json).map_err(|error| {
         format!(
-            "failed to write Hermes/Kimi assist brief {}: {error}",
+            "failed to write Hermes assist brief {}: {error}",
             record_path.display()
         )
     })?;
@@ -37116,6 +37368,12 @@ pub fn record_hermes_kimi_assist_brief(
             "timeout_kill_sent": record.timeout_kill_sent,
             "wait_after_kill_ms": record.wait_after_kill_ms,
             "partial_output_captured": record.partial_output_captured,
+            "preflight_passed": record.preflight_passed,
+            "stage_summary": &record.stage_summary,
+            "outcome_category": &record.outcome_category,
+            "failure_summary": &record.failure_summary,
+            "operator_next_action": &record.operator_next_action,
+            "transcript_evidence_ready": record.transcript_evidence_ready,
             "focus_skill_count": record.focus_skills.len(),
             "mcp_focus_count": record.mcp_servers.len(),
             "hook_focus_count": record.hooks.len(),
@@ -37152,7 +37410,7 @@ pub fn list_hermes_kimi_assist_briefs() -> Result<Vec<HermesKimiAssistBriefRecor
         )
     })? {
         let entry =
-            entry.map_err(|error| format!("failed to read Hermes/Kimi assist entry: {error}"))?;
+            entry.map_err(|error| format!("failed to read Hermes assist entry: {error}"))?;
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
@@ -39610,7 +39868,7 @@ pub fn run_unlocked_agent_prompt_session(
             execution_enabled: false,
             records: Vec::new(),
             blockers: vec![blocker],
-            next_step: "Fix the Hermes/Kimi writable log path or run the app outside the read-only wrapper, then retry Hermes/Kimi.".to_string(),
+            next_step: "Fix the Hermes writable log path or run the app outside the read-only wrapper, then retry Hermes.".to_string(),
         });
     }
 
@@ -39701,6 +39959,86 @@ pub fn run_unlocked_agent_prompt_session(
 
 const UNLOCKED_AGENT_PROMPT_STREAM_EVENT: &str = "unlocked-agent-prompt-stream";
 
+#[derive(Debug, Clone)]
+struct UnlockedAgentPromptStreamProcessState {
+    session_id: String,
+    runtime: String,
+    pid: Option<u32>,
+    record_path: String,
+    log_path: String,
+    started_at_ms: u64,
+    cancel_requested: bool,
+    cancel_requested_at_ms: Option<u64>,
+    cancel_requested_by: String,
+    cancel_reason: String,
+}
+
+static UNLOCKED_AGENT_PROMPT_STREAM_PROCESSES: OnceLock<
+    Mutex<BTreeMap<String, UnlockedAgentPromptStreamProcessState>>,
+> = OnceLock::new();
+
+fn unlocked_agent_prompt_stream_processes(
+) -> &'static Mutex<BTreeMap<String, UnlockedAgentPromptStreamProcessState>> {
+    UNLOCKED_AGENT_PROMPT_STREAM_PROCESSES.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+fn with_unlocked_agent_prompt_stream_processes<T>(
+    f: impl FnOnce(&mut BTreeMap<String, UnlockedAgentPromptStreamProcessState>) -> T,
+) -> Result<T, String> {
+    let mut guard = unlocked_agent_prompt_stream_processes()
+        .lock()
+        .map_err(|_| "unlocked agent stream process registry lock poisoned".to_string())?;
+    Ok(f(&mut guard))
+}
+
+fn register_unlocked_agent_prompt_stream_process(
+    state: UnlockedAgentPromptStreamProcessState,
+) -> Result<(), String> {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        processes.insert(state.session_id.clone(), state);
+    })
+}
+
+fn update_unlocked_agent_prompt_stream_pid(session_id: &str, pid: u32) -> Result<(), String> {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        if let Some(state) = processes.get_mut(session_id) {
+            state.pid = Some(pid);
+        }
+    })
+}
+
+fn mark_unlocked_agent_prompt_stream_cancel_requested(
+    session_id: &str,
+    requested_by: &str,
+    reason: &str,
+    timestamp: u64,
+) -> Result<Option<UnlockedAgentPromptStreamProcessState>, String> {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        let state = processes.get_mut(session_id)?;
+        state.cancel_requested = true;
+        state.cancel_requested_at_ms = Some(timestamp);
+        state.cancel_requested_by = requested_by.to_string();
+        state.cancel_reason = reason.to_string();
+        Some(state.clone())
+    })
+}
+
+fn unlocked_agent_prompt_stream_cancel_requested(session_id: &str) -> bool {
+    with_unlocked_agent_prompt_stream_processes(|processes| {
+        processes
+            .get(session_id)
+            .map(|state| state.cancel_requested)
+            .unwrap_or(false)
+    })
+    .unwrap_or(false)
+}
+
+fn unregister_unlocked_agent_prompt_stream_process(session_id: &str) {
+    let _ = with_unlocked_agent_prompt_stream_processes(|processes| {
+        processes.remove(session_id);
+    });
+}
+
 fn emit_unlocked_agent_prompt_stream_event(
     app: &tauri::AppHandle,
     log_path: &PathBuf,
@@ -39720,6 +40058,120 @@ fn emit_unlocked_agent_prompt_stream_event(
             "created_at_ms": event.created_at_ms
         }),
     );
+}
+
+#[tauri::command]
+pub fn cancel_unlocked_agent_prompt_session_stream(
+    request: UnlockedAgentPromptSessionCancelRequest,
+) -> Result<UnlockedAgentPromptSessionCancelResult, String> {
+    let timestamp = now_ms()?;
+    let session_id = request.session_id.trim().to_string();
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "gravity-omega-product-ui".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let reason = request
+        .reason
+        .unwrap_or_else(|| "operator recovery requested".to_string())
+        .trim()
+        .chars()
+        .take(260)
+        .collect::<String>();
+
+    if session_id.is_empty() {
+        return Ok(UnlockedAgentPromptSessionCancelResult {
+            accepted: false,
+            status: "unlocked_agent_prompt_stream_cancel_rejected".to_string(),
+            session_id,
+            runtime: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            agent_prompt_execution_enabled: true,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "session_id is required to cancel a tracked unlocked-agent stream".to_string(),
+            ],
+            next_step: "Retry recovery after an agent stream has emitted a session id.".to_string(),
+        });
+    }
+
+    let Some(state) = mark_unlocked_agent_prompt_stream_cancel_requested(
+        &session_id,
+        &requested_by,
+        &reason,
+        timestamp,
+    )?
+    else {
+        return Ok(UnlockedAgentPromptSessionCancelResult {
+            accepted: false,
+            status: "unlocked_agent_prompt_stream_cancel_not_found".to_string(),
+            session_id,
+            runtime: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            agent_prompt_execution_enabled: true,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "No tracked active unlocked-agent stream matched the requested session id."
+                    .to_string(),
+            ],
+            next_step: "The UI can still recover its visible gate, but no backend process cancellation was requested.".to_string(),
+        });
+    };
+
+    let status = if state.pid.is_some() {
+        "unlocked_agent_prompt_stream_cancel_requested"
+    } else {
+        "unlocked_agent_prompt_stream_cancel_requested_pending_spawn"
+    }
+    .to_string();
+    let _ = write_jsonl_event(
+        &PathBuf::from(&state.log_path),
+        serde_json::json!({
+            "event": "unlocked_agent_prompt_stream_cancel_requested",
+            "session_id": state.session_id.clone(),
+            "runtime": state.runtime.clone(),
+            "pid": state.pid,
+            "status": status.clone(),
+            "requested_by": requested_by,
+            "reason": reason,
+            "started_at_ms": state.started_at_ms,
+            "created_at_ms": timestamp,
+            "process_control_enabled": true,
+            "kill_delegated_to_stream_worker": true
+        }),
+    );
+
+    Ok(UnlockedAgentPromptSessionCancelResult {
+        accepted: true,
+        status,
+        session_id: state.session_id,
+        runtime: state.runtime,
+        pid: state.pid,
+        record_path: state.record_path,
+        log_path: state.log_path,
+        process_spawn_enabled: true,
+        process_control_enabled: true,
+        agent_prompt_execution_enabled: true,
+        cancellation_requested: true,
+        kill_delegated_to_stream_worker: true,
+        created_at_ms: timestamp,
+        blockers: Vec::new(),
+        next_step: "The tracked stream worker will terminate its own child process and record a cancelled final status.".to_string(),
+    })
 }
 
 fn read_unlocked_agent_prompt_stream<R: Read + Send + 'static>(
@@ -39917,7 +40369,7 @@ pub fn run_unlocked_agent_prompt_session_stream(
             execution_enabled: false,
             created_at_ms: timestamp,
             blockers: vec![blocker],
-            next_step: "Fix the Hermes/Kimi writable log path or run the app outside the read-only wrapper, then retry Hermes/Kimi.".to_string(),
+            next_step: "Fix the Hermes writable log path or run the app outside the read-only wrapper, then retry Hermes.".to_string(),
         });
     }
 
@@ -40034,6 +40486,19 @@ pub fn run_unlocked_agent_prompt_session_stream(
         )
     })?;
 
+    register_unlocked_agent_prompt_stream_process(UnlockedAgentPromptStreamProcessState {
+        session_id: session_id.clone(),
+        runtime: target.runtime.to_string(),
+        pid: None,
+        record_path: record_path.display().to_string(),
+        log_path: log_path.display().to_string(),
+        started_at_ms: timestamp,
+        cancel_requested: false,
+        cancel_requested_at_ms: None,
+        cancel_requested_by: String::new(),
+        cancel_reason: String::new(),
+    })?;
+
     emit_unlocked_agent_prompt_stream_event(
         &app,
         &log_path,
@@ -40106,22 +40571,24 @@ pub fn run_unlocked_agent_prompt_session_stream(
                     &thread_app,
                     &thread_log_path,
                     UnlockedAgentPromptSessionStreamEvent {
-                        session_id: thread_session_id,
-                        runtime: thread_runtime,
+                        session_id: thread_session_id.clone(),
+                        runtime: thread_runtime.clone(),
                         kind: "error".to_string(),
                         line: String::from_utf8_lossy(&stderr_bytes).to_string(),
                         status,
                         exit_code: None,
-                        record_path: thread_record_path_display,
+                        record_path: thread_record_path_display.clone(),
                         log_path: thread_log_path.display().to_string(),
                         created_at_ms: timestamp,
                     },
                 );
+                unregister_unlocked_agent_prompt_stream_process(&thread_session_id);
                 return;
             }
         };
 
         let pid = Some(child.id());
+        let _ = update_unlocked_agent_prompt_stream_pid(&thread_session_id, child.id());
         if let Err(error) = write_unlocked_agent_prompt_stdin(&mut child, &thread_target) {
             let status = "unlocked_agent_prompt_stream_stdin_failed".to_string();
             let _ = child.kill();
@@ -40152,17 +40619,18 @@ pub fn run_unlocked_agent_prompt_session_stream(
                 &thread_app,
                 &thread_log_path,
                 UnlockedAgentPromptSessionStreamEvent {
-                    session_id: thread_session_id,
-                    runtime: thread_runtime,
+                    session_id: thread_session_id.clone(),
+                    runtime: thread_runtime.clone(),
                     kind: "error".to_string(),
                     line: String::from_utf8_lossy(&stderr_bytes).to_string(),
                     status,
                     exit_code: None,
-                    record_path: thread_record_path_display,
+                    record_path: thread_record_path_display.clone(),
                     log_path: thread_log_path.display().to_string(),
                     created_at_ms: timestamp,
                 },
             );
+            unregister_unlocked_agent_prompt_stream_process(&thread_session_id);
             return;
         }
         let stdout_reader = child.stdout.take();
@@ -40207,10 +40675,16 @@ pub fn run_unlocked_agent_prompt_session_stream(
         });
 
         let mut timed_out = false;
+        let mut cancelled = false;
         loop {
             match child.try_wait() {
                 Ok(Some(_status)) => break,
                 Ok(None) => {
+                    if unlocked_agent_prompt_stream_cancel_requested(&thread_session_id) {
+                        cancelled = true;
+                        let _ = child.kill();
+                        break;
+                    }
                     if started.elapsed() >= Duration::from_millis(timeout_ms) {
                         timed_out = true;
                         let _ = child.kill();
@@ -40249,6 +40723,8 @@ pub fn run_unlocked_agent_prompt_session_stream(
             .unwrap_or_default();
         let status = if timed_out {
             "unlocked_agent_prompt_stream_timed_out"
+        } else if cancelled {
+            "unlocked_agent_prompt_stream_cancelled"
         } else if exit_code == Some(0) {
             "unlocked_agent_prompt_stream_succeeded"
         } else {
@@ -40286,17 +40762,18 @@ pub fn run_unlocked_agent_prompt_session_stream(
             &thread_app,
             &thread_log_path,
             UnlockedAgentPromptSessionStreamEvent {
-                session_id: thread_session_id,
-                runtime: thread_runtime,
+                session_id: thread_session_id.clone(),
+                runtime: thread_runtime.clone(),
                 kind: "lifecycle".to_string(),
                 line: format!("{final_status} exit={exit_code:?} duration={duration_ms}ms"),
                 status: final_status,
                 exit_code,
-                record_path: thread_record_path_display,
+                record_path: thread_record_path_display.clone(),
                 log_path: thread_log_path.display().to_string(),
                 created_at_ms: timestamp,
             },
         );
+        unregister_unlocked_agent_prompt_stream_process(&thread_session_id);
     });
 
     Ok(result)
@@ -43198,6 +43675,90 @@ pub fn run_product_terminal_command(
 
 const PRODUCT_TERMINAL_STREAM_EVENT: &str = "product-terminal-stream";
 
+#[derive(Debug, Clone)]
+struct ProductTerminalStreamProcessState {
+    session_id: String,
+    command: String,
+    pid: Option<u32>,
+    record_path: String,
+    log_path: String,
+    started_at_ms: u64,
+    cancel_requested: bool,
+    cancel_requested_at_ms: Option<u64>,
+    cancel_requested_by: String,
+    cancel_reason: String,
+}
+
+static PRODUCT_TERMINAL_STREAM_PROCESSES: OnceLock<
+    Mutex<BTreeMap<String, ProductTerminalStreamProcessState>>,
+> = OnceLock::new();
+
+fn product_terminal_stream_processes(
+) -> &'static Mutex<BTreeMap<String, ProductTerminalStreamProcessState>> {
+    PRODUCT_TERMINAL_STREAM_PROCESSES.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+fn with_product_terminal_stream_processes<T>(
+    f: impl FnOnce(&mut BTreeMap<String, ProductTerminalStreamProcessState>) -> T,
+) -> Result<T, String> {
+    let mut guard = product_terminal_stream_processes()
+        .lock()
+        .map_err(|_| "product terminal stream process registry lock poisoned".to_string())?;
+    Ok(f(&mut guard))
+}
+
+fn register_product_terminal_stream_process(
+    state: ProductTerminalStreamProcessState,
+) -> Result<(), String> {
+    with_product_terminal_stream_processes(|processes| {
+        processes.insert(state.session_id.clone(), state);
+    })
+}
+
+fn update_product_terminal_stream_pid(session_id: &str, pid: u32) -> Result<(), String> {
+    with_product_terminal_stream_processes(|processes| {
+        if let Some(state) = processes.get_mut(session_id) {
+            state.pid = Some(pid);
+        }
+    })
+}
+
+fn mark_product_terminal_stream_cancel_requested(
+    session_id: &str,
+    requested_by: &str,
+    reason: &str,
+    timestamp: u64,
+) -> Result<Option<ProductTerminalStreamProcessState>, String> {
+    with_product_terminal_stream_processes(|processes| {
+        let state = processes.get_mut(session_id)?;
+        state.cancel_requested = true;
+        state.cancel_requested_at_ms = Some(timestamp);
+        state.cancel_requested_by = requested_by.to_string();
+        state.cancel_reason = reason.to_string();
+        Some(state.clone())
+    })
+}
+
+fn product_terminal_stream_cancel_state(
+    session_id: &str,
+) -> Option<ProductTerminalStreamProcessState> {
+    with_product_terminal_stream_processes(|processes| processes.get(session_id).cloned())
+        .ok()
+        .flatten()
+}
+
+fn product_terminal_stream_cancel_requested(session_id: &str) -> bool {
+    product_terminal_stream_cancel_state(session_id)
+        .map(|state| state.cancel_requested)
+        .unwrap_or(false)
+}
+
+fn unregister_product_terminal_stream_process(session_id: &str) {
+    let _ = with_product_terminal_stream_processes(|processes| {
+        processes.remove(session_id);
+    });
+}
+
 fn emit_product_terminal_stream_event(
     app: &tauri::AppHandle,
     log_path: &PathBuf,
@@ -43223,6 +43784,133 @@ fn emit_product_terminal_stream_event(
             "created_at_ms": event.created_at_ms
         }),
     );
+}
+
+#[tauri::command]
+pub fn cancel_product_terminal_stream(
+    request: ProductTerminalStreamCancelRequest,
+) -> Result<ProductTerminalStreamCancelResult, String> {
+    let timestamp = now_ms()?;
+    let session_id = request.session_id.trim().to_string();
+    let requested_by = request
+        .requested_by
+        .unwrap_or_else(|| "gravity-omega-product-ui".to_string())
+        .trim()
+        .chars()
+        .take(120)
+        .collect::<String>();
+    let requested_by = if requested_by.is_empty() {
+        "gravity-omega-product-ui".to_string()
+    } else {
+        requested_by
+    };
+    let reason = request
+        .reason
+        .unwrap_or_else(|| "operator terminal stop requested".to_string())
+        .trim()
+        .chars()
+        .take(260)
+        .collect::<String>();
+    let reason = if reason.is_empty() {
+        "operator terminal stop requested".to_string()
+    } else {
+        reason
+    };
+
+    if session_id.is_empty() {
+        return Ok(ProductTerminalStreamCancelResult {
+            accepted: false,
+            status: "product_terminal_stream_cancel_rejected".to_string(),
+            session_id,
+            command: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            terminal_enabled: true,
+            terminal_write_enabled: false,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "session_id is required to stop a tracked product terminal stream".to_string(),
+            ],
+            next_step: "Retry after a terminal stream has emitted a session id.".to_string(),
+        });
+    }
+
+    let Some(state) = mark_product_terminal_stream_cancel_requested(
+        &session_id,
+        &requested_by,
+        &reason,
+        timestamp,
+    )?
+    else {
+        return Ok(ProductTerminalStreamCancelResult {
+            accepted: false,
+            status: "product_terminal_stream_cancel_not_found".to_string(),
+            session_id,
+            command: String::new(),
+            pid: None,
+            record_path: String::new(),
+            log_path: String::new(),
+            process_spawn_enabled: true,
+            process_control_enabled: false,
+            terminal_enabled: true,
+            terminal_write_enabled: false,
+            cancellation_requested: false,
+            kill_delegated_to_stream_worker: false,
+            created_at_ms: timestamp,
+            blockers: vec![
+                "No tracked active product terminal stream matched the requested session id."
+                    .to_string(),
+            ],
+            next_step: "The UI may clear its visible running state, but no backend terminal process kill was requested.".to_string(),
+        });
+    };
+
+    let status = if state.pid.is_some() {
+        "product_terminal_stream_cancel_requested"
+    } else {
+        "product_terminal_stream_cancel_requested_pending_spawn"
+    }
+    .to_string();
+    let _ = write_jsonl_event(
+        &PathBuf::from(&state.log_path),
+        serde_json::json!({
+            "event": "product_terminal_stream_cancel_requested",
+            "session_id": state.session_id.clone(),
+            "command": state.command.clone(),
+            "pid": state.pid,
+            "status": status.clone(),
+            "requested_by": requested_by,
+            "reason": reason,
+            "started_at_ms": state.started_at_ms,
+            "created_at_ms": timestamp,
+            "process_control_enabled": true,
+            "kill_delegated_to_stream_worker": true
+        }),
+    );
+
+    Ok(ProductTerminalStreamCancelResult {
+        accepted: true,
+        status,
+        session_id: state.session_id,
+        command: state.command,
+        pid: state.pid,
+        record_path: state.record_path,
+        log_path: state.log_path,
+        process_spawn_enabled: true,
+        process_control_enabled: true,
+        terminal_enabled: true,
+        terminal_write_enabled: false,
+        cancellation_requested: true,
+        kill_delegated_to_stream_worker: true,
+        created_at_ms: timestamp,
+        blockers: Vec::new(),
+        next_step: "The tracked terminal stream worker will terminate its own child process and record a cancelled final status.".to_string(),
+    })
 }
 
 fn read_product_terminal_stream<R: Read + Send + 'static>(
@@ -43331,7 +44019,7 @@ pub fn run_product_terminal_command_stream(
     fs::write(
         &record_path,
         serde_json::to_string_pretty(&serde_json::json!({
-            "session_id": session_id,
+            "session_id": session_id.clone(),
             "status": result.status,
             "command": command,
             "argv": argv,
@@ -43344,6 +44032,8 @@ pub fn run_product_terminal_command_stream(
             "timeout_kill_sent": false,
             "wait_after_kill_ms": 0,
             "partial_output_captured": false,
+            "cancellation_requested": false,
+            "cancel_kill_sent": false,
             "timeout_ms": timeout_ms,
             "stream_enabled": true,
             "process_spawn_enabled": true,
@@ -43360,6 +44050,18 @@ pub fn run_product_terminal_command_stream(
             "failed to write terminal stream start record {}: {error}",
             record_path.display()
         )
+    })?;
+    register_product_terminal_stream_process(ProductTerminalStreamProcessState {
+        session_id: session_id.clone(),
+        command: result.command.clone(),
+        pid: None,
+        record_path: record_path.display().to_string(),
+        log_path: log_path.display().to_string(),
+        started_at_ms: timestamp,
+        cancel_requested: false,
+        cancel_requested_at_ms: None,
+        cancel_requested_by: String::new(),
+        cancel_reason: String::new(),
     })?;
 
     emit_product_terminal_stream_event(
@@ -43426,6 +44128,8 @@ pub fn run_product_terminal_command_stream(
                         "timeout_kill_sent": false,
                         "wait_after_kill_ms": 0,
                         "partial_output_captured": true,
+                        "cancellation_requested": false,
+                        "cancel_kill_sent": false,
                         "timeout_ms": timeout_ms,
                         "stdout_transcript_path": thread_stdout_path.display().to_string(),
                         "stderr_transcript_path": thread_stderr_path.display().to_string(),
@@ -43443,7 +44147,7 @@ pub fn run_product_terminal_command_stream(
                     &thread_app,
                     &thread_log_path,
                     ProductTerminalStreamEvent {
-                        session_id: thread_session_id,
+                        session_id: thread_session_id.clone(),
                         kind: "error".to_string(),
                         line,
                         status,
@@ -43459,9 +44163,11 @@ pub fn run_product_terminal_command_stream(
                         created_at_ms: timestamp,
                     },
                 );
+                unregister_product_terminal_stream_process(&thread_session_id);
                 return;
             }
         };
+        let _ = update_product_terminal_stream_pid(&thread_session_id, child.id());
 
         let stdout_reader = child.stdout.take();
         let stderr_reader = child.stderr.take();
@@ -43501,9 +44207,11 @@ pub fn run_product_terminal_command_stream(
         });
 
         let mut timed_out = false;
+        let mut cancelled = false;
         let stdout_pipe_reader_enabled = stdout_handle.is_some();
         let stderr_pipe_reader_enabled = stderr_handle.is_some();
         let mut timeout_kill_sent = false;
+        let mut cancel_kill_sent = false;
         let mut wait_after_kill_ms = 0;
         let exit_code;
         let mut wait_failed = false;
@@ -43514,6 +44222,14 @@ pub fn run_product_terminal_command_stream(
                     break;
                 }
                 Ok(None) => {
+                    if product_terminal_stream_cancel_requested(&thread_session_id) {
+                        cancelled = true;
+                        let kill_started = Instant::now();
+                        cancel_kill_sent = child.kill().is_ok();
+                        exit_code = child.wait().ok().and_then(|status| status.code());
+                        wait_after_kill_ms = kill_started.elapsed().as_millis() as u64;
+                        break;
+                    }
                     if started.elapsed() >= Duration::from_millis(timeout_ms) {
                         timed_out = true;
                         let kill_started = Instant::now();
@@ -43564,7 +44280,12 @@ pub fn run_product_terminal_command_stream(
         let partial_output_captured = !stdout.is_empty() || !stderr.is_empty();
         let _ = fs::write(&thread_stdout_path, &stdout);
         let _ = fs::write(&thread_stderr_path, &stderr);
-        let status = if timed_out {
+        let cancel_state = product_terminal_stream_cancel_state(&thread_session_id);
+        let cancellation_requested =
+            cancelled || cancel_state.as_ref().map(|state| state.cancel_requested).unwrap_or(false);
+        let status = if cancelled {
+            "product_terminal_stream_cancelled"
+        } else if timed_out {
             "product_terminal_stream_timed_out"
         } else if wait_failed {
             "product_terminal_stream_wait_failed"
@@ -43591,6 +44312,11 @@ pub fn run_product_terminal_command_stream(
                 "timeout_kill_sent": timeout_kill_sent,
                 "wait_after_kill_ms": wait_after_kill_ms,
                 "partial_output_captured": partial_output_captured,
+                "cancellation_requested": cancellation_requested,
+                "cancel_kill_sent": cancel_kill_sent,
+                "cancel_requested_at_ms": cancel_state.as_ref().and_then(|state| state.cancel_requested_at_ms),
+                "cancel_requested_by": cancel_state.as_ref().map(|state| state.cancel_requested_by.clone()).unwrap_or_default(),
+                "cancel_reason": cancel_state.as_ref().map(|state| state.cancel_reason.clone()).unwrap_or_default(),
                 "timeout_ms": timeout_ms,
                 "stdout_transcript_path": thread_stdout_path.display().to_string(),
                 "stderr_transcript_path": thread_stderr_path.display().to_string(),
@@ -43608,7 +44334,7 @@ pub fn run_product_terminal_command_stream(
             &thread_app,
             &thread_log_path,
             ProductTerminalStreamEvent {
-                session_id: thread_session_id,
+                session_id: thread_session_id.clone(),
                 kind: "lifecycle".to_string(),
                 line: format!("{status} exit={exit_code:?} duration={duration_ms}ms"),
                 status,
@@ -43624,6 +44350,7 @@ pub fn run_product_terminal_command_stream(
                 created_at_ms: timestamp,
             },
         );
+        unregister_product_terminal_stream_process(&thread_session_id);
     });
 
     Ok(result)
@@ -43698,6 +44425,8 @@ fn write_product_terminal_command_result(
         "timeout_kill_sent": result.timeout_kill_sent,
         "wait_after_kill_ms": result.wait_after_kill_ms,
         "partial_output_captured": result.partial_output_captured,
+        "cancellation_requested": false,
+        "cancel_kill_sent": false,
         "stdout_transcript_path": result.stdout_transcript_path,
         "stderr_transcript_path": result.stderr_transcript_path,
         "process_spawn_enabled": true,
@@ -43811,6 +44540,8 @@ fn terminal_session_summary_from_record(
         timeout_kill_sent: terminal_record_bool(&value, "timeout_kill_sent"),
         wait_after_kill_ms: terminal_record_u64(&value, "wait_after_kill_ms"),
         partial_output_captured: terminal_record_bool(&value, "partial_output_captured"),
+        cancellation_requested: terminal_record_bool(&value, "cancellation_requested"),
+        cancel_kill_sent: terminal_record_bool(&value, "cancel_kill_sent"),
         stdout_transcript_path,
         stderr_transcript_path,
         source_stream_enabled: terminal_record_bool(&value, "stream_enabled"),
@@ -44719,8 +45450,8 @@ fn omega_computer_roles() -> Vec<OmegaComputerRole> {
         },
         OmegaComputerRole {
             id: "hermes-kimi-assist".to_string(),
-            title: "Hermes/Kimi Assist".to_string(),
-            runtime: "hermes chat -Q via Moonshot/Kimi".to_string(),
+            title: "Hermes Assist".to_string(),
+            runtime: "hermes chat -Q via active Hermes profile".to_string(),
             responsibility: "Provide secondary planning, skill-aware decomposition, risk review, and implementation critique from the local Hermes agent inventory.".to_string(),
             autonomy: "delegated-assist".to_string(),
             enabled: true,
@@ -44732,10 +45463,10 @@ fn omega_computer_roles() -> Vec<OmegaComputerRole> {
                 "review-only guidance".to_string(),
             ],
             evidence_required: vec![
-                "Hermes/Kimi inventory or assist record when invoked".to_string(),
+                "Hermes inventory or assist record when invoked".to_string(),
                 "delegation summary in Omega Agent Work".to_string(),
             ],
-            next_step: "Let Codex Lead delegate bounded questions to Hermes/Kimi, then reconcile before any write path runs.".to_string(),
+            next_step: "Let Codex Lead delegate bounded questions to Hermes, then reconcile before any write path runs.".to_string(),
         },
         OmegaComputerRole {
             id: "workspace-specialist".to_string(),
@@ -44840,7 +45571,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             task_log: vec![
                 "Accept prompt from the Omega chat composer.".to_string(),
                 "Create the top-level plan and preserve Agent Operating Doctrine.".to_string(),
-                "Dispatch specialist questions to Hermes/Kimi-backed lanes.".to_string(),
+                "Dispatch specialist questions to Hermes-backed lanes.".to_string(),
                 "Reconcile evidence before any final report.".to_string(),
             ],
             handoff_targets: vec![
@@ -44863,17 +45594,17 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
         },
         OmegaComputerWorker {
             id_badge: "HK-01".to_string(),
-            name: "Hermes/Kimi Router".to_string(),
+            name: "Hermes Router".to_string(),
             specialty: "skill-aware delegation and critique".to_string(),
-            runtime_lane: "hermes-chat-kimi".to_string(),
+            runtime_lane: "hermes-chat".to_string(),
             status: "assist_lane_ready".to_string(),
             progress_percent: 28,
             progress_label: "standing by".to_string(),
             selected_by_default: false,
-            screen_title: "Hermes/Kimi dispatch".to_string(),
+            screen_title: "Hermes dispatch".to_string(),
             current_task: "Prepare compact assist briefs and route specialist review without direct writes.".to_string(),
             task_log: vec![
-                "Use local Hermes as the Kimi-backed lane.".to_string(),
+                "Use local Hermes with its active model/profile.".to_string(),
                 "Prefer compact prompts and review-only outputs.".to_string(),
                 "Return findings to Codex Lead for reconciliation.".to_string(),
             ],
@@ -44883,7 +45614,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
                 "UX-08".to_string(),
             ],
             evidence_required: vec![
-                "Hermes/Kimi assist brief".to_string(),
+                "Hermes assist brief".to_string(),
                 "capability inventory".to_string(),
             ],
             blocked_actions: vec![
@@ -44898,7 +45629,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             id_badge: "DR-01".to_string(),
             name: "Deep Research".to_string(),
             specialty: "broad source discovery and context gathering".to_string(),
-            runtime_lane: "Hermes/Kimi assist".to_string(),
+            runtime_lane: "Hermes assist".to_string(),
             status: "ready_to_dispatch".to_string(),
             progress_percent: 18,
             progress_label: "queued".to_string(),
@@ -44921,7 +45652,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             id_badge: "RA-02".to_string(),
             name: "Research Analysis".to_string(),
             specialty: "synthesis, tradeoffs, and decision support".to_string(),
-            runtime_lane: "Hermes/Kimi assist".to_string(),
+            runtime_lane: "Hermes assist".to_string(),
             status: "ready_to_dispatch".to_string(),
             progress_percent: 16,
             progress_label: "queued".to_string(),
@@ -44944,7 +45675,7 @@ fn omega_computer_workers() -> Vec<OmegaComputerWorker> {
             id_badge: "WA-03".to_string(),
             name: "Writing Analysis".to_string(),
             specialty: "operator-readable summaries and artifact wording".to_string(),
-            runtime_lane: "Hermes/Kimi assist".to_string(),
+            runtime_lane: "Hermes assist".to_string(),
             status: "ready_to_dispatch".to_string(),
             progress_percent: 14,
             progress_label: "queued".to_string(),
@@ -45092,7 +45823,7 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
                 "current prompt".to_string(),
                 "active editor snapshot".to_string(),
                 "existing evidence records".to_string(),
-                "declared Hermes/Kimi capability inventory".to_string(),
+                "declared Hermes capability inventory".to_string(),
             ],
             blocked_actions: vec![
                 "live screenshot capture".to_string(),
@@ -45110,7 +45841,7 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
             allowed_inputs: vec![
                 "doctrine".to_string(),
                 "todo review".to_string(),
-                "Hermes/Kimi skill map".to_string(),
+                "Hermes skill map".to_string(),
             ],
             blocked_actions: vec![
                 "process spawn from this packet".to_string(),
@@ -45122,10 +45853,10 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
         OmegaComputerStage {
             id: "delegate".to_string(),
             title: "Delegate".to_string(),
-            owner: "Codex Lead + Hermes/Kimi".to_string(),
+            owner: "Codex Lead + Hermes".to_string(),
             status: "ready".to_string(),
             allowed_inputs: vec![
-                "compact Hermes/Kimi assist query".to_string(),
+                "compact Hermes assist query".to_string(),
                 "skill names and tool categories".to_string(),
                 "review focus".to_string(),
             ],
@@ -45133,8 +45864,8 @@ fn omega_computer_stages() -> Vec<OmegaComputerStage> {
                 "Hermes direct writes".to_string(),
                 "Hermes shell/tool execution from this packet".to_string(),
             ],
-            evidence: "Hermes/Kimi can assist through existing bounded inventory/assist records while Codex remains lead.".to_string(),
-            next_step: "Attach Hermes/Kimi brief evidence to the Codex Lead run before final reconciliation.".to_string(),
+            evidence: "Hermes can assist through existing bounded inventory/assist records while Codex remains lead.".to_string(),
+            next_step: "Attach Hermes brief evidence to the Codex Lead run before final reconciliation.".to_string(),
         },
         OmegaComputerStage {
             id: "act".to_string(),
@@ -45267,7 +45998,7 @@ pub fn record_omega_computer_session(
             "Live screenshot capture, OCR, pointer/keyboard injection, and target-window control require explicit approval records plus deferred QA.".to_string(),
             "Terminal/process execution, file writes, patches, exports, live MCP calls, and memory writes stay in their existing explicit lanes.".to_string(),
         ],
-        next_step: "Use this toolbar function as the main Omega-native computer workflow entrypoint: Codex Lead opens the swarm terminal, specialist agents become inspectable by ID badge, Hermes/Kimi assists from capability records, and live action stays behind separate verified gates.".to_string(),
+        next_step: "Use this toolbar function as the main Omega-native computer workflow entrypoint: Codex Lead opens the swarm terminal, specialist agents become inspectable by ID badge, Hermes assists from capability records, and live action stays behind separate verified gates.".to_string(),
     };
     fs::write(
         &record_path,
@@ -46465,7 +47196,7 @@ fn product_evidence_title_detail(
             let mcp = json_u64(value, "mcp_server_count").unwrap_or(0);
             let hooks = json_u64(value, "hook_count").unwrap_or(0);
             (
-                "Hermes/Kimi capability inventory".to_string(),
+                "Hermes capability inventory".to_string(),
                 format!("enabled_skills={skills}; filesystem_skills={files}; mcp={mcp}; hooks={hooks}; execution_disabled=true"),
             )
         }
@@ -46478,7 +47209,7 @@ fn product_evidence_title_detail(
             let duration = json_u64(value, "duration_ms").unwrap_or(0);
             let stdout = json_u64(value, "stdout_size_bytes").unwrap_or(0);
             (
-                "Hermes/Kimi assist brief".to_string(),
+                "Hermes assist brief".to_string(),
                 format!("{status}; exit={exit_code}; duration={duration}ms; stdout={stdout}b; writes_disabled=true"),
             )
         }
@@ -96862,7 +97593,7 @@ fn hermes_inventory_run_view_summary(
     };
     codex_hermes_run_view_evidence_summary(
         "hermes-kimi-inventory",
-        "Latest Hermes/Kimi capability inventory",
+        "Latest Hermes capability inventory",
         record.id.clone(),
         record.status.clone(),
         record.record_path.clone(),
@@ -96909,6 +97640,11 @@ fn hermes_assist_run_view_summary(
         .preview
         .clone()
         .or_else(|| Some(prompt_preview(&record.stderr, 480)));
+    let stage_summary = if record.stage_summary.is_empty() {
+        "stages=legacy-record".to_string()
+    } else {
+        format!("stages={}", record.stage_summary.join(" | "))
+    };
     let mut summary = codex_hermes_run_view_evidence_summary(
         source_id,
         title,
@@ -96926,11 +97662,14 @@ fn hermes_assist_run_view_summary(
             record.stdout_size_bytes, record.stderr_size_bytes, record.partial_output_captured
         ),
         format!(
-            "source={} max_turns={} transport={} argv_chars={} pipe_readers={}/{} timeout_kill={} wait_after_kill={}ms stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={}",
+            "source={} max_turns={} transport={} argv_chars={} outcome={} preflight={} transcript_ready={} pipe_readers={}/{} timeout_kill={} wait_after_kill={}ms stdout_transcript={} stdout_found={} stdout_lines={} stderr_transcript={} stderr_found={} stderr_lines={} failure={} next_action={} {}",
             record.source,
             record.max_turns,
             record.query_transport,
             record.argv_char_count,
+            if record.outcome_category.is_empty() { "unknown" } else { record.outcome_category.as_str() },
+            record.preflight_passed,
+            record.transcript_evidence_ready,
             record.stdout_pipe_reader_enabled,
             record.stderr_pipe_reader_enabled,
             record.timeout_kill_sent,
@@ -96940,7 +97679,10 @@ fn hermes_assist_run_view_summary(
             stdout_transcript.line_count,
             record.stderr_transcript_path,
             stderr_transcript.found,
-            stderr_transcript.line_count
+            stderr_transcript.line_count,
+            if record.failure_summary.is_empty() { "none" } else { record.failure_summary.as_str() },
+            if record.operator_next_action.is_empty() { record.next_step.as_str() } else { record.operator_next_action.as_str() },
+            stage_summary
         ),
         stdout_preview,
         stderr_preview,
@@ -97167,7 +97909,7 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         evidence_summaries.push(hermes_assist_run_view_summary(
             record,
             "hermes-kimi-assist-postmortem",
-            "Latest failed/timed-out Hermes/Kimi assist brief",
+            "Latest failed/timed-out Hermes assist brief",
         ));
     }
     if let Some(record) = hermes_assists.first() {
@@ -97178,7 +97920,7 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
             evidence_summaries.push(hermes_assist_run_view_summary(
                 record,
                 "hermes-kimi-assist",
-                "Latest Hermes/Kimi assist brief",
+                "Latest Hermes assist brief",
             ));
         }
     }
@@ -97356,11 +98098,11 @@ pub fn codex_hermes_run_view_dashboard() -> Result<CodexHermesRunViewDashboard, 
         reasons: vec![
             "run view dashboard groups existing Codex/Hermes evidence ledgers into one operator surface",
             "failed and timed-out unlocked agent sessions are promoted as postmortem evidence before generic ledgers",
-            "latest Codex Lead orchestration, Hermes/Kimi inventory, and Hermes/Kimi assist records are surfaced as read-only evidence summaries when present",
+            "latest Codex Lead orchestration, Hermes inventory, and Hermes assist records are surfaced as read-only evidence summaries when present",
             "dashboard reads existing records only and creates no task, approval, runner, joint plan, artifact, transcript, export, protection, or event records",
             "process spawn, terminal control, live MCP calls, writes, patches, desktop control, capture, export, memory writes, and execution remain disabled",
         ],
-        next_slice: "Use these visible run summaries to deepen Hermes/Kimi execution robustness, PTY/process maturity, live MCP/SSWP/Steno behavior, and pet runtime linkage while keeping unsafe live gates explicit.",
+        next_slice: "Use these visible run summaries to deepen Hermes execution robustness, PTY/process maturity, live MCP/SSWP/Steno behavior, and pet runtime linkage while keeping unsafe live gates explicit.",
     })
 }
 
@@ -98445,7 +99187,7 @@ pub fn codex_hermes_run_evidence_diff_board(
             "failure_postmortem_count",
             run_view.agent_session_failure_count,
             run_view.hermes_assist_failure_count,
-            "Compare Codex agent failures against Hermes/Kimi assist failures before retrying or delegating.",
+            "Compare Codex agent failures against Hermes assist failures before retrying or delegating.",
         ),
         codex_hermes_run_evidence_diff_item(
             "postmortem-timeouts",
@@ -98453,7 +99195,7 @@ pub fn codex_hermes_run_evidence_diff_board(
             "timeout_postmortem_count",
             run_view.agent_session_timeout_count,
             run_view.hermes_assist_timeout_count,
-            "Compare timeout pressure across Codex and Hermes/Kimi before launching another long run.",
+            "Compare timeout pressure across Codex and Hermes before launching another long run.",
         ),
     ];
 
@@ -100557,6 +101299,156 @@ pub fn list_sswp_registry_snapshots() -> Result<Vec<SswpRegistrySnapshotRecord>,
     Ok(records)
 }
 
+fn sswp_attestation_path() -> Option<PathBuf> {
+    let mut cursor = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for _ in 0..6 {
+        let candidate = cursor.join(".sswp.json");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        if !cursor.pop() {
+            break;
+        }
+    }
+    None
+}
+
+fn sswp_empty_attestation_summary(
+    status: &str,
+    path: Option<&Path>,
+    next_action: &str,
+) -> SswpAttestationSummary {
+    SswpAttestationSummary {
+        status: status.to_string(),
+        attestation_path: path.map(|path| path.display().to_string()),
+        target_name: "unknown".to_string(),
+        branch: "unknown".to_string(),
+        commit_hash: "unknown".to_string(),
+        timestamp: "unknown".to_string(),
+        gate_count: 0,
+        passing_gate_count: 0,
+        inconclusive_gate_count: 0,
+        failing_gate_count: 0,
+        dependency_count: 0,
+        suspicious_dependency_count: 0,
+        highest_dependency_risk: 0.0,
+        read_only: true,
+        witness_enabled: false,
+        verify_enabled: false,
+        export_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        next_action: next_action.to_string(),
+    }
+}
+
+fn sswp_attestation_summary() -> SswpAttestationSummary {
+    let Some(path) = sswp_attestation_path() else {
+        return sswp_empty_attestation_summary(
+            "sswp_attestation_missing",
+            None,
+            "Run SSWP witness outside the panel, then refresh the read-only lane.",
+        );
+    };
+
+    let Ok(content) = fs::read_to_string(&path) else {
+        return sswp_empty_attestation_summary(
+            "sswp_attestation_unreadable",
+            Some(&path),
+            "Fix the local .sswp.json permissions before trusting this lane.",
+        );
+    };
+
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return sswp_empty_attestation_summary(
+            "sswp_attestation_invalid_json",
+            Some(&path),
+            "Regenerate the local SSWP witness file; the current JSON is invalid.",
+        );
+    };
+
+    let gates = value
+        .get("gates")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let dependencies = value
+        .get("dependencies")
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let passing_gate_count = gates
+        .iter()
+        .filter(|gate| gate.get("status").and_then(serde_json::Value::as_str) == Some("PASS"))
+        .count();
+    let inconclusive_gate_count = gates
+        .iter()
+        .filter(|gate| {
+            gate.get("status").and_then(serde_json::Value::as_str) == Some("INCONCLUSIVE")
+        })
+        .count();
+    let failing_gate_count = gates
+        .len()
+        .saturating_sub(passing_gate_count + inconclusive_gate_count);
+    let suspicious_dependency_count = dependencies
+        .iter()
+        .filter(|dependency| {
+            dependency
+                .get("suspicious")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        })
+        .count();
+    let highest_dependency_risk = dependencies
+        .iter()
+        .filter_map(|dependency| dependency.get("riskScore").and_then(serde_json::Value::as_f64))
+        .fold(0.0, f64::max);
+
+    SswpAttestationSummary {
+        status: if failing_gate_count == 0 {
+            "sswp_attestation_read_only".to_string()
+        } else {
+            "sswp_attestation_has_failures".to_string()
+        },
+        attestation_path: Some(path.display().to_string()),
+        target_name: value
+            .pointer("/target/name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        branch: value
+            .pointer("/target/branch")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        commit_hash: value
+            .pointer("/target/commitHash")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        timestamp: value
+            .get("timestamp")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        gate_count: gates.len(),
+        passing_gate_count,
+        inconclusive_gate_count,
+        failing_gate_count,
+        dependency_count: dependencies.len(),
+        suspicious_dependency_count,
+        highest_dependency_risk,
+        read_only: true,
+        witness_enabled: false,
+        verify_enabled: false,
+        export_enabled: false,
+        writes_allowed: false,
+        execution_enabled: false,
+        next_action: "Use the external SSWP witness workflow for mutation; this panel remains read-only evidence."
+            .to_string(),
+    }
+}
+
 #[tauri::command]
 pub fn sswp_status() -> Result<SswpStatusPanel, String> {
     let dashboard = first_class_mcp_dashboard()?;
@@ -100598,6 +101490,7 @@ pub fn sswp_status() -> Result<SswpStatusPanel, String> {
         panel_title: "SSWP Status",
         subsystem: lane.subsystem,
         display_name: lane.display_name,
+        attestation: sswp_attestation_summary(),
         evidence_record_count: lane.evidence_record_count,
         ready_evidence_count: lane.ready_evidence_count,
         blocked_evidence_count: lane.blocked_evidence_count,
@@ -100844,7 +101737,7 @@ fn pet_runtime_attention_items(
             "hermes-kimi-postmortem",
             "warning",
             "warning",
-            "Hermes/Kimi assist postmortem needs review",
+            "Hermes assist postmortem needs review",
             format!(
                 "{}; timed_out={}; exit={:?}; duration={}ms; blocker={}",
                 record.status, record.timed_out, record.exit_code, record.duration_ms, blocker
@@ -101567,6 +102460,80 @@ fn steno_search_snippet(content: &str, query: &str) -> Option<(usize, String)> {
     })
 }
 
+fn steno_corpus_summaries(max_file_bytes: u64) -> Result<Vec<StenoCorpusSummary>, String> {
+    let mut summaries = Vec::new();
+
+    for (category, dir) in steno_search_dirs()? {
+        let mut allowed_file_count = 0;
+        let mut skipped_large_file_count = 0;
+        let mut total_bytes = 0;
+        let mut newest_record_ms = 0;
+        let directory_exists = dir.exists();
+
+        if directory_exists {
+            for entry in fs::read_dir(&dir).map_err(|error| {
+                format!(
+                    "failed to read Steno corpus directory {}: {error}",
+                    dir.display()
+                )
+            })? {
+                let entry = entry.map_err(|error| {
+                    format!(
+                        "failed to read Steno corpus directory entry {}: {error}",
+                        dir.display()
+                    )
+                })?;
+                let path = entry.path();
+                if !path.is_file() || !steno_search_file_allowed(&path) {
+                    continue;
+                }
+
+                let metadata = match path.metadata() {
+                    Ok(metadata) => metadata,
+                    Err(_) => continue,
+                };
+                if metadata.len() > max_file_bytes {
+                    skipped_large_file_count += 1;
+                    continue;
+                }
+
+                allowed_file_count += 1;
+                total_bytes += metadata.len();
+                newest_record_ms = newest_record_ms.max(steno_search_file_created_at(&path));
+            }
+        }
+
+        summaries.push(StenoCorpusSummary {
+            category: category.to_string(),
+            directory_path: dir.display().to_string(),
+            directory_exists,
+            allowed_file_count,
+            skipped_large_file_count,
+            total_bytes,
+            newest_record_ms,
+            read_only: true,
+            capture_enabled: false,
+            export_enabled: false,
+            live_index_enabled: false,
+            writes_allowed: false,
+            execution_enabled: false,
+            status: if directory_exists {
+                "steno_corpus_summary_read_only".to_string()
+            } else {
+                "steno_corpus_directory_missing_read_only".to_string()
+            },
+        });
+    }
+
+    summaries.sort_by(|left, right| {
+        right
+            .allowed_file_count
+            .cmp(&left.allowed_file_count)
+            .then_with(|| left.category.cmp(&right.category))
+    });
+    Ok(summaries)
+}
+
 fn run_steno_search(
     query: &str,
     max_results: usize,
@@ -101690,7 +102657,7 @@ fn steno_postmortem_result_from_hermes(
     );
 
     StenoSearchResult {
-        title: "Hermes/Kimi assist postmortem".to_string(),
+        title: "Hermes assist postmortem".to_string(),
         category: "hermes-assist-postmortem".to_string(),
         record_path: record.record_path.clone(),
         snippet,
@@ -101748,6 +102715,16 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
     let search_ran = !query.is_empty();
     let recent_postmortem_results = steno_recent_postmortem_results(max_results.min(8))?;
     let postmortem_result_count = recent_postmortem_results.len();
+    let corpus_summaries = steno_corpus_summaries(max_file_bytes)?;
+    let corpus_summary_count = corpus_summaries.len();
+    let corpus_file_count = corpus_summaries
+        .iter()
+        .map(|summary| summary.allowed_file_count)
+        .sum();
+    let corpus_total_bytes = corpus_summaries
+        .iter()
+        .map(|summary| summary.total_bytes)
+        .sum();
 
     Ok(StenoSearchPanel {
         status: "steno_search_panel_read_only",
@@ -101758,6 +102735,9 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         searched_file_count,
         matched_file_count,
         postmortem_result_count,
+        corpus_summary_count,
+        corpus_file_count,
+        corpus_total_bytes,
         max_results,
         max_file_bytes,
         transcript_bundle_count: dashboard.transcript_bundle_count,
@@ -101787,10 +102767,11 @@ pub fn steno_search(request: Option<StenoSearchRequest>) -> Result<StenoSearchPa
         execution_enabled: dashboard.execution_enabled,
         results,
         recent_postmortem_results,
+        corpus_summaries,
         sections: dashboard.sections,
         reasons: vec![
             "panel searches only approved Gravity Omega evidence and transcript record directories",
-            "panel surfaces recent Codex agent and Hermes/Kimi assist postmortems before query results without launching either runtime",
+            "panel surfaces recent Codex agent and Hermes assist postmortems before query results without launching either runtime",
             "panel creates no records and never reads old Electron .sswp files",
             "capture, export, live MCP calls, config reads, sockets, writes, patches, memory writes, desktop control, terminal/process control, and execution remain disabled",
         ],
@@ -114231,6 +115212,146 @@ mod tests {
     }
 
     #[test]
+    fn unlocked_agent_stream_cancel_registry_is_tracked_and_scoped() {
+        let _test_env_guard = test_env_lock();
+        let timestamp = now_ms().expect("timestamp");
+        let session_id = format!("test-unlocked-agent-stream-cancel-{timestamp}");
+        let record_path = std::env::temp_dir()
+            .join(format!("{session_id}.json"))
+            .display()
+            .to_string();
+        let log_path = std::env::temp_dir()
+            .join(format!("{session_id}.jsonl"))
+            .display()
+            .to_string();
+        unregister_unlocked_agent_prompt_stream_process(&session_id);
+        register_unlocked_agent_prompt_stream_process(UnlockedAgentPromptStreamProcessState {
+            session_id: session_id.clone(),
+            runtime: "codex-workspace-write".to_string(),
+            pid: None,
+            record_path: record_path.clone(),
+            log_path: log_path.clone(),
+            started_at_ms: timestamp,
+            cancel_requested: false,
+            cancel_requested_at_ms: None,
+            cancel_requested_by: String::new(),
+            cancel_reason: String::new(),
+        })
+        .expect("registry accepts test stream");
+
+        let accepted = cancel_unlocked_agent_prompt_session_stream(
+            UnlockedAgentPromptSessionCancelRequest {
+                session_id: session_id.clone(),
+                requested_by: Some("rust-test".to_string()),
+                reason: Some("verify scoped cancellation".to_string()),
+            },
+        )
+        .expect("cancel request resolves");
+        assert!(accepted.accepted);
+        assert_eq!(
+            accepted.status,
+            "unlocked_agent_prompt_stream_cancel_requested_pending_spawn"
+        );
+        assert_eq!(accepted.session_id, session_id);
+        assert_eq!(accepted.runtime, "codex-workspace-write");
+        assert_eq!(accepted.pid, None);
+        assert_eq!(accepted.record_path, record_path);
+        assert_eq!(accepted.log_path, log_path);
+        assert!(accepted.process_spawn_enabled);
+        assert!(accepted.process_control_enabled);
+        assert!(accepted.agent_prompt_execution_enabled);
+        assert!(accepted.cancellation_requested);
+        assert!(accepted.kill_delegated_to_stream_worker);
+        assert!(unlocked_agent_prompt_stream_cancel_requested(
+            &accepted.session_id
+        ));
+        unregister_unlocked_agent_prompt_stream_process(&accepted.session_id);
+
+        let missing = cancel_unlocked_agent_prompt_session_stream(
+            UnlockedAgentPromptSessionCancelRequest {
+                session_id: "not-a-tracked-stream".to_string(),
+                requested_by: Some("rust-test".to_string()),
+                reason: Some("verify scoped rejection".to_string()),
+            },
+        )
+        .expect("missing cancel request resolves");
+        assert!(!missing.accepted);
+        assert_eq!(
+            missing.status,
+            "unlocked_agent_prompt_stream_cancel_not_found"
+        );
+        assert!(!missing.process_control_enabled);
+        assert!(!missing.cancellation_requested);
+        assert!(!missing.kill_delegated_to_stream_worker);
+    }
+
+    #[test]
+    fn product_terminal_stream_cancel_registry_is_tracked_and_scoped() {
+        let _test_env_guard = test_env_lock();
+        let timestamp = now_ms().expect("timestamp");
+        let session_id = format!("test-product-terminal-stream-cancel-{timestamp}");
+        let record_path = std::env::temp_dir()
+            .join(format!("{session_id}.json"))
+            .display()
+            .to_string();
+        let log_path = std::env::temp_dir()
+            .join(format!("{session_id}.jsonl"))
+            .display()
+            .to_string();
+        unregister_product_terminal_stream_process(&session_id);
+        register_product_terminal_stream_process(ProductTerminalStreamProcessState {
+            session_id: session_id.clone(),
+            command: "npm run validate".to_string(),
+            pid: None,
+            record_path: record_path.clone(),
+            log_path: log_path.clone(),
+            started_at_ms: timestamp,
+            cancel_requested: false,
+            cancel_requested_at_ms: None,
+            cancel_requested_by: String::new(),
+            cancel_reason: String::new(),
+        })
+        .expect("registry accepts test terminal stream");
+
+        let accepted = cancel_product_terminal_stream(ProductTerminalStreamCancelRequest {
+            session_id: session_id.clone(),
+            requested_by: Some("rust-test".to_string()),
+            reason: Some("verify scoped terminal cancellation".to_string()),
+        })
+        .expect("terminal cancel request resolves");
+        assert!(accepted.accepted);
+        assert_eq!(
+            accepted.status,
+            "product_terminal_stream_cancel_requested_pending_spawn"
+        );
+        assert_eq!(accepted.session_id, session_id);
+        assert_eq!(accepted.command, "npm run validate");
+        assert_eq!(accepted.pid, None);
+        assert_eq!(accepted.record_path, record_path);
+        assert_eq!(accepted.log_path, log_path);
+        assert!(accepted.process_spawn_enabled);
+        assert!(accepted.process_control_enabled);
+        assert!(accepted.terminal_enabled);
+        assert!(!accepted.terminal_write_enabled);
+        assert!(accepted.cancellation_requested);
+        assert!(accepted.kill_delegated_to_stream_worker);
+        assert!(product_terminal_stream_cancel_requested(&accepted.session_id));
+        unregister_product_terminal_stream_process(&accepted.session_id);
+
+        let missing = cancel_product_terminal_stream(ProductTerminalStreamCancelRequest {
+            session_id: "not-a-tracked-terminal-stream".to_string(),
+            requested_by: Some("rust-test".to_string()),
+            reason: Some("verify scoped rejection".to_string()),
+        })
+        .expect("missing terminal cancel request resolves");
+        assert!(!missing.accepted);
+        assert_eq!(missing.status, "product_terminal_stream_cancel_not_found");
+        assert!(!missing.process_control_enabled);
+        assert!(!missing.cancellation_requested);
+        assert!(!missing.kill_delegated_to_stream_worker);
+    }
+
+    #[test]
     fn product_terminal_stream_record_summary_preserves_lifecycle_evidence() {
         let _test_env_guard = test_env_lock();
         let test_root = env::temp_dir().join(format!(
@@ -114257,6 +115378,8 @@ mod tests {
             "timeout_kill_sent": true,
             "wait_after_kill_ms": 17,
             "partial_output_captured": true,
+            "cancellation_requested": true,
+            "cancel_kill_sent": true,
             "timeout_ms": 100,
             "stdout_transcript_path": stdout_path.display().to_string(),
             "stderr_transcript_path": stderr_path.display().to_string(),
@@ -114284,6 +115407,8 @@ mod tests {
         assert!(summary.timeout_kill_sent);
         assert_eq!(summary.wait_after_kill_ms, 17);
         assert!(summary.partial_output_captured);
+        assert!(summary.cancellation_requested);
+        assert!(summary.cancel_kill_sent);
         assert!(summary.stdout_size_bytes > 0);
         assert!(summary.stderr_size_bytes > 0);
         assert!(!summary.terminal_write_enabled);
@@ -114543,7 +115668,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
     #[test]
     fn sovereign_docs_preview_records_self_contained_html_without_export_gates() {
         let _test_env_guard = test_env_lock();
-        let markdown = "# Gravity Omega Brief\n\n- Codex Lead\n- Hermes/Kimi assist\n\n```txt\nsealed evidence\n```\n";
+        let markdown = "# Gravity Omega Brief\n\n- Codex Lead\n- Hermes assist\n\n```txt\nsealed evidence\n```\n";
         let record = record_sovereign_docs_preview(SovereignDocsPreviewRequest {
             source_path: "Omega Agent Work.md".to_string(),
             markdown: markdown.to_string(),
@@ -114589,7 +115714,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         let _test_env_guard = test_env_lock();
         let record = record_omega_computer_session(OmegaComputerSessionRequest {
             prompt_preview: Some(
-                "Use Codex as lead, delegate bounded review to Hermes/Kimi, and verify before reporting."
+                "Use Codex as lead, delegate bounded review to Hermes, and verify before reporting."
                     .to_string(),
             ),
             requested_by: Some("rust-test".to_string()),
@@ -114615,7 +115740,9 @@ printf 'agent transcript dashboard stderr ready\n' >&2
             role.id == "codex-lead" && role.autonomy == "primary" && !role.can_execute
         }));
         assert!(record.roles.iter().any(|role| {
-            role.id == "hermes-kimi-assist" && role.runtime.contains("Kimi") && !role.can_execute
+            role.id == "hermes-kimi-assist"
+                && role.runtime.contains("active Hermes profile")
+                && !role.can_execute
         }));
         assert!(record.workers.iter().any(|worker| {
             worker.id_badge == "DR-01"
@@ -114930,7 +116057,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         assert_eq!(omega_computer.capability_tier, "safe");
         assert!(omega_computer
             .unavailable_reason
-            .contains("Codex Lead + Hermes/Kimi"));
+            .contains("Codex Lead + Hermes"));
 
         for command_id in [
             "agent.hermes_companion",
@@ -115529,7 +116656,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
             &["omega-brain (enabled, tools=all)".to_string()],
             &["PreToolUse: timeout=30".to_string()],
         );
-        assert!(assist_query.contains("Gravity Omega Hermes/Kimi assist brief."));
+        assert!(assist_query.contains("Gravity Omega Hermes assist brief."));
         assert!(assist_query.contains("Do not edit files."));
         assert!(assist_query.contains("Do not run shell commands or call tools."));
         assert!(assist_query.contains("software-development/plan"));
@@ -115627,7 +116754,7 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         );
         assert!(delegations.iter().any(|lane| {
             lane.id == "hermes-kimi-skill-pass"
-                && lane.owner == "Hermes/Kimi Assist"
+                && lane.owner == "Hermes Assist"
                 && lane.status == "assist_lane_ready_for_codex_prompt"
                 && !lane.execution_enabled
                 && !lane.live_mcp_call_enabled
@@ -116293,6 +117420,22 @@ printf 'agent transcript dashboard stderr ready\n' >&2
         assert_eq!(panel.subsystem, "sswp");
         assert_eq!(panel.lane.subsystem, "sswp");
         assert_eq!(panel.display_name, "SSWP");
+        assert!(panel.attestation.read_only);
+        assert!(panel.attestation.status.starts_with("sswp_attestation_"));
+        assert_eq!(panel.attestation.target_name, "gravity-omega");
+        assert_ne!(panel.attestation.branch, "unknown");
+        assert!(panel.attestation.attestation_path.is_some());
+        assert!(panel.attestation.commit_hash.len() >= 7);
+        assert!(panel.attestation.gate_count >= 5);
+        assert!(panel.attestation.passing_gate_count >= 4);
+        assert!(panel.attestation.dependency_count > 0);
+        assert!(panel.attestation.suspicious_dependency_count > 0);
+        assert!(panel.attestation.highest_dependency_risk >= 0.0);
+        assert!(!panel.attestation.witness_enabled);
+        assert!(!panel.attestation.verify_enabled);
+        assert!(!panel.attestation.export_enabled);
+        assert!(!panel.attestation.writes_allowed);
+        assert!(!panel.attestation.execution_enabled);
         assert_eq!(panel.disabled_gate_count, 1);
         assert!(panel
             .latest_registry_snapshot_status
@@ -116420,6 +117563,26 @@ sleep 2
             panel.postmortem_result_count,
             panel.recent_postmortem_results.len()
         );
+        assert_eq!(panel.corpus_summary_count, panel.corpus_summaries.len());
+        assert_eq!(
+            panel.corpus_file_count,
+            panel
+                .corpus_summaries
+                .iter()
+                .map(|summary| summary.allowed_file_count)
+                .sum::<usize>()
+        );
+        assert!(panel.corpus_summary_count >= 5);
+        assert!(panel.corpus_summaries.iter().any(|summary| {
+            summary.category == "pet-signal"
+                && summary.read_only
+                && !summary.capture_enabled
+                && !summary.export_enabled
+                && !summary.live_index_enabled
+                && !summary.writes_allowed
+                && !summary.execution_enabled
+                && summary.status.starts_with("steno_corpus_")
+        }));
         assert!(panel.results.is_empty());
         assert!(panel.section_count >= 5);
         assert!(panel.read_only);
@@ -116475,6 +117638,19 @@ sleep 2
             panel.postmortem_result_count,
             panel.recent_postmortem_results.len()
         );
+        assert_eq!(panel.corpus_summary_count, panel.corpus_summaries.len());
+        assert!(panel.corpus_summaries.iter().any(|summary| {
+            summary.category == "pet-signal"
+                && summary.allowed_file_count >= 1
+                && summary.total_bytes > 0
+                && summary.newest_record_ms > 0
+                && summary.read_only
+                && !summary.capture_enabled
+                && !summary.export_enabled
+                && !summary.live_index_enabled
+                && !summary.writes_allowed
+                && !summary.execution_enabled
+        }));
         assert!(panel.transcript_read_enabled);
         assert!(panel.transcript_index_enabled);
         assert!(panel.query_binding_enabled);
@@ -118891,7 +120067,7 @@ sleep 2
             task_run_id: Some(stub.id.clone()),
             prompt_preview: "test run view evidence".to_string(),
             stream_runtime: "codex-workspace-write".to_string(),
-            hermes_lane_runtime: "hermes-chat-kimi".to_string(),
+            hermes_lane_runtime: "hermes-chat".to_string(),
             runtime_depth_record_id: Some("runtime-depth-test".to_string()),
             runtime_depth_record_path: Some("/tmp/runtime-depth-test.json".to_string()),
             hermes_skill_count: 12,
@@ -119048,6 +120224,19 @@ sleep 2
             timeout_kill_sent: false,
             wait_after_kill_ms: 0,
             partial_output_captured: true,
+            preflight_passed: true,
+            stage_summary: vec![
+                "prompt:accepted:22b".to_string(),
+                "log-preflight:passed".to_string(),
+                "process:started:pid=4242:transport=argv-compact-query".to_string(),
+                "transcripts:ready=true:stdout=57b:stderr=26b".to_string(),
+                "outcome:succeeded:exit=0:timeout=false:duration=222ms".to_string(),
+            ],
+            outcome_category: "succeeded".to_string(),
+            failure_summary: "none".to_string(),
+            operator_next_action: "Attach this Hermes assist brief to the Codex Lead stream.".to_string(),
+            transcript_evidence_ready: true,
+            guidance_preview: "Hermes says keep the test scoped and verify the run view.".to_string(),
             stdout_transcript_path: assist_stdout_path.display().to_string(),
             stderr_transcript_path: assist_stderr_path.display().to_string(),
             inventory_record_path: Some(inventory_path.display().to_string()),
@@ -119092,7 +120281,7 @@ sleep 2
         let failed_assist_stderr_path =
             assist_dir.join("run-view-evidence-assist-timeout.stderr.txt");
         let failed_assist_stdout = "Hermes started reviewing but did not finish.".to_string();
-        let failed_assist_stderr = "Hermes/Kimi assist timed out before final answer.".to_string();
+        let failed_assist_stderr = "Hermes assist timed out before final answer.".to_string();
         let failed_assist_record = HermesKimiAssistBriefRecord {
             id: "run-view-evidence-assist-timeout".to_string(),
             status: "hermes_kimi_assist_brief_timed_out".to_string(),
@@ -119107,9 +120296,20 @@ sleep 2
             stderr_transcript_path: failed_assist_stderr_path.display().to_string(),
             record_path: failed_assist_path.display().to_string(),
             log_path: failed_assist_log_path.display().to_string(),
-            blockers: vec!["Hermes/Kimi assist timed out before final answer.".to_string()],
+            stage_summary: vec![
+                "prompt:accepted:22b".to_string(),
+                "log-preflight:passed".to_string(),
+                "process:started:pid=4242:transport=argv-compact-query".to_string(),
+                "transcripts:ready=true:stdout=43b:stderr=45b".to_string(),
+                "outcome:timed-out:exit=none:timeout=true:duration=5000ms".to_string(),
+            ],
+            outcome_category: "timed-out".to_string(),
+            failure_summary: "Hermes assist timed out before final answer.".to_string(),
+            operator_next_action: "Review partial Hermes stdout/stderr transcripts before retrying.".to_string(),
+            guidance_preview: failed_assist_stdout.clone(),
+            blockers: vec!["Hermes assist timed out before final answer.".to_string()],
             created_at_ms: now_ms().expect("clock") + 11,
-            next_step: "Show this Hermes/Kimi timeout before retrying assist delegation.".to_string(),
+            next_step: "Show this Hermes timeout before retrying assist delegation.".to_string(),
             ..assist_record.clone()
         };
         fs::write(
@@ -119357,6 +120557,9 @@ sleep 2
                     == Some(assist_record.stderr_transcript_path.as_str())
                 && summary.stdout_preview_source == "stdout-transcript"
                 && summary.stderr_preview_source == "stderr-transcript"
+                && summary.detail.contains("outcome=succeeded")
+                && summary.detail.contains("preflight=true")
+                && summary.detail.contains("stages=prompt:accepted")
                 && summary.stdout_preview.as_deref().unwrap_or("").contains("Hermes says")
                 && summary.stderr_preview.as_deref().unwrap_or("").contains("stayed clean")
                 && summary.record_process_spawn_enabled
@@ -119366,7 +120569,7 @@ sleep 2
         assert!(run_view.evidence_summaries.iter().any(|summary| {
             summary.source_id == "hermes-kimi-assist-postmortem"
                 && summary.record_id == "run-view-evidence-assist-timeout"
-                && summary.title == "Latest failed/timed-out Hermes/Kimi assist brief"
+                && summary.title == "Latest failed/timed-out Hermes assist brief"
                 && summary.primary_metric.contains("timeout=true")
                 && summary.transcript_evidence_ready
                 && summary.stdout_transcript_found
@@ -119379,6 +120582,9 @@ sleep 2
                     == Some(failed_assist_record.stderr_transcript_path.as_str())
                 && summary.stdout_preview_source == "stdout-transcript"
                 && summary.stderr_preview_source == "stderr-transcript"
+                && summary.detail.contains("outcome=timed-out")
+                && summary.detail.contains("failure=Hermes assist timed out")
+                && summary.detail.contains("next_action=Review partial Hermes")
                 && summary.stdout_preview.as_deref().unwrap_or("").contains("did not finish")
                 && summary.stderr_preview.as_deref().unwrap_or("").contains("timed out")
                 && summary.blocker_count >= 1

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node launcher.js",
     "dev": "node launcher.js --dev",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "test": "cd rebuild/gravity-omega-tauri && npm test"
   },
   "build": {
     "appId": "com.veritas.gravity-omega",

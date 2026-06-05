@@ -164,6 +164,8 @@ const stenoSearchPanelSummary = document.querySelector("#steno-search-panel-summ
 const stenoSearchQueryInput = document.querySelector("#steno-search-query");
 const stenoSearchRunBtn = document.querySelector("#steno-search-run-btn");
 const refreshStenoSearchPanelBtn = document.querySelector("#refresh-steno-search-panel-btn");
+const stenoSearchResultPreview = document.querySelector("#steno-search-result-preview");
+const stenoSearchResultPreviewMeta = document.querySelector("#steno-search-result-preview-meta");
 const terminalProcessLaneDashboardList = document.querySelector("#terminal-process-lane-dashboard-list");
 const terminalProcessLaneDashboardCount = document.querySelector("#terminal-process-lane-dashboard-count");
 const terminalProcessLaneDashboardSummary = document.querySelector("#terminal-process-lane-dashboard-summary");
@@ -798,6 +800,33 @@ async function loadJson(path) {
   return response.json();
 }
 
+function formatEvidenceBytes(value) {
+  const bytes = Number(value ?? 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB"];
+  let amount = bytes;
+  let unitIndex = 0;
+  while (amount >= 1024 && unitIndex < units.length - 1) {
+    amount /= 1024;
+    unitIndex += 1;
+  }
+  const digits = unitIndex === 0 || amount >= 10 ? 0 : 1;
+  return `${amount.toFixed(digits)} ${units[unitIndex]}`;
+}
+
+function formatEvidenceTimestamp(value) {
+  const millis = Number(value ?? 0);
+  if (!Number.isFinite(millis) || millis <= 0) return "newest=none";
+  const date = new Date(millis);
+  if (Number.isNaN(date.getTime())) return "newest=invalid";
+  return `newest=${date.toLocaleString(undefined, {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+}
+
 function item(title, meta, text) {
   const node = document.createElement("section");
   node.className = "list-item";
@@ -815,6 +844,57 @@ function item(title, meta, text) {
 
   node.append(heading, badge, body);
   return node;
+}
+
+function stenoPreviewMarkdown(result, kind = "result") {
+  const title = result?.title || "Steno evidence match";
+  const category = result?.category || "evidence";
+  const status = result?.status || "read-only";
+  const line = result?.line_number ? `line ${result.line_number}` : "line unavailable";
+  const path = result?.record_path || "record path unavailable";
+  const snippet = result?.snippet || "No snippet recorded.";
+  return [
+    `# ${title}`,
+    "",
+    `- kind: ${kind}`,
+    `- category: ${category}`,
+    `- status: ${status}`,
+    `- source: ${path}`,
+    `- ${line}`,
+    "- mode: read-only preview; no capture/export/write/execute action is enabled",
+    "",
+    "```text",
+    snippet,
+    "```",
+    "",
+  ].join("\n");
+}
+
+function attachStenoResultPreview(node, result, kind = "result") {
+  if (!node || !result) return;
+  const title = result.title || "Steno evidence match";
+  const path = result.record_path || "steno-result.md";
+  const preview = stenoPreviewMarkdown(result, kind);
+  node.tabIndex = 0;
+  node.setAttribute("role", "button");
+  node.setAttribute("aria-label", `Preview ${title} in the read-only Steno panel`);
+  node.dataset.previewTarget = "panel-read-only";
+  const openPreview = () => {
+    if (stenoSearchResultPreview) {
+      stenoSearchResultPreview.textContent = preview;
+    }
+    if (stenoSearchResultPreviewMeta) {
+      stenoSearchResultPreviewMeta.textContent = `preview=${kind} | source=${path} | writes=false | export=false | exec=false`;
+    }
+
+  };
+  node.addEventListener("click", openPreview);
+  node.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openPreview();
+    }
+  });
 }
 
 function tauriInvoke() {
@@ -1768,7 +1848,7 @@ async function runRuntimeDepthProbe(target = "all") {
     path_ready_count: 0,
     hermes_log_writable: false,
     hermes_log_preflight_status: "browser_preview_not_run",
-    hermes_log_preflight_error: "Open in Tauri to run the Hermes/Kimi log write preflight.",
+    hermes_log_preflight_error: "Open in Tauri to run the Hermes log write preflight.",
     hermes_capability_probe_count: 0,
     hermes_capability_ready_count: 0,
     hermes_skill_count: 0,
@@ -3323,7 +3403,7 @@ function toolbarDryRunButton(command) {
           id: command.id,
           status: "live",
           target_command: command.target_command,
-          reason: "Omega Computer is live in the product toolbar; Codex Lead + Hermes/Kimi roles are recorded while desktop/action gates remain disabled.",
+          reason: "Omega Computer is live in the product toolbar; Codex Lead + Hermes roles are recorded while desktop/action gates remain disabled.",
         });
         statusEl.textContent = `${command.label} is available in the product toolbar`;
         statusEl.classList.remove("error");
@@ -4912,7 +4992,7 @@ function renderCodexHermesRunView(dashboard) {
   codexHermesRunViewCount.textContent = String(sections.length + evidenceSummaries.length);
 
   if (sections.length === 0 && evidenceSummaries.length === 0) {
-    codexHermesRunViewList.append(item("No Codex/Hermes run view evidence", "empty", "Refresh the read-only run view after a Codex Lead or Hermes/Kimi run."));
+    codexHermesRunViewList.append(item("No Codex/Hermes run view evidence", "empty", "Refresh the read-only run view after a Codex Lead or Hermes run."));
     return;
   }
 
@@ -5723,9 +5803,14 @@ function renderSswpStatusPanel(panel) {
   }
 
   const lane = panel.lane ?? {};
+  const attestation = panel.attestation ?? {};
   const highRisk = Number(panel.highest_risk_percent ?? 0).toFixed(1);
+  const attestationRisk = Number(attestation.highest_dependency_risk ?? 0).toFixed(1);
   sswpStatusPanelSummary.textContent = [
     panel.status,
+    `attestation=${attestation.status ?? "missing"}`,
+    `gates=${attestation.passing_gate_count ?? 0}/${attestation.gate_count ?? 0}`,
+    `deps=${attestation.suspicious_dependency_count ?? 0}/${attestation.dependency_count ?? 0}`,
     `evidence=${panel.ready_evidence_count}/${panel.evidence_record_count}`,
     `registry=${panel.registry_node_count ?? 0}/${panel.registry_snapshot_count ?? 0}`,
     `risky=${panel.risky_node_count ?? 0}`,
@@ -5745,6 +5830,12 @@ function renderSswpStatusPanel(panel) {
 
   clearList(sswpStatusPanelList);
   const records = [
+    {
+      title: "Local SSWP Attestation",
+      meta: `${attestation.passing_gate_count ?? 0}/${attestation.gate_count ?? 0} gates / ${attestation.suspicious_dependency_count ?? 0}/${attestation.dependency_count ?? 0} suspicious deps`,
+      text: `${attestation.status ?? "sswp_attestation_missing"}; target=${attestation.target_name ?? "unknown"}; branch=${attestation.branch ?? "unknown"}; commit=${String(attestation.commit_hash ?? "unknown").slice(0, 12)}; timestamp=${attestation.timestamp ?? "unknown"}; inconclusive=${attestation.inconclusive_gate_count ?? 0}; failures=${attestation.failing_gate_count ?? 0}; highestRisk=${attestationRisk}%; path=${attestation.attestation_path ?? "none"}; witness=${Boolean(attestation.witness_enabled)}; verify=${Boolean(attestation.verify_enabled)}; export=${Boolean(attestation.export_enabled)}; exec=${Boolean(attestation.execution_enabled)}`,
+      state: attestation.failing_gate_count > 0 ? "gated" : "ready",
+    },
     {
       title: `${panel.display_name} / ${lane.lane_role ?? "sovereign workflow protocol lane"}`,
       meta: `${panel.ready_evidence_count}/${panel.evidence_record_count} evidence / ${panel.command_count} commands`,
@@ -5932,6 +6023,8 @@ function renderStenoSearchPanel(panel) {
     `query="${panel.query}"`,
     `results=${panel.result_count}`,
     `postmortems=${panel.postmortem_result_count ?? 0}`,
+    `corpus=${panel.corpus_file_count ?? 0}/${panel.corpus_summary_count ?? 0}`,
+    `corpus_bytes=${formatEvidenceBytes(panel.corpus_total_bytes)}`,
     `matched=${panel.matched_file_count ?? 0}`,
     `searched=${panel.searched_file_count ?? 0}`,
     `limit=${panel.max_results ?? 0}`,
@@ -5947,10 +6040,41 @@ function renderStenoSearchPanel(panel) {
   ].join(" | ");
 
   clearList(stenoSearchPanelList);
+  if (stenoSearchResultPreview) {
+    stenoSearchResultPreview.textContent = "Select a Steno search result to preview its read-only snippet.";
+  }
+  if (stenoSearchResultPreviewMeta) {
+    stenoSearchResultPreviewMeta.textContent = "No Steno result selected.";
+  }
   const results = panel.results ?? [];
   const postmortems = panel.recent_postmortem_results ?? [];
+  const corpusSummaries = panel.corpus_summaries ?? [];
   const sections = panel.sections ?? [];
-  stenoSearchPanelCount.textContent = String(results.length + postmortems.length);
+  stenoSearchPanelCount.textContent = String(results.length + postmortems.length + corpusSummaries.length);
+
+  if (corpusSummaries.length > 0) {
+    stenoSearchPanelList.append(
+      item(
+        "Approved Steno corpus",
+        `${panel.corpus_file_count ?? 0} files across ${corpusSummaries.length} directories`,
+        "Read-only inventory of local evidence/transcript records available for explicit searches; no capture, export, live index, writes, or execution are enabled.",
+      ),
+    );
+  }
+
+  for (const summary of corpusSummaries) {
+    const title = `Corpus: ${summary.category || "evidence"}`;
+    const meta = [
+      summary.status || "read-only",
+      `${summary.allowed_file_count ?? 0} files`,
+      formatEvidenceBytes(summary.total_bytes),
+      formatEvidenceTimestamp(summary.newest_record_ms),
+      (summary.skipped_large_file_count ?? 0) > 0 ? `skipped_large=${summary.skipped_large_file_count}` : "",
+    ].filter(Boolean).join(" / ");
+    const node = item(title, meta, summary.directory_path || "directory path unavailable");
+    node.dataset.state = summary.directory_exists ? "ready" : "blocked";
+    stenoSearchPanelList.append(node);
+  }
 
   if (postmortems.length > 0) {
     stenoSearchPanelList.append(
@@ -5970,6 +6094,7 @@ function renderStenoSearchPanel(panel) {
     ].filter(Boolean).join(" / ");
     const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
     node.dataset.state = "warning";
+    attachStenoResultPreview(node, result, "postmortem");
     stenoSearchPanelList.append(node);
   }
 
@@ -5992,17 +6117,18 @@ function renderStenoSearchPanel(panel) {
     ].filter(Boolean).join(" / ");
     const node = item(title, meta, `${result.snippet || ""}\n${result.record_path || ""}`);
     node.dataset.state = "ready";
+    attachStenoResultPreview(node, result, "result");
     stenoSearchPanelList.append(node);
   }
 
   if (sections.length === 0) {
-    if (results.length === 0 && postmortems.length === 0) {
+    if (results.length === 0 && postmortems.length === 0 && corpusSummaries.length === 0) {
       stenoSearchPanelList.append(item("No Steno search readiness sections", "empty", "Refresh the read-only Steno search panel."));
     }
     return;
   }
 
-  if (results.length > 0 || postmortems.length > 0) {
+  if (results.length > 0 || postmortems.length > 0 || corpusSummaries.length > 0) {
     stenoSearchPanelList.append(item("Read-only Steno readiness", `${sections.length} sections`, "Search results above are local evidence/transcript records; capture/export/live MCP remain disabled."));
   }
 
@@ -6850,15 +6976,15 @@ async function loadCodexHermesRunViewDashboard() {
       },
       {
         source_id: "hermes-kimi-inventory",
-        title: "Latest Hermes/Kimi capability inventory",
+        title: "Latest Hermes capability inventory",
         record_id: "browser-preview-inventory",
         status: "browser_preview_read_only",
-        record_path: "Open Tauri to load real Hermes/Kimi inventory records.",
+        record_path: "Open Tauri to load real Hermes inventory records.",
         log_path: "",
         created_at_ms: 0,
         primary_metric: "skills=0 filesystem=0",
         secondary_metric: "mcp=0 hooks=0 focus=none",
-        detail: "Static preview placeholder for the latest Hermes/Kimi skills, MCP, and hooks inventory.",
+        detail: "Static preview placeholder for the latest Hermes skills, MCP, and hooks inventory.",
         stdout_preview: "",
         stderr_preview: "",
         blocker_count: 0,
@@ -6880,15 +7006,15 @@ async function loadCodexHermesRunViewDashboard() {
       },
       {
         source_id: "hermes-kimi-assist",
-        title: "Latest Hermes/Kimi assist brief",
+        title: "Latest Hermes assist brief",
         record_id: "browser-preview-assist",
         status: "browser_preview_read_only",
-        record_path: "Open Tauri to load real Hermes/Kimi assist records.",
+        record_path: "Open Tauri to load real Hermes assist records.",
         log_path: "",
         created_at_ms: 0,
         primary_metric: "exit=none timeout=false duration=0ms",
         secondary_metric: "stdout=0b stderr=0b",
-        detail: "Static preview placeholder for the latest bounded Hermes/Kimi assist brief.",
+        detail: "Static preview placeholder for the latest bounded Hermes assist brief.",
         stdout_preview: "",
         stderr_preview: "",
         blocker_count: 0,
@@ -7179,8 +7305,8 @@ async function loadCodexHermesRunEvidenceDiffBoard() {
     ["export-policies", "Export policies", "export_policy_ready_count", codex.export_policy_ready_count ?? 0, hermes.export_policy_ready_count ?? 0, "Keep export disabled until both runtimes have consent and destination policy evidence."],
     ["protection-policies", "Protection policies", "protection_policy_ready_count", codex.protection_policy_ready_count ?? 0, hermes.protection_policy_ready_count ?? 0, "Keep redaction, retention, deletion, clipboard, share, and export actions disabled until both runtimes have protection policy evidence."],
     ["total-ready-evidence", "Total ready evidence", "ready_evidence_count", codex.ready_evidence_count ?? 0, hermes.ready_evidence_count ?? 0, "Use Gravity Omega reconciliation to close evidence gaps before live execution or mutation gates open."],
-    ["postmortem-failures", "Postmortem failures", "failure_postmortem_count", runView.agent_session_failure_count ?? 0, runView.hermes_assist_failure_count ?? 0, "Compare Codex agent failures against Hermes/Kimi assist failures before retrying or delegating."],
-    ["postmortem-timeouts", "Postmortem timeouts", "timeout_postmortem_count", runView.agent_session_timeout_count ?? 0, runView.hermes_assist_timeout_count ?? 0, "Compare timeout pressure across Codex and Hermes/Kimi before launching another long run."],
+    ["postmortem-failures", "Postmortem failures", "failure_postmortem_count", runView.agent_session_failure_count ?? 0, runView.hermes_assist_failure_count ?? 0, "Compare Codex agent failures against Hermes assist failures before retrying or delegating."],
+    ["postmortem-timeouts", "Postmortem timeouts", "timeout_postmortem_count", runView.agent_session_timeout_count ?? 0, runView.hermes_assist_timeout_count ?? 0, "Compare timeout pressure across Codex and Hermes before launching another long run."],
   ];
   const diffs = diffSource.map(([diff_id, title, metric, source_count, target_count, recommendation]) => {
     const delta = source_count - target_count;
@@ -8075,6 +8201,28 @@ async function loadSswpStatusPanel() {
     panel_title: "SSWP Status",
     subsystem: lane.subsystem,
     display_name: lane.display_name,
+    attestation: {
+      status: "sswp_attestation_browser_preview",
+      attestation_path: null,
+      target_name: "gravity-omega",
+      branch: "browser-preview",
+      commit_hash: "browser-preview",
+      timestamp: "browser-preview",
+      gate_count: 0,
+      passing_gate_count: 0,
+      inconclusive_gate_count: 0,
+      failing_gate_count: 0,
+      dependency_count: 0,
+      suspicious_dependency_count: 0,
+      highest_dependency_risk: 0,
+      read_only: true,
+      witness_enabled: false,
+      verify_enabled: false,
+      export_enabled: false,
+      writes_allowed: false,
+      execution_enabled: false,
+      next_action: "Open the Tauri app to read the local .sswp.json witness file.",
+    },
     evidence_record_count: lane.evidence_record_count,
     ready_evidence_count: lane.ready_evidence_count,
     blocked_evidence_count: lane.blocked_evidence_count,
@@ -8275,6 +8423,9 @@ async function loadStenoSearchPanel(query = "") {
     searched_file_count: 0,
     matched_file_count: 0,
     postmortem_result_count: 0,
+    corpus_summary_count: dashboard.sections?.length ?? 0,
+    corpus_file_count: 0,
+    corpus_total_bytes: 0,
     max_results: 18,
     max_file_bytes: 262144,
     transcript_bundle_count: dashboard.transcript_bundle_count,
@@ -8304,6 +8455,22 @@ async function loadStenoSearchPanel(query = "") {
     execution_enabled: dashboard.execution_enabled,
     results: [],
     recent_postmortem_results: [],
+    corpus_summaries: (dashboard.sections ?? []).map((section) => ({
+      category: section.section_id ?? "preview",
+      directory_path: section.source_ledger ?? "resolved by Tauri runtime",
+      directory_exists: false,
+      allowed_file_count: 0,
+      skipped_large_file_count: 0,
+      total_bytes: 0,
+      newest_record_ms: 0,
+      read_only: true,
+      capture_enabled: false,
+      export_enabled: false,
+      live_index_enabled: false,
+      writes_allowed: false,
+      execution_enabled: false,
+      status: "steno_corpus_browser_preview_read_only",
+    })),
     sections: dashboard.sections,
     reasons: [
       "Static preview binds the Steno query but defers local record reads to the Tauri runtime.",
@@ -10292,8 +10459,8 @@ async function runSupervisedRuntimeSmoke(target = "rust-build") {
       writes_allowed: false,
       task_execution_enabled: false,
       records: [],
-      blockers: ["Tauri runtime is required to run supervised runtime smoke probes."],
-      next_step: "Open the native app runtime to capture supervised process transcripts.",
+      blockers: ["Open Gravity Omega as the native desktop app to run supervised runtime smoke probes."],
+      next_step: "Launch the native app, then capture supervised process transcripts.",
     };
   }
 
@@ -10340,8 +10507,8 @@ async function runAgentTranscriptSession(runtime = "all") {
       writes_allowed: false,
       execution_enabled: false,
       records: [],
-      blockers: ["Tauri runtime is required to run Codex/Hermes transcript sessions."],
-      next_step: "Open the native app runtime to capture fixed agent-runtime transcripts.",
+      blockers: ["Open Gravity Omega as the native desktop app to run Codex/Hermes transcript sessions."],
+      next_step: "Launch the native app, then record the agent-runtime transcript evidence from this rail.",
     };
   }
 
@@ -10394,8 +10561,8 @@ async function runUnlockedAgentPromptSession(runtime = "codex-workspace-write", 
       writes_allowed: false,
       execution_enabled: false,
       records: [],
-      blockers: ["Tauri runtime is required to run unlocked Codex/Hermes prompts."],
-      next_step: "Open the native app runtime to run unlocked agent prompts.",
+      blockers: ["Open Gravity Omega as the native desktop app to run Codex/Hermes prompts."],
+      next_step: "Launch the native app, then run the prompt from the operator rail.",
     };
   }
 
@@ -10441,6 +10608,37 @@ async function runUnlockedAgentPromptSessionStream(runtime = "codex-workspace-wr
       prompt,
       timeout_ms: 900000,
       requested_by: "gravity-omega-product-ui",
+    },
+  });
+}
+
+async function cancelUnlockedAgentPromptSessionStream(sessionId, reason = "operator recovery requested") {
+  const invoke = tauriInvoke();
+  const normalizedSessionId = String(sessionId || "").trim();
+  if (!invoke) {
+    return {
+      accepted: false,
+      status: "unlocked_agent_prompt_stream_cancel_unavailable",
+      session_id: normalizedSessionId,
+      runtime: "",
+      pid: null,
+      record_path: "",
+      log_path: "",
+      process_spawn_enabled: true,
+      process_control_enabled: false,
+      agent_prompt_execution_enabled: true,
+      cancellation_requested: false,
+      kill_delegated_to_stream_worker: false,
+      blockers: ["Tauri runtime is required to cancel a backend agent stream."],
+      next_step: "Open the native app runtime to cancel active agent streams.",
+    };
+  }
+
+  return invoke("cancel_unlocked_agent_prompt_session_stream", {
+    request: {
+      session_id: normalizedSessionId,
+      requested_by: "gravity-omega-product-ui",
+      reason,
     },
   });
 }
@@ -10500,7 +10698,7 @@ async function createCodexLeadOrchestrationRecord(prompt = "", taskRunId = "") {
       task_run_id: taskRunId || null,
       prompt_preview: limitText(String(prompt ?? "").trim(), 520),
       stream_runtime: "codex-workspace-write",
-      hermes_lane_runtime: "hermes-chat-kimi",
+      hermes_lane_runtime: "hermes-chat",
       runtime_depth_record_id: null,
       runtime_depth_record_path: null,
       hermes_skill_count: 0,
@@ -10550,7 +10748,7 @@ async function recordHermesKimiCapabilityInventory(prompt = "") {
       mcp_servers: [],
       hooks: [],
       record_path: "",
-      blockers: ["Open in Tauri to record the live Hermes/Kimi capability inventory."],
+      blockers: ["Open in Tauri to record the live Hermes capability inventory."],
       next_step: "Run inside Gravity Omega Native to attach current Hermes skills, MCP servers, and hooks.",
     };
   }
@@ -10593,8 +10791,8 @@ async function recordHermesKimiAssistBrief({ prompt = "", orchestration = null, 
       mcp_servers: mcpServers,
       hooks,
       record_path: "",
-      blockers: ["Open in Tauri to run the bounded Hermes/Kimi assist brief."],
-      next_step: "Run inside Gravity Omega Native to let Hermes/Kimi advise Codex Lead.",
+      blockers: ["Open in Tauri to run the bounded Hermes assist brief."],
+      next_step: "Run inside Gravity Omega Native to let Hermes advise Codex Lead.",
     };
   }
 
@@ -25424,6 +25622,7 @@ function initOmegaProductShell() {
   const codexBtn = document.querySelector("#omega-parity-codex-write");
   const hermesBtn = document.querySelector("#omega-parity-hermes");
   const compareBtn = document.querySelector("#omega-parity-compare");
+  const recoverBtn = document.querySelector("#omega-parity-recover");
   const contextToggleButtons = Array.from(document.querySelectorAll(".omega-context-toggle[data-context-key]"));
   const agentModeButtons = Array.from(document.querySelectorAll(".omega-agent-mode-row [data-agent-run-mode]"));
   const editorInput = document.querySelector("#omega-editor-input");
@@ -25503,6 +25702,7 @@ function initOmegaProductShell() {
   const terminalSessionDuration = document.querySelector("#omega-terminal-session-duration");
   const terminalSessionRecord = document.querySelector("#omega-terminal-session-record");
   const terminalClearBtn = document.querySelector("#omega-terminal-clear");
+  const terminalStopBtn = document.querySelector("#omega-terminal-stop");
   const terminalEvidenceBtn = document.querySelector("#omega-terminal-show-evidence");
   const artifactPreviewBtn = document.querySelector("#omega-product-artifact-preview-btn");
   const artifactPreviewTitleProduct = document.querySelector("#omega-artifact-preview-title-product");
@@ -25544,6 +25744,7 @@ function initOmegaProductShell() {
   let terminalStreamWatchdogTimer = 0;
   let activeAgentStreamId = "";
   let activeAgentRun = null;
+  const ignoredAgentStreamIds = new Set();
   let agentRunWatchdogTimer = 0;
   let suppressEditorDirty = false;
   let activeAgentTranscript = null;
@@ -25686,6 +25887,30 @@ function initOmegaProductShell() {
     }
   };
 
+  const syncAgentRunRecoveryControl = () => {
+    if (!recoverBtn) return;
+    const hasActiveRun = !!(activeAgentRun || activeAgentStreamId);
+    recoverBtn.textContent = "Recover";
+    recoverBtn.title = hasActiveRun
+      ? "Reset the visible agent run gate and preserve evidence. This does not claim backend process cancellation."
+      : "No active agent run to recover.";
+    if (hasActiveRun) {
+      recoverBtn.removeAttribute("disabled");
+    } else {
+      recoverBtn.setAttribute("disabled", "disabled");
+    }
+  };
+
+  const rememberIgnoredAgentStreamId = (sessionId) => {
+    const normalized = String(sessionId ?? "").trim();
+    if (!normalized) return;
+    ignoredAgentStreamIds.add(normalized);
+    while (ignoredAgentStreamIds.size > 16) {
+      const first = ignoredAgentStreamIds.values().next().value;
+      ignoredAgentStreamIds.delete(first);
+    }
+  };
+
   const describeActiveAgentRun = () => {
     if (!activeAgentRun && !activeAgentStreamId) return "";
     const label = activeAgentRun?.label || "Agent run";
@@ -25801,6 +26026,7 @@ function initOmegaProductShell() {
     };
     syncAgentRunGateDataset();
     setAgentRunControlsDisabled(true);
+    syncAgentRunRecoveryControl();
     startAgentRunWatchdog();
     recordAgentRunLifecycleEvent("gate-started");
     return true;
@@ -25813,6 +26039,7 @@ function initOmegaProductShell() {
       activeAgentStreamId = activeAgentRun.sessionId;
     }
     syncAgentRunGateDataset();
+    syncAgentRunRecoveryControl();
   };
 
   const clearAgentRunGate = () => {
@@ -25827,6 +26054,134 @@ function initOmegaProductShell() {
     productShell?.removeAttribute("data-agent-run-prompt-chars");
     productShell?.removeAttribute("data-agent-run-last-event");
     setAgentRunControlsDisabled(false);
+    syncAgentRunRecoveryControl();
+  };
+
+  const recoverAgentRunUi = async () => {
+    if (!activeAgentRun && !activeAgentStreamId) {
+      setProductStatus("No active agent run to recover.", "warning");
+      return;
+    }
+    const snapshot = {
+      label: activeAgentRun?.label || "Agent run",
+      runtime: activeAgentRun?.runtime || "agent",
+      phase: activeAgentRun?.phase || "unknown",
+      sessionId: activeAgentRun?.sessionId || activeAgentStreamId || "",
+      recordPath: activeAgentRun?.recordPath || "",
+      lastEvent: activeAgentRun?.lastEvent || "unknown",
+      staleWarningCount: activeAgentRun?.staleWarningCount || 0,
+      ageMs: Date.now() - (activeAgentRun?.startedAt || Date.now()),
+    };
+    rememberIgnoredAgentStreamId(snapshot.sessionId);
+    let cancelResult = {
+      accepted: false,
+      status: snapshot.sessionId
+        ? "backend_cancel_not_attempted"
+        : "backend_cancel_missing_session",
+      runtime: snapshot.runtime,
+      pid: null,
+      record_path: snapshot.recordPath || "",
+      log_path: "",
+      cancellation_requested: false,
+      kill_delegated_to_stream_worker: false,
+      blockers: snapshot.sessionId
+        ? []
+        : ["No stream session id was available for backend cancellation."],
+    };
+    if (snapshot.sessionId) {
+      try {
+        cancelResult = await cancelUnlockedAgentPromptSessionStream(
+          snapshot.sessionId,
+          "operator clicked Recover for a stuck visible agent run"
+        );
+      } catch (error) {
+        cancelResult = {
+          accepted: false,
+          status: "backend_cancel_invoke_failed",
+          runtime: snapshot.runtime,
+          pid: null,
+          record_path: snapshot.recordPath || "",
+          log_path: "",
+          cancellation_requested: false,
+          kill_delegated_to_stream_worker: false,
+          blockers: [error.message],
+        };
+      }
+    }
+    const backendCancelRequested = Boolean(
+      cancelResult?.accepted && cancelResult?.cancellation_requested
+    );
+    const evidence = [
+      `label=${snapshot.label}`,
+      `runtime=${snapshot.runtime}`,
+      `phase=${snapshot.phase}`,
+      `session=${snapshot.sessionId || "pending"}`,
+      `last_event=${snapshot.lastEvent}`,
+      `age_ms=${Math.max(0, snapshot.ageMs)}`,
+      `stale_warnings=${snapshot.staleWarningCount}`,
+      `record=${snapshot.recordPath || "none"}`,
+      `operator_action=${backendCancelRequested ? "backend_cancel_requested" : "ui_gate_recovered"}`,
+      `backend_cancel_status=${cancelResult?.status || "unknown"}`,
+      `backend_cancellation_requested=${backendCancelRequested}`,
+      `backend_cancel_pid=${cancelResult?.pid ?? "none"}`,
+      `backend_cancel_record=${cancelResult?.record_path || snapshot.recordPath || "none"}`,
+      `backend_cancel_log=${cancelResult?.log_path || "none"}`,
+      `kill_delegated_to_stream_worker=${Boolean(cancelResult?.kill_delegated_to_stream_worker)}`,
+      `backend_cancel_blockers=${(cancelResult?.blockers || []).join(" | ") || "none"}`,
+    ].join("\n");
+    appendAgentWorkArtifact("Run Recovery Requested", evidence);
+    appendEvidenceText(`agent run recovery requested: ${snapshot.runtime}; session=${snapshot.sessionId || "pending"}; backend=${cancelResult?.status || "unknown"}; record=${snapshot.recordPath || "none"}`);
+    setProblemText(
+      backendCancelRequested
+        ? [
+            "Agent run recovery requested backend cancellation for the tracked stream.",
+            "The stream worker owns the child process and will record a cancelled final status when the kill completes.",
+            snapshot.recordPath ? `Inspect the evidence record before rerunning: ${snapshot.recordPath}` : "No evidence record path had been emitted yet.",
+          ].join("\n")
+        : [
+            "Agent run recovery reset the visible UI gate.",
+            `Backend cancellation was not accepted: ${cancelResult?.status || "unknown"}.`,
+            (cancelResult?.blockers || []).join(" ") || "No backend process cancellation was claimed.",
+            snapshot.recordPath ? `Inspect the evidence record before rerunning: ${snapshot.recordPath}` : "No evidence record path had been emitted yet.",
+          ].join("\n")
+    );
+    updateAgentAnswerMessage(
+      `${snapshot.label} recovery requested`,
+      [
+        backendCancelRequested
+          ? "Requested backend cancellation for the tracked stream, then recovered the visible workbench gate."
+          : "Recovered the visible workbench run gate so you can keep using the app.",
+        "Late events from this recovered session will be ignored by the UI.",
+        backendCancelRequested
+          ? "The worker will write the final cancelled evidence when the child process exits."
+          : "No backend kill is claimed because the cancellation request was not accepted.",
+        snapshot.recordPath ? `Evidence: ${snapshot.recordPath}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
+    setPetCompanionRuntimeState({
+      state: "warning",
+      source: "agent-run-recovery",
+      message: backendCancelRequested
+        ? "Agent stream cancellation requested; inspect evidence before rerun."
+        : "Agent run UI gate recovered; inspect evidence before rerun.",
+      progress: 100,
+      relatedRecordPath: snapshot.recordPath || "",
+    }, { record: true });
+    clearAgentRunGate();
+    setProductStatus(
+      backendCancelRequested
+        ? "Run recovery requested backend cancellation and reset the UI gate."
+        : "Run recovery reset the UI gate. Backend cancellation was not accepted.",
+      "warning"
+    );
+    Promise.allSettled([
+      refreshProductAgentRunCenter(),
+      refreshProductEvidenceHistory(),
+    ]).catch((error) => {
+      setProblemText(`Run recovery refresh failed: ${error.message}`);
+    });
   };
 
   const readStoredJson = (key, fallback) => {
@@ -25906,10 +26261,10 @@ function initOmegaProductShell() {
     } catch {
       // Ignore storage failures; the visual reset still applies.
     }
-    setProductLayoutSize("chat", cssPixelValue("--chat-width", 320), false);
+    setProductLayoutSize("chat", 360, false);
     setProductLayoutSize("bottom", cssPixelValue("--bottom-panel-height", 180), false);
-    appendEvidenceText("layout reset to 320px chat rail and 180px bottom dock");
-    setOutputText("Product layout reset to the parity workbench chat rail and bottom panel dimensions.");
+    appendEvidenceText("layout reset to 360px chat rail and 180px bottom dock");
+    setOutputText("Product layout reset to the operator rail and bottom panel defaults.");
     setProductStatus("Product layout reset.", "done");
   };
 
@@ -26314,6 +26669,16 @@ function initOmegaProductShell() {
     productShell.setAttribute("data-terminal-stream-stale-warnings", String(activeTerminalStreamRun?.staleWarningCount ?? 0));
   };
 
+  const syncTerminalStopControl = () => {
+    if (!terminalStopBtn) return;
+    const running = Boolean(activeTerminalStreamRun?.sessionId);
+    terminalStopBtn.disabled = !running;
+    terminalStopBtn.textContent = running ? "Stop" : "Stop";
+    terminalStopBtn.title = running
+      ? `Stop terminal stream ${activeTerminalStreamRun.sessionId}`
+      : "No active terminal stream to stop";
+  };
+
   const recordTerminalStreamLifecycleEvent = (eventName, patch = {}, options = {}) => {
     if (!activeTerminalStreamRun && patch.sessionId) {
       activeTerminalStreamRun = {
@@ -26337,6 +26702,7 @@ function initOmegaProductShell() {
       lastEventName: eventName,
     };
     syncTerminalStreamDataset();
+    syncTerminalStopControl();
     if (!options.silent) {
       appendEvidenceText(`terminal-stream ${eventName}: ${activeTerminalStreamRun.status || "running"} ${activeTerminalStreamRun.recordPath || ""}`.trim());
     }
@@ -26349,6 +26715,7 @@ function initOmegaProductShell() {
       terminalStreamWatchdogTimer = 0;
     }
     syncTerminalStreamDataset();
+    syncTerminalStopControl();
   };
 
   const tickTerminalStreamWatchdog = () => {
@@ -26420,6 +26787,8 @@ function initOmegaProductShell() {
         `timeoutKill=${Boolean(lastTerminalSession.timeoutKillSent)}`,
         `waitAfterKillMs=${lastTerminalSession.waitAfterKillMs ?? 0}`,
         `partialOutput=${Boolean(lastTerminalSession.partialOutputCaptured)}`,
+        `cancellation_requested=${Boolean(lastTerminalSession.cancellationRequested)}`,
+        `cancel_kill_sent=${Boolean(lastTerminalSession.cancelKillSent)}`,
         `replay=${lastTerminalSession.replayRecordPath || "none"}`,
       ].join("\n");
     }
@@ -26716,14 +27085,14 @@ function initOmegaProductShell() {
     if (compareBtn) {
       compareBtn.textContent = agentRunMode === "evidence-compare" ? "Compare" : "Run Dual";
       compareBtn.title = agentRunMode === "evidence-compare"
-        ? "Compare existing Codex and Hermes/Kimi evidence"
-        : "Run Codex Lead with Hermes/Kimi assist";
+        ? "Compare existing Codex and Hermes evidence"
+        : "Run Codex Lead with Hermes assist";
     }
     if (sendBtn) {
       sendBtn.textContent = agentRunMode === "evidence-compare" ? "Compare Evidence" : "Run Main";
       sendBtn.title = agentRunMode === "evidence-compare"
         ? "Run the selected Evidence Compare side lane"
-        : "Run the main Codex Lead + Hermes/Kimi work lane";
+        : "Run the main Codex Lead + Hermes work lane";
     }
   };
 
@@ -26734,7 +27103,7 @@ function initOmegaProductShell() {
     setProductStatus(
       agentRunMode === "evidence-compare"
         ? "Agent mode set to Evidence Compare."
-        : "Agent mode set to Codex Lead with Hermes/Kimi assist.",
+        : "Agent mode set to Codex Lead with Hermes assist.",
       "ready"
     );
   };
@@ -27762,7 +28131,7 @@ function initOmegaProductShell() {
             "Codex Lead is the main Gravity Omega coding operator.",
             [
               "Composer focused for the next task.",
-              "Run Main starts Codex Lead with Hermes/Kimi assist.",
+              "Run Main starts Codex Lead with Hermes assist.",
               "Codex Only starts the single-runtime lane.",
             ],
             {
@@ -27786,11 +28155,11 @@ function initOmegaProductShell() {
           productInput?.focus();
           openPanelActionWorkSurface(
             action,
-            "Hermes Kimi Assist",
-            "Hermes is the local Kimi-backed assist lane for research, second opinions, and delegated support.",
+            "Hermes Assist",
+            "Hermes is the local model-agnostic assist lane for research, second opinions, and delegated support.",
             [
               "Composer focused for the next task.",
-              "Run Main keeps Codex in charge while Hermes/Kimi assists.",
+              "Run Main keeps Codex in charge while Hermes assists.",
               "Hermes Only runs the secondary lane directly.",
             ],
             {
@@ -27801,14 +28170,14 @@ function initOmegaProductShell() {
               ],
               prompt: {
                 label: "Assist Task",
-                placeholder: "Give Hermes/Kimi a bounded support task, research lane, or second opinion.",
+                placeholder: "Give Hermes a bounded support task, research lane, or second opinion.",
                 value: getPrompt(),
               },
             },
           );
           productInput?.focus();
-          setOutputText("Hermes/Kimi Assist opened as a central control surface and the composer is focused.");
-          completionMessage = "Hermes/Kimi Assist opened as a central surface and composer.";
+          setOutputText("Hermes Assist opened as a central control surface and the composer is focused.");
+          completionMessage = "Hermes Assist opened as a central surface and composer.";
           break;
         case "joint-ci":
           productInput?.focus();
@@ -27817,14 +28186,14 @@ function initOmegaProductShell() {
           openPanelActionWorkSurface(
             action,
             "Joint CI",
-            "Joint CI is the Codex Lead + Hermes/Kimi workflow: plan, delegate, compare evidence, reconcile, approve, ship.",
+            "Joint CI is the Codex Lead + Hermes workflow: plan, delegate, compare evidence, reconcile, approve, ship.",
             [
               "Run center refreshed.",
               "Composer focused for a main-lane request.",
               "Evidence Compare remains available as a side mode.",
             ],
             {
-              kicker: "Codex Lead + Hermes/Kimi",
+              kicker: "Codex Lead + Hermes",
               metrics: [
                 { label: "sessions", value: productUnlockedSessionCount?.textContent || "0" },
                 { label: "plans", value: productJointPlanCount?.textContent || "0" },
@@ -27832,13 +28201,13 @@ function initOmegaProductShell() {
               ],
               prompt: {
                 label: "Main Request",
-                placeholder: "Describe the work for Codex Lead to own while Hermes/Kimi assists.",
+                placeholder: "Describe the work for Codex Lead to own while Hermes assists.",
                 value: getPrompt(),
               },
             },
           );
           productInput?.focus();
-          setOutputText("Joint CI opened as a central control surface and refreshed the Codex Lead + Hermes/Kimi run center.");
+          setOutputText("Joint CI opened as a central control surface and refreshed the Codex Lead + Hermes run center.");
           completionMessage = "Joint CI opened as a central surface and run center.";
           break;
         case "mcp":
@@ -28865,7 +29234,7 @@ footer {
         task_log: [
           "Accept prompt from the Omega chat composer.",
           "Create the top-level plan and preserve Agent Operating Doctrine.",
-          "Dispatch specialist questions to Hermes/Kimi-backed lanes.",
+          "Dispatch specialist questions to Hermes-backed lanes.",
           "Reconcile evidence before any final report.",
         ],
         handoff_targets: ["DR-01", "CR-04", "QA-07"],
@@ -28875,16 +29244,16 @@ footer {
       },
       {
         id_badge: "HK-01",
-        name: "Hermes/Kimi Router",
+        name: "Hermes Router",
         specialty: "skill-aware delegation and critique",
-        runtime_lane: "hermes-chat-kimi",
+        runtime_lane: "hermes-chat",
         status: "assist_lane_ready",
         progress_percent: 28,
         progress_label: "standing by",
-        screen_title: "Hermes/Kimi dispatch",
+        screen_title: "Hermes dispatch",
         current_task: "Prepare compact assist briefs and route specialist review without direct writes.",
         task_log: [
-          "Use local Hermes as the Kimi-backed lane.",
+          "Use local Hermes with its active model/profile.",
           "Prefer compact prompts and review-only outputs.",
           "Return findings to Codex Lead for reconciliation.",
         ],
@@ -28897,7 +29266,7 @@ footer {
         id_badge: "DR-01",
         name: "Deep Research",
         specialty: "broad source discovery and context gathering",
-        runtime_lane: "Hermes/Kimi assist",
+        runtime_lane: "Hermes assist",
         status: "ready_to_dispatch",
         progress_percent: 18,
         progress_label: "queued",
@@ -28913,7 +29282,7 @@ footer {
         id_badge: "RA-02",
         name: "Research Analysis",
         specialty: "synthesis, tradeoffs, and decision support",
-        runtime_lane: "Hermes/Kimi assist",
+        runtime_lane: "Hermes assist",
         status: "ready_to_dispatch",
         progress_percent: 16,
         progress_label: "queued",
@@ -28929,7 +29298,7 @@ footer {
         id_badge: "WA-03",
         name: "Writing Analysis",
         specialty: "operator-readable summaries and artifact wording",
-        runtime_lane: "Hermes/Kimi assist",
+        runtime_lane: "Hermes assist",
         status: "ready_to_dispatch",
         progress_percent: 14,
         progress_label: "queued",
@@ -29119,7 +29488,7 @@ footer {
       stages || "- no stages recorded",
       "",
       "Next",
-      record.next_step || "Use Codex Lead as the primary coding operator with Hermes/Kimi assisting from bounded records.",
+      record.next_step || "Use Codex Lead as the primary coding operator with Hermes assisting from bounded records.",
     ].join("\n");
   };
 
@@ -29234,7 +29603,7 @@ footer {
       `- memory_write=${Boolean(record?.memory_write_enabled)}`,
       "",
       "## Next",
-      record?.next_step || "Use Codex Lead as the primary coding operator with Hermes/Kimi assisting from bounded records.",
+      record?.next_step || "Use Codex Lead as the primary coding operator with Hermes assisting from bounded records.",
     ].join("\n");
   };
 
@@ -29280,7 +29649,7 @@ footer {
       : [
           { id: "observe", title: "Observe", owner: "Codex Lead", status: "ready_metadata_only", evidence: "existing app metadata" },
           { id: "plan", title: "Plan", owner: "Codex Lead", status: "ready", evidence: "doctrine and todo" },
-          { id: "delegate", title: "Delegate", owner: "Codex + Hermes/Kimi", status: "ready", evidence: "assist records" },
+          { id: "delegate", title: "Delegate", owner: "Codex + Hermes", status: "ready", evidence: "assist records" },
           { id: "act", title: "Act", owner: "Codex Lead", status: "blocked_until_explicit_action_packet", evidence: "separate action lane" },
           { id: "verify", title: "Verify", owner: "Codex Lead", status: "ready", evidence: "tests and evidence" },
         ];
@@ -29476,7 +29845,7 @@ footer {
     const header = document.createElement("header");
     header.className = "omega-computer-main-header";
     const titleWrap = document.createElement("div");
-    appendOmegaComputerText(titleWrap, "span", "Codex Lead + Hermes/Kimi", "omega-computer-main-kicker");
+    appendOmegaComputerText(titleWrap, "span", "Codex Lead + Hermes", "omega-computer-main-kicker");
     appendOmegaComputerText(titleWrap, "h2", "Omega Computer");
     appendOmegaComputerText(
       titleWrap,
@@ -29498,7 +29867,7 @@ footer {
     appendOmegaComputerText(promptWrap, "span", "Task");
     const promptInput = document.createElement("textarea");
     promptInput.className = "omega-computer-main-prompt";
-    promptInput.placeholder = "Tell Omega Computer what Codex Lead should execute with Hermes/Kimi assisting.";
+    promptInput.placeholder = "Tell Omega Computer what Codex Lead should execute with Hermes assisting.";
     promptInput.value = getPrompt() || "";
     promptWrap.append(promptInput);
 
@@ -30901,6 +31270,7 @@ footer {
     productShell?.classList.remove("xterm-pending", "xterm-failed");
     productShell?.classList.add("xterm-ready");
     updateTerminalSessionHud({ status: "idle", state: "idle", cwd: "rebuild workspace" });
+    syncTerminalStopControl();
     terminalWrite("Gravity Omega terminal lane ready.");
     terminalWrite("Allowed commands: pwd, ls, git status --short, git diff --stat, git diff --check, node --check web/src/main.js, npm run validate, cargo check --manifest-path src-tauri/Cargo.toml.");
   };
@@ -31043,6 +31413,7 @@ footer {
     if (!listen) return;
     listen("unlocked-agent-prompt-stream", async (event) => {
       const payload = event?.payload ?? {};
+      if (payload.session_id && ignoredAgentStreamIds.has(payload.session_id)) return;
       if (activeAgentStreamId && payload.session_id !== activeAgentStreamId) return;
       const runtime = payload.runtime || "agent";
       if (payload.kind === "stdout" || payload.kind === "stderr") {
@@ -31174,6 +31545,70 @@ footer {
     });
   };
 
+  const cancelTerminalStream = async () => {
+    const sessionId = activeTerminalStreamRun?.sessionId || activeTerminalStreamId || "";
+    if (!sessionId) {
+      terminalWrite("[terminal_stop] no active terminal stream");
+      setProductStatus("No active terminal stream to stop.", "warning");
+      return;
+    }
+    if (!invoke) {
+      terminalWrite("[terminal_stop] Tauri runtime required for backend terminal cancellation.");
+      setProductStatus("Tauri runtime required for terminal cancellation.", "error");
+      return;
+    }
+
+    terminalStopBtn?.setAttribute("disabled", "disabled");
+    terminalStopBtn && (terminalStopBtn.textContent = "Stopping...");
+    try {
+      const result = await invoke("cancel_product_terminal_stream", {
+        request: {
+          session_id: sessionId,
+          requested_by: "gravity-omega-terminal-stop",
+          reason: "operator clicked Stop for a running terminal stream",
+        },
+      });
+      const accepted = Boolean(result?.accepted && result?.cancellation_requested);
+      recordTerminalStreamLifecycleEvent("stream-stop-requested", {
+        sessionId,
+        status: result?.status || "product_terminal_stream_cancel_requested",
+        phase: accepted ? "cancelling" : "stop-not-accepted",
+        recordPath: result?.record_path || activeTerminalStreamRun?.recordPath || lastTerminalSession.recordPath || "",
+        logPath: result?.log_path || activeTerminalStreamRun?.logPath || lastTerminalSession.logPath || "",
+      });
+      updateTerminalSessionHud({
+        sessionId,
+        status: result?.status || "product_terminal_stream_cancel_requested",
+        state: accepted ? "running" : "error",
+        recordPath: result?.record_path || lastTerminalSession.recordPath,
+        logPath: result?.log_path || lastTerminalSession.logPath,
+        cancellationRequested: accepted,
+        cancelKillSent: Boolean(result?.kill_delegated_to_stream_worker),
+      });
+      terminalWrite(`[terminal_stop] ${result?.status || "unknown"} delegated=${Boolean(result?.kill_delegated_to_stream_worker)} pid=${result?.pid ?? "pending"}`);
+      appendEvidenceText(
+        accepted
+          ? `terminal stream cancel requested: ${result.record_path}`
+          : `terminal stream stop did not request backend kill: ${result?.blockers?.join("; ") || "no tracked stream"}`
+      );
+      setProductStatus(
+        accepted
+          ? "Terminal stop requested; the stream worker will record the final cancelled status."
+          : "Terminal stop could not find a tracked backend stream. No backend terminal kill is claimed.",
+        accepted ? "warning" : "error",
+      );
+      if (!accepted) {
+        terminalStopBtn?.removeAttribute("disabled");
+        syncTerminalStopControl();
+      }
+    } catch (error) {
+      terminalWrite(`[terminal_stop] failed: ${error.message}`);
+      setProblemText(`Terminal stop failed: ${error.message}`);
+      setProductStatus(`Terminal stop failed: ${error.message}`, "error");
+      syncTerminalStopControl();
+    }
+  };
+
   const runTerminalCommand = async (command) => {
     const trimmed = command.trim();
     if (!trimmed) {
@@ -31224,6 +31659,7 @@ footer {
           staleWarningCount: 0,
         };
         syncTerminalStreamDataset();
+        syncTerminalStopControl();
         startTerminalStreamWatchdog();
         updateTerminalSessionHud({
           command: started.command || trimmed,
@@ -31307,6 +31743,7 @@ footer {
       if (!listen) {
         terminalRunBtn?.removeAttribute("disabled");
       }
+      syncTerminalStopControl();
     }
   };
 
@@ -31643,7 +32080,7 @@ footer {
       ["terminal-session-hud", "Terminal session HUD", !!terminalSessionStatus && !!terminalSessionId && !!terminalSessionRecord && !!terminalClearBtn && !!terminalEvidenceBtn],
       ["artifact-preview-pane", "Artifact preview panel", !!artifactPreviewBtn && !!artifactPreviewFrameProduct && !!artifactPreviewTextProduct && !!artifactPreviewFitBtnProduct && !!artifactPreviewTallBtnProduct && !!artifactPreviewExpandBtnProduct && !!artifactPreviewOverlay && bottomViews.some((view) => view.dataset.bottomContent === "artifact")],
       ["sovereign-docs-preview", "Sovereign Docs live preview", !!sovereignDocsPreviewBtn && typeof buildSovereignDocsPreviewHtml === "function" && typeof renderSovereignDocsPreview === "function" && typeof scheduleSovereignDocsPreviewUpdate === "function"],
-      ["omega-computer-surface", "Omega Computer Codex Lead + Hermes/Kimi swarm terminal", !!omegaComputerStatusLine && typeof recordOmegaComputerSession === "function" && typeof renderOmegaComputerSession === "function" && typeof renderOmegaComputerSwarmTerminal === "function" && typeof omegaComputerWorkersFromRecord === "function"],
+      ["omega-computer-surface", "Omega Computer Codex Lead + Hermes swarm terminal", !!omegaComputerStatusLine && typeof recordOmegaComputerSession === "function" && typeof renderOmegaComputerSession === "function" && typeof renderOmegaComputerSwarmTerminal === "function" && typeof omegaComputerWorkersFromRecord === "function"],
       ["panel-action-surfaces", "Sidebar cards open central product surfaces", !!omegaPanelMainSurface && typeof showPanelActionMainSurface === "function" && typeof setPanelMainSurfaceVisible === "function" && panelActionButtons.length >= 14],
       ["terminal-stream", "Terminal stream event bridge", !!invoke && !!listen],
       ["agent-prompt-stream", "Codex/Hermes prompt stream bridge", !!invoke && !!listen],
@@ -32264,11 +32701,11 @@ footer {
       });
       const latest = latestAgentSession(sessions);
       const codex = comparisonRecordFromSession(latestAgentSessionForComparison(sessions, "codex"), "Codex");
-      const hermes = comparisonRecordFromSession(latestAgentSessionForComparison(sessions, "hermes"), "Hermes/Kimi");
+      const hermes = comparisonRecordFromSession(latestAgentSessionForComparison(sessions, "hermes"), "Hermes");
       const latestRecord = comparisonRecordFromSession(latest, "Latest run");
       const summaryLines = [
         "Latest Omega Computer recap.",
-        "No live Codex/Hermes/Kimi execution was launched for this status question.",
+        "No live Codex/Hermes execution was launched for this status question.",
         `Evidence scanned: ${sessions.length} captured session(s).`,
         latestRecord ? formatComparisonEvidenceLine(latestRecord) : "Latest run: missing",
         formatComparisonEvidenceLine(codex),
@@ -32323,7 +32760,7 @@ footer {
     codexBtn?.setAttribute("disabled", "disabled");
     hermesBtn?.setAttribute("disabled", "disabled");
     compareBtn?.setAttribute("disabled", "disabled");
-    setProductStatus("Evidence Compare is reading captured Codex and Hermes/Kimi evidence. No live agents will be launched.", "running");
+    setProductStatus("Evidence Compare is reading captured Codex and Hermes evidence. No live agents will be launched.", "running");
     try {
       const { codex, hermes, summary } = await compareExistingAgentEvidence(prompt);
       if (prompt) {
@@ -32338,14 +32775,14 @@ footer {
           formatComparisonEvidenceLine(codex),
           formatComparisonEvidenceLine(hermes),
         "evidence compare does not launch live agents",
-        "Switch to Codex Lead mode when you want Codex to plan, use Hermes/Kimi as secondary, and execute.",
+        "Switch to Codex Lead mode when you want Codex to plan, use Hermes as secondary, and execute.",
       ].join("\n")
       );
       appendEvidenceText(`codex/hermes-kimi evidence compare staged: codex=${codex?.status ?? "missing"}; hermes=${hermes?.status ?? "missing"}`);
       await Promise.allSettled([refreshProductAgentRunCenter(), refreshProductEvidenceHistory()]);
-      setProductStatus("Evidence Compare staged from existing Codex and Hermes/Kimi evidence.", codex && hermes ? "done" : "warning");
+      setProductStatus("Evidence Compare staged from existing Codex and Hermes evidence.", codex && hermes ? "done" : "warning");
     } catch (error) {
-      setProblemText(`Codex/Hermes-Kimi evidence compare failed: ${error.message}`);
+      setProblemText(`Codex/Hermes evidence compare failed: ${error.message}`);
       setProductStatus(`Evidence Compare failed: ${error.message}`, "error");
     } finally {
       sendBtn?.removeAttribute("disabled");
@@ -32520,7 +32957,7 @@ footer {
 
   const formatHermesKimiRuntimeInventory = (inventory) => {
     if (!inventory) {
-      return "Live Hermes/Kimi inventory record: not yet captured for this run.";
+      return "Live Hermes inventory record: not yet captured for this run.";
     }
     const focusSkills = (inventory.focus_skills ?? []).slice(0, 18);
     const mcpServers = (inventory.mcp_servers ?? [])
@@ -32530,7 +32967,7 @@ footer {
       .slice(0, 8)
       .map((hook) => `${hook.hook}: ${hook.command}`);
     return [
-      `Live Hermes/Kimi inventory record: ${inventory.record_path || inventory.status || "none"}`,
+      `Live Hermes inventory record: ${inventory.record_path || inventory.status || "none"}`,
       `- status: ${inventory.status ?? "unknown"}`,
       `- skills: enabled=${inventory.enabled_skill_count ?? 0}; filesystem=${inventory.filesystem_skill_count ?? 0}; builtin=${inventory.builtin_skill_count ?? 0}; local=${inventory.local_skill_count ?? 0}`,
       `- mcp_servers: ${inventory.mcp_server_count ?? 0}; hooks=${inventory.hook_count ?? 0}`,
@@ -32543,37 +32980,44 @@ footer {
 
   const formatHermesKimiAssistBrief = (assist) => {
     if (!assist) {
-      return "Hermes/Kimi assist brief: not yet captured for this run.";
+      return "Hermes assist brief: not yet captured for this run.";
     }
     const stdout = String(assist.stdout || "").trim();
     const stderr = String(assist.stderr || "").trim();
+    const stageSummary = Array.isArray(assist.stage_summary)
+      ? assist.stage_summary.slice(0, 8).join("\n")
+      : "";
     return [
-      `Hermes/Kimi assist brief: ${assist.record_path || assist.status || "none"}`,
+      `Hermes assist brief: ${assist.record_path || assist.status || "none"}`,
       `- status: ${assist.status ?? "unknown"}`,
+      `- outcome: ${assist.outcome_category || "unknown"}; preflight_passed=${Boolean(assist.preflight_passed)}; transcript_ready=${Boolean(assist.transcript_evidence_ready)}`,
       `- exit: ${assist.exit_code ?? "none"}; timed_out=${Boolean(assist.timed_out)}; duration=${assist.duration_ms ?? 0}ms`,
       `- stdout_bytes: ${assist.stdout_size_bytes ?? 0}; stderr_bytes=${assist.stderr_size_bytes ?? 0}`,
       `- transport: ${assist.query_transport ?? "unknown"}; argv_chars=${assist.argv_char_count ?? 0}; pipe_readers=${Boolean(assist.stdout_pipe_reader_enabled)}/${Boolean(assist.stderr_pipe_reader_enabled)}`,
       `- timeout: kill_sent=${Boolean(assist.timeout_kill_sent)}; wait_after_kill=${assist.wait_after_kill_ms ?? 0}ms; partial_output=${Boolean(assist.partial_output_captured)}`,
       `- focus_skills: ${(assist.focus_skills ?? []).slice(0, 12).join(", ") || "none"}`,
       `- blockers: ${(assist.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
+      `- failure_summary: ${assist.failure_summary || "none"}`,
+      `- next_action: ${assist.operator_next_action || assist.next_step || "none"}`,
+      stageSummary ? `\nHermes execution stages:\n${stageSummary}` : "",
       "",
-      "Hermes/Kimi guidance:",
-      stdout ? limitText(stdout, 2600) : "(no Hermes/Kimi stdout captured)",
-      stderr ? `\nHermes/Kimi stderr preview:\n${limitText(stderr, 900)}` : "",
+      "Hermes guidance:",
+      stdout ? limitText(stdout, 2600) : (assist.guidance_preview || "(no Hermes stdout captured)"),
+      stderr ? `\nHermes stderr preview:\n${limitText(stderr, 900)}` : "",
     ].join("\n").trim();
   };
 
   const hermesKimiCapabilityBrief = ({ includeFullInventory = false, runtimeInventory = null } = {}) => [
-    "Hermes/Kimi capability brief for Gravity Omega:",
+    "Hermes capability brief for Gravity Omega:",
     "- Runtime: `hermes-chat` calls the local Hermes CLI with quiet programmatic output: `hermes chat -Q --max-turns 4 --source gravity-omega-native --query <prompt>`.",
-    "- Provider: this machine's default Hermes profile is Kimi 2.6 through the Kimi/Moonshot coding provider.",
+    "- Provider: Hermes owns the active model/profile; Kimi, Step, Moonshot, or future providers are Hermes configuration details, not separate Gravity Omega lanes.",
     "- CLI abilities: chat, single-query execution, model/provider overrides, skills, toolsets, bundles, plugins, MCP, sessions, checkpoints, profiles, hooks, worktrees, logs, status, doctor, dashboard, and delegated workers.",
     "- Tool coverage: Hermes has enabled CLI toolsets for terminal/processes, files, browser automation, web/search where configured, code execution, vision, image generation, skills, todo, memory, session search, delegation, cron, and cross-platform messaging.",
     "- MCP coverage: Hermes has enabled MCP lanes for omega-brain, omega-brain-network, omega-stenographer, and sswp.",
     `- Skill coverage: Hermes reported 130 enabled skills; Gravity Omega currently tracks ${hermesKimiSkillInventory.length} installed SKILL.md entries for delegation awareness.`,
     formatHermesKimiRuntimeInventory(runtimeInventory),
     `- Live prompt inventory mode: ${includeFullInventory ? "full inventory for Monaco/evidence review" : "compact category summary to keep long prompts responsive"}.`,
-    "- Coordination rule: Codex is the lead planner/executor and final verifier; Hermes/Kimi is the secondary reviewer/researcher/subtask adviser unless the user explicitly asks Hermes to own execution.",
+    "- Coordination rule: Codex is the lead planner/executor and final verifier; Hermes is the secondary reviewer/researcher/subtask adviser unless the user explicitly asks Hermes to own execution.",
     "",
     includeFullInventory
       ? "Hermes installed skill inventory for delegation:"
@@ -32594,13 +33038,13 @@ footer {
         capabilityBrief,
         "",
         "You are Codex, the primary planning and execution agent.",
-        "Return a concise execution plan with: goal, Codex-owned work, Hermes/Kimi assist task, expected files, verification, and risks.",
+        "Return a concise execution plan with: goal, Codex-owned work, Hermes assist task, expected files, verification, and risks.",
         "Do not edit files in this stage.",
       ].join("\n");
     }
     if (stage === "assist") {
       return [
-        "Hermes/Kimi assist stage.",
+        "Hermes assist stage.",
         "",
         "User request:",
         base,
@@ -32610,7 +33054,7 @@ footer {
         "",
         capabilityBrief,
         "",
-        "Act as the secondary Kimi-backed reviewer/researcher. Identify gaps, risks, useful subtasks, test ideas, and anything Codex should avoid.",
+        "Act as the secondary Hermes reviewer/researcher using the active Hermes model/profile. Identify gaps, risks, useful subtasks, test ideas, and anything Codex should avoid.",
         "Do not edit files. Keep the response concise and actionable.",
       ].join("\n");
     }
@@ -32623,19 +33067,19 @@ footer {
       "Codex lead plan:",
       plan || "(no Codex plan captured)",
       "",
-      "Hermes/Kimi assist feedback:",
-      assist || "(no Hermes/Kimi feedback captured)",
+      "Hermes assist feedback:",
+      assist || "(no Hermes feedback captured)",
       "",
       capabilityBrief,
       "",
       "You are Codex, the primary owner. Execute the work, keep changes scoped to the rebuild workspace and allowed doctrine files, run verification, and report evidence.",
-      "Use Hermes/Kimi feedback as input, but Codex owns the final implementation and quality gate.",
+      "Use Hermes feedback as input, but Codex owns the final implementation and quality gate.",
     ].join("\n");
   };
 
   const codexLeadOrchestrationBrief = (orchestration) => {
     if (!orchestration) {
-      return "Codex Lead orchestration record: unavailable; proceed with compact Hermes/Kimi awareness and record the gap.";
+      return "Codex Lead orchestration record: unavailable; proceed with compact Hermes awareness and record the gap.";
     }
     const lanes = Array.isArray(orchestration.delegations)
       ? orchestration.delegations
@@ -32650,8 +33094,8 @@ footer {
       `- record_path: ${orchestration.record_path || "none"}`,
       `- runtime_depth_record: ${orchestration.runtime_depth_record_path || "none"}`,
       `- stream_runtime: ${orchestration.stream_runtime ?? "codex-workspace-write"}`,
-      `- hermes_lane_runtime: ${orchestration.hermes_lane_runtime ?? "hermes-chat-kimi"}`,
-      `- Hermes/Kimi evidence: skills=${orchestration.hermes_skill_count ?? 0}; mcp=${orchestration.hermes_mcp_server_count ?? 0}; hooks=${orchestration.hermes_hook_count ?? 0}; log_writable=${Boolean(orchestration.hermes_log_writable)}`,
+      `- hermes_lane_runtime: ${orchestration.hermes_lane_runtime ?? "hermes-chat"}`,
+      `- Hermes evidence: skills=${orchestration.hermes_skill_count ?? 0}; mcp=${orchestration.hermes_mcp_server_count ?? 0}; hooks=${orchestration.hermes_hook_count ?? 0}; log_writable=${Boolean(orchestration.hermes_log_writable)}`,
       `- readiness: codex=${Boolean(orchestration.codex_runtime_ready)}; hermes=${Boolean(orchestration.hermes_runtime_ready)}; sswp=${Boolean(orchestration.sswp_runtime_ready)}; mcp=${Boolean(orchestration.mcp_metadata_ready)}; steno=${Boolean(orchestration.steno_metadata_ready)}; pet=${Boolean(orchestration.pet_metadata_ready)}`,
       `- blockers: ${(orchestration.blockers ?? []).slice(0, 8).join("; ") || "none"}`,
       "Delegation lanes:",
@@ -32674,7 +33118,7 @@ footer {
     "Run this as one responsive Codex-owned work session so the Gravity Omega renderer does not block.",
     "Required sequence:",
     "1. Write a concise plan into the visible work artifact.",
-    "2. Use the attached Hermes/Kimi assist brief when it exists; if it failed or timed out, record that and continue without blocking.",
+    "2. Use the attached Hermes assist brief when it exists; if it failed or timed out, record that and continue without blocking.",
     "3. Implement the scoped work yourself as Codex Lead.",
     "4. Run verification and report evidence.",
     "5. Keep chat concise; put plan, files, commands, tests, warnings, and evidence into Monaco/Omega Agent Work.",
@@ -32729,7 +33173,7 @@ footer {
     }
     if (!beginAgentRunGate({
       runtime: "codex-lead-dual",
-      label: "Codex Lead + Hermes/Kimi",
+      label: "Codex Lead + Hermes",
       phase: "preparing",
       promptChars: prompt.length,
     })) {
@@ -32737,21 +33181,21 @@ footer {
     }
 
     const contextSummary = getPromptContextSummary();
-    startAgentWorkArtifact({ runtime: "codex-lead-dual", label: "Codex Lead + Hermes/Kimi", prompt, contextSummary });
-    appendAgentWorkArtifact("Hermes/Kimi Capability Brief", hermesKimiCapabilityBrief());
+    startAgentWorkArtifact({ runtime: "codex-lead-dual", label: "Codex Lead + Hermes", prompt, contextSummary });
+    appendAgentWorkArtifact("Hermes Capability Brief", hermesKimiCapabilityBrief());
     appendPromptMessage("user", prompt);
-    const startingText = agentRunStartingText("Codex Lead + Hermes/Kimi", contextSummary);
+    const startingText = agentRunStartingText("Codex Lead + Hermes", contextSummary);
     activeAgentTranscript = {
       sessionId: "",
       runtime: "codex-lead-dual",
-      label: "Codex Lead + Hermes/Kimi",
+      label: "Codex Lead + Hermes",
       stdoutLines: [],
       stderrLines: [],
       displayLines: [],
-      message: createAgentAnswerMessage("Codex Lead + Hermes/Kimi", startingText),
+      message: createAgentAnswerMessage("Codex Lead + Hermes", startingText),
     };
     updateAgentAnswerMessage(
-      "Codex Lead + Hermes/Kimi starting",
+      "Codex Lead + Hermes starting",
       startingText
     );
     productInput.value = "";
@@ -32759,12 +33203,12 @@ footer {
     codexBtn?.setAttribute("disabled", "disabled");
     hermesBtn?.setAttribute("disabled", "disabled");
     compareBtn?.setAttribute("disabled", "disabled");
-    setOutputText("Codex Lead responsive stream starting.\nCodex remains lead; Hermes/Kimi is available as the compact secondary assist lane.");
+    setOutputText("Codex Lead responsive stream starting.\nCodex remains lead; Hermes is available as the compact secondary assist lane.");
     setProductStatus("Codex Lead stream is starting. Gravity Omega remains responsive while it runs.", "running");
     setPetCompanionRuntimeState({
       state: "thinking",
       source: "codex-lead",
-      message: "Codex Lead is preparing the plan and Hermes/Kimi delegation context.",
+      message: "Codex Lead is preparing the plan and Hermes delegation context.",
       progress: 25,
     }, { record: true });
     await waitForProductPaint();
@@ -32801,14 +33245,14 @@ footer {
             "Codex Lead orchestration recorded.",
             `Record: ${orchestration.record_path || "none"}`,
             `Runtime depth: ${orchestration.runtime_depth_record_path || "none"}`,
-            `Delegation lanes: ${orchestration.delegation_count ?? 0} (${orchestration.codex_owned_count ?? 0} Codex / ${orchestration.hermes_assist_count ?? 0} Hermes-Kimi)`,
-            `Hermes/Kimi: skills=${orchestration.hermes_skill_count ?? 0}, mcp=${orchestration.hermes_mcp_server_count ?? 0}, hooks=${orchestration.hermes_hook_count ?? 0}`,
+            `Delegation lanes: ${orchestration.delegation_count ?? 0} (${orchestration.codex_owned_count ?? 0} Codex / ${orchestration.hermes_assist_count ?? 0} Hermes)`,
+            `Hermes: skills=${orchestration.hermes_skill_count ?? 0}, mcp=${orchestration.hermes_mcp_server_count ?? 0}, hooks=${orchestration.hermes_hook_count ?? 0}`,
           ].join("\n")
         );
         setProductStatus("Codex Lead orchestration recorded. Starting responsive stream next.", "running");
         await updateCodexLeadPreparationStatus("Codex Lead orchestration recorded", [
           `Record: ${orchestration.record_path || orchestration.status || "no-record"}`,
-          `Delegation lanes: ${orchestration.delegation_count ?? 0} (${orchestration.codex_owned_count ?? 0} Codex / ${orchestration.hermes_assist_count ?? 0} Hermes-Kimi).`,
+          `Delegation lanes: ${orchestration.delegation_count ?? 0} (${orchestration.codex_owned_count ?? 0} Codex / ${orchestration.hermes_assist_count ?? 0} Hermes).`,
         ]);
       } catch (orchestrationError) {
         appendAgentWorkArtifact("Codex Lead Orchestration Warning", orchestrationError.message);
@@ -32820,14 +33264,14 @@ footer {
         ]);
       }
       try {
-        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory running", [
-          "Reading local Hermes/Kimi skills, MCP awareness, and hooks for delegation context.",
-          "Hermes/Kimi is advisory here; Codex Lead remains the execution owner.",
+        await updateCodexLeadPreparationStatus("Hermes inventory running", [
+          "Reading local Hermes skills, MCP awareness, and hooks for delegation context.",
+          "Hermes is advisory here; Codex Lead remains the execution owner.",
         ]);
         hermesInventory = await recordHermesKimiCapabilityInventory(prompt);
-        appendEvidenceText(`Hermes/Kimi capability inventory recorded: ${hermesInventory.record_path || hermesInventory.status || "no-record"}`);
+        appendEvidenceText(`Hermes capability inventory recorded: ${hermesInventory.record_path || hermesInventory.status || "no-record"}`);
         appendAgentWorkArtifact(
-          "Hermes/Kimi Live Capability Inventory",
+          "Hermes Live Capability Inventory",
           [
             `status=${hermesInventory.status ?? "unknown"}`,
             `record=${hermesInventory.record_path || "none"}`,
@@ -32839,22 +33283,22 @@ footer {
             `blockers=${(hermesInventory.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
           ].join("\n")
         );
-        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory recorded", [
+        await updateCodexLeadPreparationStatus("Hermes inventory recorded", [
           `Record: ${hermesInventory.record_path || hermesInventory.status || "no-record"}`,
           `Skills: ${hermesInventory.enabled_skill_count ?? 0}; MCP: ${hermesInventory.mcp_server_count ?? 0}; hooks: ${hermesInventory.hook_count ?? 0}.`,
         ]);
       } catch (inventoryError) {
-        appendAgentWorkArtifact("Hermes/Kimi Capability Inventory Warning", inventoryError.message);
-        appendEvidenceText(`Hermes/Kimi capability inventory failed before stream: ${inventoryError.message}`);
-        setProblemText(`Hermes/Kimi capability inventory failed before stream: ${inventoryError.message}`);
-        await updateCodexLeadPreparationStatus("Hermes/Kimi inventory warning", [
+        appendAgentWorkArtifact("Hermes Capability Inventory Warning", inventoryError.message);
+        appendEvidenceText(`Hermes capability inventory failed before stream: ${inventoryError.message}`);
+        setProblemText(`Hermes capability inventory failed before stream: ${inventoryError.message}`);
+        await updateCodexLeadPreparationStatus("Hermes inventory warning", [
           inventoryError.message,
-          "Codex Lead will continue with compact built-in Hermes/Kimi awareness.",
+          "Codex Lead will continue with compact built-in Hermes awareness.",
         ]);
       }
       try {
-        setProductStatus("Hermes/Kimi assist brief is running with a bounded no-write policy.", "running");
-        await updateCodexLeadPreparationStatus("Hermes/Kimi assist running", [
+        setProductStatus("Hermes assist brief is running with a bounded no-write policy.", "running");
+        await updateCodexLeadPreparationStatus("Hermes assist running", [
           `Bounded secondary assist timeout: ${codexLeadAssistTimeoutMs}ms.`,
           "The assist cannot edit, patch, run shell commands, call live MCP tools, or write memory.",
         ]);
@@ -32864,31 +33308,37 @@ footer {
           hermesInventory,
           timeoutMs: codexLeadAssistTimeoutMs,
         });
-        appendEvidenceText(`Hermes/Kimi assist brief recorded: ${hermesAssist.record_path || hermesAssist.status || "no-record"}`);
+        appendEvidenceText(`Hermes assist brief recorded: ${hermesAssist.record_path || hermesAssist.status || "no-record"}`);
         appendAgentWorkArtifact(
-          "Hermes/Kimi Assist Brief",
+          "Hermes Assist Brief",
           [
             `status=${hermesAssist.status ?? "unknown"}`,
             `record=${hermesAssist.record_path || "none"}`,
+            `outcome=${hermesAssist.outcome_category || "unknown"}`,
+            `preflight_passed=${Boolean(hermesAssist.preflight_passed)}`,
+            `transcript_ready=${Boolean(hermesAssist.transcript_evidence_ready)}`,
             `exit=${hermesAssist.exit_code ?? "none"}`,
             `timed_out=${Boolean(hermesAssist.timed_out)}`,
             `duration_ms=${hermesAssist.duration_ms ?? 0}`,
             `stdout_bytes=${hermesAssist.stdout_size_bytes ?? 0}`,
             `stderr_bytes=${hermesAssist.stderr_size_bytes ?? 0}`,
             `focus_skills=${(hermesAssist.focus_skills ?? []).slice(0, 12).join(", ") || "none"}`,
+            `stage_summary=${(hermesAssist.stage_summary ?? []).slice(0, 8).join(" | ") || "none"}`,
+            `failure_summary=${hermesAssist.failure_summary || "none"}`,
+            `next_action=${hermesAssist.operator_next_action || hermesAssist.next_step || "none"}`,
             `blockers=${(hermesAssist.blockers ?? []).slice(0, 6).join("; ") || "none"}`,
             "",
-            limitText(String(hermesAssist.stdout || "").trim() || "(no Hermes/Kimi guidance captured)", 3200),
+            limitText(String(hermesAssist.stdout || hermesAssist.guidance_preview || "").trim() || "(no Hermes guidance captured)", 3200),
           ].join("\n")
         );
         if (hermesAssist.status !== "hermes_kimi_assist_brief_succeeded") {
-          setProblemText(`Hermes/Kimi assist brief returned ${hermesAssist.status}; Codex Lead will continue with recorded warning.`);
+          setProblemText(`Hermes assist brief returned ${hermesAssist.status}; Codex Lead will continue with recorded warning.`);
         }
-        setProductStatus("Hermes/Kimi assist brief recorded. Starting Codex Lead stream.", "running");
+        setProductStatus("Hermes assist brief recorded. Starting Codex Lead stream.", "running");
         await updateCodexLeadPreparationStatus(
           hermesAssist.status === "hermes_kimi_assist_brief_succeeded"
-            ? "Hermes/Kimi assist recorded"
-            : "Hermes/Kimi assist recorded with warning",
+            ? "Hermes assist recorded"
+            : "Hermes assist recorded with warning",
           [
             `Status: ${hermesAssist.status ?? "unknown"}; exit=${hermesAssist.exit_code ?? "none"}; timed_out=${Boolean(hermesAssist.timed_out)}; duration=${hermesAssist.duration_ms ?? 0}ms.`,
             `Record: ${hermesAssist.record_path || "none"}`,
@@ -32896,10 +33346,10 @@ footer {
           ]
         );
       } catch (assistError) {
-        appendAgentWorkArtifact("Hermes/Kimi Assist Brief Warning", assistError.message);
-        appendEvidenceText(`Hermes/Kimi assist brief failed before stream: ${assistError.message}`);
-        setProblemText(`Hermes/Kimi assist brief failed before stream: ${assistError.message}`);
-        await updateCodexLeadPreparationStatus("Hermes/Kimi assist warning", [
+        appendAgentWorkArtifact("Hermes Assist Brief Warning", assistError.message);
+        appendEvidenceText(`Hermes assist brief failed before stream: ${assistError.message}`);
+        setProblemText(`Hermes assist brief failed before stream: ${assistError.message}`);
+        await updateCodexLeadPreparationStatus("Hermes assist warning", [
           assistError.message,
           "Codex Lead will start the implementation stream without blocking on the secondary assist.",
         ]);
@@ -32961,7 +33411,7 @@ footer {
           `record=${started.record_path || "none"}`,
         ].join("\n")
       );
-      updateAgentAnswerMessage("Codex Lead + Hermes/Kimi running", agentRunAcceptedText(started));
+      updateAgentAnswerMessage("Codex Lead + Hermes running", agentRunAcceptedText(started));
       setProductStatus("Codex Lead stream started. Gravity Omega remains responsive while it runs.", "running");
     } catch (error) {
       updateAgentAnswerMessage("Codex Lead dual execution failed", error.message);
@@ -33174,6 +33624,12 @@ footer {
   compareBtn?.addEventListener("click", () => {
     runAgentComparison().catch((error) => {
       setProductStatus(`Codex/Hermes compare failed: ${error.message}`, "error");
+    });
+  });
+
+  recoverBtn?.addEventListener("click", () => {
+    recoverAgentRunUi().catch((error) => {
+      setProductStatus(`Run recovery failed: ${error.message}`, "error");
     });
   });
 
@@ -33394,6 +33850,12 @@ footer {
     clearProductTerminal();
   });
 
+  terminalStopBtn?.addEventListener("click", () => {
+    cancelTerminalStream().catch((error) => {
+      setProductStatus(`Terminal stop failed: ${error.message}`, "error");
+    });
+  });
+
   terminalEvidenceBtn?.addEventListener("click", () => {
     showTerminalEvidence().catch((error) => {
       setProductStatus(`Terminal evidence failed: ${error.message}`, "error");
@@ -33517,6 +33979,7 @@ footer {
   setActiveArtifactPreview(activeArtifactPreview);
   restorePromptContextState();
   restoreAgentRunMode();
+  syncAgentRunRecoveryControl();
   restoreTerminalHistory();
   restoreEditorSession();
   renderEditorTabs();
